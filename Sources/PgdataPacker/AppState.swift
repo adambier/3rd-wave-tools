@@ -361,12 +361,13 @@ final class AppState: ObservableObject {
         }
         let written = Panels.write(outputs, into: folder)
         var msg = "Wrote \(written) .pgdata file\(written == 1 ? "" : "s") to \(folder.path)."
-        if !blocked.isEmpty { msg += "\n\nNot written, content missing: " + blocked.joined(separator: "; ") + "." }
-        if !failed.isEmpty { msg += "\n\nFailed: " + failed.joined(separator: "; ") }
+        // One item per line, a blank line between sections.
+        if !blocked.isEmpty { msg += "\n\nNot written, content missing:\n" + blocked.joined(separator: "\n") }
+        if !failed.isEmpty { msg += "\n\nFailed:\n" + failed.joined(separator: "\n") }
         let unused = unusedContent
         if !unused.isEmpty {
-            msg += "\n\nAdded files not used by any program: " + contentFiles.filter { unused[$0.id] != nil }
-                .map { "\($0.url.lastPathComponent) (\(unused[$0.id]!.lowercased()))" }.joined(separator: ", ") + "."
+            msg += "\n\nAdded files not used by any program:\n" + contentFiles.filter { unused[$0.id] != nil }
+                .map { "\($0.url.lastPathComponent) (\(unused[$0.id]!.lowercased()))" }.joined(separator: "\n")
         }
         note(msg)
         if !blocked.isEmpty || !failed.isEmpty || !unused.isEmpty { alertMessage = msg }
@@ -450,11 +451,11 @@ final class AppState: ObservableObject {
             if let s = f.slot, f.fits(s) { pairs.append((s, f)) } else { unplaced.append(u.lastPathComponent) }
         }
         guard !pairs.isEmpty else {
-            alertMessage = "Nothing to assign: " + (unplaced.isEmpty ? "no files." : unplaced.joined(separator: ", ")) + "\n\nWavetable file names must start with a slot (\"U48 …\"); otherwise use Set… → Assign File… on a slot. Multisamples are added on the Pack screen."
+            alertMessage = "Nothing to assign" + (unplaced.isEmpty ? ": no files." : ":\n" + unplaced.joined(separator: "\n")) + "\n\nWavetable file names must start with a slot (\"U48 …\"); otherwise use Set… → Assign File… on a slot. Multisamples are added on the Pack screen."
             return
         }
         let list = pairs.map { "\($0.0.label)  ←  \($0.1.url.lastPathComponent)" }.joined(separator: "\n")
-        let extra = unplaced.isEmpty ? "" : "\n\nNot assigned: " + unplaced.joined(separator: ", ")
+        let extra = unplaced.isEmpty ? "" : "\n\nNot assigned:\n" + unplaced.joined(separator: "\n")
         if Panels.confirm(title: "Assign these files to slots?", message: list + extra, ok: "Assign") {
             for (s, f) in pairs { profile.assign(f, to: s) }
             note("Assigned \(pairs.count) file\(pairs.count == 1 ? "" : "s") to slots by name.")
