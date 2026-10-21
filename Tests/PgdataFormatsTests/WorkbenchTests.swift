@@ -217,20 +217,23 @@ final class NameCleanerTests: XCTestCase {
 
 final class OutputNameTests: XCTestCase {
     func testProgramLocations() {
-        XCTAssertEqual(OutputNames.programLocation(inFileName: "B05P003.pro"), "B5-P003")
-        XCTAssertEqual(OutputNames.programLocation(inFileName: "B05P01_Hanger Drums.pgdata"), "B5-P001")
-        XCTAssertEqual(OutputNames.programLocation(inFileName: "B4-P100 Name.pro"), "B4-P100")
-        XCTAssertEqual(OutputNames.programLocation(inFileName: "b1p059.PRO"), "B1-P059")
-        XCTAssertNil(OutputNames.programLocation(inFileName: "ARP Restooth Arp.pro"))
-        XCTAssertNil(OutputNames.programLocation(inFileName: "B06P003.pro"))     // banks are 1–5
-        XCTAssertNil(OutputNames.programLocation(inFileName: "AB05P003.pro"))
+        func loc(_ n: String) -> String? { OutputNames.programLocation(inFileName: n).map { "\($0.bank)/\($0.program)" } }
+        XCTAssertEqual(loc("B05P003.pro"), "5/3")
+        XCTAssertEqual(loc("B05P18_Transymba.pgdata"), "5/18")
+        XCTAssertEqual(loc("B4-P100 Name.pro"), "4/100")
+        XCTAssertEqual(loc("b1p059.PRO"), "1/59")
+        XCTAssertNil(loc("ARP Restooth Arp.pro"))
+        XCTAssertNil(loc("B06P003.pro"))       // banks are 1–5
+        XCTAssertNil(loc("AB05P003.pro"))
     }
 
-    func testPrefixesKeepListOrder() {
-        XCTAssertEqual(OutputNames.orderPrefixes(fileNames: ["B05P003.pro", "B05P010.pro"]), ["B5-P003", "B5-P010"])
+    func testPrefixesFollowGrooveAndKeepListOrder() {
+        XCTAssertEqual(OutputNames.orderPrefixes(fileNames: ["B05P003.pro", "B05P087.pro"]), ["B05P03", "B05P87"])
+        // A program 100 in the batch: three digits for all, so P100 sorts last.
+        XCTAssertEqual(OutputNames.orderPrefixes(fileNames: ["B05P011.pro", "B05P100.pro"]), ["B05P011", "B05P100"])
         XCTAssertEqual(OutputNames.orderPrefixes(fileNames: ["B05P003.pro", "Lead.pro", "Bass.pro"]), ["001", "002", "003"])
         var p = makeProgram(sources: Array(repeating: 42, count: 12)); p.name = "Ghibli Bell"
-        XCTAssertEqual(OutputNames.unified(p, prefix: "B5-P087"), "B5-P087 Ghibli Bell.pgdata")
+        XCTAssertEqual(OutputNames.unified(p, prefix: "B05P87"), "B05P87_Ghibli Bell.pgdata")
         XCTAssertEqual(OutputNames.unified(p), "Ghibli Bell.pgdata")
     }
 }

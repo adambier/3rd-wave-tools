@@ -369,29 +369,33 @@ public enum OutputNames {
     }
     public static func wavetable(_ ref: SourceRef, _ w: WavetableFile) -> String { ref.label + "_" + sanitize(w.name) + ".wt" }
     public static func program(_ p: ProgramFile) -> String { sanitize(p.name) + ".pro" }
-    /// "B5-P003 Ghibli Bell.pgdata". The synth's bulk import takes files in alphabetical order, so
-    /// the prefix keeps them in program order. Without a prefix, the name alone.
+    /// "B05P87_Ghibli Bell.pgdata", Groove's own pattern (B05P18_Transymba.pgdata). The synth's bulk
+    /// import takes files in alphabetical order, so the prefix keeps them in program order.
     public static func unified(_ p: ProgramFile, prefix: String? = nil) -> String {
-        (prefix.map { $0 + " " } ?? "") + sanitize(p.name) + ".pgdata"
+        (prefix.map { $0 + "_" } ?? "") + sanitize(p.name) + ".pgdata"
     }
 
     private static let locationPattern = try! NSRegularExpression(
         pattern: #"(?<![A-Za-z0-9])[Bb]0?([1-5])-?[Pp](\d{1,3})(?!\d)"#)
 
-    /// Program location named in a file name, in the synth's display form:
-    /// "B05P003.pro" → "B5-P003", "B05P01_Name.pgdata" → "B5-P001". nil when there is none.
-    public static func programLocation(inFileName name: String) -> String? {
+    /// Program location named in a file name ("B05P003.pro", "B5-P003 Name.pro", "B05P18_Name.pgdata").
+    public static func programLocation(inFileName name: String) -> (bank: Int, program: Int)? {
         guard let m = locationPattern.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
               let b = Range(m.range(at: 1), in: name), let p = Range(m.range(at: 2), in: name),
               let bank = Int(name[b]), let prog = Int(name[p]), (1...100).contains(prog) else { return nil }
-        return String(format: "B%d-P%03d", bank, prog)
+        return (bank, prog)
     }
 
-    /// File-name prefixes for programs written together, in list order: their locations when every
-    /// file name carries one, otherwise "001", "002"… by position in the list.
+    /// File-name prefixes for programs written together, in list order. When every file name carries
+    /// a location: Groove's "B05P18" form, two-digit program, or three digits for the whole batch if
+    /// it includes a program 100 ("B05P100" would sort between P10 and P11). Otherwise "001", "002"…
+    /// by position in the list.
     public static func orderPrefixes(fileNames: [String]) -> [String] {
         let locs = fileNames.map { programLocation(inFileName: $0) }
-        if locs.allSatisfy({ $0 != nil }) { return locs.map { $0! } }
+        if !locs.isEmpty, locs.allSatisfy({ $0 != nil }) {
+            let wide = locs.contains { $0!.program >= 100 }
+            return locs.map { String(format: wide ? "B%02dP%03d" : "B%02dP%02d", $0!.bank, $0!.program) }
+        }
         return fileNames.indices.map { String(format: "%03d", $0 + 1) }
     }
 }
