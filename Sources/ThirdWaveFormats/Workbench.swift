@@ -85,7 +85,9 @@ public struct SlotEntry: Codable, Equatable {
 }
 
 public struct SlotProfile: Codable, Equatable {
-    /// Keyed by slot label ("U50", "S10"). Missing entries take the default.
+    /// Keyed by slot label ("U50"). Missing entries take the default.
+    /// Only wavetable slots are tracked. Sample memory is swapped too often for a record of it to
+    /// stay true, so sample slots always read as unknown and their .bin must be supplied when packing.
     public var entries: [String: SlotEntry] = [:]
 
     public init() {}
@@ -94,9 +96,12 @@ public struct SlotProfile: Codable, Equatable {
         ref.isFactorySlot ? SlotEntry(state: .factory) : SlotEntry(state: .unknown)
     }
 
-    public func entry(_ ref: SourceRef) -> SlotEntry { entries[ref.label] ?? Self.defaultEntry(ref) }
+    public func entry(_ ref: SourceRef) -> SlotEntry {
+        ref.isSample ? Self.defaultEntry(ref) : (entries[ref.label] ?? Self.defaultEntry(ref))
+    }
 
     public mutating func set(_ ref: SourceRef, _ e: SlotEntry?) {
+        if ref.isSample { entries[ref.label] = nil; return }
         if let e, e != Self.defaultEntry(ref) { entries[ref.label] = e } else { entries[ref.label] = nil }
     }
 
@@ -214,7 +219,7 @@ public struct PackPlan {
     ///  1. a content file assigned to that slot in this session (the program's author supplied it)
     ///  2. for a factory slot: the factory table — embedded only if `embedFactory` — with a warning
     ///     if the synth profile says that slot now holds something else
-    ///  3. for a non-factory slot: the file the synth profile has there
+    ///  3. for a non-factory wavetable slot: the file the synth profile has there (samples: never)
     ///  4. otherwise nothing: the source is reported missing and packing is blocked
     public static func make(program: ProgramFile, files: [ContentFile], profile: SlotProfile,
                             factory: FactoryLibrary, embedFactory: Bool,

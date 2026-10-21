@@ -23,11 +23,12 @@ Tests (`./run-tests.sh`) need a full Xcode installation, as in ThirdWaveWT.
 
 The window has three sections.
 
-**Synth Slots** — tell the app what your synth actually holds. Every factory slot (P00–P35,
+**Synth Slots** — tell the app what your synth's wavetable slots hold. Every factory slot (P00–P35,
 U00–U55) is assumed to hold its factory table unless you say otherwise. Other slots are "unknown"
-until you assign the `.wt` or `.bin` file that is in them. Drop files named with a slot
-(`U48 SM OBX8 1.WT`, `S010_JP8_.bin`) onto this view to assign several at once, or use **Set… →
-Assign File…** on a row. Also add the folders of Groove's factory `.wt` files here. The app uses
+until you assign the `.wt` file that is in them. Drop files named with a slot (`U48 SM OBX8 1.WT`)
+onto this view to assign several at once, or use **Set… → Assign File…** on a row. Sample (S)
+slots are not tracked, because sample memory changes too often for a record of it to stay right:
+add the `.bin` a program needs on the Pack screen. Also add the folders of Groove's factory `.wt` files here. The app uses
 them to embed factory tables when asked, and to recognise factory tables when unpacking. The slot
 list is saved in `~/Library/Application Support/ThirdWavePG/synth-slots.json`.
 
@@ -38,7 +39,7 @@ lists its oscillator sources and what each will be:
   supplied),
 - for a factory slot: the factory table, not embedded by default ("Embed factory wavetables"
   embeds them),
-- for any other slot: the file the Synth Slots list says is there,
+- for any other wavetable slot: the file the Synth Slots list says is there,
 - otherwise **missing**, and that program will not be written.
 
 You can change any choice from the Content menu. A warning appears where your synth differs

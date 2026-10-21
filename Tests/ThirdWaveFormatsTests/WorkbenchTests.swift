@@ -81,6 +81,23 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertEqual(plan.verdict, .needsUnifiedFile)
     }
 
+    func testSampleSlotsAreNotTracked() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let u = dir.appendingPathComponent("S010_Test.bin")
+        try makeMultisample().binData().write(to: u)
+        var profile = SlotProfile()
+        profile.assign(try ContentFile.load(u), to: .s(10))
+        XCTAssertTrue(profile.entries.isEmpty)
+        // An old profile that still has an S entry is ignored.
+        profile.entries["S10"] = SlotEntry(state: .file, name: "Test", path: u.path)
+        XCTAssertEqual(profile.entry(.s(10)).state, .unknown)
+        let pro = makeProgram(sources: [4010] + Array(repeating: 42, count: 11))
+        let plan = PackPlan.make(program: pro, files: [], profile: profile, factory: FactoryLibrary(), embedFactory: false)
+        XCTAssertEqual(plan.verdict, .blocked([.s(10)]))
+        XCTAssertFalse(plan.rows[0].options.contains(.profile))
+    }
+
     func testProfileRoundTripsAsJSON() throws {
         var p = SlotProfile()
         p.set(.u(58), SlotEntry(state: .empty, name: "blank"))

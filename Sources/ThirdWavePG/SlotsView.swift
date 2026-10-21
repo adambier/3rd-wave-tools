@@ -5,13 +5,13 @@ import UniformTypeIdentifiers
 import ThirdWaveFormats
 #endif
 
-/// What the user's synth has in each slot. Used to decide what a program will actually play,
-/// and to offer "as on my synth" when packing.
+/// What the user's synth has in each wavetable slot. Used to decide what a program will actually play,
+/// and to offer "as on my synth" when packing. Sample slots are not tracked: sample memory changes
+/// too often, so multisamples are always supplied on the Pack screen.
 struct SlotsView: View {
     @EnvironmentObject var state: AppState
-    enum Bank: String, CaseIterable, Identifiable { case u = "U wavetables", p = "P wavetables", s = "S multisamples"; var id: String { rawValue } }
+    enum Bank: String, CaseIterable, Identifiable { case u = "U wavetables", p = "P wavetables"; var id: String { rawValue } }
     @State private var bank: Bank = .u
-    @State private var showAllS = false
 
     struct SlotRow: Identifiable {
         var id: String { ref.label }
@@ -24,7 +24,6 @@ struct SlotsView: View {
         switch bank {
         case .u: refs = (0..<SourceRef.uCount).map { .u($0) }
         case .p: refs = (0..<SourceRef.pCount).map { .p($0) }
-        case .s: refs = (0..<(showAllS ? SourceRef.sMax + 1 : 32)).map { .s($0) }
         }
         return refs.map { SlotRow(ref: $0, entry: state.profile.entry($0)) }
     }
@@ -40,10 +39,9 @@ struct SlotsView: View {
                 Picker("", selection: $bank) {
                     ForEach(Bank.allCases) { b in Text(b.rawValue).tag(b) }
                 }
-                .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420)
-                if bank == .s { Toggle("Show all 128", isOn: $showAllS) }
+                .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 320)
                 Spacer()
-                Text("Drop .wt or .bin files whose names start with a slot (\"U48 …\", \"S010_…\") to assign them.")
+                Text("Drop .wt files whose names start with a slot (\"U48 …\") to assign them.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .padding(10)

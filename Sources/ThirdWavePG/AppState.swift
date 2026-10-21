@@ -281,11 +281,12 @@ final class AppState: ObservableObject {
     // MARK: Synth slots
 
     func assignFile(to ref: SourceRef) {
-        guard let url = Panels.chooseFile(types: ref.isSample ? ["bin"] : ["wt"],
-                                          message: "Choose the \(ref.isSample ? "multisample (.bin)" : "wavetable (.wt)") that is in \(ref.label) on your synth") else { return }
+        guard ref.isWavetable else { return }   // sample slots are not tracked
+        guard let url = Panels.chooseFile(types: ["wt"],
+                                          message: "Choose the wavetable (.wt) that is in \(ref.label) on your synth") else { return }
         do {
             let f = try ContentFile.load(url)
-            guard f.fits(ref) else { alertMessage = "\(url.lastPathComponent) is a \(f.kindLabel.lowercased()); \(ref.label) needs a \(ref.isSample ? "multisample" : (ref.isP ? "P wavetable" : "U wavetable"))."; return }
+            guard f.fits(ref) else { alertMessage = "\(url.lastPathComponent) is a \(f.kindLabel.lowercased()); \(ref.label) needs a \(ref.isP ? "P wavetable" : "U wavetable")."; return }
             profile.assign(f, to: ref)
             note("\(ref.label) set to \"\(f.name)\" (\(url.lastPathComponent)).")
         } catch { alertMessage = "\(url.lastPathComponent): \(error)" }
@@ -303,21 +304,22 @@ final class AppState: ObservableObject {
         var e = profile.entry(ref); e.name = name; profile.set(ref, e)
     }
 
-    /// Assigns dropped files to the slots their names suggest ("U48 SM OBX8 1.WT", "S010_JP8.bin"),
-    /// after the user confirms the list.
+    /// Assigns dropped wavetable files to the slots their names suggest ("U48 SM OBX8 1.WT"),
+    /// after the user confirms the list. Multisamples are not tracked here; they go on the Pack screen.
     func assignByFilename(_ urls: [URL]) {
         var pairs: [(SourceRef, ContentFile)] = []
         var unplaced: [String] = []
         for u in urls {
             guard let f = try? ContentFile.load(u) else { unplaced.append(u.lastPathComponent + " (unreadable)"); continue }
+            if f.isSample { unplaced.append(u.lastPathComponent + " (multisamples are added on the Pack screen)"); continue }
             if let s = f.slot, f.fits(s) { pairs.append((s, f)) } else { unplaced.append(u.lastPathComponent) }
         }
         guard !pairs.isEmpty else {
-            alertMessage = "None of these file names say which slot they belong in. Use the Assign button on a slot instead."
+            alertMessage = "Nothing to assign: " + (unplaced.isEmpty ? "no files." : unplaced.joined(separator: ", ")) + "\n\nWavetable file names must start with a slot (\"U48 …\"); otherwise use Set… → Assign File… on a slot. Multisamples are added on the Pack screen."
             return
         }
         let list = pairs.map { "\($0.0.label)  ←  \($0.1.url.lastPathComponent)" }.joined(separator: "\n")
-        let extra = unplaced.isEmpty ? "" : "\n\nNot assigned (no slot in the name): " + unplaced.joined(separator: ", ")
+        let extra = unplaced.isEmpty ? "" : "\n\nNot assigned: " + unplaced.joined(separator: ", ")
         if Panels.confirm(title: "Assign these files to slots?", message: list + extra, ok: "Assign") {
             for (s, f) in pairs { profile.assign(f, to: s) }
             note("Assigned \(pairs.count) file\(pairs.count == 1 ? "" : "s") to slots by name.")
