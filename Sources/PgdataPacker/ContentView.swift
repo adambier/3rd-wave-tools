@@ -29,12 +29,11 @@ struct ContentView: View {
             LogBar(showLog: $showLog)
         }
         .frame(minWidth: 960, minHeight: 600)
-        // A sheet rather than a system alert: alerts are narrow and cannot be widened, which made
-        // the multi-paragraph reports after Write hard to read.
-        .sheet(isPresented: Binding(
-            get: { state.alertMessage != nil }, set: { if !$0 { state.alertMessage = nil } }
-        )) {
-            MessageSheet(state: state)
+        // Standard alert with a scrolling text area (see AlertPresenter): system look, but wide
+        // enough for one-item-per-line reports, and long lists scroll.
+        .onChange(of: state.alertMessage) { msg in
+            guard let msg else { return }
+            AlertPresenter.show(msg) { state.alertMessage = nil }
         }
     }
 }
@@ -152,37 +151,51 @@ extension PackPlan.Verdict {
     }
 }
 
-/// Report shown after Write and for errors: wide, a blank line between paragraphs, selectable.
-struct MessageSheet: View {
-    @ObservedObject var state: AppState
-
-    private var messageText: some View {
-        Text(state.alertMessage ?? "")
-            .textSelection(.enabled)
-            .lineSpacing(2)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .fixedSize(horizontal: false, vertical: true)
+/// Shows a report as a standard alert sheet. The first paragraph is the alert's bold title; the
+/// rest goes in a selectable text area 520 points wide that scrolls past about 360 points of text.
+enum AlertPresenter {
+    static func show(_ text: String, done: @escaping () -> Void) {
+        let parts = text.components(separatedBy: "\n\n")
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = parts.first ?? ""
+        let rest = parts.dropFirst().joined(separator: "\n\n")
+        if !rest.isEmpty { alert.accessoryView = textArea(rest) }
+        alert.addButton(withTitle: "OK")
+        if let w = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first(where: \.isVisible) {
+            alert.beginSheetModal(for: w) { _ in done() }
+        } else {
+            alert.runModal(); done()
+        }
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(nsImage: NSApplication.shared.applicationIconImage)
-                    .resizable().frame(width: 48, height: 48)
-                // Short reports size to fit; long ones (e.g. many blocked programs) scroll.
-                ViewThatFits(in: .vertical) {
-                    messageText
-                    ScrollView { messageText }.frame(height: 420)
-                }
-            }
-            HStack {
-                Spacer()
-                Button("OK") { state.alertMessage = nil }
-                    .keyboardShortcut(.defaultAction)
-            }
+    private static func textArea(_ text: String) -> NSView {
+        let width: CGFloat = 520, maxHeight: CGFloat = 360
+        let tv = NSTextView(frame: NSRect(x: 0, y: 0, width: width, height: 10))
+        tv.isEditable = false
+        tv.isSelectable = true
+        tv.drawsBackground = false
+        tv.font = .systemFont(ofSize: NSFont.systemFontSize)
+        tv.textContainerInset = NSSize(width: 0, height: 2)
+        tv.textContainer?.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
+        tv.textContainer?.widthTracksTextView = true
+        tv.isVerticallyResizable = true
+        tv.isHorizontallyResizable = false
+        tv.autoresizingMask = [.width]
+        tv.maxSize = NSSize(width: width, height: .greatestFiniteMagnitude)
+        tv.string = text
+        var used: CGFloat = 60
+        if let lm = tv.layoutManager, let tc = tv.textContainer {
+            lm.ensureLayout(for: tc)
+            used = lm.usedRect(for: tc).height + 8
         }
-        .padding(20)
-        .frame(width: 620)
-        .frame(maxHeight: 520)
+        let height = min(max(used, 20), maxHeight)
+        tv.frame = NSRect(x: 0, y: 0, width: width, height: max(used, height))
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        scroll.hasVerticalScroller = used > maxHeight
+        scroll.drawsBackground = false
+        scroll.borderType = .noBorder
+        scroll.documentView = tv
+        return scroll
     }
 }
