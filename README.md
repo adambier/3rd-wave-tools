@@ -75,7 +75,8 @@ rather than text). A multisample a program uses is always embedded; there is no 
 out. Each program shows **factory content only** (nothing embedded), **embeds wavetables or
 samples**, or **missing content** (not written until you add the file). **Write Selected…** /
 **Write All…** ask for a folder. Files are named with the program location first, in
-Groove's own pattern (`B05P87_Ghibli Bell.pgdata`, as in `B05P18_Transymba.pgdata`), taken from the
+Groove's own pattern (`B05P87_Ghibli_Bell.pgdata`, as in `B05P06_Glass_Cow_Bell_Transients.pgdata`;
+spaces become underscores in the file name only, not in the program name inside it), taken from the
 `.pro` file name, so the synth's alphabetical bulk import keeps them in order. A batch that includes
 a program 100 uses three digits throughout (`B05P087_…`, `B05P100_…`), since `B05P100` would sort
 between P10 and P11. If any program's file name has no location, all are numbered by their place

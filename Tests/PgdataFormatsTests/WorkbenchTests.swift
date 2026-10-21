@@ -233,7 +233,8 @@ final class OutputNameTests: XCTestCase {
         XCTAssertEqual(OutputNames.orderPrefixes(fileNames: ["B05P011.pro", "B05P100.pro"]), ["B05P011", "B05P100"])
         XCTAssertEqual(OutputNames.orderPrefixes(fileNames: ["B05P003.pro", "Lead.pro", "Bass.pro"]), ["001", "002", "003"])
         var p = makeProgram(sources: Array(repeating: 42, count: 12)); p.name = "Ghibli Bell"
-        XCTAssertEqual(OutputNames.unified(p, prefix: "B05P87"), "B05P87_Ghibli Bell.pgdata")
-        XCTAssertEqual(OutputNames.unified(p), "Ghibli Bell.pgdata")
+        XCTAssertEqual(OutputNames.unified(p, prefix: "B05P87"), "B05P87_Ghibli_Bell.pgdata")
+        XCTAssertEqual(OutputNames.unified(p), "Ghibli_Bell.pgdata")
+        XCTAssertEqual(p.name, "Ghibli Bell")      // the name inside the file keeps its spaces
     }
 }

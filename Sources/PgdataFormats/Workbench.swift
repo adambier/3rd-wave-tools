@@ -369,10 +369,12 @@ public enum OutputNames {
     }
     public static func wavetable(_ ref: SourceRef, _ w: WavetableFile) -> String { ref.label + "_" + sanitize(w.name) + ".wt" }
     public static func program(_ p: ProgramFile) -> String { sanitize(p.name) + ".pro" }
-    /// "B05P87_Ghibli Bell.pgdata", Groove's own pattern (B05P18_Transymba.pgdata). The synth's bulk
-    /// import takes files in alphabetical order, so the prefix keeps them in program order.
+    /// "B05P87_Ghibli_Bell.pgdata", Groove's own pattern (B05P06_Glass_Cow_Bell_Transients.pgdata):
+    /// spaces become underscores in the file name only; the name inside the file keeps its spaces.
+    /// The synth's bulk import takes files in alphabetical order, so the prefix keeps program order.
     public static func unified(_ p: ProgramFile, prefix: String? = nil) -> String {
-        (prefix.map { $0 + "_" } ?? "") + sanitize(p.name) + ".pgdata"
+        let name = sanitize(p.name).split(separator: " ", omittingEmptySubsequences: true).joined(separator: "_")
+        return (prefix.map { $0 + "_" } ?? "") + name + ".pgdata"
     }
 
     private static let locationPattern = try! NSRegularExpression(
