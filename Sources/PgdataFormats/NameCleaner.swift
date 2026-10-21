@@ -9,8 +9,9 @@ import Foundation
 ///  - underscores to spaces, runs of spaces collapsed, ends trimmed
 ///  - title case, but only for names that are entirely upper case or entirely lower case; a name
 ///    that already mixes cases is left as its author wrote it. Words containing digits (JP8, OBX8)
-///    are kept as they are; words on the fixed-spellings list are written exactly as listed
-///    (SM, FM, PWM, LoFi…); short joining words (and, of, the…) are lower case except at the start.
+///    are kept as they are; words with no vowels (A E I O U Y) are taken to be acronyms and written
+///    in capitals (SM, PWM, DX, PPG); words on the fixed-spellings list are written exactly as listed
+///    (LFO, MIDI, LoFi…); short joining words (and, of, the…) are lower case except at the start.
 public struct NameCleaner: Equatable {
     public var stripSlots = true
     public var underscoresToSpaces = true
@@ -18,9 +19,9 @@ public struct NameCleaner: Equatable {
     /// Words written exactly as listed, whatever case they arrive in ("LOFI" → "LoFi").
     public var fixedSpellings: [String] = NameCleaner.defaultFixedSpellings
 
-    public static let defaultFixedSpellings = ["SM", "FM", "AM", "PWM", "LFO", "VCO", "VCF", "VCA", "DX", "PPG",
-                                               "MIDI", "EQ", "BPM", "OB", "JP", "CS", "CZ", "TB", "TR", "SH",
-                                               "EP", "FX", "DJ", "UK", "USA", "LoFi", "HiFi"]
+    /// Words without vowels are already treated as acronyms, so this lists only the ones with vowels.
+    public static let defaultFixedSpellings = ["AM", "LFO", "VCO", "VCA", "MIDI", "EQ", "OB", "EP", "UK", "USA",
+                                               "LoFi", "HiFi"]
     static let minorWords: Set<String> = ["a", "an", "and", "the", "of", "in", "on", "to", "for", "with", "or", "at", "by"]
 
     /// Longest program name in Groove's 8M factory banks: names up to this length are known to fit.
@@ -64,16 +65,23 @@ public struct NameCleaner: Equatable {
         return String(w.map { $0.isLetter ? (it.next() ?? $0) : $0 })
     }
 
+    /// No vowels (Y counts as one, so SYNTH, RHYTHM and FLY are words): an acronym such as PWM or PPG.
+    static func isAcronym(_ letters: String) -> Bool {
+        !letters.isEmpty && !letters.lowercased().contains { "aeiouy".contains($0) }
+    }
+
     private func titleWord(_ w: String, first: Bool, keep: [String: String]) -> String {
         if w.contains(where: { $0.isNumber }) { return w }
         let letters = w.filter { $0.isLetter }
         if let s = keep[letters.lowercased()] { return respell(w, s) }
+        if Self.isAcronym(letters) { return w.uppercased() }
         if !first, Self.minorWords.contains(letters.lowercased()), letters.count == w.count { return w.lowercased() }
         // Hyphenated or slashed parts are cased separately: "DX-PPG" → "DX-PPG", "LO-FI" → "Lo-Fi".
         var out = "", part = ""
         func flush() {
             let l = part.filter { $0.isLetter }
             if let sp = keep[l.lowercased()] { out += respell(part, sp) }
+            else if Self.isAcronym(l) { out += part.uppercased() }
             else {
                 var done = false
                 for ch in part.lowercased() {

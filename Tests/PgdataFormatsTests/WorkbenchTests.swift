@@ -171,6 +171,10 @@ final class NameCleanerTests: XCTestCase {
             ("LO-FI PAD", "Lo-Fi Pad"),
             ("LOFI KEYS", "LoFi Keys"),                  // fixed spelling
             ("DUSTY (LOFI)", "Dusty (LoFi)"),
+            ("PWM STRINGS", "PWM Strings"),              // no vowels: acronym
+            ("ppg wave pad", "PPG Wave Pad"),
+            ("SYNTH RHYTHM", "Synth Rhythm"),             // Y counts as a vowel
+            ("SM PAD", "SM Pad"),
             ("Additive_Bell_17", "Additive Bell 17"),    // mixed case: only underscores change
             ("FIIx_Arr_Vocal", "FIIx Arr Vocal"),
             ("Tube Bell SM PAD", "Tube Bell SM PAD"),    // mixed case: all-caps words left alone
