@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 #if canImport(ThirdWaveFormats)
 import ThirdWaveFormats   // SwiftPM build; absent in the single-module swiftc build
@@ -92,9 +93,24 @@ final class AppState: ObservableObject {
         defaults.set(skipFactoryDuplicates, forKey: "skipFactoryDuplicates")
     }
 
+    /// Reading the factory .wt files takes a moment (about 92 text files), so it runs off the main thread.
+    @Published private(set) var loadingFactory = false
+    private var factoryGeneration = 0
+
     func reloadFactory() {
-        factory = FactoryLibrary(folders: factoryFolders)
-        rebuildUnpackPlans()
+        let folders = factoryFolders
+        factoryGeneration += 1
+        let generation = factoryGeneration
+        loadingFactory = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            let lib = FactoryLibrary(folders: folders)
+            DispatchQueue.main.async {
+                guard generation == self.factoryGeneration else { return }
+                self.factory = lib
+                self.loadingFactory = false
+                self.rebuildUnpackPlans()
+            }
+        }
     }
 
     // MARK: Messages
@@ -223,9 +239,18 @@ final class AppState: ObservableObject {
 
     // MARK: Unpack
 
+    /// Recomputes descriptions and factory-duplicate flags, keeping the user's file names and
+    /// Write choices (only the default for factory duplicates follows the "skip" setting).
     func rebuildUnpackPlans() {
         for i in unpacks.indices {
-            unpacks[i].plan = UnpackPlan.make(unpacks[i].unified, factory: factory, skipFactoryDuplicates: skipFactoryDuplicates)
+            let old = unpacks[i].plan.items
+            var plan = UnpackPlan.make(unpacks[i].unified, factory: factory, skipFactoryDuplicates: skipFactoryDuplicates)
+            for j in plan.items.indices {
+                guard let prev = old.first(where: { $0.ref == plan.items[j].ref }) else { continue }
+                plan.items[j].fileName = prev.fileName
+                if !plan.items[j].isFactoryDuplicate { plan.items[j].write = prev.write }
+            }
+            unpacks[i].plan = plan
         }
     }
 

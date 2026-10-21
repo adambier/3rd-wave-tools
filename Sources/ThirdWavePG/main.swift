@@ -51,9 +51,10 @@ let window = NSWindow(
     defer: false
 )
 window.title = "3rd Wave Program Packer"
+window.isReleasedWhenClosed = false
 window.contentView = NSHostingView(rootView: ContentView().environmentObject(appState))
+if !window.setFrameUsingName("MainWindow") { window.center() }
 window.setFrameAutosaveName("MainWindow")
-window.center()
 window.makeKeyAndOrderFront(nil)
 
 application.activate(ignoringOtherApps: true)

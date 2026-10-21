@@ -14,7 +14,7 @@ struct ContentView: View {
             NavigationSplitView {
                 List(selection: $state.section) {
                     ForEach(AppState.Section.allCases) { s in
-                        Label(s.rawValue, systemImage: s.icon).tag(s as AppState.Section?)
+                        Label(s.rawValue, systemImage: s.icon).tag(s)
                     }
                 }
                 .navigationSplitViewColumnWidth(min: 150, ideal: 170, max: 220)

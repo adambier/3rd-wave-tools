@@ -45,13 +45,13 @@ struct SlotsView: View {
             }
             .padding(10)
             Table(rows) {
-                TableColumn("Slot") { r in Text(r.ref.label).monospacedDigit() }
+                TableColumn("Slot") { (r: SlotRow) in Text(r.ref.label).monospacedDigit() }
                     .width(50)
-                TableColumn("Contents") { r in SlotNameCell(row: r) }
+                TableColumn("Contents") { (r: SlotRow) in SlotNameCell(row: r) }
                     .width(min: 160, ideal: 240)
-                TableColumn("Where it comes from") { r in SlotSourceCell(row: r) }
+                TableColumn("Where it comes from") { (r: SlotRow) in SlotSourceCell(row: r) }
                     .width(min: 160, ideal: 260)
-                TableColumn("") { r in SlotActionsCell(ref: r.ref) }
+                TableColumn("") { (r: SlotRow) in SlotActionsCell(ref: r.ref) }
                     .width(90)
             }
         }

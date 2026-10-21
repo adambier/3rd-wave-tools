@@ -102,9 +102,17 @@ final class PackTests: XCTestCase {
         XCTAssertEqual(Unpacker.unpack(g).program.serialized(), pro.serialized())
     }
 
-    func testSampleSlotMustCarryData() {
+    func testSampleCanBeLeftOutOnlyExplicitly() throws {
         let pro = makeProgram(sources: [4000] + Array(repeating: 42, count: 11))
-        XCTAssertThrowsError(try Packer.pack(pro, content: [.s(0): .reference]))
+        let g = try Packer.pack(pro, content: [.s(0): .reference])
+        XCTAssertFalse(g.sources[0].hasData)
+        // The plan never chooses that by itself.
+        let plan = PackPlan.make(program: pro, files: [], profile: SlotProfile(), factory: FactoryLibrary(), embedFactory: false)
+        XCTAssertEqual(plan.verdict, .blocked([.s(0)]))
+        XCTAssertTrue(plan.rows[0].options.contains(.reference))
+        let chosen = PackPlan.make(program: pro, files: [], profile: SlotProfile(), factory: FactoryLibrary(), embedFactory: false,
+                                   overrides: [.s(0): .reference])
+        guard case .warning? = chosen.rows.first?.status else { return XCTFail("expected a warning") }
     }
 
     func testMissingContentIsReported() {

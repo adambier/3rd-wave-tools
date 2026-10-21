@@ -11,7 +11,7 @@ struct PackView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            toolbar
+            controls
             Divider()
             if state.programs.isEmpty && state.contentFiles.isEmpty {
                 EmptyHint(title: "Drop programs and their wavetables or samples here",
@@ -32,11 +32,11 @@ struct PackView: View {
         }
     }
 
-    private var toolbar: some View {
+    private var controls: some View {
         HStack(spacing: 14) {
             Button("Add Files…") { state.add(urls: Panels.chooseFiles(message: "Choose .pro programs and the .wt / .bin files they use")) }
             Toggle("Embed factory wavetables", isOn: $state.embedFactory)
-                .help("Off: factory tables are listed but not carried (Groove's own sample library does this). On: they are embedded, for sharing with synths whose factory slots may differ. Needs the factory folders set under Synth Slots.")
+                .help("Off (recommended): factory tables are listed but not carried, as in Groove's own sample library. On: they are embedded — each U table adds about 0.5 MB and each P table about 65 KB, which makes files slower to copy and import. Useful for sharing with synths whose factory slots may differ. Needs the factory folders set under Synth Slots.")
             Toggle("Write a .pgdata even when the .pro is enough", isOn: $state.writeWhenNotNeeded)
             Spacer()
             Button("Remove") { state.removePrograms(selection); selection = [] }.disabled(selection.isEmpty)
@@ -62,6 +62,21 @@ struct PackView: View {
         } else {
             Text("Select a program").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+}
+
+struct SizeLine: View {
+    let plan: PackPlan
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("Estimated .pgdata size: \(PackPlan.formatBytes(plan.estimatedBytes))").foregroundStyle(.secondary)
+            if plan.factoryBytes > 0 {
+                Label("\(PackPlan.formatBytes(plan.factoryBytes)) of it is factory wavetables, which a factory synth already has. Larger files take longer to copy and import.",
+                      systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+            }
+        }
+        .font(.callout)
     }
 }
 
@@ -95,14 +110,15 @@ struct ProgramDetail: View {
                 Button("Show File") { Panels.reveal(item.url) }.buttonStyle(.link)
             }
             VerdictBadge(verdict: plan.verdict)
+            SizeLine(plan: plan)
             Table(plan.rows) {
-                TableColumn("Source") { row in Text(row.ref.description).monospacedDigit() }
+                TableColumn("Source") { (row: PackPlan.Row) in Text(row.ref.description).monospacedDigit() }
                     .width(min: 70, ideal: 90, max: 130)
-                TableColumn("Used by") { row in UsedByCell(usedBy: row.usedBy) }
+                TableColumn("Used by") { (row: PackPlan.Row) in UsedByCell(usedBy: row.usedBy) }
                     .width(min: 90, ideal: 130, max: 220)
-                TableColumn("Content") { row in ChoiceCell(itemID: item.id, row: row) }
+                TableColumn("Content") { (row: PackPlan.Row) in ChoiceCell(itemID: item.id, row: row) }
                     .width(min: 200, ideal: 300)
-                TableColumn("Status") { row in StatusText(status: row.status).lineLimit(2) }
+                TableColumn("Status") { (row: PackPlan.Row) in StatusText(status: row.status).lineLimit(2) }
             }
         }
         .padding(12)
@@ -154,15 +170,15 @@ struct ContentFilesTable: View {
             Text("Assign each file to the slot the programs refer to. A file assigned to a slot is used for every program here that uses that slot.")
                 .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12)
             Table(state.contentFiles) {
-                TableColumn("File") { f in Text(f.url.lastPathComponent).lineLimit(1).help(f.url.path) }
+                TableColumn("File") { (f: ContentFile) in Text(f.url.lastPathComponent).lineLimit(1).help(f.url.path) }
                     .width(min: 140, ideal: 220)
-                TableColumn("Name") { f in Text(f.name).lineLimit(1) }
+                TableColumn("Name") { (f: ContentFile) in Text(f.name).lineLimit(1) }
                     .width(min: 100, ideal: 160)
-                TableColumn("Kind") { f in Text(f.kindLabel).foregroundStyle(.secondary) }
+                TableColumn("Kind") { (f: ContentFile) in Text(f.kindLabel).foregroundStyle(.secondary) }
                     .width(min: 110, ideal: 150)
-                TableColumn("Slot") { f in SlotPickerCell(file: f) }
+                TableColumn("Slot") { (f: ContentFile) in SlotPickerCell(file: f) }
                     .width(min: 120, ideal: 140)
-                TableColumn("") { f in
+                TableColumn("") { (f: ContentFile) in
                     Button { state.removeContent(f.id) } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.borderless).help("Remove")
                 }

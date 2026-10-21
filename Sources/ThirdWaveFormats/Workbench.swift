@@ -184,6 +184,8 @@ public struct PackPlan {
         public var options: [Choice]
         public var status: Status
         public var embeds: Bool
+        /// Approximate bytes this source adds to the .pgdata.
+        public var bytes: Int = 3
     }
 
     public enum Verdict: Equatable {
@@ -194,6 +196,17 @@ public struct PackPlan {
 
     public var rows: [Row]
     public var verdict: Verdict
+    /// Approximate size of the .pgdata this plan would produce.
+    public var estimatedBytes: Int
+    /// Part of that size taken by embedded factory wavetables.
+    public var factoryBytes: Int
+
+    static let uTableBytes = 3 + 32 + 131_072 * 4
+    static let pTableBytes = 3 + 32 + 16_384 * 4
+    static func multisampleBytes(_ m: Multisample) -> Int { 3 + 33 + m.samples.reduce(0) { $0 + 78 + 2 * Int($1.length) } }
+    public static func formatBytes(_ n: Int) -> String {
+        n >= 1_000_000 ? String(format: "%.1f MB", Double(n) / 1_000_000) : String(format: "%.0f KB", Double(n) / 1_000)
+    }
 
     /// Builds the plan for a program.
     ///
@@ -223,6 +236,8 @@ public struct PackPlan {
             }
             if entry.state == .file, entry.path != nil { options.append(.profile) }
             if ref.isWavetable, !ref.isFactorySlot, !options.contains(.reference) { options.append(.reference) }
+            // Samples can be left out only by explicit choice; it is never the default.
+            if ref.isSample { options.append(.reference) }
 
             var choice: Choice? = overrides[ref].flatMap { options.contains($0) ? $0 : nil }
             if choice == nil {
@@ -234,18 +249,28 @@ public struct PackPlan {
             let factoryName = factory.name(ref).map { "\"\($0)\"" } ?? "the factory table"
             var status: Status
             var embeds = false
+            let tableBytes = ref.isP ? pTableBytes : uTableBytes
+            var bytes = 3
             switch choice {
             case .file(let id)?:
                 let f = files.first { $0.id == id }!
                 status = .ok("Embeds \"\(f.name)\" from \(f.url.lastPathComponent)")
                 embeds = true
+                if case let .multisample(m) = f.body { bytes = multisampleBytes(m) } else { bytes = tableBytes }
                 if entry.state == .file, let fp = entry.fingerprint, fp != f.fingerprint {
                     status = .warning("Embeds \"\(f.name)\"; your synth has \"\(entry.name)\" in \(ref.label) (whether importing overwrites that slot is not yet known)")
                 }
             case .factory?:
-                status = .ok("Embeds factory \(factoryName)"); embeds = true
+                status = .ok("Embeds factory \(factoryName) (+\(formatBytes(tableBytes)); already on a factory synth)")
+                embeds = true; bytes = tableBytes
             case .profile?:
                 status = .ok("Embeds \"\(entry.name)\", as on your synth"); embeds = true
+                if ref.isSample {
+                    let size = (try? FileManager.default.attributesOfItem(atPath: entry.path ?? "")[.size] as? Int) ?? nil
+                    bytes = (size ?? 0) + 3 - 16
+                } else { bytes = tableBytes }
+            case .reference? where ref.isSample:
+                status = .warning("Not included. The program will play whatever multisample is in \(ref.label) when it is loaded: if that slot is empty, or holds a different multisample (even one with the same name), the oscillator will be silent or wrong. How the synth handles this is not yet tested.")
             case .reference?:
                 if ref.isFactorySlot {
                     status = .ok("Factory \(factoryName); not embedded")
@@ -261,14 +286,16 @@ public struct PackPlan {
                     ? "Needs the multisample for \(ref.label): add its .bin file and assign it to \(ref.label)"
                     : "Needs a wavetable for \(ref.label) (not a factory slot): add its .wt file and assign it to \(ref.label)")
             }
-            rows.append(Row(ref: ref, usedBy: users, choice: choice, options: options, status: status, embeds: embeds))
+            rows.append(Row(ref: ref, usedBy: users, choice: choice, options: options, status: status, embeds: embeds, bytes: bytes))
         }
         let missing = rows.filter { $0.choice == nil }.map(\.ref)
         let verdict: Verdict
         if !missing.isEmpty { verdict = .blocked(missing) }
         else if rows.contains(where: { $0.embeds && !($0.choice == .factory) }) { verdict = .needsUnifiedFile }
         else { verdict = .plainProgramEnough }
-        return PackPlan(rows: rows, verdict: verdict)
+        let total = 17 + 4 * rows.count + rows.reduce(0) { $0 + $1.bytes } + 32 + 4 * program.values.count
+        let factoryTotal = rows.filter { $0.choice == .factory }.reduce(0) { $0 + $1.bytes }
+        return PackPlan(rows: rows, verdict: verdict, estimatedBytes: total, factoryBytes: factoryTotal)
     }
 
     /// Content for the packer, loading profile files from disk as needed.

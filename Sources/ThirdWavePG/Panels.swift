@@ -64,15 +64,18 @@ enum Panels {
             }
         }
         var count = 0
+        var used = Set<String>()   // names written in this batch: never overwrite one with another
         for f in files {
             var url = folder.appendingPathComponent(f.name)
-            if !replace, fm.fileExists(atPath: url.path) {
+            func taken(_ u: URL) -> Bool { used.contains(u.lastPathComponent) || (!replace && fm.fileExists(atPath: u.path)) }
+            if taken(url) {
                 let base = url.deletingPathExtension().lastPathComponent, ext = url.pathExtension
                 var n = 2
                 repeat {
                     url = folder.appendingPathComponent("\(base) \(n)").appendingPathExtension(ext); n += 1
-                } while fm.fileExists(atPath: url.path)
+                } while taken(url)
             }
+            used.insert(url.lastPathComponent)
             do { try f.data.write(to: url, options: .atomic); count += 1 } catch {
                 let a = NSAlert(); a.messageText = "Could not write \(url.lastPathComponent)"; a.informativeText = error.localizedDescription
                 a.runModal()

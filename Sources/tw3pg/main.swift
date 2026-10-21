@@ -228,6 +228,26 @@ case "maketests":
     try write(t4, refsOnly(t4), "TW3_T4_v4.pgdata")
     try v4.serialized().write(to: out.appendingPathComponent("TW3_T4_original.pro"))
 
+case "maketest5":
+    // tw3pg maketest5 <program using a sample slot> <outdir>
+    // T5a: the program's sample slot listed without its samples. T5b: the same, pointed at empty S20.
+    var p = try ProgramFile(data: try load(URL(fileURLWithPath: rest[0])))
+    let out = URL(fileURLWithPath: rest[1])
+    try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+    guard let sRef = p.distinctSources.first(where: \.isSample) else { print("program uses no sample slot"); exit(1) }
+    func refs(_ q: ProgramFile) -> [SourceRef: SourceContent] {
+        var c: [SourceRef: SourceContent] = [:]
+        for r in q.distinctSources where !r.isBuiltIn { c[r] = .reference }
+        return c
+    }
+    let original = p.name
+    p.name = String(("TW3 T5a " + original).prefix(31))
+    try Packer.pack(p, content: refs(p)).serialized().write(to: out.appendingPathComponent("TW3_T5a_SampleRef.pgdata"))
+    var q = p; q.name = String(("TW3 T5b " + original).prefix(31))
+    for (k, r) in q.sources.enumerated() where r == sRef { q.setSourceID(SourceRef.s(20).id, at: k) }
+    try Packer.pack(q, content: refs(q)).serialized().write(to: out.appendingPathComponent("TW3_T5b_EmptyS20.pgdata"))
+    print("T5a: \(sRef.label) listed without samples; T5b: same oscillators pointed at S20, listed without samples")
+
 default:
     print("unknown command \(cmd)"); exit(2)
 }

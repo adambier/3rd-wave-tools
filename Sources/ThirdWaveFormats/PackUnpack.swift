@@ -30,8 +30,8 @@ public enum Packer {
     ///
     /// Sources are listed in order of first use (part 1 osc 1 … part 4 osc 3), every referenced
     /// source included, as Groove's sample library does. Analog shapes never carry data.
-    /// Multisamples must be supplied: a .pgdata that lists an S slot without its samples has
-    /// never been seen and its behavior is unknown.
+    /// Multisamples are normally carried. Listing an S slot without its samples is allowed only when
+    /// asked for explicitly: no such file has been seen, and the synth's handling is untested.
     public static func pack(_ program: ProgramFile, content: [SourceRef: SourceContent]) throws -> UnifiedProgram {
         let refs = program.distinctSources
         if let bad = refs.first(where: { if case .unknown = $0 { return true }; return false }) {
@@ -45,8 +45,11 @@ public enum Packer {
             switch (ref, c) {
             case (.s, .multisample(let m)):
                 sources.append(.init(ref: ref, payload: .multisample(m)))
+            case (.s, .reference):
+                // Listed without its samples. Never seen in Groove's files; the synth's handling is untested.
+                sources.append(.init(ref: ref, payload: .none))
             case (.s, _):
-                throw PackError.wrongKind(ref, "a sample slot needs its multisample (.bin) included.")
+                throw PackError.wrongKind(ref, "a sample slot needs a multisample (.bin), not a wavetable.")
             case (_, .reference):
                 sources.append(.init(ref: ref, payload: .none))
             case (_, .wavetable(let wt)):
