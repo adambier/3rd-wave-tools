@@ -25,10 +25,7 @@ struct RepointSheet: View {
         let item = request.itemID ?? state.selectedProgram ?? state.programs.first?.id
         _itemID = State(initialValue: item)
         let file = request.fileID.flatMap { id in state.contentFiles.first { $0.id == id } }
-        var slots: [UUID: SourceRef] = [:]
-        for f in state.contentFiles where !f.isSample && f.slot == nil {
-            if let s = state.suggestedSlot(for: f) { slots[f.id] = s }
-        }
+        let slots = state.suggestedSlots()
         _fileSlots = State(initialValue: slots)
         _target = State(initialValue: file.flatMap { $0.slot ?? slots[$0.id] })
         _targetFile = State(initialValue: file?.id)
@@ -147,6 +144,14 @@ struct RepointSheet: View {
         targetFile = t.file?.id
     }
 
+    /// " — 02.wt" when another added file has (or is about to get) that slot; " (factory)" for factory slots.
+    private func slotNote(_ s: SourceRef, for f: ContentFile) -> String {
+        if let other = state.contentFiles.first(where: { $0.id != f.id && ($0.slot ?? fileSlots[$0.id]) == s }) {
+            return " — " + other.url.lastPathComponent
+        }
+        return s.isFactorySlot ? " (factory)" : ""
+    }
+
     private func slotChoices(for f: ContentFile) -> [SourceRef] {
         f.isPTable ? (0..<SourceRef.pCount).map { SourceRef.p($0) } : (0..<SourceRef.uCount).map { SourceRef.u($0) }
     }
@@ -201,7 +206,7 @@ struct RepointSheet: View {
                                 }
                             )) {
                                 ForEach(slotChoices(for: f), id: \.self) { s in
-                                    Text(s.label + (s.isFactorySlot ? " (factory)" : "")).tag(s)
+                                    Text(s.label + slotNote(s, for: f)).tag(s)
                                 }
                             }
                             .labelsHidden()

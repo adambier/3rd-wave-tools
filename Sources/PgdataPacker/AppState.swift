@@ -277,12 +277,23 @@ final class AppState: ObservableObject {
     /// A slot to offer for an unassigned wavetable file: the first user slot of the right kind
     /// (U56–U63, P36–P47) that no other added file is assigned to and that Synth Slots does not
     /// record as holding another file. The user can change it.
-    func suggestedSlot(for file: ContentFile) -> SourceRef? {
+    func suggestedSlot(for file: ContentFile, alsoTaken: Set<SourceRef> = []) -> SourceRef? {
         guard !file.isSample else { return nil }
-        let taken = Set(contentFiles.compactMap { $0.id == file.id ? nil : $0.slot })
+        let taken = Set(contentFiles.compactMap { $0.id == file.id ? nil : $0.slot }).union(alsoTaken)
         let candidates: [SourceRef] = file.isPTable ? (36..<SourceRef.pCount).map { .p($0) } : (56..<SourceRef.uCount).map { .u($0) }
         return candidates.first { !taken.contains($0) && profile.entry($0).state != .file }
             ?? candidates.first { !taken.contains($0) } ?? candidates.first
+    }
+
+    /// Suggestions for every unassigned wavetable file, in list order, each one different
+    /// (01.wt → U56, 02.wt → U57).
+    func suggestedSlots() -> [UUID: SourceRef] {
+        var out: [UUID: SourceRef] = [:]
+        var used = Set<SourceRef>()
+        for f in contentFiles where !f.isSample && f.slot == nil {
+            if let s = suggestedSlot(for: f, alsoTaken: used) { out[f.id] = s; used.insert(s) }
+        }
+        return out
     }
 
     /// What a wavetable slot holds on the user's synth, for display.
