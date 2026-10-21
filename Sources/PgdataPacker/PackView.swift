@@ -255,7 +255,7 @@ struct ContentFilesTable: View {
                 TableColumn("Used") { (f: ContentFile) in UsageCell(state: st, file: f, note: unused[f.id]) }
                     .width(min: 180, ideal: 300)
                 TableColumn("Kind") { (f: ContentFile) in Text(f.kindLabel).foregroundStyle(.secondary).lineLimit(1).help(f.kindLabel) }
-                    .width(min: 80, ideal: 120)
+                    .width(min: 160, ideal: 180)
                 TableColumn("") { (f: ContentFile) in
                     Button { st.removeContent(f.id) } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.borderless).help("Remove")

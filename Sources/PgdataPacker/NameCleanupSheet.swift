@@ -77,7 +77,7 @@ struct NameCleanupSheet: View {
                 }
                 .width(24)
                 TableColumn("Kind") { (r: Row) in Text(r.kind).foregroundStyle(.secondary) }
-                    .width(min: 80, ideal: 95)
+                    .width(min: 100, ideal: 110)
                 TableColumn("Current") { (r: Row) in Text(r.current).lineLimit(1).foregroundStyle(.secondary).help(r.current) }
                     .width(min: 140, ideal: 220)
                 TableColumn("New name") { (r: Row) in
