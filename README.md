@@ -168,3 +168,7 @@ Sources/PgdataPacker/       the app (SwiftUI)
 Sources/tw3pg/              developer harness: inspect, roundtrip, repack, compare, wtcheck
 Tests/PgdataFormatsTests/
 ```
+
+## License
+
+MIT; see `LICENSE`. "3rd Wave" and "Groove Synthesis" are used only to say what this works with; this project is not affiliated with or endorsed by Groove Synthesis.
