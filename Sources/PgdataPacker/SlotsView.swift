@@ -115,7 +115,8 @@ struct SlotActionsCell: View {
             }
         }
         .menuStyle(.button)
-        .buttonStyle(.borderless)
+        .buttonStyle(.bordered)
+        .menuIndicator(.visible)
         .fixedSize()
     }
 }

@@ -201,8 +201,10 @@ struct ChoiceCell: View {
             } label: {
                 Text(row.choice.map { state.describe($0, for: row.ref) } ?? "Choose…").lineLimit(1)
             }
+            // A bordered pop-up with its chevron, so it reads as a menu rather than as text.
             .menuStyle(.button)
-            .buttonStyle(.borderless)
+            .buttonStyle(.bordered)
+            .menuIndicator(.visible)
         }
     }
 }
