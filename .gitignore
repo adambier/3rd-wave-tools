@@ -2,3 +2,5 @@
 *.app
 .DS_Store
 .swiftpm/
+hw-tests/*.pgdata
+hw-tests/*.pro
