@@ -169,6 +169,23 @@ enum AlertPresenter {
         }
     }
 
+    /// Plain text, except that a line ending in ":" (a list heading such as "Added files not used by
+    /// any program:") gets a little space below it before its list starts.
+    private static func styled(_ text: String) -> NSAttributedString {
+        let out = NSMutableAttributedString()
+        let lines = text.components(separatedBy: "\n")
+        for (i, line) in lines.enumerated() {
+            let para = NSMutableParagraphStyle()
+            if line.hasSuffix(":") { para.paragraphSpacing = 6 }
+            out.append(NSAttributedString(string: line + (i < lines.count - 1 ? "\n" : ""), attributes: [
+                .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                .foregroundColor: NSColor.labelColor,
+                .paragraphStyle: para,
+            ]))
+        }
+        return out
+    }
+
     static func textArea(_ text: String) -> NSView {
         let width: CGFloat = 520, maxHeight: CGFloat = 360
         let tv = NSTextView(frame: NSRect(x: 0, y: 0, width: width, height: 10))
@@ -183,7 +200,7 @@ enum AlertPresenter {
         tv.isHorizontallyResizable = false
         tv.autoresizingMask = [.width]
         tv.maxSize = NSSize(width: width, height: .greatestFiniteMagnitude)
-        tv.string = text
+        tv.textStorage?.setAttributedString(styled(text))
         var used: CGFloat = 60
         if let lm = tv.layoutManager, let tc = tv.textContainer {
             lm.ensureLayout(for: tc)
