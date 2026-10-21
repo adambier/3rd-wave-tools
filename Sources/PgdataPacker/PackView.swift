@@ -181,22 +181,43 @@ struct ChoiceCell: View {
     let itemID: UUID
     let row: PackPlan.Row
 
+    private func repoint() { state.repointRequest = .init(itemID: itemID, from: row.ref) }
+
+    @ViewBuilder private var optionItems: some View {
+        ForEach(row.options, id: \.self) { c in
+            Button { state.setOverride(itemID, row.ref, c) } label: {
+                if c == row.choice { Label(state.describe(c, for: row.ref), systemImage: "checkmark") }
+                else { Text(state.describe(c, for: row.ref)) }
+            }
+        }
+    }
+
     var body: some View {
         let canRepoint = !row.ref.isSample
         if !canRepoint && row.options.count <= 1 {
             if let c = row.choice { Text(state.describe(c, for: row.ref)).lineLimit(1) }
             else { Text("—").foregroundStyle(.secondary) }
+        } else if row.choice == nil && canRepoint {
+            // Nothing for this slot yet: pointing the oscillators elsewhere is the usual fix, so it
+            // comes first and is what a click on the button does; the chevron shows the rest.
+            Menu {
+                Button("Point to another slot…", action: repoint)
+                if !row.options.isEmpty { Divider() }
+                optionItems
+            } label: {
+                Text("Point to another slot…").lineLimit(1)
+            } primaryAction: {
+                repoint()
+            }
+            .menuStyle(.button)
+            .buttonStyle(.bordered)
+            .menuIndicator(.visible)
         } else {
             Menu {
-                ForEach(row.options, id: \.self) { c in
-                    Button { state.setOverride(itemID, row.ref, c) } label: {
-                        if c == row.choice { Label(state.describe(c, for: row.ref), systemImage: "checkmark") }
-                        else { Text(state.describe(c, for: row.ref)) }
-                    }
-                }
+                optionItems
                 if canRepoint {
                     if !row.options.isEmpty { Divider() }
-                    Button("Point to another slot…") { state.repointRequest = .init(itemID: itemID, from: row.ref) }
+                    Button("Point to another slot…", action: repoint)
                 }
             } label: {
                 Text(row.choice.map { state.describe($0, for: row.ref) } ?? "Choose…").lineLimit(1)
