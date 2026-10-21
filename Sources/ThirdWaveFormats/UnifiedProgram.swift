@@ -129,5 +129,5 @@ public struct UnifiedProgram: Equatable {
 }
 
 extension SourceRef {
-    var isP: Bool { if case .p = self { return true }; return false }
+    public var isP: Bool { if case .p = self { return true }; return false }
 }
