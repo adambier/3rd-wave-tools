@@ -256,7 +256,7 @@ struct UsageCell: View {
         if let note {
             HStack(spacing: 6) {
                 Label(note, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).lineLimit(1).help(note)
-                if !file.isSample, file.slot != nil, !state.programs.isEmpty {
+                if !file.isSample, !state.programs.isEmpty {
                     Button("Use in a program…") { state.repointRequest = .init(fileID: file.id) }
                         .buttonStyle(.link)
                 }

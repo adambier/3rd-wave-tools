@@ -13,6 +13,10 @@ struct RepointSheet: View {
     @State private var itemID: UUID?
     @State private var picked = Set<Int>()
     @State private var target: SourceRef?
+    /// Set when the target was chosen through an added file (rather than a bare slot).
+    @State private var targetFile: UUID?
+    /// Slot chosen in the sheet for each added file that is not yet assigned to one.
+    @State private var fileSlots: [UUID: SourceRef] = [:]
     @State private var search = ""
 
     init(state: AppState, request: AppState.RepointRequest) {
@@ -21,7 +25,13 @@ struct RepointSheet: View {
         let item = request.itemID ?? state.selectedProgram ?? state.programs.first?.id
         _itemID = State(initialValue: item)
         let file = request.fileID.flatMap { id in state.contentFiles.first { $0.id == id } }
-        _target = State(initialValue: file?.slot)
+        var slots: [UUID: SourceRef] = [:]
+        for f in state.contentFiles where !f.isSample && f.slot == nil {
+            if let s = state.suggestedSlot(for: f) { slots[f.id] = s }
+        }
+        _fileSlots = State(initialValue: slots)
+        _target = State(initialValue: file.flatMap { $0.slot ?? slots[$0.id] })
+        _targetFile = State(initialValue: file?.id)
         var picks = Set<Int>()
         if let from = request.from, let it = state.programs.first(where: { $0.id == item }) {
             for (i, s) in it.effectiveProgram.sources.enumerated() where s == from { picks.insert(i) }
@@ -112,13 +122,33 @@ struct RepointSheet: View {
         let ref: SourceRef
         let title: String
         let detail: String
+        var file: ContentFile? = nil
     }
 
+    /// Added wavetable files. An unassigned one shows a slot picker; choosing it assigns that slot.
     private var fileTargets: [Target] {
         state.contentFiles.compactMap { f in
-            guard !f.isSample, let s = f.slot else { return nil }
-            return Target(id: "f" + f.id.uuidString, ref: s, title: "\(s.label)  \(f.name)", detail: f.url.lastPathComponent)
+            guard !f.isSample else { return nil }
+            if let s = f.slot {
+                return Target(id: "f" + f.id.uuidString, ref: s, title: "\(s.label)  \(f.name)", detail: f.url.lastPathComponent, file: f)
+            }
+            guard let s = fileSlots[f.id] else { return nil }
+            return Target(id: "f" + f.id.uuidString, ref: s, title: f.name, detail: f.url.lastPathComponent, file: f)
         }
+    }
+
+    private func isChosen(_ t: Target) -> Bool {
+        if let f = t.file { return targetFile == f.id }
+        return targetFile == nil && target == t.ref
+    }
+
+    private func choose(_ t: Target) {
+        target = t.ref
+        targetFile = t.file?.id
+    }
+
+    private func slotChoices(for f: ContentFile) -> [SourceRef] {
+        f.isPTable ? (0..<SourceRef.pCount).map { SourceRef.p($0) } : (0..<SourceRef.uCount).map { SourceRef.u($0) }
     }
     private var slotTargets: [Target] {
         Oscillator.repointTargets.filter { !$0.isBuiltIn }.map { r in
@@ -150,17 +180,35 @@ struct RepointSheet: View {
         if !items.isEmpty {
             Section(title) {
                 ForEach(items) { t in
-                    Button { target = t.ref } label: {
-                        HStack {
-                            Image(systemName: target == t.ref ? "largecircle.fill.circle" : "circle")
-                                .foregroundStyle(target == t.ref ? Color.accentColor : Color.secondary)
-                            Text(t.title).lineLimit(1)
-                            Spacer()
-                            Text(t.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    HStack {
+                        Button { choose(t) } label: {
+                            HStack {
+                                Image(systemName: isChosen(t) ? "largecircle.fill.circle" : "circle")
+                                    .foregroundStyle(isChosen(t) ? Color.accentColor : Color.secondary)
+                                Text(t.title).lineLimit(1)
+                                Spacer()
+                                Text(t.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            .contentShape(Rectangle())
                         }
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
+                        if let f = t.file, f.slot == nil {
+                            Picker("Slot", selection: Binding<SourceRef>(
+                                get: { fileSlots[f.id] ?? t.ref },
+                                set: { s in
+                                    fileSlots[f.id] = s
+                                    if targetFile == f.id { target = s }
+                                }
+                            )) {
+                                ForEach(slotChoices(for: f), id: \.self) { s in
+                                    Text(s.label + (s.isFactorySlot ? " (factory)" : "")).tag(s)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 110)
+                            .help("Not yet assigned to a slot: it will be assigned to this one")
+                        }
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
@@ -170,12 +218,21 @@ struct RepointSheet: View {
 
     private var applyTitle: String {
         guard let t = target else { return "Point" }
+        if let fid = targetFile, let f = state.contentFiles.first(where: { $0.id == fid }) {
+            let n = picked.count
+            return "Point \(n) oscillator\(n == 1 ? "" : "s") to \(f.name) (\(t.label))"
+        }
         let n = picked.count
         return "Point \(n) oscillator\(n == 1 ? "" : "s") to \(t.isBuiltIn ? t.description : t.label)"
     }
 
     private func apply() {
-        guard let id = itemID, let t = target else { return }
+        guard let id = itemID, var t = target else { return }
+        if let fid = targetFile, let f = state.contentFiles.first(where: { $0.id == fid }), f.slot == nil {
+            t = fileSlots[fid] ?? t
+            state.setSlot(fid, t)
+            state.note("\(f.url.lastPathComponent) assigned to \(t.label).")
+        }
         state.repoint(id, positions: Array(picked), to: t)
         state.selectedProgram = id
         dismiss()

@@ -214,6 +214,17 @@ final class AppState: ObservableObject {
         programs[i].repoints = programs[i].repoints.filter { $0.value != ref }
     }
 
+    /// A slot to offer for an unassigned wavetable file: the first user slot of the right kind
+    /// (U56–U63, P36–P47) that no other added file is assigned to and that Synth Slots does not
+    /// record as holding another file. The user can change it.
+    func suggestedSlot(for file: ContentFile) -> SourceRef? {
+        guard !file.isSample else { return nil }
+        let taken = Set(contentFiles.compactMap { $0.id == file.id ? nil : $0.slot })
+        let candidates: [SourceRef] = file.isPTable ? (36..<SourceRef.pCount).map { .p($0) } : (56..<SourceRef.uCount).map { .u($0) }
+        return candidates.first { !taken.contains($0) && profile.entry($0).state != .file }
+            ?? candidates.first { !taken.contains($0) } ?? candidates.first
+    }
+
     /// What a wavetable slot holds on the user's synth, for display.
     func slotName(_ ref: SourceRef) -> String {
         if ref.isBuiltIn { return ref.description }
