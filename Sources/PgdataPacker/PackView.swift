@@ -18,7 +18,7 @@ struct PackView: View {
                           detail: "Add .pro files, plus any .wt and .bin files they use. For each program the app works out which wavetables and samples it needs, and whether a .pgdata is needed at all.")
             } else {
                 HSplitView {
-                    programList.frame(minWidth: 230, idealWidth: 270, maxWidth: 420)
+                    programList.frame(minWidth: 200, idealWidth: 240, maxWidth: 420)
                     VSplitView {
                         detail.frame(minHeight: 220)
                         ContentFilesTable().frame(minHeight: 120, idealHeight: 190)
@@ -118,9 +118,9 @@ struct ProgramDetail: View {
                 TableColumn("Source") { (row: PackPlan.Row) in SourceCell(state: st, itemID: item.id, row: row) }
                     .width(min: 70, ideal: 110, max: 180)
                 TableColumn("Used by") { (row: PackPlan.Row) in UsedByCell(usedBy: row.usedBy) }
-                    .width(min: 90, ideal: 130, max: 220)
+                    .width(min: 90, ideal: 110, max: 220)
                 TableColumn("Content") { (row: PackPlan.Row) in ChoiceCell(state: st, itemID: item.id, row: row) }
-                    .width(min: 200, ideal: 300)
+                    .width(min: 200, ideal: 260)
                 TableColumn("Status") { (row: PackPlan.Row) in StatusText(status: row.status).lineLimit(2) }
             }
         }
@@ -203,16 +203,17 @@ struct ContentFilesTable: View {
             Text("Assign each file to the slot the programs refer to. A file assigned to a slot is used for every program here that uses that slot.")
                 .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12)
             Table(st.contentFiles) {
+                // Most important first: what the file is, its slot, and whether anything uses it.
                 TableColumn("File") { (f: ContentFile) in Text(f.url.lastPathComponent).lineLimit(1).help(f.url.path) }
-                    .width(min: 140, ideal: 220)
+                    .width(min: 120, ideal: 170)
                 TableColumn("Name") { (f: ContentFile) in Text(f.name).lineLimit(1) }
-                    .width(min: 100, ideal: 160)
-                TableColumn("Kind") { (f: ContentFile) in Text(f.kindLabel).foregroundStyle(.secondary) }
-                    .width(min: 110, ideal: 150)
+                    .width(min: 90, ideal: 130)
                 TableColumn("Slot") { (f: ContentFile) in SlotPickerCell(state: st, file: f) }
-                    .width(min: 120, ideal: 140)
+                    .width(min: 110, ideal: 120)
                 TableColumn("Used") { (f: ContentFile) in UsageCell(state: st, file: f, note: unused[f.id]) }
-                    .width(min: 160, ideal: 300)
+                    .width(min: 180, ideal: 300)
+                TableColumn("Kind") { (f: ContentFile) in Text(f.kindLabel).foregroundStyle(.secondary).lineLimit(1).help(f.kindLabel) }
+                    .width(min: 80, ideal: 120)
                 TableColumn("") { (f: ContentFile) in
                     Button { st.removeContent(f.id) } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.borderless).help("Remove")

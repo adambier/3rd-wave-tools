@@ -54,8 +54,11 @@ application.delegate = appDelegate
 
 let appState = AppState()
 
+// Wide enough for the sidebar, the program list and every column of the Pack tables
+// (about 1,400 points), but never larger than the screen.
+let visible = NSScreen.main?.visibleFrame.size ?? NSSize(width: 1440, height: 900)
 let window = NSWindow(
-    contentRect: NSRect(x: 0, y: 0, width: 1120, height: 740),
+    contentRect: NSRect(x: 0, y: 0, width: min(1440, visible.width - 40), height: min(880, visible.height - 40)),
     styleMask: [.titled, .closable, .miniaturizable, .resizable],
     backing: .buffered,
     defer: false
@@ -63,8 +66,9 @@ let window = NSWindow(
 window.title = appName
 window.isReleasedWhenClosed = false
 window.contentView = NSHostingView(rootView: ContentView().environmentObject(appState))
-if !window.setFrameUsingName("MainWindow") { window.center() }
-window.setFrameAutosaveName("MainWindow")
+// "MainWindow2": frames saved under the old name were saved at the old, too-narrow default.
+if !window.setFrameUsingName("MainWindow2") { window.center() }
+window.setFrameAutosaveName("MainWindow2")
 window.makeKeyAndOrderFront(nil)
 
 application.activate(ignoringOtherApps: true)
