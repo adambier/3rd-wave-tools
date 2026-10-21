@@ -346,11 +346,11 @@ final class AppState: ObservableObject {
         }
         let written = Panels.write(outputs, into: folder)
         var msg = "Wrote \(written) .pgdata file\(written == 1 ? "" : "s") to \(folder.path)."
-        if !blocked.isEmpty { msg += "\nNot written, content missing: " + blocked.joined(separator: "; ") + "." }
-        if !failed.isEmpty { msg += "\nFailed: " + failed.joined(separator: "; ") }
+        if !blocked.isEmpty { msg += "\n\nNot written, content missing: " + blocked.joined(separator: "; ") + "." }
+        if !failed.isEmpty { msg += "\n\nFailed: " + failed.joined(separator: "; ") }
         let unused = unusedContent
         if !unused.isEmpty {
-            msg += "\nAdded files not used by any program: " + contentFiles.filter { unused[$0.id] != nil }
+            msg += "\n\nAdded files not used by any program: " + contentFiles.filter { unused[$0.id] != nil }
                 .map { "\($0.url.lastPathComponent) (\(unused[$0.id]!.lowercased()))" }.joined(separator: ", ") + "."
         }
         note(msg)

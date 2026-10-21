@@ -29,12 +29,12 @@ struct ContentView: View {
             LogBar(showLog: $showLog)
         }
         .frame(minWidth: 960, minHeight: 600)
-        .alert("pgdata Packer", isPresented: Binding(
+        // A sheet rather than a system alert: alerts are narrow and cannot be widened, which made
+        // the multi-paragraph reports after Write hard to read.
+        .sheet(isPresented: Binding(
             get: { state.alertMessage != nil }, set: { if !$0 { state.alertMessage = nil } }
         )) {
-            Button("OK") { state.alertMessage = nil }
-        } message: {
-            Text(state.alertMessage ?? "")
+            MessageSheet(state: state)
         }
     }
 }
@@ -149,5 +149,40 @@ extension PackPlan.Verdict {
         case .embedsContent: return .blue
         case .blocked: return .red
         }
+    }
+}
+
+/// Report shown after Write and for errors: wide, a blank line between paragraphs, selectable.
+struct MessageSheet: View {
+    @ObservedObject var state: AppState
+
+    private var messageText: some View {
+        Text(state.alertMessage ?? "")
+            .textSelection(.enabled)
+            .lineSpacing(2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(nsImage: NSApplication.shared.applicationIconImage)
+                    .resizable().frame(width: 48, height: 48)
+                // Short reports size to fit; long ones (e.g. many blocked programs) scroll.
+                ViewThatFits(in: .vertical) {
+                    messageText
+                    ScrollView { messageText }.frame(height: 420)
+                }
+            }
+            HStack {
+                Spacer()
+                Button("OK") { state.alertMessage = nil }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 620)
+        .frame(maxHeight: 520)
     }
 }
