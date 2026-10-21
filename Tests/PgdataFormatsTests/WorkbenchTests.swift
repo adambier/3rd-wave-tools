@@ -126,7 +126,7 @@ final class WorkbenchTests: XCTestCase {
         let p3 = PackPlan.make(program: moved, files: [unassigned], profile: SlotProfile(), factory: FactoryLibrary(),
                                embedFactory: false, original: pro)
         XCTAssertEqual(p3.verdict, .blocked([.u(56)]))
-        XCTAssertEqual(PackPlan.unusedFiles([unassigned], plans: [p3])[cf.id], "Not assigned to a slot")
+        XCTAssertEqual(PackPlan.unusedFiles([unassigned], plans: [p3])[cf.id], "Not used by any program here")
     }
 
     func testProfileRoundTripsAsJSON() throws {

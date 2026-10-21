@@ -310,13 +310,14 @@ public struct PackPlan {
         return PackPlan(rows: rows, verdict: verdict, estimatedBytes: total, factoryBytes: factoryTotal)
     }
 
-    /// For each content file that no plan uses, why: not assigned to a slot, or not used by any program.
+    /// For each content file that no plan uses, why: not used by any program (whether or not it has a
+    /// slot), or another file or choice is used for its slot.
     public static func unusedFiles(_ files: [ContentFile], plans: [PackPlan]) -> [UUID: String] {
         var used = Set<UUID>()
         for p in plans { for r in p.rows { if case .file(let id)? = r.choice { used.insert(id) } } }
         var out: [UUID: String] = [:]
         for f in files where !used.contains(f.id) {
-            guard let slot = f.slot else { out[f.id] = "Not assigned to a slot"; continue }
+            guard let slot = f.slot else { out[f.id] = "Not used by any program here"; continue }
             let slotUsed = plans.contains { $0.rows.contains { $0.ref == slot } }
             out[f.id] = slotUsed ? "Not used: another choice is made for \(slot.label)"
                                  : "Not used by any program here"

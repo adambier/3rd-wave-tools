@@ -62,8 +62,8 @@ are. Names longer than 26 characters (the longest factory program name) are flag
 synth's display limit is unknown; name fields hold 31 characters. A table embedded "as on my synth"
 carries the name recorded in Synth Slots.
 
-Added files that no program uses are flagged in the files table ("Not assigned to a slot", "Not
-used by any program here"), with **Use in a program…** to repoint a program to them, and are listed
+Added files that no program uses are flagged in the files table ("Not used by any program here",
+or "another choice is made for U57" when a different file fills its slot), with **Use in a program…** to repoint a program to them, and are listed
 again after **Write**.
 
 You can change any choice from the Content menu. A warning appears where your synth differs
