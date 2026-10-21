@@ -108,6 +108,6 @@ struct FileNameCell: View {
     let file: UnpackPlan.Item
     var body: some View {
         TextField("", text: Binding(get: { file.fileName }, set: { state.setUnpackItem(unpackID, file.id, fileName: $0) }))
-            .textFieldStyle(.plain)
+            .textFieldStyle(.roundedBorder)
     }
 }

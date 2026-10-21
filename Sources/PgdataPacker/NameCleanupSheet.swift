@@ -78,12 +78,12 @@ struct NameCleanupSheet: View {
                 .width(24)
                 TableColumn("Kind") { (r: Row) in Text(r.kind).foregroundStyle(.secondary) }
                     .width(min: 80, ideal: 95)
-                TableColumn("Current") { (r: Row) in Text(r.current).lineLimit(1).help(r.current) }
+                TableColumn("Current") { (r: Row) in Text(r.current).lineLimit(1).foregroundStyle(.secondary).help(r.current) }
                     .width(min: 140, ideal: 220)
                 TableColumn("New name") { (r: Row) in
                     TextField("", text: Binding(get: { proposed(r) }, set: { edited[r.id] = $0 }))
-                        .textFieldStyle(.plain)
-                        .foregroundStyle(changes(r) ? Color.primary : Color.secondary)
+                        .textFieldStyle(.roundedBorder)
+                        .help("Edit to change the proposed name")
                 }
                 .width(min: 160, ideal: 240)
                 TableColumn("") { (r: Row) in lengthNote(proposed(r)) }

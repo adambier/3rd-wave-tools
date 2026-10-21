@@ -77,7 +77,7 @@ struct SlotNameCell: View {
                 get: { row.entry.name },
                 set: { state.renameSlot(row.ref, $0) }
             ))
-            .textFieldStyle(.plain)
+            .textFieldStyle(.roundedBorder)
         }
     }
 }
