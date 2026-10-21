@@ -90,7 +90,7 @@ final class AppState: ObservableObject {
             c.stripSlots = defaults.bool(forKey: "cleanStripSlots")
             c.underscoresToSpaces = defaults.bool(forKey: "cleanUnderscores")
             c.titleCase = defaults.bool(forKey: "cleanTitleCase")
-            if let k = defaults.stringArray(forKey: "cleanKeepUppercase") { c.keepUppercase = k }
+            if let k = defaults.stringArray(forKey: "cleanFixedSpellings") { c.fixedSpellings = k }
             nameCleaner = c
         }
         if defaults.object(forKey: "skipFactoryDuplicates") != nil {
@@ -143,7 +143,7 @@ final class AppState: ObservableObject {
         defaults.set(nameCleaner.stripSlots, forKey: "cleanStripSlots")
         defaults.set(nameCleaner.underscoresToSpaces, forKey: "cleanUnderscores")
         defaults.set(nameCleaner.titleCase, forKey: "cleanTitleCase")
-        defaults.set(nameCleaner.keepUppercase, forKey: "cleanKeepUppercase")
+        defaults.set(nameCleaner.fixedSpellings, forKey: "cleanFixedSpellings")
     }
 
     /// Reading the factory .wt files takes a moment (about 92 text files), so it runs off the main thread.

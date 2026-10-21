@@ -9,17 +9,18 @@ import Foundation
 ///  - underscores to spaces, runs of spaces collapsed, ends trimmed
 ///  - title case, but only for names that are entirely upper case or entirely lower case; a name
 ///    that already mixes cases is left as its author wrote it. Words containing digits (JP8, OBX8)
-///    and words on the keep-uppercase list (SM, FM, PWM…) stay upper case; short joining words
-///    (and, of, the…) are lower case except at the start.
+///    are kept as they are; words on the fixed-spellings list are written exactly as listed
+///    (SM, FM, PWM, LoFi…); short joining words (and, of, the…) are lower case except at the start.
 public struct NameCleaner: Equatable {
     public var stripSlots = true
     public var underscoresToSpaces = true
     public var titleCase = true
-    public var keepUppercase: [String] = NameCleaner.defaultKeepUppercase
+    /// Words written exactly as listed, whatever case they arrive in ("LOFI" → "LoFi").
+    public var fixedSpellings: [String] = NameCleaner.defaultFixedSpellings
 
-    public static let defaultKeepUppercase = ["SM", "FM", "AM", "PWM", "LFO", "VCO", "VCF", "VCA", "DX", "PPG",
-                                              "MIDI", "EQ", "BPM", "OB", "JP", "CS", "CZ", "TB", "TR", "SH",
-                                              "EP", "FX", "DJ", "UK", "USA"]
+    public static let defaultFixedSpellings = ["SM", "FM", "AM", "PWM", "LFO", "VCO", "VCF", "VCA", "DX", "PPG",
+                                               "MIDI", "EQ", "BPM", "OB", "JP", "CS", "CZ", "TB", "TR", "SH",
+                                               "EP", "FX", "DJ", "UK", "USA", "LoFi", "HiFi"]
     static let minorWords: Set<String> = ["a", "an", "and", "the", "of", "in", "on", "to", "for", "with", "or", "at", "by"]
 
     /// Longest program name in Groove's 8M factory banks: names up to this length are known to fit.
@@ -51,21 +52,28 @@ public struct NameCleaner: Equatable {
     private func applyTitleCase(_ s: String) -> String {
         let hasLower = s.contains { $0.isLowercase }, hasUpper = s.contains { $0.isUppercase }
         guard hasLower != hasUpper else { return s }        // mixed case (or no letters): leave it
-        let keep = Set(keepUppercase.map { $0.uppercased() })
+        var keep: [String: String] = [:]
+        for w in fixedSpellings where !w.isEmpty { keep[w.lowercased()] = w }
         let words = s.split(separator: " ").map(String.init)
         return words.enumerated().map { i, w in titleWord(w, first: i == 0, keep: keep) }.joined(separator: " ")
     }
 
-    private func titleWord(_ w: String, first: Bool, keep: Set<String>) -> String {
+    /// Rewrites the letters of `w` with those of `spelling`, keeping any punctuation around them.
+    private func respell(_ w: String, _ spelling: String) -> String {
+        var it = spelling.makeIterator()
+        return String(w.map { $0.isLetter ? (it.next() ?? $0) : $0 })
+    }
+
+    private func titleWord(_ w: String, first: Bool, keep: [String: String]) -> String {
         if w.contains(where: { $0.isNumber }) { return w }
         let letters = w.filter { $0.isLetter }
-        if keep.contains(letters.uppercased()) { return w.uppercased() }
+        if let s = keep[letters.lowercased()] { return respell(w, s) }
         if !first, Self.minorWords.contains(letters.lowercased()), letters.count == w.count { return w.lowercased() }
         // Hyphenated or slashed parts are cased separately: "DX-PPG" → "DX-PPG", "LO-FI" → "Lo-Fi".
         var out = "", part = ""
         func flush() {
             let l = part.filter { $0.isLetter }
-            if keep.contains(l.uppercased()) { out += part.uppercased() }
+            if let sp = keep[l.lowercased()] { out += respell(part, sp) }
             else {
                 var done = false
                 for ch in part.lowercased() {

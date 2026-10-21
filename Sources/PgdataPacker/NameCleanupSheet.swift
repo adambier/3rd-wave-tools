@@ -26,7 +26,7 @@ struct NameCleanupSheet: View {
     init(state: AppState) {
         _state = ObservedObject(wrappedValue: state)
         _rules = State(initialValue: state.nameCleaner)
-        _keepText = State(initialValue: state.nameCleaner.keepUppercase.joined(separator: ", "))
+        _keepText = State(initialValue: state.nameCleaner.fixedSpellings.joined(separator: ", "))
     }
 
     private var allRows: [Row] {
@@ -56,13 +56,13 @@ struct NameCleanupSheet: View {
             HStack(spacing: 18) {
                 Toggle("Title case", isOn: $rules.titleCase)
                     .help("Only for names that are entirely upper or entirely lower case. Names that already mix cases keep their capitals.")
-                Text("Keep upper case:")
-                TextField("SM, FM, PWM…", text: $keepText)
+                Text("Always spell as:")
+                TextField("SM, FM, LoFi…", text: $keepText)
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: keepText) { t in
-                        rules.keepUppercase = t.split(whereSeparator: { $0 == "," || $0 == " " }).map { String($0).uppercased() }
+                        rules.fixedSpellings = t.split(whereSeparator: { $0 == "," || $0 == " " }).map(String.init)
                     }
-                    .help("Words always kept in capitals. Words containing digits (JP8, OBX8) are always kept as they are.")
+                    .help("Words always written exactly as typed here, e.g. SM, LoFi. Words containing digits (JP8, OBX8) are always kept as they are.")
             }
             Toggle("Show only names that change", isOn: $onlyChanges)
 

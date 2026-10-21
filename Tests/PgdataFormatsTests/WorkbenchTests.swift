@@ -169,6 +169,8 @@ final class NameCleanerTests: XCTestCase {
             ("DRUMS AND AMPS", "Drums and Amps"),
             ("DX-PPG KEYS", "DX-PPG Keys"),
             ("LO-FI PAD", "Lo-Fi Pad"),
+            ("LOFI KEYS", "LoFi Keys"),                  // fixed spelling
+            ("DUSTY (LOFI)", "Dusty (LoFi)"),
             ("Additive_Bell_17", "Additive Bell 17"),    // mixed case: only underscores change
             ("FIIx_Arr_Vocal", "FIIx Arr Vocal"),
             ("Tube Bell SM PAD", "Tube Bell SM PAD"),    // mixed case: all-caps words left alone
