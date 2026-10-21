@@ -111,10 +111,20 @@ struct ProgramDetail: View {
         let plan = st.plan(for: item)
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text(item.name).font(.title2)
-                if item.newName != nil {
-                    Text("(was \(item.program.name))").font(.caption).foregroundStyle(.secondary)
+                TextField("Program name", text: Binding(
+                    get: { item.newName ?? item.program.name },
+                    set: { st.setProgramName(item.id, $0) }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .font(.title2)
+                .frame(maxWidth: 380)
+                .help("The name written into the .pgdata. The .pro file is not changed.")
+                if item.name != item.program.name {
+                    Text("was \(item.program.name)").font(.caption).foregroundStyle(.secondary)
+                    Button { st.setProgramName(item.id, nil) } label: { Image(systemName: "arrow.uturn.backward") }
+                        .buttonStyle(.borderless).help("Restore the name from the .pro file")
                 }
+                NameLengthNote(name: item.name)
                 Text(item.program.version).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Show File") { Panels.reveal(item.url) }.buttonStyle(.link)

@@ -86,7 +86,7 @@ struct NameCleanupSheet: View {
                         .help("Edit to change the proposed name")
                 }
                 .width(min: 160, ideal: 240)
-                TableColumn("") { (r: Row) in lengthNote(proposed(r)) }
+                TableColumn("") { (r: Row) in NameLengthNote(name: proposed(r)) }
                     .width(min: 120, ideal: 200)
             }
             .frame(minHeight: 300)
@@ -110,18 +110,6 @@ struct NameCleanupSheet: View {
         .frame(minWidth: 860, minHeight: 520)
     }
 
-    @ViewBuilder private func lengthNote(_ name: String) -> some View {
-        if name.count > NameCleaner.fieldLimit {
-            Label("Too long: cut to \(NameCleaner.fieldLimit)", systemImage: "xmark.octagon").foregroundStyle(.red)
-        } else if name.count > NameCleaner.longestFactoryName {
-            Label("Longer than any factory name (\(NameCleaner.longestFactoryName)); may not fit the display", systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.orange).lineLimit(1)
-                .help("The synth's display limit is not known. Every factory program name is \(NameCleaner.longestFactoryName) characters or fewer.")
-        } else {
-            EmptyView()
-        }
-    }
-
     private func apply() {
         var n = 0
         for r in toApply {
@@ -132,5 +120,19 @@ struct NameCleanupSheet: View {
         state.nameCleaner = rules
         state.note("Renamed \(n) item\(n == 1 ? "" : "s") for packing.")
         dismiss()
+    }
+}
+
+/// Warns when a name may not fit: the synth's display limit is not yet known (see hw-tests T6).
+struct NameLengthNote: View {
+    let name: String
+    var body: some View {
+        if name.count > NameCleaner.fieldLimit {
+            Label("Too long: cut to \(NameCleaner.fieldLimit)", systemImage: "xmark.octagon").foregroundStyle(.red)
+        } else if name.count > NameCleaner.longestFactoryName {
+            Label("Longer than any factory name (\(NameCleaner.longestFactoryName)); may not fit the display", systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.orange).lineLimit(1)
+                .help("The synth's display limit is not known. Every factory program name is \(NameCleaner.longestFactoryName) characters or fewer.")
+        }
     }
 }

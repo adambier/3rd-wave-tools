@@ -27,10 +27,14 @@ final class AppState: ObservableObject {
         /// The program as it will be packed (the original .pro is never changed).
         var effectiveProgram: ProgramFile {
             var p = repoints.isEmpty ? program : program.repointed(repoints)
-            if let n = newName { p.name = n }
+            p.name = name
             return p
         }
-        var name: String { newName ?? program.name }
+        /// Name used for packing; an empty edit falls back to the .pro's own name.
+        var name: String {
+            if let n = newName?.trimmingCharacters(in: .whitespaces), !n.isEmpty { return n }
+            return program.name
+        }
     }
 
     /// Opens the "Point to another slot" sheet: from a source row (itemID + from), or from a
