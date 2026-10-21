@@ -23,70 +23,123 @@ Tests (`./run-tests.sh`) need a full Xcode installation, as in ThirdWaveWT.
 
 ## Using it
 
-The window has three sections.
+The window has three sections: **Synth Slots**, **Pack** and **Unpack**.
 
-**Synth Slots** — tell the app what your synth's wavetable slots hold. Every factory slot (P00–P35,
-U00–U55) is assumed to hold its factory table unless you say otherwise. Other slots are "unknown"
-until you assign the `.wt` file that is in them. Drop files named with a slot (`U48 SM OBX8 1.WT`)
-onto this view to assign several at once, or use **Set… → Assign File…** on a row. Sample (S)
-slots are not tracked, because sample memory changes too often for a record of it to stay right:
-add the `.bin` a program needs on the Pack screen. Also add the folders of Groove's factory `.wt` files here. The app uses
-them to embed factory tables when asked, and to recognise factory tables when unpacking. The slot
-list is saved in `~/Library/Application Support/pgdata Packer/synth-slots.json`.
+### Synth Slots
 
-**Pack** — drop `.pro` files, plus any `.wt` / `.bin` files they need. For each program the app
-lists its oscillator sources and what each will be:
+Tell the app what your synth's wavetable slots hold.
+
+- Factory slots (P00–P35, U00–U55) are assumed to hold their factory tables unless you say
+  otherwise.
+- Other slots are "unknown" until you assign the `.wt` file that is in them. Use
+  **Set… → Assign File…** on a row, or drop files whose names start with a slot
+  (`U48 SM OBX8 1.WT`) to assign several at once.
+- Sample (S) slots are not tracked: sample memory changes too often for a record of it to stay
+  right. Add the `.bin` a program needs on the Pack screen instead.
+
+Also add the folders of Groove's factory `.wt` files here. The app uses them to embed factory tables
+when asked, and to recognise factory tables when unpacking.
+
+The slot list is saved in `~/Library/Application Support/pgdata Packer/synth-slots.json`.
+
+### Pack
+
+Drop `.pro` files, plus any `.wt` / `.bin` files they need. For each program the app lists its
+oscillator sources and what each will be:
 
 - a file you added and assigned to that slot (this wins, since it is what the program's author
-  supplied),
+  supplied);
 - for a factory slot: the factory table, not embedded by default ("Embed factory wavetables"
-  embeds them),
-- for any other wavetable slot: the file the Synth Slots list says is there,
-- otherwise **missing**, and that program will not be written.
+  embeds them);
+- for any other wavetable slot: the file the Synth Slots list says is there;
+- otherwise **missing**, and that program is not written.
 
-**Point to another slot…** (bottom of the Content menu) repoints oscillators: tick the oscillators
-to change and pick the target, which can be a file you added (listed first, under the slot it is
-assigned to), any U or P slot on your synth (searchable by slot or name), or an analog shape. The
-Source column then shows e.g. **U01 → U56**, with a button to undo it. Only the `.pgdata` changes;
-the `.pro` file is not modified. Multisample oscillators are not repointed. Parts 3 and 4 play only
-on 4-part models (24K, 24M); on an 8M they hold filler (P02, U01 and an analog shape).
+You can change any choice from the Content menu. A warning appears where your synth differs from
+what the program expects, for example a factory slot you have overwritten.
 
-**Clean Up Names…** proposes tidier names for the programs and the wavetables and multisamples
-you added (never factory wavetables): slot numbers removed from the start or end ("U48 SM OBX8 1" →
-"SM OBX8 1", "S010_JP8_" → "JP8", "B5-P003 Name" → "Name"), underscores to spaces, and title case for names written entirely
-in capitals or entirely in lower case ("NOSTALGIA RES" → "Nostalgia Res"). Names that already mix
-cases keep their capitals; words with digits (JP8, OBX8) words with no vowels are taken to be acronyms (SM, PWM, PPG; Y counts as a vowel, so
-"SYNTH" becomes "Synth"); and words on an editable list keep a fixed spelling (LFO, MIDI, LoFi…). Every proposal is shown, editable and can be unticked. New names go into
-the `.pgdata` (and its file name); source files are not changed, and unpacking keeps names as they
-are. Names longer than 26 characters (the longest factory program name) are flagged, since the
-synth's display limit is unknown; name fields hold 31 characters. A table embedded "as on my synth"
-carries the name recorded in Synth Slots.
+A multisample a program uses is always embedded; there is no option to leave it out.
+
+Each program shows one of:
+
+- **factory content only**: nothing to embed;
+- **embeds wavetables or samples**;
+- **missing content**: not written until you add the file.
+
+#### Pointing oscillators to another slot
+
+**Point to another slot…** (in the Content menu; the first choice when a wavetable is missing)
+repoints oscillators. Tick the oscillators to change, then pick the target:
+
+- a file you added (listed first, with a slot picker if it has no slot yet);
+- any U or P slot on your synth (searchable by slot or name);
+- an analog shape.
+
+The Source column then shows, for example, **U01 → U56**, with a button to undo it. Only the
+`.pgdata` changes; the `.pro` file is not modified. Multisample oscillators are not repointed.
+
+Parts 3 and 4 play only on 4-part models (24K, 24M). On an 8M they hold filler (P02, U01 and an
+analog shape).
 
 Added files that no program uses are flagged in the files table ("Not used by any program here",
-or "another choice is made for U57" when a different file fills its slot), with **Use in a program…** to repoint a program to them, and are listed
-again after **Write**.
+or "another choice is made for U57" when a different file fills its slot). **Use in a program…**
+repoints a program to them, and they are listed again after writing.
 
-You can change any choice from the Content menu. A warning appears where your synth differs
-from what the program expects (for example a factory slot you have overwritten).
+#### Names
 
-Every program gets a `.pgdata`, even one that uses only factory tables and analog shapes: the
-`.pgdata` is no bigger than the `.pro` (about 13% smaller, since values are stored as 4-byte words
-rather than text). A multisample a program uses is always embedded; there is no option to leave it
-out. Each program shows **factory content only** (nothing embedded), **embeds wavetables or
-samples**, or **missing content** (not written until you add the file). **Write Selected…** /
-**Write All…** ask for a folder. Files are named with the program location first, in
-Groove's own pattern (`B05P87_Ghibli_Bell.pgdata`, as in `B05P06_Glass_Cow_Bell_Transients.pgdata`;
-spaces become underscores in the file name only, not in the program name inside it), taken from the
-`.pro` file name, so the synth's alphabetical bulk import keeps them in order. Provisionally (open question, to be checked on the synth), a batch that includes
-a program 100 uses three digits throughout (`B05P087_…`, `B05P100_…`), since `B05P100` would sort
-between P10 and P11. A `.pro` file does not record its own location, so it is read from the file name; every
-third-party set seen names files that way (`B05P100.pro`). If any program's file name has no
-location (a renamed file), all are numbered by their place in the list instead (`001_…`, `002_…`).
+The program name at the top of the detail area can be edited. **Clean Up Names…** proposes tidier
+names for the programs and for the wavetables and multisamples you added (never factory
+wavetables):
 
-**Unpack** — drop `.pgdata` files. Each becomes a `.pro`, plus a `.wt` per embedded wavetable and
-a `.bin` per multisample, named the way Groove names its own files (`U50_SM OB2.wt`,
-`S010_JP8.bin`). Untick anything you don't want, or rename it, before **Unpack…**. Wavetables
-identical to the factory table in their slot are skipped by default.
+- slot numbers removed from the start or end: "U48 SM OBX8 1" → "SM OBX8 1", "S010_JP8_" → "JP8",
+  "B5-P003 Name" → "Name";
+- underscores to spaces;
+- title case for names written entirely in capitals or entirely in lower case:
+  "NOSTALGIA RES" → "Nostalgia Res". Names that already mix cases keep their capitals.
+
+Within title case:
+
+- words with digits stay as they are (JP8, OBX8);
+- words with no vowels are taken to be acronyms (SM, PWM, PPG). Y counts as a vowel, so "SYNTH"
+  becomes "Synth";
+- words on an editable list keep a fixed spelling (LFO, MIDI, LoFi…).
+
+Every proposal is shown, can be edited, and can be unticked. New names go into the `.pgdata` and
+its file name. Source files are not changed, and unpacking keeps names as they are.
+
+Names longer than 26 characters (the longest factory program name) are flagged, since the synth's
+display limit is not yet known. Name fields hold 31 characters.
+
+A table embedded "as on my synth" carries the name recorded in Synth Slots.
+
+#### Writing
+
+Every program gets a `.pgdata`, even one that uses only factory tables and analog shapes. The
+`.pgdata` is no bigger than the `.pro`: about 13% smaller, since values are stored as 4-byte words
+rather than text.
+
+**Write Selected…** and **Write All…** ask for a folder. If some programs are missing content,
+the app asks first whether to write the others.
+
+Files are named in Groove's own pattern, with the program location first:
+`B05P87_Ghibli_Bell.pgdata`, as in Groove's `B05P06_Glass_Cow_Bell_Transients.pgdata`.
+
+- The location comes from the `.pro` file name, since a `.pro` does not record it. Every set seen
+  names its files that way (`B05P100.pro`).
+- The prefix keeps the synth's alphabetical bulk import in program order.
+- Spaces become underscores in the file name only, not in the program name inside it.
+- Provisionally (an open question, to be checked on the synth), a batch that includes a program
+  100 uses three digits throughout (`B05P087_…`, `B05P100_…`), since `B05P100` would sort between
+  P10 and P11.
+- If any program's file name has no location (a renamed file), all are numbered by their place
+  in the list instead (`001_…`, `002_…`).
+
+### Unpack
+
+Drop `.pgdata` files. Each becomes a `.pro`, plus a `.wt` per embedded wavetable and a `.bin` per
+multisample, named the way Groove names its own files (`U50_SM OB2.wt`, `S010_JP8.bin`).
+
+Untick anything you don't want, or rename it, before **Unpack…**. Wavetables identical to the
+factory table in their slot are skipped by default.
 
 ## Formats
 
