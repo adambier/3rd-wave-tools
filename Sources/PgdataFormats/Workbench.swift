@@ -118,7 +118,7 @@ public struct SlotProfile: Codable, Equatable {
 
 // MARK: - Factory library
 
-/// The factory wavetables, read from the folders Groove distributes ("00-Additive_Bell_17.wt",
+/// The factory wavetables, read from the folders Groove Synthesis distributes ("00-Additive_Bell_17.wt",
 /// "00P.wt", "P34_VS_0-63.wt"). The slot comes from the number at the start of the file name;
 /// the kind from the file's own header.
 public struct FactoryLibrary {
@@ -363,14 +363,14 @@ public enum OutputNames {
         return trimmed.isEmpty ? "Untitled" : trimmed
     }
 
-    /// Groove's convention: "S000_Amen Cuts.bin"; wavetables "U50_SM OB2.wt".
+    /// Groove Synthesis's convention: "S000_Amen Cuts.bin"; wavetables "U50_SM OB2.wt".
     public static func multisample(_ ref: SourceRef, _ m: Multisample) -> String {
         if case let .s(n) = ref { return String(format: "S%03d_", n) + sanitize(m.name) + ".bin" }
         return sanitize(m.name) + ".bin"
     }
     public static func wavetable(_ ref: SourceRef, _ w: WavetableFile) -> String { ref.label + "_" + sanitize(w.name) + ".wt" }
     public static func program(_ p: ProgramFile) -> String { sanitize(p.name) + ".pro" }
-    /// "B05P87_Ghibli_Bell.pgdata", Groove's own pattern (B05P06_Glass_Cow_Bell_Transients.pgdata):
+    /// "B05P87_Ghibli_Bell.pgdata", Groove Synthesis's own pattern (B05P06_Glass_Cow_Bell_Transients.pgdata):
     /// spaces become underscores in the file name only; the name inside the file keeps its spaces.
     /// The synth's bulk import takes files in alphabetical order, so the prefix keeps program order.
     public static func unified(_ p: ProgramFile, prefix: String? = nil) -> String {
@@ -390,7 +390,7 @@ public enum OutputNames {
     }
 
     /// File-name prefixes for programs written together, in list order. When every file name carries
-    /// a location: Groove's "B05P18" form, two-digit program, or three digits for the whole batch if
+    /// a location: Groove Synthesis's "B05P18" form, two-digit program, or three digits for the whole batch if
     /// it includes a program 100 ("B05P100" would sort between P10 and P11). Otherwise "001", "002"…
     /// by position in the list.
     public static func orderPrefixes(fileNames: [String]) -> [String] {

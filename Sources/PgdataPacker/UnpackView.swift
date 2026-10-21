@@ -24,7 +24,7 @@ struct UnpackView: View {
             Divider()
             if state.unpacks.isEmpty {
                 EmptyHint(title: "Drop .pgdata files here",
-                          detail: "Each one is split into its program (.pro), the wavetables it carries (.wt) and its multisamples (.bin, named with their S slot the way Groove's own files are).")
+                          detail: "Each one is split into its program (.pro), the wavetables it carries (.wt) and its multisamples (.bin, named with their S slot the way Groove Synthesis's own files are).")
             } else {
                 HSplitView {
                     List(selection: $selection) {

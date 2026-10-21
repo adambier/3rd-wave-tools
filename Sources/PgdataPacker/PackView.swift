@@ -41,7 +41,7 @@ struct PackView: View {
                 .help("Propose tidier names (slot numbers removed, title case) for the programs and the wavetables and samples you added. Factory wavetables are not renamed.")
                 .sheet(isPresented: $state.showNameCleanup) { NameCleanupSheet(state: state) }
             Toggle("Embed factory wavetables", isOn: $state.embedFactory)
-                .help("Off (recommended): factory tables are listed but not carried, as in Groove's own sample library. On: they are embedded — each U table adds about 0.5 MB and each P table about 65 KB, which makes files slower to copy and import. Useful for sharing with synths whose factory slots may differ. Needs the factory folders set under Synth Slots.")
+                .help("Off (recommended): factory tables are listed but not carried, as in Groove Synthesis's own sample library. On: they are embedded — each U table adds about 0.5 MB and each P table about 65 KB, which makes files slower to copy and import. Useful for sharing with synths whose factory slots may differ. Needs the factory folders set under Synth Slots.")
             Spacer()
             Button("Remove") { state.removePrograms(selection); selection = [] }.disabled(selection.isEmpty)
             Button("Write Selected…") { state.writeUnified(Array(selection)) }.disabled(selection.isEmpty)

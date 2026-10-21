@@ -12,7 +12,7 @@ import Foundation
 ///     u32 ×      one word per .pro value from line 3 on (int32 or float32), to end of file;
 ///                the 12 oscillator source ids are replaced by indices into the source table.
 ///
-/// Verified on Groove's 8M factory banks (19), Groove's sample library (45) and 138 third-party files.
+/// Verified on Groove Synthesis's 8M factory banks (19), Groove Synthesis's sample library (45) and 138 third-party files.
 public struct UnifiedProgram: Equatable {
     public enum Payload: Equatable {
         case none

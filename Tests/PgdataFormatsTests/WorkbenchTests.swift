@@ -15,7 +15,7 @@ final class WorkbenchTests: XCTestCase {
         let u = dir.appendingPathComponent(file); try w.serialized().write(to: u); return u
     }
 
-    func testFactoryLibraryReadsGrooveNames() throws {
+    func testFactoryLibraryReadsGrooveSynthesisNames() throws {
         let f = dir.appendingPathComponent("factory"); try FileManager.default.createDirectory(at: f, withIntermediateDirectories: true)
         let save = dir; dir = f
         _ = try writeWT("Additive_Bell_17", kind: .u, seed: 0.1, file: "00-Additive_Bell_17.wt")
@@ -227,7 +227,7 @@ final class OutputNameTests: XCTestCase {
         XCTAssertNil(loc("AB05P003.pro"))
     }
 
-    func testPrefixesFollowGrooveAndKeepListOrder() {
+    func testPrefixesFollowGrooveSynthesisAndKeepListOrder() {
         XCTAssertEqual(OutputNames.orderPrefixes(fileNames: ["B05P003.pro", "B05P087.pro"]), ["B05P03", "B05P87"])
         // A program 100 in the batch: three digits for all, so P100 sorts last.
         XCTAssertEqual(OutputNames.orderPrefixes(fileNames: ["B05P011.pro", "B05P100.pro"]), ["B05P011", "B05P100"])

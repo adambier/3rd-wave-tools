@@ -37,7 +37,7 @@ Tell the app what your synth's wavetable slots hold.
 - Sample (S) slots are not tracked: sample memory changes too often for a record of it to stay
   right. Add the `.bin` a program needs on the Pack screen instead.
 
-Also add the folders of Groove's factory `.wt` files here. The app uses them to embed factory tables
+Also add the folders of Groove Synthesis's factory `.wt` files here. The app uses them to embed factory tables
 when asked, and to recognise factory tables when unpacking.
 
 The slot list is saved in `~/Library/Application Support/pgdata Packer/synth-slots.json`.
@@ -120,8 +120,8 @@ rather than text.
 **Write Selected…** and **Write All…** ask for a folder. If some programs are missing content,
 the app asks first whether to write the others.
 
-Files are named in Groove's own pattern, with the program location first:
-`B05P87_Ghibli_Bell.pgdata`, as in Groove's `B05P06_Glass_Cow_Bell_Transients.pgdata`.
+Files are named in Groove Synthesis's own pattern, with the program location first:
+`B05P87_Ghibli_Bell.pgdata`, as in Groove Synthesis's `B05P06_Glass_Cow_Bell_Transients.pgdata`.
 
 - The location comes from the `.pro` file name, since a `.pro` does not record it. Every set seen
   names its files that way (`B05P100.pro`).
@@ -136,7 +136,7 @@ Files are named in Groove's own pattern, with the program location first:
 ### Unpack
 
 Drop `.pgdata` files. Each becomes a `.pro`, plus a `.wt` per embedded wavetable and a `.bin` per
-multisample, named the way Groove names its own files (`U50_SM OB2.wt`, `S010_JP8.bin`).
+multisample, named the way Groove Synthesis names its own files (`U50_SM OB2.wt`, `S010_JP8.bin`).
 
 Untick anything you don't want, or rename it, before **Unpack…**. Wavetables identical to the
 factory table in their slot are skipped by default.
@@ -180,30 +180,30 @@ indices.
 
 ## Verification
 
-Run against 2,000-odd real files: Groove's 8M factory banks and sample library, Groove's
+Run against 2,000-odd real files: Groove Synthesis's 8M factory banks and sample library, Groove Synthesis's
 1.8 examples and the Bank Arranger banks, plus nine third-party sound sets.
 
 - Every `.pro`, `.bin`, `.wt` and `.pgdata` reads and rewrites byte for byte.
 - All 202 intact `.pgdata` unpack and repack identically, up to the `.pro` format's six-decimal
   float precision (the synth's own `.pro` export has the same limit).
-- All 280 embedded wavetables are bit-identical to Groove's `.wt` files.
-- Packing Groove's 19 factory `.pro` files reproduces Groove's `.pgdata`. The differences are
+- All 280 embedded wavetables are bit-identical to Groove Synthesis's `.wt` files.
+- Packing Groove Synthesis's 19 factory `.pro` files reproduces Groove Synthesis's `.pgdata`. The differences are
   three values that appear to be state captured at export time, and the leftover source
-  references from unused parts, which this app lists and Groove's 8M exporter does not (Groove's
+  references from unused parts, which this app lists and Groove Synthesis's 8M exporter does not (Groove Synthesis's
   sample library does).
 
 ## Not yet known (needs a test on the synth)
 
 - Whether importing a `.pgdata` puts its wavetables back in their original slots or moves them
-  to free ones. Groove's own instructions imply that samples are moved to free S slots.
+  to free ones. Groove Synthesis's own instructions imply that samples are moved to free S slots.
 - Whether a `.pgdata` containing an older `W3_PROG_4` program imports correctly.
-- Whether the synth accepts our `.pgdata` files with factory tables left out. Groove's own sample
+- Whether the synth accepts our `.pgdata` files with factory tables left out. Groove Synthesis's own sample
   library does this, so it is expected to work.
 
 ## Synth tests
 
 The open questions above are being checked on a synth. `tw3pg maketests`, `maketest5` and
-`maketest6` build the test `.pgdata` files from your own copies of the programs they use (a Groove
+`maketest6` build the test `.pgdata` files from your own copies of the programs they use (a Groove Synthesis
 factory program and two third-party programs, which are not included here).
 
 ## Layout

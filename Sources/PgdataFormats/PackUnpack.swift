@@ -29,7 +29,7 @@ public enum Packer {
     /// Builds a .pgdata from a program and the content chosen for each of its sources.
     ///
     /// Sources are listed in order of first use (part 1 osc 1 … part 4 osc 3), every referenced
-    /// source included, as Groove's sample library does. Analog shapes never carry data.
+    /// source included, as Groove Synthesis's sample library does. Analog shapes never carry data.
     /// Multisamples are normally carried. Listing an S slot without its samples is allowed only when
     /// asked for explicitly: no such file has been seen, and the synth's handling is untested.
     public static func pack(_ program: ProgramFile, content: [SourceRef: SourceContent]) throws -> UnifiedProgram {
@@ -46,7 +46,7 @@ public enum Packer {
             case (.s, .multisample(let m)):
                 sources.append(.init(ref: ref, payload: .multisample(m)))
             case (.s, .reference):
-                // Listed without its samples. Never seen in Groove's files; the synth's handling is untested.
+                // Listed without its samples. Never seen in Groove Synthesis's files; the synth's handling is untested.
                 sources.append(.init(ref: ref, payload: .none))
             case (.s, _):
                 throw PackError.wrongKind(ref, "a sample slot needs a multisample (.bin), not a wavetable.")

@@ -131,13 +131,13 @@ struct FactoryFoldersBox: View {
                 Text("Factory wavetables").font(.headline)
                 Spacer()
                 Button("Add Folder…") {
-                    if let f = Panels.chooseFolder(prompt: "Use Folder", message: "Choose a folder of Groove's factory .wt files (P or U)") {
+                    if let f = Panels.chooseFolder(prompt: "Use Folder", message: "Choose a folder of Groove Synthesis's factory .wt files (P or U)") {
                         if !state.factoryFolders.contains(f) { state.factoryFolders.append(f) }
                     }
                 }
             }
             if state.factoryFolders.isEmpty {
-                Text("Not set. Point this at the folders of factory P and U wavetables from Groove's support page. Needed to embed factory tables and to recognise them when unpacking.")
+                Text("Not set. Point this at the folders of factory P and U wavetables from Groove Synthesis's support page. Needed to embed factory tables and to recognise them when unpacking.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             ForEach(state.factoryFolders, id: \.self) { f in
