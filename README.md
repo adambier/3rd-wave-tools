@@ -77,7 +77,7 @@ samples**, or **missing content** (not written until you add the file). **Write 
 **Write All…** ask for a folder. Files are named with the program location first, in
 Groove's own pattern (`B05P87_Ghibli_Bell.pgdata`, as in `B05P06_Glass_Cow_Bell_Transients.pgdata`;
 spaces become underscores in the file name only, not in the program name inside it), taken from the
-`.pro` file name, so the synth's alphabetical bulk import keeps them in order. Provisionally (open question, see synth test T7), a batch that includes
+`.pro` file name, so the synth's alphabetical bulk import keeps them in order. Provisionally (open question, to be checked on the synth), a batch that includes
 a program 100 uses three digits throughout (`B05P087_…`, `B05P100_…`), since `B05P100` would sort
 between P10 and P11. A `.pro` file does not record its own location, so it is read from the file name; every
 third-party set seen names files that way (`B05P100.pro`). If any program's file name has no
@@ -149,8 +149,9 @@ Run against 2,000-odd real files: Groove's 8M factory banks and sample library, 
 
 ## Synth tests
 
-`hw-tests/` holds four small `.pgdata` files and step-by-step instructions (`hw-tests/TESTS.md`)
-for the open questions above. `tw3pg maketests` regenerates them.
+The open questions above are being checked on a synth. `tw3pg maketests`, `maketest5` and
+`maketest6` build the test `.pgdata` files from your own copies of the programs they use (a Groove
+factory program and two third-party programs, which are not included here).
 
 ## Layout
 

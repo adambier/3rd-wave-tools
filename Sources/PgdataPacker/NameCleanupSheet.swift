@@ -123,7 +123,7 @@ struct NameCleanupSheet: View {
     }
 }
 
-/// Warns when a name may not fit: the synth's display limit is not yet known (see hw-tests T6).
+/// Warns when a name may not fit: the synth's display limit is not yet known (still to be checked on the synth).
 struct NameLengthNote: View {
     let name: String
     var body: some View {
