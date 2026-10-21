@@ -214,3 +214,23 @@ final class NameCleanerTests: XCTestCase {
         XCTAssertEqual(back.wavetables.first?.file.name, "Nostalgia")
     }
 }
+
+final class OutputNameTests: XCTestCase {
+    func testProgramLocations() {
+        XCTAssertEqual(OutputNames.programLocation(inFileName: "B05P003.pro"), "B5-P003")
+        XCTAssertEqual(OutputNames.programLocation(inFileName: "B05P01_Hanger Drums.pgdata"), "B5-P001")
+        XCTAssertEqual(OutputNames.programLocation(inFileName: "B4-P100 Name.pro"), "B4-P100")
+        XCTAssertEqual(OutputNames.programLocation(inFileName: "b1p059.PRO"), "B1-P059")
+        XCTAssertNil(OutputNames.programLocation(inFileName: "ARP Restooth Arp.pro"))
+        XCTAssertNil(OutputNames.programLocation(inFileName: "B06P003.pro"))     // banks are 1–5
+        XCTAssertNil(OutputNames.programLocation(inFileName: "AB05P003.pro"))
+    }
+
+    func testPrefixesKeepListOrder() {
+        XCTAssertEqual(OutputNames.orderPrefixes(fileNames: ["B05P003.pro", "B05P010.pro"]), ["B5-P003", "B5-P010"])
+        XCTAssertEqual(OutputNames.orderPrefixes(fileNames: ["B05P003.pro", "Lead.pro", "Bass.pro"]), ["001", "002", "003"])
+        var p = makeProgram(sources: Array(repeating: 42, count: 12)); p.name = "Ghibli Bell"
+        XCTAssertEqual(OutputNames.unified(p, prefix: "B5-P087"), "B5-P087 Ghibli Bell.pgdata")
+        XCTAssertEqual(OutputNames.unified(p), "Ghibli Bell.pgdata")
+    }
+}

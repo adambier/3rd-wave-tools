@@ -74,7 +74,10 @@ Every program gets a `.pgdata`, even one that uses only factory tables and analo
 rather than text). A multisample a program uses is always embedded; there is no option to leave it
 out. Each program shows **factory content only** (nothing embedded), **embeds wavetables or
 samples**, or **missing content** (not written until you add the file). **Write Selected…** /
-**Write All…** ask for a folder.
+**Write All…** ask for a folder. Files are named with the program location first,
+`B5-P003 Ghibli Bell.pgdata`, taken from the `.pro` file name, so the synth's alphabetical bulk import
+keeps them in order. If any program's file name has no location, all are numbered by their place
+in the list instead (`001 …`, `002 …`).
 
 **Unpack** — drop `.pgdata` files. Each becomes a `.pro`, plus a `.wt` per embedded wavetable and
 a `.bin` per multisample, named the way Groove names its own files (`U50_SM OB2.wt`,

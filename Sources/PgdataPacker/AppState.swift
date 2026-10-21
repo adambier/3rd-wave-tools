@@ -331,6 +331,10 @@ final class AppState: ObservableObject {
         guard !items.isEmpty, let folder = Panels.chooseFolder(prompt: "Write Here", message: "Choose where to write the .pgdata files") else { return }
         var outputs: [(name: String, data: Data)] = []
         var blocked: [String] = [], failed: [String] = []
+        // Prefix each file with its program location (or list position) so the synth's alphabetical
+        // bulk import keeps the programs in order. Positions count over the whole list.
+        let prefixes = OutputNames.orderPrefixes(fileNames: programs.map { $0.url.lastPathComponent })
+        let prefixByID = Dictionary(uniqueKeysWithValues: zip(programs.map(\.id), prefixes))
         for item in items {
             let plan = plan(for: item)
             switch plan.verdict {
@@ -341,7 +345,7 @@ final class AppState: ObservableObject {
             do {
                 let content = try plan.content(files: contentFiles, profile: profile, factory: factory, names: contentNames)
                 let g = try Packer.pack(item.effectiveProgram, content: content)
-                outputs.append((name: OutputNames.unified(item.effectiveProgram), data: g.serialized()))
+                outputs.append((name: OutputNames.unified(item.effectiveProgram, prefix: prefixByID[item.id]), data: g.serialized()))
             } catch { failed.append("\(item.name): \(error)") }
         }
         let written = Panels.write(outputs, into: folder)

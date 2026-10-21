@@ -369,7 +369,31 @@ public enum OutputNames {
     }
     public static func wavetable(_ ref: SourceRef, _ w: WavetableFile) -> String { ref.label + "_" + sanitize(w.name) + ".wt" }
     public static func program(_ p: ProgramFile) -> String { sanitize(p.name) + ".pro" }
-    public static func unified(_ p: ProgramFile) -> String { sanitize(p.name) + ".pgdata" }
+    /// "B5-P003 Ghibli Bell.pgdata". The synth's bulk import takes files in alphabetical order, so
+    /// the prefix keeps them in program order. Without a prefix, the name alone.
+    public static func unified(_ p: ProgramFile, prefix: String? = nil) -> String {
+        (prefix.map { $0 + " " } ?? "") + sanitize(p.name) + ".pgdata"
+    }
+
+    private static let locationPattern = try! NSRegularExpression(
+        pattern: #"(?<![A-Za-z0-9])[Bb]0?([1-5])-?[Pp](\d{1,3})(?!\d)"#)
+
+    /// Program location named in a file name, in the synth's display form:
+    /// "B05P003.pro" → "B5-P003", "B05P01_Name.pgdata" → "B5-P001". nil when there is none.
+    public static func programLocation(inFileName name: String) -> String? {
+        guard let m = locationPattern.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
+              let b = Range(m.range(at: 1), in: name), let p = Range(m.range(at: 2), in: name),
+              let bank = Int(name[b]), let prog = Int(name[p]), (1...100).contains(prog) else { return nil }
+        return String(format: "B%d-P%03d", bank, prog)
+    }
+
+    /// File-name prefixes for programs written together, in list order: their locations when every
+    /// file name carries one, otherwise "001", "002"… by position in the list.
+    public static func orderPrefixes(fileNames: [String]) -> [String] {
+        let locs = fileNames.map { programLocation(inFileName: $0) }
+        if locs.allSatisfy({ $0 != nil }) { return locs.map { $0! } }
+        return fileNames.indices.map { String(format: "%03d", $0 + 1) }
+    }
 }
 
 // MARK: - Unpack plan
