@@ -77,10 +77,11 @@ samples**, or **missing content** (not written until you add the file). **Write 
 **Write All…** ask for a folder. Files are named with the program location first, in
 Groove's own pattern (`B05P87_Ghibli_Bell.pgdata`, as in `B05P06_Glass_Cow_Bell_Transients.pgdata`;
 spaces become underscores in the file name only, not in the program name inside it), taken from the
-`.pro` file name, so the synth's alphabetical bulk import keeps them in order. A batch that includes
+`.pro` file name, so the synth's alphabetical bulk import keeps them in order. Provisionally (open question, see synth test T7), a batch that includes
 a program 100 uses three digits throughout (`B05P087_…`, `B05P100_…`), since `B05P100` would sort
-between P10 and P11. If any program's file name has no location, all are numbered by their place
-in the list instead (`001_…`, `002_…`).
+between P10 and P11. A `.pro` file does not record its own location, so it is read from the file name; every
+third-party set seen names files that way (`B05P100.pro`). If any program's file name has no
+location (a renamed file), all are numbered by their place in the list instead (`001_…`, `002_…`).
 
 **Unpack** — drop `.pgdata` files. Each becomes a `.pro`, plus a `.wt` per embedded wavetable and
 a `.bin` per multisample, named the way Groove names its own files (`U50_SM OB2.wt`,
