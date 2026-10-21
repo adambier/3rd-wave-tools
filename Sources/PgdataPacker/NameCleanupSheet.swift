@@ -50,7 +50,7 @@ struct NameCleanupSheet: View {
                 .font(.caption).foregroundStyle(.secondary)
 
             HStack(spacing: 18) {
-                Toggle("Remove slot numbers (U48, S010, B05P003) at the start or end", isOn: $rules.stripSlots)
+                Toggle("Remove slot numbers (B5-P003, U48, S10) at the start or end", isOn: $rules.stripSlots)
                 Toggle("Underscores to spaces", isOn: $rules.underscoresToSpaces)
             }
             HStack(spacing: 18) {

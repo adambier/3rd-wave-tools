@@ -180,6 +180,8 @@ final class NameCleanerTests: XCTestCase {
             ("Tube Bell SM PAD", "Tube Bell SM PAD"),    // mixed case: all-caps words left alone
             ("ghibli bell", "Ghibli Bell"),
             ("B05P003 GHIBLI BELL", "Ghibli Bell"),
+            ("B5-P003 GHIBLI BELL", "Ghibli Bell"),
+            ("ARP SEQ LEAD", "Arp SEQ Lead"),
             ("GHIBLI BELL U57", "Ghibli Bell"),
             ("U56", "U56"),                               // nothing left: keep
             ("U2 TRIBUTE", "U2 Tribute"),                 // one digit is not a slot

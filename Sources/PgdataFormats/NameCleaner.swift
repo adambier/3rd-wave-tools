@@ -5,7 +5,7 @@ import Foundation
 ///
 /// Rules, each optional:
 ///  - strip a slot number at the start or end ("U48 SM OBX8 1" → "SM OBX8 1", "S010_JP8_" → "JP8",
-///    "B05P003 Name" → "Name"); never one in the middle, and never if nothing would be left
+///    "B5-P003 Name" → "Name"; the file-name form B05P003 too); never one in the middle, and never if nothing would be left
 ///  - underscores to spaces, runs of spaces collapsed, ends trimmed
 ///  - title case, but only for names that are entirely upper case or entirely lower case; a name
 ///    that already mixes cases is left as its author wrote it. Words containing digits (JP8, OBX8)
@@ -20,7 +20,7 @@ public struct NameCleaner: Equatable {
     public var fixedSpellings: [String] = NameCleaner.defaultFixedSpellings
 
     /// Words without vowels are already treated as acronyms, so this lists only the ones with vowels.
-    public static let defaultFixedSpellings = ["AM", "LFO", "VCO", "VCA", "MIDI", "EQ", "OB", "EP", "UK", "USA",
+    public static let defaultFixedSpellings = ["AM", "LFO", "VCO", "VCA", "MIDI", "EQ", "SEQ", "OB", "EP", "UK", "USA",
                                                "LoFi", "HiFi"]
     static let minorWords: Set<String> = ["a", "an", "and", "the", "of", "in", "on", "to", "for", "with", "or", "at", "by"]
 
