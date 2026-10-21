@@ -112,6 +112,11 @@ Run against 2,000-odd real files: Groove's 8M factory banks and sample library, 
 - Whether the synth accepts our `.pgdata` files with factory tables left out. Groove's own sample
   library does this, so it is expected to work.
 
+## Synth tests
+
+`hw-tests/` holds four small `.pgdata` files and step-by-step instructions (`hw-tests/TESTS.md`)
+for the open questions above. `tw3pg maketests` regenerates them.
+
 ## Layout
 
 ```

@@ -183,6 +183,51 @@ case "wtcheck":
     }
     print("wtcheck: \(exact) bit-exact, \(mismatch) mismatched; no .wt found for: \(unmatched.sorted())")
 
+case "maketests":
+    // tw3pg maketests <factory .pro using U07> <a .wt already on the synth> <a W3_PROG_4 .pro> <outdir>
+    // Builds the hardware-test .pgdata files described in the README's "synth tests" section.
+    let base = try ProgramFile(data: try load(URL(fileURLWithPath: rest[0])))
+    let existing = try WavetableFile(data: try load(URL(fileURLWithPath: rest[1])))
+    let v4 = try ProgramFile(data: try load(URL(fileURLWithPath: rest[2])))
+    let out = URL(fileURLWithPath: rest[3])
+    try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+    func refsOnly(_ p: ProgramFile) -> [SourceRef: SourceContent] {
+        var c: [SourceRef: SourceContent] = [:]
+        for r in p.distinctSources where !r.isBuiltIn { c[r] = .reference }
+        return c
+    }
+    func write(_ p: ProgramFile, _ c: [SourceRef: SourceContent], _ file: String) throws {
+        let g = try Packer.pack(p, content: c)
+        try g.serialized().write(to: out.appendingPathComponent(file))
+        print("\(file): \"\(p.name)\" sources \(g.sources.map { $0.ref.label + ($0.hasData ? "*" : "") })")
+    }
+    // T1: factory tables listed, not carried.
+    var t1 = base; t1.name = "TW3 T1 FactoryRef"
+    try write(t1, refsOnly(t1), "TW3_T1_FactoryRef.pgdata")
+    // T2: part 1 osc 1 -> U58, carrying a table the synth already has in another slot.
+    var t2 = base; t2.name = "TW3 T2 U58 Dup"; t2.setSourceID(SourceRef.u(58).id, at: 0)
+    var c2 = refsOnly(t2); c2[.u(58)] = .wavetable(existing)
+    try write(t2, c2, "TW3_T2_U58_Dup.pgdata")
+    // T3: part 1 osc 1 -> U59, carrying a brand-new table (2 cycles of 1024 per wave, sine → square).
+    var vals: [Float] = []; vals.reserveCapacity(131_072)
+    for wave in 0..<64 {
+        let mix = Float(wave) / 63
+        for i in 0..<2048 {
+            let ph = Float(i % 1024) / 1024 * 2 * .pi
+            let sq: Float = sin(ph) >= 0 ? 0.8 : -0.8
+            vals.append((1 - mix) * 0.8 * sin(ph) + mix * sq)
+        }
+    }
+    let fresh = WavetableFile(kind: .u, name: "TW3 Test Table", values: vals)
+    var t3 = base; t3.name = "TW3 T3 U59 New"; t3.setSourceID(SourceRef.u(59).id, at: 0)
+    var c3 = refsOnly(t3); c3[.u(59)] = .wavetable(fresh)
+    try write(t3, c3, "TW3_T3_U59_New.pgdata")
+    try fresh.serialized().write(to: out.appendingPathComponent("U59_TW3 Test Table.wt"))
+    // T4: an older-format (W3_PROG_4) program inside a .pgdata.
+    var t4 = v4; t4.name = String(("TW3 T4 v4 " + v4.name).prefix(31))
+    try write(t4, refsOnly(t4), "TW3_T4_v4.pgdata")
+    try v4.serialized().write(to: out.appendingPathComponent("TW3_T4_original.pro"))
+
 default:
     print("unknown command \(cmd)"); exit(2)
 }
