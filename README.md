@@ -1,4 +1,6 @@
-# 3rd Wave Program Packer
+# pgdata Packer
+
+*for the Groove Synthesis 3rd Wave*
 
 A macOS app that packs Groove Synthesis 3rd Wave programs together with the wavetables and
 multisamples they use into unified program files (`.pgdata`), and unpacks `.pgdata` files back
@@ -13,8 +15,8 @@ are inferred.
 Requires macOS 13+ and the Xcode command-line tools (`xcode-select --install`). No Xcode project.
 
 ```
-./make-app.sh          # builds ThirdWavePG.app in this folder
-open ThirdWavePG.app
+./make-app.sh          # builds "pgdata Packer.app" in this folder
+open "pgdata Packer.app"
 ```
 
 Tests (`./run-tests.sh`) need a full Xcode installation, as in ThirdWaveWT.
@@ -30,7 +32,7 @@ onto this view to assign several at once, or use **Set… → Assign File…** o
 slots are not tracked, because sample memory changes too often for a record of it to stay right:
 add the `.bin` a program needs on the Pack screen. Also add the folders of Groove's factory `.wt` files here. The app uses
 them to embed factory tables when asked, and to recognise factory tables when unpacking. The slot
-list is saved in `~/Library/Application Support/ThirdWavePG/synth-slots.json`.
+list is saved in `~/Library/Application Support/pgdata Packer/synth-slots.json`.
 
 **Pack** — drop `.pro` files, plus any `.wt` / `.bin` files they need. For each program the app
 lists its oscillator sources and what each will be:
@@ -143,7 +145,7 @@ Sources/ThirdWaveFormats/   formats and packing logic, no UI (tested on Linux an
   UnifiedProgram.swift      .pgdata
   PackUnpack.swift          Packer / Unpacker
   Workbench.swift           slot profile, factory library, pack and unpack plans
-Sources/ThirdWavePG/        the app (SwiftUI)
+Sources/PgdataPacker/       the app (SwiftUI)
 Sources/tw3pg/              developer harness: inspect, roundtrip, repack, compare, wtcheck
 Tests/ThirdWaveFormatsTests/
 ```

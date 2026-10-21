@@ -29,7 +29,7 @@ struct ContentView: View {
             LogBar(showLog: $showLog)
         }
         .frame(minWidth: 960, minHeight: 600)
-        .alert("3rd Wave Program Packer", isPresented: Binding(
+        .alert("pgdata Packer", isPresented: Binding(
             get: { state.alertMessage != nil }, set: { if !$0 { state.alertMessage = nil } }
         )) {
             Button("OK") { state.alertMessage = nil }

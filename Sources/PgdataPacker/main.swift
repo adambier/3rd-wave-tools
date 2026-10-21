@@ -4,8 +4,19 @@ import SwiftUI
 // Built as a plain swiftc target (see make-app.sh), so the app is assembled here by hand
 // rather than through the `App` protocol. Same structure as ThirdWaveWT.
 
+let appName = "pgdata Packer"
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    @objc func showAbout(_ sender: Any?) {
+        let credits = NSAttributedString(
+            string: "Packs and unpacks unified program data (.pgdata) files for the Groove Synthesis 3rd Wave.\n"
+                + "Not affiliated with or endorsed by Groove Synthesis.",
+            attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+                         .foregroundColor: NSColor.secondaryLabelColor])
+        NSApplication.shared.orderFrontStandardAboutPanel(options: [.applicationName: appName, .credits: credits])
+    }
 }
 
 private func buildMainMenu() -> NSMenu {
@@ -13,9 +24,8 @@ private func buildMainMenu() -> NSMenu {
 
     let appMenuItem = NSMenuItem()
     let appMenu = NSMenu()
-    let name = "3rd Wave Program Packer"
-    appMenu.addItem(withTitle: "About \(name)",
-                    action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+    let name = appName
+    appMenu.addItem(withTitle: "About \(name)", action: #selector(AppDelegate.showAbout(_:)), keyEquivalent: "")
     appMenu.addItem(.separator())
     appMenu.addItem(withTitle: "Hide \(name)", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
     appMenu.addItem(.separator())
@@ -50,7 +60,7 @@ let window = NSWindow(
     backing: .buffered,
     defer: false
 )
-window.title = "3rd Wave Program Packer"
+window.title = appName
 window.isReleasedWhenClosed = false
 window.contentView = NSHostingView(rootView: ContentView().environmentObject(appState))
 if !window.setFrameUsingName("MainWindow") { window.center() }

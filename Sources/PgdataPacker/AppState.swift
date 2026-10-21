@@ -69,6 +69,7 @@ final class AppState: ObservableObject {
     private var loading = true
 
     init() {
+        Self.migrateFromOldName(defaults)
         if let paths = defaults.stringArray(forKey: "factoryFolders") {
             factoryFolders = paths.map { URL(fileURLWithPath: $0) }
         }
@@ -83,9 +84,27 @@ final class AppState: ObservableObject {
 
     // MARK: Persistence
 
-    private var supportDir: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return base.appendingPathComponent("ThirdWavePG", isDirectory: true)
+    private static var supportBase: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    }
+    private var supportDir: URL { Self.supportBase.appendingPathComponent("pgdata Packer", isDirectory: true) }
+
+    /// The app was first built as "ThirdWavePG" (bundle id org.biers.thirdwavepg). Carry its
+    /// settings and slot list over once, leaving the old copies in place.
+    private static func migrateFromOldName(_ defaults: UserDefaults) {
+        if defaults.object(forKey: "factoryFolders") == nil, let old = UserDefaults(suiteName: "org.biers.thirdwavepg") {
+            for key in ["factoryFolders", "embedFactory", "skipFactoryDuplicates"] {
+                if let v = old.object(forKey: key) { defaults.set(v, forKey: key) }
+            }
+        }
+        let fm = FileManager.default
+        let oldFile = supportBase.appendingPathComponent("ThirdWavePG/synth-slots.json")
+        let newDir = supportBase.appendingPathComponent("pgdata Packer", isDirectory: true)
+        let newFile = newDir.appendingPathComponent("synth-slots.json")
+        if !fm.fileExists(atPath: newFile.path), fm.fileExists(atPath: oldFile.path) {
+            try? fm.createDirectory(at: newDir, withIntermediateDirectories: true)
+            try? fm.copyItem(at: oldFile, to: newFile)
+        }
     }
     private var profileURL: URL { supportDir.appendingPathComponent("synth-slots.json") }
 

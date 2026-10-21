@@ -1,11 +1,11 @@
 #!/bin/bash
-# Build the 3rd Wave Program Packer and wrap it in a .app bundle.
+# Build pgdata Packer and wrap it in a .app bundle.
 #
 #   ./make-app.sh            release build, compiled directly with swiftc
 #   ./make-app.sh debug      debug build
 #   ./make-app.sh --spm      build through SwiftPM instead (needs full Xcode)
 #
-# The result is ./ThirdWavePG.app — double-clickable, no Xcode needed; the Command Line
+# The result is "./pgdata Packer.app" — double-clickable, no Xcode needed; the Command Line
 # Tools are enough (xcode-select --install). Same approach as ThirdWaveWT: SwiftPM looks
 # for XCTest even when it does not need it, which fails without Xcode, so by default the
 # sources are compiled straight into one module with swiftc. The app sources'
@@ -24,8 +24,8 @@ for arg in "$@"; do
     esac
 done
 
-APP="ThirdWavePG.app"
-BUNDLE_ID="org.biers.thirdwavepg"
+APP="pgdata Packer.app"
+BUNDLE_ID="org.biers.pgdatapacker"
 VERSION="1.0"
 DEPLOYMENT_TARGET="13.0"
 
@@ -33,8 +33,8 @@ mkdir -p build
 
 if [ "$USE_SPM" -eq 1 ]; then
     echo "Building through SwiftPM ($CONFIG)…"
-    swift build -c "$CONFIG" --product ThirdWavePG
-    BIN="$(swift build -c "$CONFIG" --show-bin-path)/ThirdWavePG"
+    swift build -c "$CONFIG" --product PgdataPacker
+    BIN="$(swift build -c "$CONFIG" --show-bin-path)/PgdataPacker"
 else
     SDK="$(xcrun --sdk macosx --show-sdk-path)"
     if [ ! -d "$SDK" ]; then
@@ -42,7 +42,7 @@ else
         exit 1
     fi
     ARCH="$(uname -m)"
-    BIN="build/ThirdWavePG"
+    BIN="build/PgdataPacker"
 
     if [ "$CONFIG" = "release" ]; then
         OPTFLAGS=(-O -whole-module-optimization)
@@ -57,13 +57,13 @@ else
         "${OPTFLAGS[@]}" \
         -sdk "$SDK" \
         -target "${ARCH}-apple-macos${DEPLOYMENT_TARGET}" \
-        -module-name ThirdWavePG \
+        -module-name PgdataPacker \
         -framework AppKit \
         -framework SwiftUI \
         -framework UniformTypeIdentifiers \
         -o "$BIN" \
         Sources/ThirdWaveFormats/*.swift \
-        Sources/ThirdWavePG/*.swift
+        Sources/PgdataPacker/*.swift
 fi
 
 if [ ! -x "$BIN" ]; then
@@ -73,7 +73,7 @@ fi
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN" "$APP/Contents/MacOS/ThirdWavePG"
+cp "$BIN" "$APP/Contents/MacOS/PgdataPacker"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -81,10 +81,10 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleExecutable</key>       <string>ThirdWavePG</string>
+    <key>CFBundleExecutable</key>       <string>PgdataPacker</string>
     <key>CFBundleIdentifier</key>       <string>$BUNDLE_ID</string>
-    <key>CFBundleName</key>             <string>3rd Wave Packer</string>
-    <key>CFBundleDisplayName</key>      <string>3rd Wave Program Packer</string>
+    <key>CFBundleName</key>             <string>pgdata Packer</string>
+    <key>CFBundleDisplayName</key>      <string>pgdata Packer</string>
     <key>CFBundlePackageType</key>      <string>APPL</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>
     <key>CFBundleVersion</key>          <string>$VERSION</string>
