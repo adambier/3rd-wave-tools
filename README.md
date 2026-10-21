@@ -56,7 +56,7 @@ you added (never factory wavetables): slot numbers removed from the start or end
 "SM OBX8 1", "S010_JP8_" → "JP8", "B5-P003 Name" → "Name"), underscores to spaces, and title case for names written entirely
 in capitals or entirely in lower case ("NOSTALGIA RES" → "Nostalgia Res"). Names that already mix
 cases keep their capitals; words with digits (JP8, OBX8) words with no vowels are taken to be acronyms (SM, PWM, PPG; Y counts as a vowel, so
-"SYNTH" becomes "Synth"); and words on an editable list keep a fixed spelling (LFO, MIDI, SEQ, LoFi…). Every proposal is shown, editable and can be unticked. New names go into
+"SYNTH" becomes "Synth"); and words on an editable list keep a fixed spelling (LFO, MIDI, LoFi…). Every proposal is shown, editable and can be unticked. New names go into
 the `.pgdata` (and its file name); source files are not changed, and unpacking keeps names as they
 are. Names longer than 26 characters (the longest factory program name) are flagged, since the
 synth's display limit is unknown; name fields hold 31 characters. A table embedded "as on my synth"

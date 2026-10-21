@@ -181,7 +181,7 @@ final class NameCleanerTests: XCTestCase {
             ("ghibli bell", "Ghibli Bell"),
             ("B05P003 GHIBLI BELL", "Ghibli Bell"),
             ("B5-P003 GHIBLI BELL", "Ghibli Bell"),
-            ("ARP SEQ LEAD", "Arp SEQ Lead"),
+            ("ARP SEQ LEAD", "Arp Seq Lead"),
             ("GHIBLI BELL U57", "Ghibli Bell"),
             ("U56", "U56"),                               // nothing left: keep
             ("U2 TRIBUTE", "U2 Tribute"),                 // one digit is not a slot

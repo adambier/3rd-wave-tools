@@ -20,7 +20,7 @@ public struct NameCleaner: Equatable {
     public var fixedSpellings: [String] = NameCleaner.defaultFixedSpellings
 
     /// Words without vowels are already treated as acronyms, so this lists only the ones with vowels.
-    public static let defaultFixedSpellings = ["AM", "LFO", "VCO", "VCA", "MIDI", "EQ", "SEQ", "OB", "EP", "UK", "USA",
+    public static let defaultFixedSpellings = ["AM", "LFO", "VCO", "VCA", "MIDI", "EQ", "OB", "EP", "UK", "USA",
                                                "LoFi", "HiFi"]
     static let minorWords: Set<String> = ["a", "an", "and", "the", "of", "in", "on", "to", "for", "with", "or", "at", "by"]
 
