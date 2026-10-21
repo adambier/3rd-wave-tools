@@ -1,6 +1,6 @@
 import SwiftUI
-#if canImport(ThirdWaveFormats)
-import ThirdWaveFormats
+#if canImport(PgdataFormats)
+import PgdataFormats
 #endif
 
 /// "Point to another slot…": choose oscillators of one program and the slot they should use.

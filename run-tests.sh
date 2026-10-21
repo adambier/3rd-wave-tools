@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run the ThirdWaveFormats tests. Needs full Xcode on a Mac (XCTest is not part of the
+# Run the PgdataFormats tests. Needs full Xcode on a Mac (XCTest is not part of the
 # Command Line Tools). The app itself does not — see make-app.sh.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -8,4 +8,4 @@ if ! xcrun --sdk macosx --show-sdk-platform-path >/dev/null 2>&1; then
     echo "The app does not need Xcode. Run ./make-app.sh to build it." >&2
     exit 1
 fi
-THIRDWAVE_TESTS=1 swift test "$@"
+PGDATA_TESTS=1 swift test "$@"

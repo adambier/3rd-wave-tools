@@ -1,5 +1,5 @@
 import XCTest
-@testable import ThirdWaveFormats
+@testable import PgdataFormats
 
 final class SourceRefTests: XCTestCase {
     // Each of these was checked on an 8M (OS 2.0d) by reading the slot the synth displays.

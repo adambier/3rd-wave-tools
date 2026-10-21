@@ -1,8 +1,8 @@
 import AppKit
 import Combine
 import Foundation
-#if canImport(ThirdWaveFormats)
-import ThirdWaveFormats   // SwiftPM build; absent in the single-module swiftc build
+#if canImport(PgdataFormats)
+import PgdataFormats   // SwiftPM build; absent in the single-module swiftc build
 #endif
 
 /// All app state. Plain ObservableObject, used only from the main thread (as in ThirdWaveWT).

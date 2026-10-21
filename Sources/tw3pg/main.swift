@@ -1,5 +1,5 @@
 import Foundation
-import ThirdWaveFormats
+import PgdataFormats
 
 // Developer harness for the format library. Not the user-facing tool (that is the app).
 //

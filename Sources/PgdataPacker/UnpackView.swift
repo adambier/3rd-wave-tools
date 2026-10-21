@@ -1,8 +1,8 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
-#if canImport(ThirdWaveFormats)
-import ThirdWaveFormats
+#if canImport(PgdataFormats)
+import PgdataFormats
 #endif
 
 struct UnpackView: View {

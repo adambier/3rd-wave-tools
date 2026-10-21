@@ -1,5 +1,5 @@
 import XCTest
-@testable import ThirdWaveFormats
+@testable import PgdataFormats
 
 final class WorkbenchTests: XCTestCase {
     var dir: URL!

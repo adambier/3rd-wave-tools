@@ -1,8 +1,8 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
-#if canImport(ThirdWaveFormats)
-import ThirdWaveFormats
+#if canImport(PgdataFormats)
+import PgdataFormats
 #endif
 
 /// What the user's synth has in each wavetable slot. Used to decide what a program will actually play,

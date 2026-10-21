@@ -9,7 +9,7 @@
 # Tools are enough (xcode-select --install). Same approach as ThirdWaveWT: SwiftPM looks
 # for XCTest even when it does not need it, which fails without Xcode, so by default the
 # sources are compiled straight into one module with swiftc. The app sources'
-# `import ThirdWaveFormats` is wrapped in `#if canImport(...)` and compiles out.
+# `import PgdataFormats` is wrapped in `#if canImport(...)` and compiles out.
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -62,7 +62,7 @@ else
         -framework SwiftUI \
         -framework UniformTypeIdentifiers \
         -o "$BIN" \
-        Sources/ThirdWaveFormats/*.swift \
+        Sources/PgdataFormats/*.swift \
         Sources/PgdataPacker/*.swift
 fi
 

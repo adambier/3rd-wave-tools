@@ -137,7 +137,7 @@ for the open questions above. `tw3pg maketests` regenerates them.
 ## Layout
 
 ```
-Sources/ThirdWaveFormats/   formats and packing logic, no UI (tested on Linux and macOS)
+Sources/PgdataFormats/   formats and packing logic, no UI (tested on Linux and macOS)
   SourceRef.swift           source-id mapping
   ProgramFile.swift         .pro
   WavetableFile.swift       .wt
@@ -147,5 +147,5 @@ Sources/ThirdWaveFormats/   formats and packing logic, no UI (tested on Linux an
   Workbench.swift           slot profile, factory library, pack and unpack plans
 Sources/PgdataPacker/       the app (SwiftUI)
 Sources/tw3pg/              developer harness: inspect, roundtrip, repack, compare, wtcheck
-Tests/ThirdWaveFormatsTests/
+Tests/PgdataFormatsTests/
 ```
