@@ -60,6 +60,7 @@ struct UnpackDetail: View {
     let item: AppState.UnpackItem
 
     var body: some View {
+        let st = state
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text(item.plan.programName).font(.title2)
@@ -68,9 +69,9 @@ struct UnpackDetail: View {
             }
             Text("Files to write").font(.headline)
             Table(item.plan.items) {
-                TableColumn("Write") { (f: UnpackPlan.Item) in WriteToggleCell(unpackID: item.id, file: f) }
+                TableColumn("Write") { (f: UnpackPlan.Item) in WriteToggleCell(state: st, unpackID: item.id, file: f) }
                     .width(44)
-                TableColumn("File name") { (f: UnpackPlan.Item) in FileNameCell(unpackID: item.id, file: f) }
+                TableColumn("File name") { (f: UnpackPlan.Item) in FileNameCell(state: st, unpackID: item.id, file: f) }
                     .width(min: 180, ideal: 260)
                 TableColumn("Contents") { (f: UnpackPlan.Item) in Text(f.description).foregroundStyle(.secondary).lineLimit(2) }
             }
@@ -91,7 +92,7 @@ struct UnpackDetail: View {
 }
 
 struct WriteToggleCell: View {
-    @EnvironmentObject var state: AppState
+    @ObservedObject var state: AppState
     let unpackID: UUID
     let file: UnpackPlan.Item
     var body: some View {
@@ -102,7 +103,7 @@ struct WriteToggleCell: View {
 }
 
 struct FileNameCell: View {
-    @EnvironmentObject var state: AppState
+    @ObservedObject var state: AppState
     let unpackID: UUID
     let file: UnpackPlan.Item
     var body: some View {

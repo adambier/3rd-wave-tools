@@ -47,9 +47,10 @@ struct PackView: View {
     }
 
     private var programList: some View {
-        List(selection: $selection) {
-            ForEach(state.programs) { item in
-                ProgramRow(item: item).tag(item.id)
+        let st = state
+        return List(selection: $selection) {
+            ForEach(st.programs) { item in
+                ProgramRow(state: st, item: item).tag(item.id)
             }
         }
         .onChange(of: selection) { s in state.selectedProgram = s.first }
@@ -81,7 +82,7 @@ struct SizeLine: View {
 }
 
 struct ProgramRow: View {
-    @EnvironmentObject var state: AppState
+    @ObservedObject var state: AppState
     let item: AppState.PackItem
 
     var body: some View {
@@ -101,7 +102,8 @@ struct ProgramDetail: View {
     let item: AppState.PackItem
 
     var body: some View {
-        let plan = state.plan(for: item)
+        let st = state
+        let plan = st.plan(for: item)
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text(item.program.name).font(.title2)
@@ -116,7 +118,7 @@ struct ProgramDetail: View {
                     .width(min: 70, ideal: 90, max: 130)
                 TableColumn("Used by") { (row: PackPlan.Row) in UsedByCell(usedBy: row.usedBy) }
                     .width(min: 90, ideal: 130, max: 220)
-                TableColumn("Content") { (row: PackPlan.Row) in ChoiceCell(itemID: item.id, row: row) }
+                TableColumn("Content") { (row: PackPlan.Row) in ChoiceCell(state: st, itemID: item.id, row: row) }
                     .width(min: 200, ideal: 300)
                 TableColumn("Status") { (row: PackPlan.Row) in StatusText(status: row.status).lineLimit(2) }
             }
@@ -135,7 +137,7 @@ struct UsedByCell: View {
 }
 
 struct ChoiceCell: View {
-    @EnvironmentObject var state: AppState
+    @ObservedObject var state: AppState
     let itemID: UUID
     let row: PackPlan.Row
 
@@ -165,21 +167,22 @@ struct ContentFilesTable: View {
     @EnvironmentObject var state: AppState
 
     var body: some View {
+        let st = state
         VStack(alignment: .leading, spacing: 4) {
             Text("Wavetables and samples for packing").font(.headline).padding(.horizontal, 12).padding(.top, 8)
             Text("Assign each file to the slot the programs refer to. A file assigned to a slot is used for every program here that uses that slot.")
                 .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12)
-            Table(state.contentFiles) {
+            Table(st.contentFiles) {
                 TableColumn("File") { (f: ContentFile) in Text(f.url.lastPathComponent).lineLimit(1).help(f.url.path) }
                     .width(min: 140, ideal: 220)
                 TableColumn("Name") { (f: ContentFile) in Text(f.name).lineLimit(1) }
                     .width(min: 100, ideal: 160)
                 TableColumn("Kind") { (f: ContentFile) in Text(f.kindLabel).foregroundStyle(.secondary) }
                     .width(min: 110, ideal: 150)
-                TableColumn("Slot") { (f: ContentFile) in SlotPickerCell(file: f) }
+                TableColumn("Slot") { (f: ContentFile) in SlotPickerCell(state: st, file: f) }
                     .width(min: 120, ideal: 140)
                 TableColumn("") { (f: ContentFile) in
-                    Button { state.removeContent(f.id) } label: { Image(systemName: "minus.circle") }
+                    Button { st.removeContent(f.id) } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.borderless).help("Remove")
                 }
                 .width(28)
@@ -189,7 +192,7 @@ struct ContentFilesTable: View {
 }
 
 struct SlotPickerCell: View {
-    @EnvironmentObject var state: AppState
+    @ObservedObject var state: AppState
     let file: ContentFile
 
     private var slots: [SourceRef] {

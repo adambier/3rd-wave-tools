@@ -30,6 +30,9 @@ struct SlotsView: View {
     }
 
     var body: some View {
+        // Table cells get the state passed in: on recent macOS, cells hosted by a Table do not
+        // reliably inherit environment objects (crash: "No ObservableObject of type AppState").
+        let st = state
         VStack(alignment: .leading, spacing: 0) {
             FactoryFoldersBox().padding(12)
             Divider()
@@ -47,11 +50,11 @@ struct SlotsView: View {
             Table(rows) {
                 TableColumn("Slot") { (r: SlotRow) in Text(r.ref.label).monospacedDigit() }
                     .width(50)
-                TableColumn("Contents") { (r: SlotRow) in SlotNameCell(row: r) }
+                TableColumn("Contents") { (r: SlotRow) in SlotNameCell(state: st, row: r) }
                     .width(min: 160, ideal: 240)
                 TableColumn("Where it comes from") { (r: SlotRow) in SlotSourceCell(row: r) }
                     .width(min: 160, ideal: 260)
-                TableColumn("") { (r: SlotRow) in SlotActionsCell(ref: r.ref) }
+                TableColumn("") { (r: SlotRow) in SlotActionsCell(state: st, ref: r.ref) }
                     .width(90)
             }
         }
@@ -63,7 +66,7 @@ struct SlotsView: View {
 }
 
 struct SlotNameCell: View {
-    @EnvironmentObject var state: AppState
+    @ObservedObject var state: AppState
     let row: SlotsView.SlotRow
     var body: some View {
         switch row.entry.state {
@@ -100,7 +103,7 @@ struct SlotSourceCell: View {
 }
 
 struct SlotActionsCell: View {
-    @EnvironmentObject var state: AppState
+    @ObservedObject var state: AppState
     let ref: SourceRef
     var body: some View {
         Menu("Set…") {
