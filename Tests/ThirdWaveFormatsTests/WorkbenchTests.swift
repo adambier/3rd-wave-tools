@@ -98,6 +98,37 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertFalse(plan.rows[0].options.contains(.profile))
     }
 
+    func testRepointMovesOscillatorsAndEmbedsTheAssignedFile() throws {
+        // Parts 3 and 4 hold U01 (as in Matt Johnson's NOSTALGIA RES); repoint part 3 osc 2 to U56.
+        let pro = makeProgram(sources: [41, 42, 43, 41, 42, 43, 2, 35, 42, 2, 35, 42])
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let u = dir.appendingPathComponent("01.wt")
+        try WavetableFile(kind: .u, name: "NOSTALGIA", values: Array(repeating: 0.25, count: 131_072)).serialized().write(to: u)
+        var cf = try ContentFile.load(u); cf.slot = .u(56)
+
+        let before = PackPlan.make(program: pro, files: [cf], profile: SlotProfile(), factory: FactoryLibrary(), embedFactory: false)
+        XCTAssertEqual(PackPlan.unusedFiles([cf], plans: [before])[cf.id], "Not used by any program here")
+
+        let moved = pro.repointed([7: .u(56)])
+        XCTAssertEqual(moved.sources[7], .u(56))
+        XCTAssertEqual(moved.sources[10], .u(1))          // part 4 osc 2 untouched
+        let plan = PackPlan.make(program: moved, files: [cf], profile: SlotProfile(), factory: FactoryLibrary(),
+                                 embedFactory: false, original: pro)
+        let row = plan.rows.first { $0.ref == .u(56) }!
+        XCTAssertEqual(row.oscillators, [7])
+        XCTAssertEqual(row.repointedFrom, [.u(1)])
+        XCTAssertEqual(row.choice, .file(cf.id))
+        XCTAssertEqual(plan.verdict, .embedsContent)
+        XCTAssertTrue(PackPlan.unusedFiles([cf], plans: [plan]).isEmpty)
+
+        var unassigned = cf; unassigned.slot = nil
+        let p3 = PackPlan.make(program: moved, files: [unassigned], profile: SlotProfile(), factory: FactoryLibrary(),
+                               embedFactory: false, original: pro)
+        XCTAssertEqual(p3.verdict, .blocked([.u(56)]))
+        XCTAssertEqual(PackPlan.unusedFiles([unassigned], plans: [p3])[cf.id], "Not assigned to a slot")
+    }
+
     func testProfileRoundTripsAsJSON() throws {
         var p = SlotProfile()
         p.set(.u(58), SlotEntry(state: .empty, name: "blank"))

@@ -42,6 +42,17 @@ lists its oscillator sources and what each will be:
 - for any other wavetable slot: the file the Synth Slots list says is there,
 - otherwise **missing**, and that program will not be written.
 
+**Point to another slot…** (bottom of the Content menu) repoints oscillators: tick the oscillators
+to change and pick the target, which can be a file you added (listed first, under the slot it is
+assigned to), any U or P slot on your synth (searchable by slot or name), or an analog shape. The
+Source column then shows e.g. **U01 → U56**, with a button to undo it. Only the `.pgdata` changes;
+the `.pro` file is not modified. Multisample oscillators are not repointed. Parts 3 and 4 play only
+on 4-part models (24K, 24M); on an 8M they hold filler (P02, U01 and an analog shape).
+
+Added files that no program uses are flagged in the files table ("Not assigned to a slot", "Not
+used by any program here"), with **Use in a program…** to repoint a program to them, and are listed
+again after **Write**.
+
 You can change any choice from the Content menu. A warning appears where your synth differs
 from what the program expects (for example a factory slot you have overwritten).
 

@@ -30,6 +30,7 @@ struct PackView: View {
             DropSupport.load(providers) { state.add(urls: $0) }
             return true
         }
+        .sheet(item: $state.repointRequest) { req in RepointSheet(state: state, request: req) }
     }
 
     private var controls: some View {
@@ -53,6 +54,7 @@ struct PackView: View {
             }
         }
         .onChange(of: selection) { s in state.selectedProgram = s.first }
+        .onChange(of: state.selectedProgram) { s in if let s, !selection.contains(s) { selection = [s] } }
         .onAppear { if let s = state.selectedProgram { selection = [s] } }
     }
 
@@ -113,8 +115,8 @@ struct ProgramDetail: View {
             VerdictBadge(verdict: plan.verdict)
             SizeLine(plan: plan)
             Table(plan.rows) {
-                TableColumn("Source") { (row: PackPlan.Row) in Text(row.ref.description).monospacedDigit() }
-                    .width(min: 70, ideal: 90, max: 130)
+                TableColumn("Source") { (row: PackPlan.Row) in SourceCell(state: st, itemID: item.id, row: row) }
+                    .width(min: 70, ideal: 110, max: 180)
                 TableColumn("Used by") { (row: PackPlan.Row) in UsedByCell(usedBy: row.usedBy) }
                     .width(min: 90, ideal: 130, max: 220)
                 TableColumn("Content") { (row: PackPlan.Row) in ChoiceCell(state: st, itemID: item.id, row: row) }
@@ -135,27 +137,55 @@ struct UsedByCell: View {
     }
 }
 
+struct SourceCell: View {
+    @ObservedObject var state: AppState
+    let itemID: UUID
+    let row: PackPlan.Row
+
+    var body: some View {
+        if row.repointedFrom.isEmpty {
+            Text(row.ref.description).monospacedDigit()
+        } else {
+            let from = row.repointedFrom.map(\.label).joined(separator: ", ")
+            HStack(spacing: 4) {
+                Text("\(from) → \(row.ref.label)").monospacedDigit().foregroundStyle(.blue)
+                Button { state.undoRepoints(itemID, to: row.ref) } label: { Image(systemName: "arrow.uturn.backward") }
+                    .buttonStyle(.borderless)
+                    .help("Point \(row.usedBy.joined(separator: ", ")) back to \(from), as in the .pro file")
+            }
+        }
+    }
+}
+
+/// The Content menu: the choices for this source, plus "Point to another slot…" for wavetables
+/// and analog shapes.
 struct ChoiceCell: View {
     @ObservedObject var state: AppState
     let itemID: UUID
     let row: PackPlan.Row
 
     var body: some View {
-        if row.options.count <= 1, let c = row.choice {
-            Text(state.describe(c, for: row.ref)).lineLimit(1)
-        } else if row.options.isEmpty {
-            Text("—").foregroundStyle(.secondary)
+        let canRepoint = !row.ref.isSample
+        if !canRepoint && row.options.count <= 1 {
+            if let c = row.choice { Text(state.describe(c, for: row.ref)).lineLimit(1) }
+            else { Text("—").foregroundStyle(.secondary) }
         } else {
-            Picker("", selection: Binding<PackPlan.Choice?>(
-                get: { row.choice },
-                set: { state.setOverride(itemID, row.ref, $0) }
-            )) {
-                if row.choice == nil { Text("Choose…").tag(PackPlan.Choice?.none) }
+            Menu {
                 ForEach(row.options, id: \.self) { c in
-                    Text(state.describe(c, for: row.ref)).tag(PackPlan.Choice?.some(c))
+                    Button { state.setOverride(itemID, row.ref, c) } label: {
+                        if c == row.choice { Label(state.describe(c, for: row.ref), systemImage: "checkmark") }
+                        else { Text(state.describe(c, for: row.ref)) }
+                    }
                 }
+                if canRepoint {
+                    if !row.options.isEmpty { Divider() }
+                    Button("Point to another slot…") { state.repointRequest = .init(itemID: itemID, from: row.ref) }
+                }
+            } label: {
+                Text(row.choice.map { state.describe($0, for: row.ref) } ?? "Choose…").lineLimit(1)
             }
-            .labelsHidden()
+            .menuStyle(.button)
+            .buttonStyle(.borderless)
         }
     }
 }
@@ -167,6 +197,7 @@ struct ContentFilesTable: View {
 
     var body: some View {
         let st = state
+        let unused = st.unusedContent
         VStack(alignment: .leading, spacing: 4) {
             Text("Wavetables and samples for packing").font(.headline).padding(.horizontal, 12).padding(.top, 8)
             Text("Assign each file to the slot the programs refer to. A file assigned to a slot is used for every program here that uses that slot.")
@@ -180,6 +211,8 @@ struct ContentFilesTable: View {
                     .width(min: 110, ideal: 150)
                 TableColumn("Slot") { (f: ContentFile) in SlotPickerCell(state: st, file: f) }
                     .width(min: 120, ideal: 140)
+                TableColumn("Used") { (f: ContentFile) in UsageCell(state: st, file: f, note: unused[f.id]) }
+                    .width(min: 160, ideal: 300)
                 TableColumn("") { (f: ContentFile) in
                     Button { st.removeContent(f.id) } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.borderless).help("Remove")
@@ -211,5 +244,25 @@ struct SlotPickerCell: View {
             }
         }
         .labelsHidden()
+    }
+}
+
+struct UsageCell: View {
+    @ObservedObject var state: AppState
+    let file: ContentFile
+    let note: String?
+
+    var body: some View {
+        if let note {
+            HStack(spacing: 6) {
+                Label(note, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).lineLimit(1).help(note)
+                if !file.isSample, file.slot != nil, !state.programs.isEmpty {
+                    Button("Use in a program…") { state.repointRequest = .init(fileID: file.id) }
+                        .buttonStyle(.link)
+                }
+            }
+        } else {
+            Text("Yes").foregroundStyle(.secondary)
+        }
     }
 }

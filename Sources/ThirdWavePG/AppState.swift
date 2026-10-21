@@ -20,6 +20,19 @@ final class AppState: ObservableObject {
         var url: URL
         var program: ProgramFile
         var overrides: [SourceRef: PackPlan.Choice] = [:]
+        /// Oscillators the user pointed at another slot: position 0...11 → new source.
+        var repoints: [Int: SourceRef] = [:]
+        /// The program as it will be packed (the original .pro is never changed).
+        var effectiveProgram: ProgramFile { repoints.isEmpty ? program : program.repointed(repoints) }
+    }
+
+    /// Opens the "Point to another slot" sheet: from a source row (itemID + from), or from a
+    /// content file ("Use in a program…", fileID; the program is then chosen in the sheet).
+    struct RepointRequest: Identifiable {
+        let id = UUID()
+        var itemID: UUID?
+        var from: SourceRef?
+        var fileID: UUID?
     }
 
     struct UnpackItem: Identifiable {
@@ -42,6 +55,7 @@ final class AppState: ObservableObject {
     @Published var programs: [PackItem] = []
     @Published var contentFiles: [ContentFile] = []
     @Published var selectedProgram: UUID?
+    @Published var repointRequest: RepointRequest?
 
     // Unpack
     @Published var unpacks: [UnpackItem] = []
@@ -173,8 +187,44 @@ final class AppState: ObservableObject {
     // MARK: Pack
 
     func plan(for item: PackItem) -> PackPlan {
-        PackPlan.make(program: item.program, files: contentFiles, profile: profile, factory: factory,
-                      embedFactory: embedFactory, overrides: item.overrides)
+        PackPlan.make(program: item.effectiveProgram, files: contentFiles, profile: profile, factory: factory,
+                      embedFactory: embedFactory, overrides: item.overrides, original: item.program)
+    }
+
+    /// Why each added file is not used by any loaded program (absent when it is used).
+    var unusedContent: [UUID: String] {
+        PackPlan.unusedFiles(contentFiles, plans: programs.map { plan(for: $0) })
+    }
+
+    /// Points the given oscillators of a program at `ref`. Pointing one back at its original source
+    /// removes the change.
+    func repoint(_ itemID: UUID, positions: [Int], to ref: SourceRef) {
+        guard let i = programs.firstIndex(where: { $0.id == itemID }) else { return }
+        let original = programs[i].program.sources
+        for p in positions where p < original.count {
+            programs[i].repoints[p] = original[p] == ref ? nil : ref
+        }
+        let labels = positions.sorted().map(Oscillator.label).joined(separator: ", ")
+        note("\(programs[i].program.name): \(labels) now use \(ref.description).")
+    }
+
+    /// Undoes every repoint that leads to `ref` in a program.
+    func undoRepoints(_ itemID: UUID, to ref: SourceRef) {
+        guard let i = programs.firstIndex(where: { $0.id == itemID }) else { return }
+        programs[i].repoints = programs[i].repoints.filter { $0.value != ref }
+    }
+
+    /// What a wavetable slot holds on the user's synth, for display.
+    func slotName(_ ref: SourceRef) -> String {
+        if ref.isBuiltIn { return ref.description }
+        if ref.isSample { return "Multisample" }
+        let e = profile.entry(ref)
+        switch e.state {
+        case .file: return e.name
+        case .factory: return factory.name(ref) ?? "Factory table"
+        case .empty: return "Blank"
+        case .unknown: return ref.isFactorySlot ? (factory.name(ref) ?? "Factory table") : "Unknown"
+        }
     }
 
     func setOverride(_ itemID: UUID, _ ref: SourceRef, _ choice: PackPlan.Choice?) {
@@ -219,7 +269,7 @@ final class AppState: ObservableObject {
             }
             do {
                 let content = try plan.content(files: contentFiles, profile: profile, factory: factory)
-                let g = try Packer.pack(item.program, content: content)
+                let g = try Packer.pack(item.effectiveProgram, content: content)
                 outputs.append((name: OutputNames.unified(item.program), data: g.serialized()))
             } catch { failed.append("\(item.program.name): \(error)") }
         }
@@ -227,8 +277,13 @@ final class AppState: ObservableObject {
         var msg = "Wrote \(written) .pgdata file\(written == 1 ? "" : "s") to \(folder.path)."
         if !blocked.isEmpty { msg += "\nNot written, content missing: " + blocked.joined(separator: "; ") + "." }
         if !failed.isEmpty { msg += "\nFailed: " + failed.joined(separator: "; ") }
+        let unused = unusedContent
+        if !unused.isEmpty {
+            msg += "\nAdded files not used by any program: " + contentFiles.filter { unused[$0.id] != nil }
+                .map { "\($0.url.lastPathComponent) (\(unused[$0.id]!.lowercased()))" }.joined(separator: ", ") + "."
+        }
         note(msg)
-        if !blocked.isEmpty || !failed.isEmpty { alertMessage = msg }
+        if !blocked.isEmpty || !failed.isEmpty || !unused.isEmpty { alertMessage = msg }
     }
 
     // MARK: Unpack

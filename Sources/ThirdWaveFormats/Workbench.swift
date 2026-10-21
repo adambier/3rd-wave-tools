@@ -185,6 +185,10 @@ public struct PackPlan {
         public var ref: SourceRef
         /// Oscillators using it, e.g. ["Part 1 Osc 1", "Part 2 Osc 1"].
         public var usedBy: [String]
+        /// The same oscillators as positions 0...11 (part = pos / 3, osc = pos % 3).
+        public var oscillators: [Int] = []
+        /// Where those oscillators pointed in the original program, when the user repointed them.
+        public var repointedFrom: [SourceRef] = []
         public var choice: Choice?
         public var options: [Choice]
         public var status: Status
@@ -223,13 +227,18 @@ public struct PackPlan {
     ///  4. otherwise nothing: the source is reported missing and packing is blocked
     public static func make(program: ProgramFile, files: [ContentFile], profile: SlotProfile,
                             factory: FactoryLibrary, embedFactory: Bool,
-                            overrides: [SourceRef: Choice] = [:]) -> PackPlan {
+                            overrides: [SourceRef: Choice] = [:], original: ProgramFile? = nil) -> PackPlan {
         let srcs = program.sources
+        let originalSrcs = original?.sources ?? srcs
         var rows: [Row] = []
         for ref in program.distinctSources {
-            let users = srcs.enumerated().filter { $0.element == ref }.map { "Part \($0.offset / 3 + 1) Osc \($0.offset % 3 + 1)" }
+            let positions = srcs.indices.filter { srcs[$0] == ref }
+            let users = positions.map(Oscillator.label)
+            var from: [SourceRef] = []
+            for p in positions where p < originalSrcs.count && originalSrcs[p] != ref && !from.contains(originalSrcs[p]) { from.append(originalSrcs[p]) }
             if ref.isBuiltIn {
-                rows.append(Row(ref: ref, usedBy: users, choice: .builtIn, options: [.builtIn], status: .ok("Built in"), embeds: false))
+                rows.append(Row(ref: ref, usedBy: users, oscillators: positions, repointedFrom: from,
+                                choice: .builtIn, options: [.builtIn], status: .ok("Built in"), embeds: false))
                 continue
             }
             let entry = profile.entry(ref)
@@ -288,7 +297,8 @@ public struct PackPlan {
                     ? "Needs the multisample for \(ref.label): add its .bin file and assign it to \(ref.label)"
                     : "Needs a wavetable for \(ref.label) (not a factory slot): add its .wt file and assign it to \(ref.label)")
             }
-            rows.append(Row(ref: ref, usedBy: users, choice: choice, options: options, status: status, embeds: embeds, bytes: bytes))
+            rows.append(Row(ref: ref, usedBy: users, oscillators: positions, repointedFrom: from,
+                            choice: choice, options: options, status: status, embeds: embeds, bytes: bytes))
         }
         let missing = rows.filter { $0.choice == nil }.map(\.ref)
         let verdict: Verdict
@@ -298,6 +308,20 @@ public struct PackPlan {
         let total = 17 + 4 * rows.count + rows.reduce(0) { $0 + $1.bytes } + 32 + 4 * program.values.count
         let factoryTotal = rows.filter { $0.choice == .factory }.reduce(0) { $0 + $1.bytes }
         return PackPlan(rows: rows, verdict: verdict, estimatedBytes: total, factoryBytes: factoryTotal)
+    }
+
+    /// For each content file that no plan uses, why: not assigned to a slot, or not used by any program.
+    public static func unusedFiles(_ files: [ContentFile], plans: [PackPlan]) -> [UUID: String] {
+        var used = Set<UUID>()
+        for p in plans { for r in p.rows { if case .file(let id)? = r.choice { used.insert(id) } } }
+        var out: [UUID: String] = [:]
+        for f in files where !used.contains(f.id) {
+            guard let slot = f.slot else { out[f.id] = "Not assigned to a slot"; continue }
+            let slotUsed = plans.contains { $0.rows.contains { $0.ref == slot } }
+            out[f.id] = slotUsed ? "Not used: another choice is made for \(slot.label)"
+                                 : "Not used by any program here"
+        }
+        return out
     }
 
     /// Content for the packer, loading profile files from disk as needed.
@@ -382,5 +406,27 @@ public struct UnpackPlan {
                               isFactoryDuplicate: false, write: true))
         }
         return UnpackPlan(programName: up.program.name, items: items, referenced: up.referenced, notes: up.notes)
+    }
+}
+
+// MARK: - Repointing oscillators
+
+public enum Oscillator {
+    /// Position 0...11 → "Part 1 Osc 1".
+    public static func label(_ pos: Int) -> String { "Part \(pos / 3 + 1) Osc \(pos % 3 + 1)" }
+    /// Wavetable slots and analog shapes an oscillator can be pointed at (samples are not offered).
+    public static var repointTargets: [SourceRef] {
+        (0..<SourceRef.uCount).map { SourceRef.u($0) } + (0..<SourceRef.pCount).map { SourceRef.p($0) }
+            + (0..<SourceRef.analogNames.count).map { SourceRef.analog($0) }
+    }
+}
+
+public extension ProgramFile {
+    /// A copy with some oscillators pointed at other sources; keys are positions 0...11.
+    func repointed(_ map: [Int: SourceRef]) -> ProgramFile {
+        var p = self
+        let n = sources.count
+        for (pos, ref) in map where pos >= 0 && pos < n { p.setSourceID(ref.id, at: pos) }
+        return p
     }
 }
