@@ -102,17 +102,18 @@ final class PackTests: XCTestCase {
         XCTAssertEqual(Unpacker.unpack(g).program.serialized(), pro.serialized())
     }
 
-    func testSampleCanBeLeftOutOnlyExplicitly() throws {
+    func testSampleIsNeverLeftOut() throws {
         let pro = makeProgram(sources: [4000] + Array(repeating: 42, count: 11))
+        // The low-level packer can still list a sample without data (used only to make synth test files).
         let g = try Packer.pack(pro, content: [.s(0): .reference])
         XCTAssertFalse(g.sources[0].hasData)
-        // The plan never chooses that by itself.
+        // The app's plan offers no way to leave it out, even when asked.
         let plan = PackPlan.make(program: pro, files: [], profile: SlotProfile(), factory: FactoryLibrary(), embedFactory: false)
         XCTAssertEqual(plan.verdict, .blocked([.s(0)]))
-        XCTAssertTrue(plan.rows[0].options.contains(.reference))
-        let chosen = PackPlan.make(program: pro, files: [], profile: SlotProfile(), factory: FactoryLibrary(), embedFactory: false,
+        XCTAssertFalse(plan.rows[0].options.contains(.reference))
+        let forced = PackPlan.make(program: pro, files: [], profile: SlotProfile(), factory: FactoryLibrary(), embedFactory: false,
                                    overrides: [.s(0): .reference])
-        guard case .warning? = chosen.rows.first?.status else { return XCTFail("expected a warning") }
+        XCTAssertEqual(forced.verdict, .blocked([.s(0)]))
     }
 
     func testMissingContentIsReported() {

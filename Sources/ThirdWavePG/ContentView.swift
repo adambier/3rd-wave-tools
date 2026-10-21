@@ -124,10 +124,10 @@ struct VerdictBadge: View {
     let verdict: PackPlan.Verdict
     var body: some View {
         switch verdict {
-        case .plainProgramEnough:
-            Label("Factory content only — the .pro is enough", systemImage: "checkmark.circle").foregroundStyle(.secondary)
-        case .needsUnifiedFile:
-            Label("Needs a .pgdata", systemImage: "shippingbox.fill").foregroundStyle(.blue)
+        case .factoryOnly:
+            Label("Factory content only — nothing to embed", systemImage: "checkmark.circle").foregroundStyle(.secondary)
+        case .embedsContent:
+            Label("Embeds wavetables or samples", systemImage: "shippingbox.fill").foregroundStyle(.blue)
         case .blocked(let refs):
             Label("Missing content for " + refs.map(\.label).joined(separator: ", "), systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
@@ -138,15 +138,15 @@ struct VerdictBadge: View {
 extension PackPlan.Verdict {
     var symbol: String {
         switch self {
-        case .plainProgramEnough: return "checkmark.circle"
-        case .needsUnifiedFile: return "shippingbox.fill"
+        case .factoryOnly: return "checkmark.circle"
+        case .embedsContent: return "shippingbox.fill"
         case .blocked: return "exclamationmark.triangle.fill"
         }
     }
     var tint: Color {
         switch self {
-        case .plainProgramEnough: return .secondary
-        case .needsUnifiedFile: return .blue
+        case .factoryOnly: return .secondary
+        case .embedsContent: return .blue
         case .blocked: return .red
         }
     }

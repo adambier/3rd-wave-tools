@@ -32,7 +32,7 @@ final class WorkbenchTests: XCTestCase {
     func testFactoryOnlyProgramNeedsNoUnifiedFile() {
         let pro = makeProgram(sources: [34, 2000, 1000, 41, 42, 42, 2, 35, 42, 41, 42, 42])
         let plan = PackPlan.make(program: pro, files: [], profile: SlotProfile(), factory: FactoryLibrary(), embedFactory: false)
-        XCTAssertEqual(plan.verdict, .plainProgramEnough)
+        XCTAssertEqual(plan.verdict, .factoryOnly)
         XCTAssertTrue(plan.rows.allSatisfy { $0.choice == .reference || $0.choice == .builtIn })
     }
 
@@ -50,7 +50,7 @@ final class WorkbenchTests: XCTestCase {
         let pro = makeProgram(sources: [2043, 2043, 42] + Array(repeating: 42, count: 9))
         let plan = PackPlan.make(program: pro, files: [cf], profile: SlotProfile(), factory: FactoryLibrary(), embedFactory: false)
         XCTAssertEqual(plan.rows.first?.choice, .file(cf.id))
-        XCTAssertEqual(plan.verdict, .needsUnifiedFile)
+        XCTAssertEqual(plan.verdict, .embedsContent)
         let g = try Packer.pack(pro, content: try plan.content(files: [cf], profile: SlotProfile(), factory: FactoryLibrary()))
         XCTAssertTrue(g.sources[0].hasData)
     }
@@ -66,7 +66,7 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertTrue(plan.rows[0].options.contains(.profile))
         // Choosing the synth's table embeds it.
         let p2 = PackPlan.make(program: pro, files: [], profile: profile, factory: FactoryLibrary(), embedFactory: false, overrides: [.u(50): .profile])
-        XCTAssertEqual(p2.verdict, .needsUnifiedFile)
+        XCTAssertEqual(p2.verdict, .embedsContent)
         let c = try p2.content(files: [], profile: profile, factory: FactoryLibrary())
         guard case .wavetable(let w)? = c[.u(50)] else { return XCTFail() }
         XCTAssertEqual(w.name, "SM OB2")
@@ -78,7 +78,7 @@ final class WorkbenchTests: XCTestCase {
         let pro = makeProgram(sources: [2050] + Array(repeating: 42, count: 11))
         let plan = PackPlan.make(program: pro, files: [], profile: profile, factory: FactoryLibrary(), embedFactory: false)
         XCTAssertEqual(plan.rows.first?.choice, .profile)
-        XCTAssertEqual(plan.verdict, .needsUnifiedFile)
+        XCTAssertEqual(plan.verdict, .embedsContent)
     }
 
     func testSampleSlotsAreNotTracked() throws {

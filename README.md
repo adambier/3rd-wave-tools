@@ -45,9 +45,12 @@ lists its oscillator sources and what each will be:
 You can change any choice from the Content menu. A warning appears where your synth differs
 from what the program expects (for example a factory slot you have overwritten).
 
-Each program gets a verdict: **the .pro is enough** (factory content and analog shapes only, so no
-`.pgdata` is written unless you tick "Write a .pgdata even when the .pro is enough"), **needs a
-.pgdata**, or **missing content**. **Write Selected…** / **Write All…** ask for a folder.
+Every program gets a `.pgdata`, even one that uses only factory tables and analog shapes: the
+`.pgdata` is no bigger than the `.pro` (about 13% smaller, since values are stored as 4-byte words
+rather than text). A multisample a program uses is always embedded; there is no option to leave it
+out. Each program shows **factory content only** (nothing embedded), **embeds wavetables or
+samples**, or **missing content** (not written until you add the file). **Write Selected…** /
+**Write All…** ask for a folder.
 
 **Unpack** — drop `.pgdata` files. Each becomes a `.pro`, plus a `.wt` per embedded wavetable and
 a `.bin` per multisample, named the way Groove names its own files (`U50_SM OB2.wt`,

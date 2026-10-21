@@ -37,7 +37,6 @@ struct PackView: View {
             Button("Add Files…") { state.add(urls: Panels.chooseFiles(message: "Choose .pro programs and the .wt / .bin files they use")) }
             Toggle("Embed factory wavetables", isOn: $state.embedFactory)
                 .help("Off (recommended): factory tables are listed but not carried, as in Groove's own sample library. On: they are embedded — each U table adds about 0.5 MB and each P table about 65 KB, which makes files slower to copy and import. Useful for sharing with synths whose factory slots may differ. Needs the factory folders set under Synth Slots.")
-            Toggle("Write a .pgdata even when the .pro is enough", isOn: $state.writeWhenNotNeeded)
             Spacer()
             Button("Remove") { state.removePrograms(selection); selection = [] }.disabled(selection.isEmpty)
             Button("Write Selected…") { state.writeUnified(Array(selection)) }.disabled(selection.isEmpty)

@@ -194,8 +194,8 @@ public struct PackPlan {
     }
 
     public enum Verdict: Equatable {
-        case plainProgramEnough      // only factory/built-in content; no .pgdata needed
-        case needsUnifiedFile
+        case factoryOnly             // only factory/built-in content: the .pgdata embeds nothing
+        case embedsContent           // the .pgdata carries at least one wavetable or multisample
         case blocked([SourceRef])
     }
 
@@ -241,8 +241,7 @@ public struct PackPlan {
             }
             if entry.state == .file, entry.path != nil { options.append(.profile) }
             if ref.isWavetable, !ref.isFactorySlot, !options.contains(.reference) { options.append(.reference) }
-            // Samples can be left out only by explicit choice; it is never the default.
-            if ref.isSample { options.append(.reference) }
+            // Samples are always embedded: a program is never packed without its multisample.
 
             var choice: Choice? = overrides[ref].flatMap { options.contains($0) ? $0 : nil }
             if choice == nil {
@@ -274,8 +273,6 @@ public struct PackPlan {
                     let size = (try? FileManager.default.attributesOfItem(atPath: entry.path ?? "")[.size] as? Int) ?? nil
                     bytes = (size ?? 0) + 3 - 16
                 } else { bytes = tableBytes }
-            case .reference? where ref.isSample:
-                status = .warning("Not included. The program will play whatever multisample is in \(ref.label) when it is loaded: if that slot is empty, or holds a different multisample (even one with the same name), the oscillator will be silent or wrong. How the synth handles this is not yet tested.")
             case .reference?:
                 if ref.isFactorySlot {
                     status = .ok("Factory \(factoryName); not embedded")
@@ -296,8 +293,8 @@ public struct PackPlan {
         let missing = rows.filter { $0.choice == nil }.map(\.ref)
         let verdict: Verdict
         if !missing.isEmpty { verdict = .blocked(missing) }
-        else if rows.contains(where: { $0.embeds && !($0.choice == .factory) }) { verdict = .needsUnifiedFile }
-        else { verdict = .plainProgramEnough }
+        else if rows.contains(where: { $0.embeds && !($0.choice == .factory) }) { verdict = .embedsContent }
+        else { verdict = .factoryOnly }
         let total = 17 + 4 * rows.count + rows.reduce(0) { $0 + $1.bytes } + 32 + 4 * program.values.count
         let factoryTotal = rows.filter { $0.choice == .factory }.reduce(0) { $0 + $1.bytes }
         return PackPlan(rows: rows, verdict: verdict, estimatedBytes: total, factoryBytes: factoryTotal)

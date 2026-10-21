@@ -36,7 +36,6 @@ final class AppState: ObservableObject {
     @Published var factoryFolders: [URL] = [] { didSet { saveSettings(); reloadFactory() } }
     @Published private(set) var factory = FactoryLibrary()
     @Published var embedFactory = false { didSet { saveSettings() } }
-    @Published var writeWhenNotNeeded = false { didSet { saveSettings() } }
     @Published var skipFactoryDuplicates = true { didSet { saveSettings(); rebuildUnpackPlans() } }
 
     // Pack
@@ -60,7 +59,6 @@ final class AppState: ObservableObject {
             factoryFolders = paths.map { URL(fileURLWithPath: $0) }
         }
         embedFactory = defaults.bool(forKey: "embedFactory")
-        writeWhenNotNeeded = defaults.bool(forKey: "writeWhenNotNeeded")
         if defaults.object(forKey: "skipFactoryDuplicates") != nil {
             skipFactoryDuplicates = defaults.bool(forKey: "skipFactoryDuplicates")
         }
@@ -89,7 +87,6 @@ final class AppState: ObservableObject {
         guard !loading else { return }
         defaults.set(factoryFolders.map(\.path), forKey: "factoryFolders")
         defaults.set(embedFactory, forKey: "embedFactory")
-        defaults.set(writeWhenNotNeeded, forKey: "writeWhenNotNeeded")
         defaults.set(skipFactoryDuplicates, forKey: "skipFactoryDuplicates")
     }
 
@@ -212,14 +209,12 @@ final class AppState: ObservableObject {
         let items = programs.filter { ids.contains($0.id) }
         guard !items.isEmpty, let folder = Panels.chooseFolder(prompt: "Write Here", message: "Choose where to write the .pgdata files") else { return }
         var outputs: [(name: String, data: Data)] = []
-        var skippedPlain: [String] = [], blocked: [String] = [], failed: [String] = []
+        var blocked: [String] = [], failed: [String] = []
         for item in items {
             let plan = plan(for: item)
             switch plan.verdict {
             case .blocked(let refs):
                 blocked.append("\(item.program.name) (needs \(refs.map(\.label).joined(separator: ", ")))"); continue
-            case .plainProgramEnough where !writeWhenNotNeeded:
-                skippedPlain.append(item.program.name); continue
             default: break
             }
             do {
@@ -230,11 +225,10 @@ final class AppState: ObservableObject {
         }
         let written = Panels.write(outputs, into: folder)
         var msg = "Wrote \(written) .pgdata file\(written == 1 ? "" : "s") to \(folder.path)."
-        if !skippedPlain.isEmpty { msg += "\nNo .pgdata needed (factory content only), so not written: " + skippedPlain.joined(separator: ", ") + "." }
         if !blocked.isEmpty { msg += "\nNot written, content missing: " + blocked.joined(separator: "; ") + "." }
         if !failed.isEmpty { msg += "\nFailed: " + failed.joined(separator: "; ") }
         note(msg)
-        if !blocked.isEmpty || !failed.isEmpty || !skippedPlain.isEmpty { alertMessage = msg }
+        if !blocked.isEmpty || !failed.isEmpty { alertMessage = msg }
     }
 
     // MARK: Unpack
