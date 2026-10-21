@@ -228,6 +228,38 @@ case "maketests":
     try write(t4, refsOnly(t4), "TW3_T4_v4.pgdata")
     try v4.serialized().write(to: out.appendingPathComponent("TW3_T4_original.pro"))
 
+case "maketest6":
+    // tw3pg maketest6 <factory .pro using U07> <a small .bin> <outdir>
+    // Name-length test: every name is 31 characters (the most a name field holds), in a pattern
+    // that shows where a display cuts it off: digits 1–10, lower case 11–20, capitals 21–31.
+    let pattern = "1234567890abcdefghijKLMNOPQRSTU"
+    var base = try ProgramFile(data: try load(URL(fileURLWithPath: rest[0])))
+    let ms = try Multisample(binData: try load(URL(fileURLWithPath: rest[1])))
+    let out = URL(fileURLWithPath: rest[2])
+    try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+    base.name = pattern
+    var refs: [SourceRef: SourceContent] = [:]
+    for r in base.distinctSources where !r.isBuiltIn { refs[r] = .reference }
+    // T6a: program name + a new wavetable in U60 (a blank placeholder on Adam's synth).
+    var vals: [Float] = []; vals.reserveCapacity(131_072)
+    for wave in 0..<64 {
+        let k = Float(1 + wave / 8)            // brighter every 8 waves: easy to hear it is ours
+        for i in 0..<2048 { vals.append(0.8 * sin(Float(i % 1024) / 1024 * 2 * .pi * k)) }
+    }
+    var a = base; a.setSourceID(SourceRef.u(60).id, at: 0)
+    var ca = refs; ca.removeValue(forKey: .u(7)); ca[.u(60)] = .wavetable(WavetableFile(kind: .u, name: pattern, values: vals))
+    if a.sources.contains(.u(7)) { ca[.u(7)] = .reference }
+    let ga = try Packer.pack(a, content: ca)
+    try ga.serialized().write(to: out.appendingPathComponent("TW3_T6a_Names31.pgdata"))
+    print("T6a: \"\(a.name)\" sources \(ga.sources.map { $0.ref.label + ($0.hasData ? "*" : "") })")
+    // T6b: same, plus a small multisample (0.5 s sine) on part 1 osc 2, listed as S20.
+    var b = a; b.setSourceID(SourceRef.s(20).id, at: 1)
+    var cb = ca; cb[.s(20)] = .multisample(ms)
+    if !b.sources.contains(.p(2)) { cb.removeValue(forKey: .p(2)) }
+    let gb = try Packer.pack(b, content: cb)
+    try gb.serialized().write(to: out.appendingPathComponent("TW3_T6b_Names31_Sample.pgdata"))
+    print("T6b: \"\(b.name)\" sources \(gb.sources.map { $0.ref.label + ($0.hasData ? "*" : "") })")
+
 case "maketest5":
     // tw3pg maketest5 <program using a sample slot> <outdir>
     // T5a: the program's sample slot listed without its samples. T5b: the same, pointed at empty S20.
