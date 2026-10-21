@@ -325,17 +325,24 @@ public struct PackPlan {
     }
 
     /// Content for the packer, loading profile files from disk as needed.
-    public func content(files: [ContentFile], profile: SlotProfile, factory: FactoryLibrary) throws -> [SourceRef: SourceContent] {
+    /// `names` renames added files (by file id). A table taken from the synth profile carries the
+    /// name the profile records, i.e. the name the synth shows.
+    public func content(files: [ContentFile], profile: SlotProfile, factory: FactoryLibrary,
+                        names: [UUID: String] = [:]) throws -> [SourceRef: SourceContent] {
         var out: [SourceRef: SourceContent] = [:]
         for r in rows {
             switch r.choice {
-            case .file(let id)?: out[r.ref] = files.first { $0.id == id }!.content
+            case .file(let id)?:
+                let c = files.first { $0.id == id }!.content
+                out[r.ref] = names[id].map { c.renamed($0) } ?? c
             case .factory?:
                 guard let w = factory.wavetable(r.ref) else { throw FormatError.invalid("Factory table for \(r.ref.label) could not be read.") }
                 out[r.ref] = .wavetable(w)
             case .profile?:
                 let path = profile.entry(r.ref).path ?? ""
-                out[r.ref] = try ContentFile.load(URL(fileURLWithPath: path)).content
+                let c = try ContentFile.load(URL(fileURLWithPath: path)).content
+                let shown = profile.entry(r.ref).name
+                out[r.ref] = shown.isEmpty ? c : c.renamed(shown)
             case .reference?: out[r.ref] = .reference
             case .builtIn?, nil: break
             }

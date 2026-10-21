@@ -22,8 +22,15 @@ final class AppState: ObservableObject {
         var overrides: [SourceRef: PackPlan.Choice] = [:]
         /// Oscillators the user pointed at another slot: position 0...11 → new source.
         var repoints: [Int: SourceRef] = [:]
+        /// New program name from Clean Up Names (nil: the .pro's own name).
+        var newName: String?
         /// The program as it will be packed (the original .pro is never changed).
-        var effectiveProgram: ProgramFile { repoints.isEmpty ? program : program.repointed(repoints) }
+        var effectiveProgram: ProgramFile {
+            var p = repoints.isEmpty ? program : program.repointed(repoints)
+            if let n = newName { p.name = n }
+            return p
+        }
+        var name: String { newName ?? program.name }
     }
 
     /// Opens the "Point to another slot" sheet: from a source row (itemID + from), or from a
@@ -56,6 +63,10 @@ final class AppState: ObservableObject {
     @Published var contentFiles: [ContentFile] = []
     @Published var selectedProgram: UUID?
     @Published var repointRequest: RepointRequest?
+    /// New names for added wavetables and multisamples (by file id), from Clean Up Names.
+    @Published var contentNames: [UUID: String] = [:]
+    @Published var showNameCleanup = false
+    @Published var nameCleaner = NameCleaner() { didSet { saveSettings() } }
 
     // Unpack
     @Published var unpacks: [UnpackItem] = []
@@ -74,6 +85,14 @@ final class AppState: ObservableObject {
             factoryFolders = paths.map { URL(fileURLWithPath: $0) }
         }
         embedFactory = defaults.bool(forKey: "embedFactory")
+        if defaults.object(forKey: "cleanStripSlots") != nil {
+            var c = NameCleaner()
+            c.stripSlots = defaults.bool(forKey: "cleanStripSlots")
+            c.underscoresToSpaces = defaults.bool(forKey: "cleanUnderscores")
+            c.titleCase = defaults.bool(forKey: "cleanTitleCase")
+            if let k = defaults.stringArray(forKey: "cleanKeepUppercase") { c.keepUppercase = k }
+            nameCleaner = c
+        }
         if defaults.object(forKey: "skipFactoryDuplicates") != nil {
             skipFactoryDuplicates = defaults.bool(forKey: "skipFactoryDuplicates")
         }
@@ -121,6 +140,10 @@ final class AppState: ObservableObject {
         defaults.set(factoryFolders.map(\.path), forKey: "factoryFolders")
         defaults.set(embedFactory, forKey: "embedFactory")
         defaults.set(skipFactoryDuplicates, forKey: "skipFactoryDuplicates")
+        defaults.set(nameCleaner.stripSlots, forKey: "cleanStripSlots")
+        defaults.set(nameCleaner.underscoresToSpaces, forKey: "cleanUnderscores")
+        defaults.set(nameCleaner.titleCase, forKey: "cleanTitleCase")
+        defaults.set(nameCleaner.keepUppercase, forKey: "cleanKeepUppercase")
     }
 
     /// Reading the factory .wt files takes a moment (about 92 text files), so it runs off the main thread.
@@ -210,6 +233,20 @@ final class AppState: ObservableObject {
                       embedFactory: embedFactory, overrides: item.overrides, original: item.program)
     }
 
+    /// The name an added file will be packed under.
+    func displayName(_ f: ContentFile) -> String { contentNames[f.id] ?? f.name }
+
+    /// Added files that are copies of a factory wavetable: never offered for renaming.
+    func isFactoryCopy(_ f: ContentFile) -> Bool {
+        guard case let .wavetable(w) = f.body else { return false }
+        return factory.slot(withFingerprint: w.fingerprint) != nil
+    }
+
+    func setProgramName(_ itemID: UUID, _ name: String?) {
+        guard let i = programs.firstIndex(where: { $0.id == itemID }) else { return }
+        programs[i].newName = (name == programs[i].program.name) ? nil : name
+    }
+
     /// Why each added file is not used by any loaded program (absent when it is used).
     var unusedContent: [UUID: String] {
         PackPlan.unusedFiles(contentFiles, plans: programs.map { plan(for: $0) })
@@ -224,7 +261,7 @@ final class AppState: ObservableObject {
             programs[i].repoints[p] = original[p] == ref ? nil : ref
         }
         let labels = positions.sorted().map(Oscillator.label).joined(separator: ", ")
-        note("\(programs[i].program.name): \(labels) now use \(ref.description).")
+        note("\(programs[i].name): \(labels) now use \(ref.description).")
     }
 
     /// Undoes every repoint that leads to `ref` in a program.
@@ -294,14 +331,14 @@ final class AppState: ObservableObject {
             let plan = plan(for: item)
             switch plan.verdict {
             case .blocked(let refs):
-                blocked.append("\(item.program.name) (needs \(refs.map(\.label).joined(separator: ", ")))"); continue
+                blocked.append("\(item.name) (needs \(refs.map(\.label).joined(separator: ", ")))"); continue
             default: break
             }
             do {
-                let content = try plan.content(files: contentFiles, profile: profile, factory: factory)
+                let content = try plan.content(files: contentFiles, profile: profile, factory: factory, names: contentNames)
                 let g = try Packer.pack(item.effectiveProgram, content: content)
-                outputs.append((name: OutputNames.unified(item.program), data: g.serialized()))
-            } catch { failed.append("\(item.program.name): \(error)") }
+                outputs.append((name: OutputNames.unified(item.effectiveProgram), data: g.serialized()))
+            } catch { failed.append("\(item.name): \(error)") }
         }
         let written = Panels.write(outputs, into: folder)
         var msg = "Wrote \(written) .pgdata file\(written == 1 ? "" : "s") to \(folder.path)."

@@ -36,6 +36,10 @@ struct PackView: View {
     private var controls: some View {
         HStack(spacing: 14) {
             Button("Add Files…") { state.add(urls: Panels.chooseFiles(message: "Choose .pro programs and the .wt / .bin files they use")) }
+            Button("Clean Up Names…") { state.showNameCleanup = true }
+                .disabled(state.programs.isEmpty && state.contentFiles.isEmpty)
+                .help("Propose tidier names (slot numbers removed, title case) for the programs and the wavetables and samples you added. Factory wavetables are not renamed.")
+                .sheet(isPresented: $state.showNameCleanup) { NameCleanupSheet(state: state) }
             Toggle("Embed factory wavetables", isOn: $state.embedFactory)
                 .help("Off (recommended): factory tables are listed but not carried, as in Groove's own sample library. On: they are embedded — each U table adds about 0.5 MB and each P table about 65 KB, which makes files slower to copy and import. Useful for sharing with synths whose factory slots may differ. Needs the factory folders set under Synth Slots.")
             Spacer()
@@ -91,7 +95,7 @@ struct ProgramRow: View {
         HStack {
             Image(systemName: verdict.symbol).foregroundStyle(verdict.tint)
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.program.name).lineLimit(1)
+                Text(item.name).lineLimit(1)
                 Text(item.url.lastPathComponent).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
@@ -107,7 +111,10 @@ struct ProgramDetail: View {
         let plan = st.plan(for: item)
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text(item.program.name).font(.title2)
+                Text(item.name).font(.title2)
+                if item.newName != nil {
+                    Text("(was \(item.program.name))").font(.caption).foregroundStyle(.secondary)
+                }
                 Text(item.program.version).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Show File") { Panels.reveal(item.url) }.buttonStyle(.link)
@@ -206,7 +213,9 @@ struct ContentFilesTable: View {
                 // Most important first: what the file is, its slot, and whether anything uses it.
                 TableColumn("File") { (f: ContentFile) in Text(f.url.lastPathComponent).lineLimit(1).help(f.url.path) }
                     .width(min: 120, ideal: 170)
-                TableColumn("Name") { (f: ContentFile) in Text(f.name).lineLimit(1) }
+                TableColumn("Name") { (f: ContentFile) in
+                    Text(st.displayName(f)).lineLimit(1).help(st.contentNames[f.id] != nil ? "Was \(f.name)" : f.name)
+                }
                     .width(min: 90, ideal: 130)
                 TableColumn("Slot") { (f: ContentFile) in SlotPickerCell(state: st, file: f) }
                     .width(min: 110, ideal: 120)

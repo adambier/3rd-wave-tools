@@ -156,3 +156,53 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertEqual(OutputNames.sanitize("   "), "Untitled")
     }
 }
+
+final class NameCleanerTests: XCTestCase {
+    func testProposals() {
+        let c = NameCleaner()
+        let cases: [(String, String)] = [
+            ("U48 SM OBX8 1", "SM OBX8 1"),            // slot prefix; SM kept; digits kept
+            ("S010_JP8_", "JP8"),
+            ("BREATHY_VOWELS", "Breathy Vowels"),
+            ("NOSTALGIA RES", "Nostalgia Res"),         // all caps: short words change too
+            ("STREET DREAMS (PEDAL)", "Street Dreams (Pedal)"),
+            ("DRUMS AND AMPS", "Drums and Amps"),
+            ("DX-PPG KEYS", "DX-PPG Keys"),
+            ("LO-FI PAD", "Lo-Fi Pad"),
+            ("Additive_Bell_17", "Additive Bell 17"),    // mixed case: only underscores change
+            ("FIIx_Arr_Vocal", "FIIx Arr Vocal"),
+            ("Tube Bell SM PAD", "Tube Bell SM PAD"),    // mixed case: all-caps words left alone
+            ("ghibli bell", "Ghibli Bell"),
+            ("B05P003 GHIBLI BELL", "Ghibli Bell"),
+            ("GHIBLI BELL U57", "Ghibli Bell"),
+            ("U56", "U56"),                               // nothing left: keep
+            ("U2 TRIBUTE", "U2 Tribute"),                 // one digit is not a slot
+            ("  SPACED   OUT  ", "Spaced Out"),
+        ]
+        for (a, b) in cases { XCTAssertEqual(c.clean(a), b, a) }
+    }
+
+    func testRulesCanBeTurnedOff() {
+        var c = NameCleaner(); c.titleCase = false
+        XCTAssertEqual(c.clean("U48 SM OBX8 1"), "SM OBX8 1")
+        XCTAssertEqual(c.clean("BREATHY_VOWELS"), "BREATHY VOWELS")
+        c = NameCleaner(); c.stripSlots = false
+        XCTAssertEqual(c.clean("U48 SM OBX8 1"), "U48 SM OBX8 1")
+    }
+
+    func testRenamedContentPacksUnderTheNewName() throws {
+        let pro = makeProgram(sources: [2049] + Array(repeating: 42, count: 11))
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let u = dir.appendingPathComponent("01.wt")
+        try WavetableFile(kind: .u, name: "NOSTALGIA", values: Array(repeating: 0.5, count: 131_072)).serialized().write(to: u)
+        var cf = try ContentFile.load(u); cf.slot = .u(56)
+        var renamed = pro; renamed.name = "Nostalgia Res"
+        let plan = PackPlan.make(program: renamed, files: [cf], profile: SlotProfile(), factory: FactoryLibrary(), embedFactory: false)
+        let g = try Packer.pack(renamed, content: plan.content(files: [cf], profile: SlotProfile(), factory: FactoryLibrary(),
+                                                               names: [cf.id: "Nostalgia"]))
+        let back = Unpacker.unpack(try UnifiedProgram(data: g.serialized()))
+        XCTAssertEqual(back.program.name, "Nostalgia Res")
+        XCTAssertEqual(back.wavetables.first?.file.name, "Nostalgia")
+    }
+}

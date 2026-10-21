@@ -51,6 +51,17 @@ Source column then shows e.g. **U01 → U56**, with a button to undo it. Only th
 the `.pro` file is not modified. Multisample oscillators are not repointed. Parts 3 and 4 play only
 on 4-part models (24K, 24M); on an 8M they hold filler (P02, U01 and an analog shape).
 
+**Clean Up Names…** proposes tidier names for the programs and the wavetables and multisamples
+you added (never factory wavetables): slot numbers removed from the start or end ("U48 SM OBX8 1" →
+"SM OBX8 1", "S010_JP8_" → "JP8"), underscores to spaces, and title case for names written entirely
+in capitals or entirely in lower case ("NOSTALGIA RES" → "Nostalgia Res"). Names that already mix
+cases keep their capitals; words with digits (JP8, OBX8) and words on an editable list (SM, FM,
+PWM…) stay upper case. Every proposal is shown, editable and can be unticked. New names go into
+the `.pgdata` (and its file name); source files are not changed, and unpacking keeps names as they
+are. Names longer than 26 characters (the longest factory program name) are flagged, since the
+synth's display limit is unknown; name fields hold 31 characters. A table embedded "as on my synth"
+carries the name recorded in Synth Slots.
+
 Added files that no program uses are flagged in the files table ("Not assigned to a slot", "Not
 used by any program here"), with **Use in a program…** to repoint a program to them, and are listed
 again after **Write**.

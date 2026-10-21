@@ -46,12 +46,12 @@ struct RepointSheet: View {
             Text("Point oscillators to another slot").font(.title3).bold()
             if request.itemID == nil {
                 Picker("Program", selection: $itemID) {
-                    ForEach(state.programs) { p in Text(p.program.name).tag(Optional(p.id)) }
+                    ForEach(state.programs) { p in Text(p.name).tag(Optional(p.id)) }
                 }
                 .frame(maxWidth: 360)
                 .onChange(of: itemID) { _ in picked = [] }
             } else if let item {
-                Text(item.program.name).foregroundStyle(.secondary)
+                Text(item.name).foregroundStyle(.secondary)
             }
             HStack(alignment: .top, spacing: 16) {
                 oscillatorList.frame(width: 330)
@@ -130,10 +130,10 @@ struct RepointSheet: View {
         state.contentFiles.compactMap { f in
             guard !f.isSample else { return nil }
             if let s = f.slot {
-                return Target(id: "f" + f.id.uuidString, ref: s, title: "\(s.label)  \(f.name)", detail: f.url.lastPathComponent, file: f)
+                return Target(id: "f" + f.id.uuidString, ref: s, title: "\(s.label)  \(state.displayName(f))", detail: f.url.lastPathComponent, file: f)
             }
             guard let s = fileSlots[f.id] else { return nil }
-            return Target(id: "f" + f.id.uuidString, ref: s, title: f.name, detail: f.url.lastPathComponent, file: f)
+            return Target(id: "f" + f.id.uuidString, ref: s, title: state.displayName(f), detail: f.url.lastPathComponent, file: f)
         }
     }
 
@@ -220,7 +220,7 @@ struct RepointSheet: View {
         guard let t = target else { return "Point" }
         if let fid = targetFile, let f = state.contentFiles.first(where: { $0.id == fid }) {
             let n = picked.count
-            return "Point \(n) oscillator\(n == 1 ? "" : "s") to \(f.name) (\(t.label))"
+            return "Point \(n) oscillator\(n == 1 ? "" : "s") to \(state.displayName(f)) (\(t.label))"
         }
         let n = picked.count
         return "Point \(n) oscillator\(n == 1 ? "" : "s") to \(t.isBuiltIn ? t.description : t.label)"
