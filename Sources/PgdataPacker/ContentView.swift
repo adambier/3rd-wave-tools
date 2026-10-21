@@ -169,7 +169,7 @@ enum AlertPresenter {
         }
     }
 
-    private static func textArea(_ text: String) -> NSView {
+    static func textArea(_ text: String) -> NSView {
         let width: CGFloat = 520, maxHeight: CGFloat = 360
         let tv = NSTextView(frame: NSRect(x: 0, y: 0, width: width, height: 10))
         tv.isEditable = false

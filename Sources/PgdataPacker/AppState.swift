@@ -339,7 +339,29 @@ final class AppState: ObservableObject {
     /// Writes .pgdata files for the given programs into a folder chosen by the user.
     func writeUnified(_ ids: [UUID]) {
         let items = programs.filter { ids.contains($0.id) }
-        guard !items.isEmpty, let folder = Panels.chooseFolder(prompt: "Write Here", message: "Choose where to write the .pgdata files") else { return }
+        guard !items.isEmpty else { return }
+        // Programs missing content cannot be packed: ask before writing the rest.
+        let missing: [String] = items.compactMap { item in
+            guard case .blocked(let refs) = plan(for: item).verdict else { return nil }
+            return "\(item.name) (needs \(refs.map(\.label).joined(separator: ", ")))"
+        }
+        if !missing.isEmpty {
+            let ok = items.count - missing.count
+            if ok == 0 {
+                alertMessage = (items.count == 1 ? "This program is missing content, so it can't be written."
+                                                 : "None of these programs can be written: all are missing content.")
+                    + "\n\n" + missing.joined(separator: "\n")
+                    + "\n\nAdd the .wt or .bin files they need and assign them to the slots shown."
+                return
+            }
+            let n = missing.count
+            guard Panels.confirm(
+                title: "\(n) of \(items.count) programs \(n == 1 ? "is" : "are") missing content",
+                message: "\(n == 1 ? "It" : "They") will not be written. Write the other \(ok)?",
+                details: missing.joined(separator: "\n"),
+                ok: "Write \(ok)") else { return }
+        }
+        guard let folder = Panels.chooseFolder(prompt: "Write Here", message: "Choose where to write the .pgdata files") else { return }
         var outputs: [(name: String, data: Data)] = []
         var blocked: [String] = [], failed: [String] = []
         // Prefix each file with its program location (or list position) so the synth's alphabetical

@@ -33,10 +33,12 @@ enum Panels {
         return p.runModal() == .OK ? p.urls : []
     }
 
-    static func confirm(title: String, message: String, ok: String) -> Bool {
+    /// `details`, when given, goes in a scrolling text area below the message (one item per line).
+    static func confirm(title: String, message: String, details: String? = nil, ok: String) -> Bool {
         let a = NSAlert()
         a.messageText = title
         a.informativeText = message
+        if let d = details, !d.isEmpty { a.accessoryView = AlertPresenter.textArea(d) }
         a.addButton(withTitle: ok)
         a.addButton(withTitle: "Cancel")
         return a.runModal() == .alertFirstButtonReturn
