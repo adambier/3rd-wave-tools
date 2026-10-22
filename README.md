@@ -256,6 +256,7 @@ Sources/PgdataFormats/   formats and packing logic, no UI (tested on Linux and m
   Workbench.swift           factory library, pack and unpack plans
   FactoryCatalog.swift      factory table names and fingerprints (generated)
 Sources/PgdataPacker/       the app (SwiftUI)
+Resources/AppIcon.icns      app icon, drawn by tools/make-icon.py (needs cairosvg and Pillow)
 Sources/tw3pg/              developer harness: inspect, roundtrip, repack, compare, wtcheck, factory-catalog, pack
 Tests/PgdataFormatsTests/
 ```
