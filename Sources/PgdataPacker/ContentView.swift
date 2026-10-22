@@ -251,14 +251,14 @@ enum AlertPresenter {
         }
     }
 
-    /// Plain text, except that a line ending in ":" (a list heading such as "Added files not used by
-    /// any program:") gets a little space below it before its list starts.
+    /// Plain text with a little space after every line, so list items stay apart, and more after
+    /// a line ending in ":" (a list heading such as "Added files that no program uses:").
     private static func styled(_ text: String) -> NSAttributedString {
         let out = NSMutableAttributedString()
         let lines = text.components(separatedBy: "\n")
         for (i, line) in lines.enumerated() {
             let para = NSMutableParagraphStyle()
-            if line.hasSuffix(":") { para.paragraphSpacing = 6 }
+            para.paragraphSpacing = line.hasSuffix(":") ? 8 : 5
             out.append(NSAttributedString(string: line + (i < lines.count - 1 ? "\n" : ""), attributes: [
                 .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
                 .foregroundColor: NSColor.labelColor,
