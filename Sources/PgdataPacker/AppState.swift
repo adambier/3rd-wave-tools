@@ -18,7 +18,7 @@ final class AppState: ObservableObject {
     struct PackItem: Identifiable {
         let id = UUID()
         var url: URL
-        /// Bank and program from the file name or its "Bank n" folder, as the synth shows it ("B4-P029").
+        /// Bank and program from the file name or its "Bank n" folder, as the 3rd Wave shows it ("B4-P029").
         var location: (bank: Int, program: Int)? { OutputNames.programLocation(of: url) }
         var locationLabel: String? { location.map { String(format: "B%d-P%03d", $0.bank, $0.program) } }
         var program: ProgramFile
@@ -105,7 +105,7 @@ final class AppState: ObservableObject {
         if defaults.object(forKey: "skipFactoryDuplicates") != nil {
             skipFactoryDuplicates = defaults.bool(forKey: "skipFactoryDuplicates")
         }
-        // Settings from versions that asked for the factory .wt files and tracked the synth's slots.
+        // Settings from versions that asked for the factory .wt files and tracked the 3rd Wave's slots.
         for key in ["factoryFolders", "embedFactory", "synthHasAllFactory"] { defaults.removeObject(forKey: key) }
         loading = false
     }
@@ -191,7 +191,7 @@ final class AppState: ObservableObject {
             case let .problem(s): problems.append(s)
             }
         }
-        // Programs in bank and program order, as on the synth; files without a location after them.
+        // Programs in bank and program order, as on the 3rd Wave; files without a location after them.
         programs.sort { a, b in
             switch (a.location, b.location) {
             case let (x?, y?): return (x.bank, x.program) < (y.bank, y.program)
@@ -281,7 +281,7 @@ final class AppState: ObservableObject {
         return out
     }
 
-    /// What a wavetable slot holds on the user's synth, for display.
+    /// What a wavetable slot holds on the user's 3rd Wave, for display.
     func slotName(_ ref: SourceRef) -> String {
         if ref.isBuiltIn { return ref.description }
         if ref.isSample { return "Multisample" }
@@ -310,7 +310,7 @@ final class AppState: ObservableObject {
         switch choice {
         case .builtIn: return ref.description
         case .reference:
-            return "Factory \(factory.name(ref) ?? ref.label) (the synth's own copy)"
+            return "Factory \(factory.name(ref) ?? ref.label) (the 3rd Wave's own copy)"
         case .file(let id):
             let f = contentFiles.first { $0.id == id }
             return "\(f.map(displayName) ?? "?") — from \(f?.url.lastPathComponent ?? "?")"
@@ -348,7 +348,7 @@ final class AppState: ObservableObject {
         var outputs: [(name: String, data: Data)] = []
         var blocked: [String] = [], failed: [String] = [], unfamiliar: [String] = [], replaced: [String] = []
         // Prefix each file with its program location (or its position among the files written) so
-        // the synth's alphabetical bulk import keeps the programs in order.
+        // the 3rd Wave's alphabetical bulk import keeps the programs in order.
         let prefixes = OutputNames.orderPrefixes(urls: items.map(\.url))
         let prefixByID = Dictionary(uniqueKeysWithValues: zip(items.map(\.id), prefixes))
         for item in items {
@@ -378,7 +378,7 @@ final class AppState: ObservableObject {
         if !blocked.isEmpty { msg += "\n\nNot packed (files missing):\n" + blocked.joined(separator: "\n") }
         if !failed.isEmpty { msg += "\n\nNot packed:\n" + failed.joined(separator: "\n") }
         if !replaced.isEmpty { msg += "\n\nFactory tables replaced by added files (check these are meant):\n" + replaced.joined(separator: "\n") }
-        if !unfamiliar.isEmpty { msg += "\n\nPacked, but check these on the synth (unfamiliar layout or a cut name; see each program's notes):\n" + unfamiliar.joined(separator: "\n") }
+        if !unfamiliar.isEmpty { msg += "\n\nPacked, but check these on the 3rd Wave (unfamiliar layout or a cut name; see each program's notes):\n" + unfamiliar.joined(separator: "\n") }
         let unused = unusedContent
         if !unused.isEmpty {
             msg += "\n\nAdded files that no program uses (left out):\n" + contentFiles.filter { unused[$0.id] != nil }

@@ -3,7 +3,7 @@ import Foundation
 /// One multisample slot (S): up to 8 samples, each with key range, loop and level settings.
 ///
 /// Stored in a .bin file ("W3_MSAMPLE_<v>", v = 1, 4 or 5 seen) and, in the v5 layout, inside
-/// a .pgdata. Older versions lack some fields; on upgrade they get the values the synth itself
+/// a .pgdata. Older versions lack some fields; on upgrade they get the values the 3rd Wave itself
 /// assigns (verified against Groove Synthesis's v1 and v5 copies of "Hanger Drums"): 48 kHz, 16-bit,
 /// pitch 0, second rate = rate, volume 1.0.
 public struct Multisample: Equatable {

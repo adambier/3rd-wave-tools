@@ -151,7 +151,7 @@ case "repack":
                 if a.sources.map(\.ref) != b.sources.map(\.ref) { why.append("source order \(a.sources.map(\.ref.label)) vs \(b.sources.map(\.ref.label))") }
                 if a.sources != b.sources && a.sources.map(\.ref) == b.sources.map(\.ref) { why.append("payloads") }
                 if a.programName != b.programName { why.append("name") }
-                // A .pro keeps floats to six decimals (as the synth's own export does), so words in
+                // A .pro keeps floats to six decimals (as the 3rd Wave's own export does), so words in
                 // the float section may differ below that precision; anything else is a real difference.
                 func sixDecimals(_ w: UInt32) -> String { String(format: "%f", Double(Float(bitPattern: w))) }
                 let wd = zip(a.words, b.words).enumerated().filter { $0.element.0 != $0.element.1 }
@@ -222,8 +222,8 @@ case "wtcheck":
     print("wtcheck: \(exact) bit-exact, \(mismatch) mismatched; no .wt found for: \(unmatched.sorted())")
 
 case "maketests":
-    need(4, rest, "maketests <factory .pro using U07> <a .wt already on the synth> <a W3_PROG_4 .pro> <outdir>")
-    // tw3pg maketests <factory .pro using U07> <a .wt already on the synth> <a W3_PROG_4 .pro> <outdir>
+    need(4, rest, "maketests <factory .pro using U07> <a .wt already on the 3rd Wave> <a W3_PROG_4 .pro> <outdir>")
+    // tw3pg maketests <factory .pro using U07> <a .wt already on the 3rd Wave> <a W3_PROG_4 .pro> <outdir>
     // Builds the hardware-test .pgdata files described in the README's "synth tests" section.
     let base = try ProgramFile(data: try load(URL(fileURLWithPath: rest[0])))
     let existing = try WavetableFile(data: try load(URL(fileURLWithPath: rest[1])))
@@ -243,7 +243,7 @@ case "maketests":
     // T1: factory tables listed, not carried.
     var t1 = base; t1.name = "TW3 T1 FactoryRef"
     try write(t1, refsOnly(t1), "TW3_T1_FactoryRef.pgdata")
-    // T2: part 1 osc 1 -> U58, carrying a table the synth already has in another slot.
+    // T2: part 1 osc 1 -> U58, carrying a table the 3rd Wave already has in another slot.
     var t2 = base; t2.name = "TW3 T2 U58 Dup"; t2.setSourceID(SourceRef.u(58).id, at: 0)
     var c2 = refsOnly(t2); c2[.u(58)] = .wavetable(existing)
     try write(t2, c2, "TW3_T2_U58_Dup.pgdata")

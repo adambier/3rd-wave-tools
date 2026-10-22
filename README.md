@@ -7,8 +7,8 @@ A macOS app that packs Groove Synthesis 3rd Wave programs (`.pro`) together with
 `.pgdata` files back into those parts.
 
 Not affiliated with or endorsed by Groove Synthesis. Everything here was worked out from files and
-checked on one 8M running OS 2.0d. The Formats and Synth tests sections say what was confirmed on
-the synth and what is inferred.
+checked on one 8M running OS 2.0d. The Formats and Tests sections say what was confirmed on
+the 3rd Wave and what is inferred.
 
 ## Build
 
@@ -30,7 +30,7 @@ The window has two pages, **Pack** and **Unpack**. There is nothing to set up.
 ### Factory wavetables
 
 The app never embeds factory wavetables. A program that uses a factory slot (U00–U55, P00–P35)
-lists the slot without data, and the synth that loads the file plays its own factory table, unless
+lists the slot without data, and the 3rd Wave that loads the file plays its own factory table, unless
 you add a different table for that slot (see Pack).
 
 The app knows each factory table by name and by a fingerprint of its content (built in from Groove
@@ -38,15 +38,15 @@ Synthesis's factory `.wt` files; only names and fingerprints are stored). It use
 
 - show factory slot names (e.g., "U00 Additive_Bell_17");
 - treat an added file that is identical to the factory table of its slot as that table (listed,
-  not embedded), for example a table unpacked from the synth's own export, which carries every
+  not embedded), for example a table unpacked from the 3rd Wave's own export, which carries every
   table a program uses;
-- leave factory tables out of the free-slot estimate, since a synth that has them reuses them;
+- leave factory tables out of the free-slot estimate, since a 3rd Wave that has them reuses them;
 - skip, when unpacking, tables identical to the factory table in their slot, and never offer
   factory tables for renaming.
 
 **U48–U55.** These joined the factory set in 2025, alongside OS 1.9 (which also brought `.pgdata`).
 The 8M ships with them; 24K and 24M owners import them from Groove Synthesis's download. The app
-assumes the synth that loads a `.pgdata` has them.
+assumes the 3rd Wave that loads a `.pgdata` has them.
 
 Before 2025 those were user slots, and some older program sets used them for their own tables,
 shipped as `.wt` files named with the slot (e.g., `U48 Warm Pad.wt`). So in a program saved before
@@ -84,13 +84,13 @@ the app lists its oscillator sources and what each will be:
 You can change any choice from the Plays menu.
 
 A line under the program name sums it up: what will be embedded, the size of the `.pgdata`, and
-how many free slots the synth will need; or what the program still needs before it can be packed.
+how many free slots the 3rd Wave will need; or what the program still needs before it can be packed.
 The list on the left can be filtered by name or location, or limited to programs needing
 attention.
 
 A program in a layout not seen before (a format other than `W3_PROG_3` to `_5`, or an unusual
 number of values per part) gets a warning: the app finds the oscillator sources from the layout, so
-check them, and check the program on the synth after importing. A source number outside every
+check them, and check the program on the 3rd Wave after importing. A source number outside every
 known range shows as an unknown source, and the program is not written until those oscillators are
 pointed elsewhere.
 
@@ -140,7 +140,7 @@ Within title case:
 Every proposal is shown, can be edited, and can be unticked. New names go into the `.pgdata` and
 its file name. Source files are not changed, and unpacking keeps names as they are.
 
-Name fields hold 31 characters, and the synth displays all 31 for programs, wavetables and
+Name fields hold 31 characters, and the 3rd Wave displays all 31 for programs, wavetables and
 multisamples. A longer name is flagged next to the name, in the program's notes and in the report
 after packing, and is cut to 31.
 
@@ -162,33 +162,33 @@ Files are named in Groove Synthesis's own pattern, with the program location fir
 - The location comes from the `.pro` file name (e.g., `B05P100.pro`), since a `.pro` does not
   record it. Groove Synthesis's older layout of a `Bank 1` folder holding `001.PRO` to `100.PRO`
   is read too.
-- The prefix keeps the synth's alphabetical bulk import in program order.
-- As in the synth's own exports, spaces become underscores and everything other than ASCII letters,
+- The prefix keeps the 3rd Wave's alphabetical bulk import in program order.
+- As in the 3rd Wave's own exports, spaces become underscores and everything other than ASCII letters,
   digits, hyphens and underscores is dropped (e.g., "Big Bass (MW)" → `Big_Bass_MW`). This affects
   the file name only, not the program name inside it.
 - A batch that includes a program 100 uses three digits throughout (e.g., `B05P087_…`,
-  `B05P100_…`). The synth itself writes `B05P09_…` and `B05P100_…`, but in plain alphabetical order
+  `B05P100_…`). The 3rd Wave itself writes `B05P09_…` and `B05P100_…`, but in plain alphabetical order
   `B05P100` sorts between `B05P10` and `B05P11`, which could put it out of order in a bulk import.
 - If any program being written has no location in its file name (for example, a renamed file, or a
   `.pro` written by Unpack), all of them are numbered by their place in the batch instead (e.g.,
   `001_…`, `002_…`).
 
-#### What the synth does on import
+#### What the 3rd Wave does on import
 
 Checked on an 8M (OS 2.0d):
 
-- **A table the synth already has** (same content, in any slot, whatever its name) is reused. No
-  slot is used, and the synth keeps its own name for it.
+- **A table the 3rd Wave already has** (same content, in any slot, whatever its name) is reused. No
+  slot is used, and the 3rd Wave keeps its own name for it.
 - **A new table or multisample** goes into a free slot, and the program is pointed there. The slot
-  number in the file is only a label. With no free slot, the synth offers to overwrite its last
+  number in the file is only a label. With no free slot, the 3rd Wave offers to overwrite its last
   ones; blank placeholder tables count as used. The Pack page shows how many free wavetable slots a
   program may need; each embedded multisample also takes a free S slot. (For multisamples, the
-  synth's message says it erases the most recently loaded samples; not tried here.)
-- **A table or multisample listed without its data** plays whatever is in that slot on the synth,
+  3rd Wave's message says it erases the most recently loaded samples; not tried here.)
+- **A table or multisample listed without its data** plays whatever is in that slot on the 3rd Wave,
   with no warning; an empty sample slot plays silence. That is why multisamples are always
   embedded.
 - A `W3_PROG_4` program imports from a `.pgdata` and plays the same as from its `.pro` (one
-  program checked). `W3_PROG_3` programs have not been tried on the synth.
+  program checked). `W3_PROG_3` programs have not been tried on the 3rd Wave.
 
 ### Unpack
 
@@ -197,12 +197,12 @@ wavetable named with its slot (e.g., `U57_Warm Pad.wt`), and a `.bin` per multis
 Groove Synthesis's sample library names them (e.g., `S010_Strings.bin`).
 
 Untick anything you don't want, or rename it, before **Unpack Selected…** or **Unpack All…**.
-Wavetables identical to the factory table in their slot are skipped by default: the synth's own
+Wavetables identical to the factory table in their slot are skipped by default: the 3rd Wave's own
 export embeds factory tables too, and a repack lists them anyway. Unpacked names are kept as they
 are.
 
 A `.pgdata` does not record the program's format, so the unpacked `.pro` is always tagged
-`W3_PROG_5`, the current format, whatever its layout. Whether the synth's **Import Program**
+`W3_PROG_5`, the current format, whatever its layout. Whether the 3rd Wave's **Import Program**
 accepts that tag on an older layout has not been tried; the `.pgdata` itself imports either way.
 
 ## Formats
@@ -219,7 +219,7 @@ irregular: it looks as if later ranges were added without renumbering the earlie
 | 2000+k | U(7+k): U07–U63 |
 | 4000+n | S n |
 
-Checked on the synth for ids 34 (U00), 1000 (P34) and 2000 (U07), and for the seven analog waves;
+Checked on the 3rd Wave for ids 34 (U00), 1000 (P34) and 2000 (U07), and for the seven analog waves;
 the rest of each range follows from the ids seen in files (P36–P47 are inferred). An id names a
 slot, not content: what plays is whatever is loaded in that slot.
 
@@ -235,7 +235,7 @@ tables hold 64 × 128 (sample, delta-to-next) pairs = 16,384 values; U tables 13
 **.bin** — `W3_MSAMPLE_<v>` (1, 4 and 5 seen), sample count, 32-byte slot name, then the samples:
 length, rate, bit depth, name, start and end, loop start and end, root, low and high note, loop
 mode, crossfade length and type, pitch, second rate, volume, int16 audio. Versions 1 and 4 lack
-some fields; they are upgraded with the values the synth itself fills in.
+some fields; they are upgraded with the values the 3rd Wave itself fills in.
 
 **.pgdata** — `W3_UNIPROG_1`, a source table (index, type, id), one record per source (with the
 embedded `.wt` values as float32, or the multisample in `.bin` v5 layout, or nothing), then the
@@ -252,7 +252,7 @@ factory tables instead of embedding them, so its output differs there by design.
 - Every `.pro`, `.wt`, `.pgdata` and v5 `.bin` reads and rewrites byte for byte (v1 and v4 `.bin`
   files are upgraded to v5).
 - All 221 `.pgdata` files unpack and repack identically, up to the `.pro` format's six-decimal
-  float precision (the synth's own `.pro` export has the same limit).
+  float precision (the 3rd Wave's own `.pro` export has the same limit).
 - All 314 embedded wavetables are bit-identical to the `.wt` files they came from.
 - Packing Groove Synthesis's factory `.pro` files reproduces the structure of their `.pgdata` (19
   for the 8M, 19 for the 24-voice models): the same sources, in the same order, with the same
@@ -262,15 +262,15 @@ factory tables instead of embedding them, so its output differs there by design.
   exporter does not (their 24-voice files do). One 24-voice program's `.pro` and `.pgdata` differ
   in real settings; they appear to be different editions.
 
-## Synth tests
+## Tests on the 3rd Wave
 
-The behaviour under "What the synth does on import" was checked on an 8M (OS 2.0d), along with
-name lengths and the synth's own export file names. The synth's exports were also unpacked and
+The behaviour under "What the 3rd Wave does on import" was checked on an 8M (OS 2.0d), along with
+name lengths and the 3rd Wave's own export file names. The 3rd Wave's exports were also unpacked and
 repacked byte for byte with `tw3pg`. The test `.pgdata` files are built with `tw3pg` from files that are not
 included here (a Groove Synthesis factory program and one of its `.wt` files, two third-party
 programs, and a small `.bin`).
 
-Still unknown: whether the synth reuses a multisample it already has (as it does for wavetables);
+Still unknown: whether the 3rd Wave reuses a multisample it already has (as it does for wavetables);
 whether its bulk import sorts file names plainly or by number; how it writes non-ASCII letters in
 file names; whether `W3_PROG_3` programs import from a `.pgdata`; whether **Import Program**
 accepts an unpacked `.pro` tagged `W3_PROG_5` on an older layout; and the meaning of the few
@@ -293,7 +293,7 @@ Sources/PgdataFormats/   formats and packing logic, no UI (tested on Linux and m
 Sources/PgdataPacker/       the app (SwiftUI)
 Resources/                  app icon, drawn by tools/make-icon.py (needs cairosvg and Pillow)
 Sources/tw3pg/              developer harness: inspect, roundtrip, unpack, repack, compare, wtcheck,
-                            factory-catalog, pack, and the synth-test builders
+                            factory-catalog, pack, and the 3rd Wave-test builders
 Tests/PgdataFormatsTests/
 ```
 

@@ -198,7 +198,7 @@ final class WorkbenchTests: XCTestCase {
         let lib = FactoryLibrary([.u(7): .init(name: "Knob Grotto 6", fingerprint: cf.fingerprint)])
         var fac = cf; fac.slot = .u(7)
         let p3 = PackPlan.make(program: makeProgram(sources: [2000] + Array(repeating: 42, count: 11)), files: [fac], factory: lib)
-        XCTAssertEqual(PackPlan.unusedFiles([fac], plans: [p3], factory: lib)[fac.id], "Identical to factory U07; the synth's own copy is used, so it is not embedded")
+        XCTAssertEqual(PackPlan.unusedFiles([fac], plans: [p3], factory: lib)[fac.id], "Identical to factory U07; the 3rd Wave's own copy is used, so it is not embedded")
         XCTAssertTrue(p3.content(files: []).isEmpty || p3.content(files: [])[.u(7)] == .reference)   // no crash without the file
     }
 

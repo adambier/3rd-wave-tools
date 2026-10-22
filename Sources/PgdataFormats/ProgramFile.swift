@@ -105,7 +105,7 @@ public struct ProgramFile: Equatable {
         var what: [String] = []
         if !v { what.append("format \(version)") }
         if !s { what.append("\(valuesPerPart) values per part") }
-        return "Unfamiliar program layout (\(what.joined(separator: ", "))): the oscillator sources may be misread. Check them here and on the synth after importing."
+        return "Unfamiliar program layout (\(what.joined(separator: ", "))): the oscillator sources may be misread. Check them here and on the 3rd Wave after importing."
     }
 
     public var valuesPerPart: Int {

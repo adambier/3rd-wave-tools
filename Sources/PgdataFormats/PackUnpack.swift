@@ -4,7 +4,7 @@ import Foundation
 
 /// What to put in the .pgdata for one source.
 public enum SourceContent: Equatable {
-    /// List the source but carry no data: the synth uses whatever is in that slot.
+    /// List the source but carry no data: the 3rd Wave uses whatever is in that slot.
     case reference
     case wavetable(WavetableFile)
     case multisample(Multisample)
@@ -31,7 +31,7 @@ public enum Packer {
     /// Sources are listed in order of first use (part 1 osc 1 … part 4 osc 3), every referenced
     /// source included, as Groove Synthesis's sample library does. Analog shapes never carry data.
     /// Multisamples are normally carried. Listing an S slot without its samples is allowed only when
-    /// asked for explicitly: no such file has been seen, and the synth's handling is untested.
+    /// asked for explicitly: no such file has been seen, and the 3rd Wave's handling is untested.
     public static func pack(_ program: ProgramFile, content: [SourceRef: SourceContent]) throws -> UnifiedProgram {
         let refs = program.distinctSources
         if let bad = refs.first(where: { if case .unknown = $0 { return true }; return false }) {
@@ -46,7 +46,7 @@ public enum Packer {
             case (.s, .multisample(let m)):
                 sources.append(.init(ref: ref, payload: .multisample(m)))
             case (.s, .reference):
-                // Listed without its samples. Never seen in Groove Synthesis's files; the synth's handling is untested.
+                // Listed without its samples. Never seen in Groove Synthesis's files; the 3rd Wave's handling is untested.
                 sources.append(.init(ref: ref, payload: .none))
             case (.s, _):
                 throw PackError.wrongKind(ref, "a sample slot needs a multisample (.bin), not a wavetable.")
@@ -72,7 +72,7 @@ public enum Packer {
         return UnifiedProgram(sources: sources, programName: NameField(program.name), words: words)
     }
 
-    /// True when the program cannot be expressed as a plain .pro for a synth whose slots
+    /// True when the program cannot be expressed as a plain .pro for a 3rd Wave whose slots
     /// hold factory content in `factoryContent` slots: it uses a sample, or a wavetable slot
     /// for which `isFactoryContent` returns false.
     public static func needsUnifiedFile(_ program: ProgramFile, isFactoryContent: (SourceRef) -> Bool) -> Bool {
@@ -89,7 +89,7 @@ public struct UnpackedProgram {
     /// Embedded content, keyed by the slot the program refers to.
     public var wavetables: [(ref: SourceRef, file: WavetableFile)]
     public var multisamples: [(ref: SourceRef, sample: Multisample)]
-    /// Sources listed without data (expected to be present on the synth already).
+    /// Sources listed without data (expected to be present on the 3rd Wave already).
     public var referenced: [SourceRef]
     public var notes: [String]
 }
@@ -114,9 +114,9 @@ public enum Unpacker {
             if k < u.sources.count {
                 values[i] = .int(u.sources[k].ref.id)
             } else {
-                // Kept as it is, so nothing is invented; the synth will read it as source id k.
+                // Kept as it is, so nothing is invented; the 3rd Wave will read it as source id k.
                 notes.append("Oscillator \(slot % 3 + 1) of part \(slot / 3 + 1) points at source \(k), which the file does not list. "
-                             + "The .pro keeps the value \(k), which the synth reads as \(SourceRef(id: Int32(k)).description).")
+                             + "The .pro keeps the value \(k), which the 3rd Wave reads as \(SourceRef(id: Int32(k)).description).")
             }
         }
         let program = ProgramFile(version: "W3_PROG_5", name: u.programName.text, values: values)

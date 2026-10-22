@@ -16,7 +16,7 @@ struct UnpackView: View {
                 Button("Add Files or Folders…") { state.add(urls: Panels.chooseFiles(message: "Choose .pgdata files to unpack")) }
                     .keyboardShortcut("o")
                 Toggle("Skip factory wavetables", isOn: $state.skipFactoryDuplicates)
-                    .help("Leave out wavetables that are identical to the factory table in their slot. The synth's own exports embed factory tables too; a repack lists the factory slot instead. Any table can still be ticked.")
+                    .help("Leave out wavetables that are identical to the factory table in their slot. The 3rd Wave's own exports embed factory tables too; a repack lists the factory slot instead. Any table can still be ticked.")
                 if let p = state.reading {
                     ProgressView(value: Double(p.done), total: Double(max(p.total, 1))).frame(width: 120)
                     Text("Reading \(p.done) of \(p.total)…").font(.caption).foregroundStyle(.secondary)
@@ -94,7 +94,7 @@ struct UnpackDetail: View {
             .visibleScrollers()
             .frame(minHeight: 140)
             if !item.plan.referenced.isEmpty {
-                Text("Not embedded (the synth plays what it has in these slots): "
+                Text("Not embedded (the 3rd Wave plays what it has in these slots): "
                      + item.plan.referenced.map(\.description).joined(separator: ", "))
                     .font(.callout).foregroundStyle(.secondary)
             }

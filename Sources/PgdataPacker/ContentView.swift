@@ -198,7 +198,7 @@ struct PlanSummary: View {
             if need.u > 0 { slots.append("\(need.u) U") }
             if need.p > 0 { slots.append("\(need.p) P") }
             if c.multisamples > 0 { slots.append("\(c.multisamples) S") }
-            if !slots.isEmpty { s += "; needs " + slots.joined(separator: ", ") + " free slot\(need.u + need.p + c.multisamples == 1 ? "" : "s") on the synth" }
+            if !slots.isEmpty { s += "; needs " + slots.joined(separator: ", ") + " free slot\(need.u + need.p + c.multisamples == 1 ? "" : "s") on the 3rd Wave" }
             return s
         }
     }
@@ -206,7 +206,7 @@ struct PlanSummary: View {
     var body: some View {
         Label(text, systemImage: plan.verdict.symbol)
             .foregroundStyle(plan.verdict.tint)
-            .help("The synth reuses a table it already has (in any slot, under any name) and stores new ones in free slots. With none free, it offers to overwrite its last tables; blank placeholders count as used.")
+            .help("The 3rd Wave reuses a table it already has (in any slot, under any name) and stores new ones in free slots. With none free, it offers to overwrite its last tables; blank placeholders count as used.")
     }
 }
 

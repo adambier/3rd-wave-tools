@@ -85,7 +85,7 @@ public struct NameField: Equatable, Hashable {
 }
 
 extension Array where Element == UInt8 {
-    /// Latin-1 decode (the synth's files are single-byte text).
+    /// Latin-1 decode (the 3rd Wave's files are single-byte text).
     var latin1: String { String(self.map { Character(Unicode.Scalar($0)) }) }
 }
 

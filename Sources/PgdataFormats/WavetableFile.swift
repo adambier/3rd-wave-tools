@@ -69,9 +69,9 @@ public struct WavetableFile: Equatable {
         return Data(s.latin1Bytes)
     }
 
-    /// Six decimals (the synth's own "%f" style) when that reproduces the float32 exactly;
+    /// Six decimals (the 3rd Wave's own "%f" style) when that reproduces the float32 exactly;
     /// otherwise the shortest text that does. Groove Synthesis's factory P tables use 12–14 digits and
-    /// exponent forms ("1.38777878078e-17f"), so the synth reads both.
+    /// exponent forms ("1.38777878078e-17f"), so the 3rd Wave reads both.
     static func literal(_ v: Float) -> String {
         let six = String(format: "%f", Double(v))
         if Float(six) == v { return six }

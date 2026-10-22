@@ -58,13 +58,13 @@ public enum SourceRef: Hashable, Comparable, CustomStringConvertible {
         }
     }
 
-    /// The seven analog-modelled waves, as the synth labels and names them [verified on an 8M,
+    /// The seven analog-modelled waves, as the 3rd Wave labels and names them [verified on an 8M,
     /// 2026-10-22]. The wave offset knob sweeps A05 from white through pink to red noise and A06
     /// from white through blue to violet.
     public static let analogNames = ["Sawtooth", "Square", "Triangle", "Sine", "Supersaw", "Pink noise", "Blue noise"]
     public static var analogCount: Int { analogNames.count }
 
-    /// Slot label as the synth shows it: P07, U50, S10.
+    /// Slot label as the 3rd Wave shows it: P07, U50, S10.
     public var label: String {
         switch self {
         case let .p(n): return String(format: "P%02d", n)
@@ -86,7 +86,7 @@ public enum SourceRef: Hashable, Comparable, CustomStringConvertible {
     public var isBuiltIn: Bool { if case .analog = self { return true }; return false }
 
     /// Slot number lies in the factory-filled range (P00–P35, U00–U55). Says nothing about
-    /// what a particular synth actually has loaded there.
+    /// what a particular 3rd Wave actually has loaded there.
     public var isFactorySlot: Bool {
         switch self {
         case let .p(n): return n < Self.factoryPCount

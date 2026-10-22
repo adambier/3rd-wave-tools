@@ -167,7 +167,7 @@ public struct PackPlan {
     /// What the user (or the defaults) chose for one source.
     public enum Choice: Hashable {
         case builtIn                 // analog shape
-        case reference               // list the slot only; the synth supplies its factory table
+        case reference               // list the slot only; the 3rd Wave supplies its factory table
         case file(UUID)              // embed a content file from this session
     }
 
@@ -194,7 +194,7 @@ public struct PackPlan {
         public var embeds: Bool
         /// Approximate bytes this source adds to the .pgdata.
         public var bytes: Int = 3
-        /// An embedded wavetable the synth is not known to have. On import the synth reuses a table
+        /// An embedded wavetable the 3rd Wave is not known to have. On import the 3rd Wave reuses a table
         /// whose content it already has (in any slot, whatever its name); anything else goes into a
         /// free slot, and if there is none it offers to overwrite the last ones. [verified, T2/T6]
         public var mayNeedSlot = false
@@ -272,7 +272,7 @@ public struct PackPlan {
     /// Default choice per source:
     ///  1. a content file assigned to that slot in this session (the program's author supplied it),
     ///     unless it is identical to the factory table of that slot: then the slot is listed only
-    ///  2. for a factory slot: listed without data; the receiving synth plays its own factory table.
+    ///  2. for a factory slot: listed without data; the receiving 3rd Wave plays its own factory table.
     ///     Factory tables are never embedded. Exception: in a program saved before the 2025 factory
     ///     tables (see `predates2025FactoryTables`), U48–U55 were user slots, so they are treated
     ///     like user slots; the factory table stays available as a choice, not as the default.
@@ -286,7 +286,7 @@ public struct PackPlan {
         func packedName(_ f: ContentFile) -> String { names[f.id] ?? f.name }
         var warnings: [String] = [program.layoutWarning].compactMap { $0 }
         if program.name.count > NameCleaner.fieldLimit {
-            warnings.append("The program name is \(program.name.count) characters; the synth keeps \(NameCleaner.fieldLimit), so it is cut to \"\(String(program.name.prefix(NameCleaner.fieldLimit)))\".")
+            warnings.append("The program name is \(program.name.count) characters; the 3rd Wave keeps \(NameCleaner.fieldLimit), so it is cut to \"\(String(program.name.prefix(NameCleaner.fieldLimit)))\".")
         }
         let originalSrcs = original?.sources ?? srcs
         let predates = predates2025FactoryTables(program)
@@ -298,7 +298,7 @@ public struct PackPlan {
             for p in positions where p < originalSrcs.count && originalSrcs[p] != ref && !from.contains(originalSrcs[p]) { from.append(originalSrcs[p]) }
             if ref.isBuiltIn {
                 rows.append(Row(ref: ref, usedBy: users, oscillators: positions, repointedFrom: from,
-                                choice: .builtIn, options: [.builtIn], status: .ok("Built in"), brief: "Built in", embeds: false))
+                                choice: .builtIn, options: [.builtIn], status: .ok("Built-in analog wave; nothing to embed"), brief: "Built-in analog wave", embeds: false))
                 continue
             }
             if case let .unknown(id) = ref {
@@ -350,7 +350,7 @@ public struct PackPlan {
                 embeds = true
                 let name = packedName(f)
                 if name.count > NameCleaner.fieldLimit {
-                    warnings.append("\(f.url.lastPathComponent): the name \"\(name)\" is \(name.count) characters; the synth keeps \(NameCleaner.fieldLimit), so it is cut to \"\(String(name.prefix(NameCleaner.fieldLimit)))\".")
+                    warnings.append("\(f.url.lastPathComponent): the name \"\(name)\" is \(name.count) characters; the 3rd Wave keeps \(NameCleaner.fieldLimit), so it is cut to \"\(String(name.prefix(NameCleaner.fieldLimit)))\".")
                 }
                 if case let .multisample(m) = f.body {
                     bytes = multisampleBytes(m)
@@ -359,7 +359,7 @@ public struct PackPlan {
                 } else {
                     bytes = tableBytes
                     if let same = factory.slot(withFingerprint: f.fingerprint) {
-                        status = .ok("Embeds \"\(name)\", identical to factory \(same.label); a synth that has it reuses it")
+                        status = .ok("Embeds \"\(name)\", identical to factory \(same.label); a 3rd Wave that has it reuses it")
                         brief = "Embedded; same as factory \(same.label), reused"
                     } else if isFactory && !replacingIsExpected {
                         mayNeedSlot = true
@@ -372,12 +372,12 @@ public struct PackPlan {
                     }
                 }
             case .reference?:
-                // Offered only for factory slots: listed without data, the synth plays its own table.
+                // Offered only for factory slots: listed without data, the 3rd Wave plays its own table.
                 status = .ok("Factory \(factoryName); not embedded"
                              + (assigned.count > distinct.count ? " (the added file is identical to it)" : "")
                              + (keepsFactory ? ". This program is from after \(ref.label) became a factory slot, so the added file is not used; choose it in this menu to use it" : ""))
-                brief = keepsFactory ? "Uses the synth's own factory table; added file not used" : "Uses the synth's own factory table (not embedded)"
-            case .builtIn?: status = .ok("Built in"); brief = "Built in"
+                brief = keepsFactory ? "Uses the 3rd Wave's own factory table; added file not used" : "Uses the 3rd Wave's own factory table (not embedded)"
+            case .builtIn?: status = .ok("Built-in analog wave; nothing to embed"); brief = "Built-in analog wave"
             case nil where wasUserSlot:
                 status = .missing("Probably the author's own wavetable; see the note above")
                 brief = "Missing: the author's table (see note)"
@@ -428,9 +428,9 @@ public struct PackPlan {
     /// Why a program counts as saved before OS 1.9, for the note.
     static func layoutReason(_ p: ProgramFile) -> String {
         if (1...4).contains(p.versionNumber) {
-            return "it is in the \(p.version) format, older than the W3_PROG_5 the synth has saved since OS 1.9"
+            return "it is in the \(p.version) format, older than the W3_PROG_5 the 3rd Wave has saved since OS 1.9"
         }
-        return "its layout is older than what the synth has saved since OS 1.9 (\(p.floatBlockCount) values in its float block rather than \(currentFloatBlockCount))"
+        return "its layout is older than what the 3rd Wave has saved since OS 1.9 (\(p.floatBlockCount) values in its float block rather than \(currentFloatBlockCount))"
     }
 
     /// The explanation shown with a program whose U48–U55 sources are missing because it predates them.
@@ -451,7 +451,7 @@ public struct PackPlan {
         Until 2025, U48–U55 were user slots, where people loaded their own wavetables. Groove Synthesis then made them factory slots. Loaded as it is, this program would play the factory \(one ? "table" : "tables") \(factoryList) instead of the \(one ? "one" : "ones") the author used.
 
         To fix it, do one of these:
-        • Add the author's wavetable \(one ? "file" : "files") for \(list). Program sets that use these slots usually include them, often named with the slot (for example "\(first.label) Name.wt"). A file whose name starts with the slot is assigned to it automatically; otherwise, choose Choose what to play… in the slot's Plays menu and pick the file. \(one ? "The table is" : "The tables are") then included in the .pgdata, and the synth stores \(one ? "it in a free slot" : "them in free slots") when it imports the file.
+        • Add the author's wavetable \(one ? "file" : "files") for \(list). Program sets that use these slots usually include them, often named with the slot (for example "\(first.label) Name.wt"). A file whose name starts with the slot is assigned to it automatically; otherwise, choose Choose what to play… in the slot's Plays menu and pick the file. \(one ? "The table is" : "The tables are") then included in the .pgdata, and the 3rd Wave stores \(one ? "it in a free slot" : "them in free slots") when it imports the file.
         • Point the oscillators to a different wavetable you have: Choose what to play… in the slot's Plays menu.
         • Use the factory \(one ? "table" : "tables") anyway: \(one ? "in the slot's Plays menu, choose Factory \(fname(first))" : "in each slot's Plays menu, choose its factory table (Factory \(fname(first)) for \(first.label), and so on)"). Choose this if you know the program was made for \(one ? "it" : "them"), or you accept a different sound.
         """
@@ -468,7 +468,7 @@ public struct PackPlan {
             guard let slot = f.slot else { out[f.id] = "Not used by any program here"; continue }
             let slotUsed = plans.contains { $0.rows.contains { $0.ref == slot } }
             if !slotUsed { out[f.id] = "Not used by any program here" }
-            else if factory.tables[slot]?.fingerprint == f.fingerprint { out[f.id] = "Identical to factory \(slot.label); the synth's own copy is used, so it is not embedded" }
+            else if factory.tables[slot]?.fingerprint == f.fingerprint { out[f.id] = "Identical to factory \(slot.label); the 3rd Wave's own copy is used, so it is not embedded" }
             else if plans.contains(where: { $0.rows.contains { $0.ref == slot && $0.heldBack.contains(f.id) } }) {
                 out[f.id] = "Not used: the programs here that use \(slot.label) are from after it became a factory slot, so they use the factory table"
             }
@@ -496,7 +496,7 @@ public struct PackPlan {
 // MARK: - File names
 
 public enum OutputNames {
-    /// Removes characters that are awkward in file names on macOS and on the synth's drive.
+    /// Removes characters that are awkward in file names on macOS and on the 3rd Wave's drive.
     public static func sanitize(_ s: String) -> String {
         let bad = CharacterSet(charactersIn: "/:\\\0").union(.controlCharacters)
         let t = s.unicodeScalars.map { bad.contains($0) ? "_" : String($0) }.joined()
@@ -511,17 +511,17 @@ public enum OutputNames {
     }
     public static func wavetable(_ ref: SourceRef, _ w: WavetableFile) -> String { ref.label + "_" + sanitize(w.name) + ".wt" }
     public static func program(_ p: ProgramFile) -> String { sanitize(p.name) + ".pro" }
-    /// "B05P87_Ghibli_Bell.pgdata", as the synth names its own exports: spaces become underscores,
+    /// "B05P87_Ghibli_Bell.pgdata", as the 3rd Wave names its own exports: spaces become underscores,
     /// letters, digits, hyphens and underscores are kept, anything else is dropped
     /// ("SM Ripper Bass (MW)" → "SM_Ripper_Bass_MW", "SM Cutting Bs&Ld" → "SM_Cutting_BsLd").
     /// Only the file name changes; the name inside the file keeps its spaces and punctuation.
-    /// The synth's bulk import takes files in alphabetical order, so the prefix keeps program order.
+    /// The 3rd Wave's bulk import takes files in alphabetical order, so the prefix keeps program order.
     public static func unified(_ p: ProgramFile, prefix: String? = nil) -> String {
         (prefix.map { $0 + "_" } ?? "") + exportName(p.name) + ".pgdata"
     }
 
     /// The name part of an exported .pgdata file name (see `unified`). Non-ASCII letters are dropped
-    /// too: how the synth writes them is not known.
+    /// too: how the 3rd Wave writes them is not known.
     public static func exportName(_ name: String) -> String {
         let words = name.split(separator: " ", omittingEmptySubsequences: true).map { w in
             String(w.unicodeScalars.filter { $0.isASCII && (CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "_") })
@@ -587,7 +587,7 @@ public struct UnpackPlan {
 
     public var programName: String
     public var items: [Item]
-    /// Slots the file lists without data: the synth is expected to have them already.
+    /// Slots the file lists without data: the 3rd Wave is expected to have them already.
     public var referenced: [SourceRef]
     public var notes: [String]
 

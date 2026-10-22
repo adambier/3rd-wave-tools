@@ -173,7 +173,7 @@ struct RepointSheet: View {
     }
     private var analogTargets: [Target] {
         Oscillator.repointTargets.filter(\.isBuiltIn).map { r in
-            Target(id: "a\(r.id)", ref: r, title: r.description, detail: "built in")
+            Target(id: "a\(r.id)", ref: r, title: r.description, detail: "built-in wave")
         }
     }
     private func matches(_ t: Target) -> Bool {
@@ -213,7 +213,7 @@ struct RepointSheet: View {
                             Text("→ \(t.ref.label)").font(.caption).foregroundStyle(.secondary)
                                 .help(t.ref == request.from
                                       ? "Will be assigned to \(t.ref.label), the slot this program uses."
-                                      : "Given a free slot automatically; the synth chooses the real slot on import.")
+                                      : "Given a free slot automatically; the 3rd Wave chooses the real slot on import.")
                         }
                         Text(t.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
