@@ -12,13 +12,21 @@ the 3rd Wave and what is inferred.
 
 ## Build
 
+There is no download: the app is not notarised with Apple (that needs a paid developer account),
+and an app that isn't makes macOS show a security warning that has to be bypassed. Building it
+yourself takes a minute and avoids that; an app built on your own Mac opens normally.
+
 Requires macOS 13 or later and the Xcode command-line tools (`xcode-select --install`). There is no
 Xcode project.
 
 ```
+git clone https://github.com/adambier/pgdata-packer.git
+cd pgdata-packer
 ./make-app.sh          # builds "pgdata Packer.app" in this folder
 open "pgdata Packer.app"
 ```
+
+Move the app wherever you like afterwards, for example to your Applications folder.
 
 The tests (`./run-tests.sh`) need a full Xcode installation on a Mac; on Linux, `swift test` runs
 them directly.

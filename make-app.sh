@@ -1,9 +1,11 @@
 #!/bin/bash
 # Build pgdata Packer and wrap it in a .app bundle.
 #
-#   ./make-app.sh            release build, compiled directly with swiftc
-#   ./make-app.sh debug      debug build
-#   ./make-app.sh --spm      build through SwiftPM instead (needs full Xcode)
+#   ./make-app.sh              release build for this Mac
+#   ./make-app.sh debug        debug build
+#   ./make-app.sh --universal  release build for Apple Silicon and Intel (one binary; for a release)
+#   ./make-app.sh --zip        also write pgdata-Packer-<version>.zip, for a GitHub release
+#   ./make-app.sh --spm        build through SwiftPM instead (needs full Xcode; this Mac only)
 #
 # The result is "./pgdata Packer.app" — double-clickable, no Xcode needed; the Command Line
 # Tools are enough (xcode-select --install). Same approach as ThirdWaveWT: SwiftPM looks
@@ -16,10 +18,14 @@ cd "$(dirname "$0")"
 
 CONFIG="release"
 USE_SPM=0
+MAKE_ZIP=0
+UNIVERSAL=0
 for arg in "$@"; do
     case "$arg" in
         debug|release) CONFIG="$arg" ;;
         --spm) USE_SPM=1 ;;
+        --zip) MAKE_ZIP=1 ;;
+        --universal) UNIVERSAL=1 ;;
         *) echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
@@ -49,21 +55,33 @@ else
     else
         OPTFLAGS=(-Onone -g)
     fi
+    ARCHS=("$ARCH")
+    if [ "$UNIVERSAL" -eq 1 ]; then ARCHS=(arm64 x86_64); fi   # one binary for Apple Silicon and Intel
 
-    echo "Building with swiftc ($CONFIG, $ARCH)…"
+    echo "Building with swiftc ($CONFIG, ${ARCHS[*]})…"
     echo "  SDK: $SDK"
 
-    swiftc \
-        "${OPTFLAGS[@]}" \
-        -sdk "$SDK" \
-        -target "${ARCH}-apple-macos${DEPLOYMENT_TARGET}" \
-        -module-name PgdataPacker \
-        -framework AppKit \
-        -framework SwiftUI \
-        -framework UniformTypeIdentifiers \
-        -o "$BIN" \
-        Sources/PgdataFormats/*.swift \
-        Sources/PgdataPacker/*.swift
+    SLICES=()
+    for A in "${ARCHS[@]}"; do
+        SLICE="build/PgdataPacker-$A"
+        swiftc \
+            "${OPTFLAGS[@]}" \
+            -sdk "$SDK" \
+            -target "${A}-apple-macos${DEPLOYMENT_TARGET}" \
+            -module-name PgdataPacker \
+            -framework AppKit \
+            -framework SwiftUI \
+            -framework UniformTypeIdentifiers \
+            -o "$SLICE" \
+            Sources/PgdataFormats/*.swift \
+            Sources/PgdataPacker/*.swift
+        SLICES+=("$SLICE")
+    done
+    if [ "${#SLICES[@]}" -gt 1 ]; then
+        lipo -create "${SLICES[@]}" -output "$BIN"
+    else
+        cp "${SLICES[0]}" "$BIN"
+    fi
 fi
 
 if [ ! -x "$BIN" ]; then
@@ -97,15 +115,21 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# An unsigned arm64 app is killed at launch, so on Apple Silicon the ad-hoc signature is required.
+# An unsigned arm64 app is killed at launch, so the ad-hoc signature is required for any build
+# that includes an Apple Silicon slice (every release build, and debug builds on Apple Silicon).
 if ! codesign --force --sign - "$APP" 2>/dev/null; then
-    if [ "$ARCH" = "arm64" ]; then
-        echo "codesign failed: on Apple Silicon the app will not launch without an ad-hoc signature." >&2
-        exit 1
-    fi
-    echo "note: ad-hoc codesign skipped"
+    echo "codesign failed: the app will not launch on Apple Silicon without an ad-hoc signature." >&2
+    exit 1
 fi
 
 echo
-echo "Built $APP"
+echo "Built $APP ($(lipo -archs "$APP/Contents/MacOS/PgdataPacker" 2>/dev/null || echo "$ARCH"))"
 echo "Run it with:  open $APP"
+
+if [ "$MAKE_ZIP" -eq 1 ]; then
+    ZIP="pgdata-Packer-$VERSION.zip"
+    rm -f "$ZIP"
+    # ditto keeps the bundle's metadata and signature, which zip does not.
+    ditto -c -k --keepParent "$APP" "$ZIP"
+    echo "Wrote $ZIP"
+fi

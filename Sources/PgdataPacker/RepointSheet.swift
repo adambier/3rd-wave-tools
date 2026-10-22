@@ -30,18 +30,22 @@ struct RepointSheet: View {
         var file = request.fileID.flatMap { id in state.contentFiles.first { $0.id == id } }
         var slots = state.suggestedSlots()
         // Opened from a wavetable slot that has nothing yet (e.g. Ghibli Bell's U57, or U48 in a
-        // Dynamica program, which predates the factory U48): an added file
-        // without a slot is simply assigned to that slot, so the oscillators need not move. The
-        // first such file that no program uses is preselected.
+        // Dynamica program, which predates the factory U48): an added file without a slot can
+        // simply be assigned to that slot, so the oscillators need not move. The suggestions map
+        // unassigned files in name order to the user slots in order (01.wt → U56, 02.wt → U57), so
+        // the file whose suggested slot is this one is preselected; failing that, the first
+        // unassigned file no program uses, which is then offered for this slot.
         if let from = request.from, from.isWavetable,
            let it = state.programs.first(where: { $0.id == item }),
            state.plan(for: it).rows.first(where: { $0.ref == from })?.choice == nil {
             let candidates = state.contentFiles.filter { $0.slot == nil && $0.fits(from) }
-            for f in candidates { slots[f.id] = from }
             if file == nil {
                 let unused = state.unusedContent
-                file = candidates.first { unused[$0.id] != nil } ?? candidates.first
+                file = candidates.first { slots[$0.id] == from }
+                    ?? candidates.first { unused[$0.id] != nil }
+                    ?? candidates.first
             }
+            if let f = file, f.slot == nil { slots[f.id] = from }
         }
         _fileSlots = State(initialValue: slots)
         _target = State(initialValue: file.flatMap { $0.slot ?? slots[$0.id] })

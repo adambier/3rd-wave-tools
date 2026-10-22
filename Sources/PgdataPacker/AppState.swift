@@ -270,12 +270,15 @@ final class AppState: ObservableObject {
         return candidates.first { !taken.contains($0) } ?? candidates.first
     }
 
-    /// Suggestions for every unassigned wavetable file, in list order, each one different
-    /// (01.wt → U56, 02.wt → U57).
+    /// Suggestions for every unassigned wavetable file, each one different: the files in file-name
+    /// order (numerically, so 2.wt comes before 10.wt) take the free user slots in order
+    /// (01.wt → U56, 02.wt → U57), which is how sets that ship numbered files mean them to be loaded.
     func suggestedSlots() -> [UUID: SourceRef] {
         var out: [UUID: SourceRef] = [:]
         var used = Set<SourceRef>()
-        for f in contentFiles where !f.isSample && f.slot == nil {
+        let unassigned = contentFiles.filter { !$0.isSample && $0.slot == nil }
+            .sorted { $0.url.lastPathComponent.localizedStandardCompare($1.url.lastPathComponent) == .orderedAscending }
+        for f in unassigned {
             if let s = suggestedSlot(for: f, alsoTaken: used) { out[f.id] = s; used.insert(s) }
         }
         return out
