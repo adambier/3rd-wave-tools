@@ -251,19 +251,40 @@ enum AlertPresenter {
         }
     }
 
-    /// Plain text with a little space after every line, so list items stay apart, and more after
-    /// a line ending in ":" (a list heading such as "Added files that no program uses:").
+    /// Lays out a report (see `ReportText`): paragraphs separated by blank lines, headings (lines
+    /// ending in ":") in semibold with the list under them as indented bullets, and an item's
+    /// explanation (after the tab) in italic grey after the name.
     private static func styled(_ text: String) -> NSAttributedString {
+        let size = NSFont.systemFontSize
+        let body = NSFont.systemFont(ofSize: size)
+        let heading = NSFont.systemFont(ofSize: size, weight: .semibold)
+        let italic = NSFont(descriptor: body.fontDescriptor.withSymbolicTraits(.italic), size: size) ?? body
         let out = NSMutableAttributedString()
-        let lines = text.components(separatedBy: "\n")
-        for (i, line) in lines.enumerated() {
-            let para = NSMutableParagraphStyle()
-            para.paragraphSpacing = line.hasSuffix(":") ? 8 : 5
-            out.append(NSAttributedString(string: line + (i < lines.count - 1 ? "\n" : ""), attributes: [
-                .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
-                .foregroundColor: NSColor.labelColor,
-                .paragraphStyle: para,
-            ]))
+        for paragraph in text.components(separatedBy: "\n\n") {
+            for line in paragraph.components(separatedBy: "\n") {
+                let para = NSMutableParagraphStyle()
+                para.paragraphSpacingBefore = out.string.isEmpty ? 0 : 10   // before a paragraph or heading
+                if !out.string.isEmpty { out.append(NSAttributedString(string: "\n")) }
+                if line.hasPrefix("• ") {
+                    // A list item: bullet in a hanging indent, then the name and its explanation.
+                    para.paragraphSpacingBefore = 3
+                    para.firstLineHeadIndent = 10
+                    para.headIndent = 24
+                    para.tabStops = [NSTextTab(textAlignment: .left, location: 24)]
+                    para.defaultTabInterval = 24
+                    let parts = line.dropFirst(2).components(separatedBy: "\t")
+                    out.append(NSAttributedString(string: "•\t" + parts[0], attributes: [
+                        .font: body, .foregroundColor: NSColor.labelColor, .paragraphStyle: para]))
+                    if parts.count > 1 {
+                        out.append(NSAttributedString(string: " — " + parts.dropFirst().joined(separator: " "), attributes: [
+                            .font: italic, .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: para]))
+                    }
+                } else {
+                    out.append(NSAttributedString(string: line, attributes: [
+                        .font: line.hasSuffix(":") ? heading : body,
+                        .foregroundColor: NSColor.labelColor, .paragraphStyle: para]))
+                }
+            }
         }
         return out
     }

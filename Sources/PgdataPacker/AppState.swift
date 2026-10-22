@@ -125,7 +125,7 @@ final class AppState: ObservableObject {
 
     func note(_ s: String) {
         let f = DateFormatter(); f.dateFormat = "HH:mm:ss"
-        log.append("\(f.string(from: Date()))  \(s)")
+        log.append("\(f.string(from: Date()))  \(ReportText.plain(s))")
     }
 
     // MARK: Adding files
@@ -212,8 +212,8 @@ final class AppState: ObservableObject {
         else if addedUnified == 0 && addedPrograms + addedContent > 0 { section = .pack }
         if !problems.isEmpty {
             problems.forEach { note("Could not read \($0)") }
-            alertMessage = "Some files could not be read:\n\n" + problems.prefix(8).joined(separator: "\n")
-                + (problems.count > 8 ? "\n…and \(problems.count - 8) more (see the log)." : "")
+            alertMessage = "Some files could not be read.\n\n" + problems.prefix(8).map { ReportText.item($0) }.joined(separator: "\n")
+                + (problems.count > 8 ? "\n\n…and \(problems.count - 8) more (see the log)." : "")
         }
     }
 
@@ -327,7 +327,7 @@ final class AppState: ObservableObject {
         // Programs missing content cannot be packed: ask before writing the rest.
         let missing: [String] = items.compactMap { item in
             guard let needs = plan(for: item).missingSummary else { return nil }
-            return "\(item.name) (\(needs))"
+            return ReportText.item(item.name, needs)
         }
         let oldTables = items.contains { plan(for: $0).userSlotNote != nil }
         if !missing.isEmpty {
@@ -358,34 +358,34 @@ final class AppState: ObservableObject {
             let plan = plan(for: item)
             switch plan.verdict {
             case .blocked:
-                blocked.append("\(item.name) (\(plan.missingSummary ?? "content missing"))"); continue
+                blocked.append(ReportText.item(item.name, plan.missingSummary ?? "content missing")); continue
             default: break
             }
             do {
                 let content = plan.content(files: contentFiles, names: contentNames)
                 let g = try Packer.pack(item.effectiveProgram, content: content)
                 outputs.append((name: OutputNames.unified(item.effectiveProgram, prefix: prefixByID[item.id]), data: g.serialized()))
-                if !plan.warnings.isEmpty { unfamiliar.append(item.name) }
+                if !plan.warnings.isEmpty { unfamiliar.append(ReportText.item(item.name)) }
                 for r in plan.rows where r.replacesFactory {
                     if case .file(let id)? = r.choice, let f = contentFiles.first(where: { $0.id == id }) {
-                        replaced.append("\(item.name): \(r.ref.label) uses \(f.url.lastPathComponent) instead of factory \(factory.name(r.ref).map { "\"\($0)\"" } ?? "table")")
+                        replaced.append(ReportText.item(item.name, "\(r.ref.label) uses \(f.url.lastPathComponent) instead of factory \(factory.name(r.ref).map { "\"\($0)\"" } ?? "table")"))
                     }
                 }
-            } catch { failed.append("\(item.name): \(error)") }
+            } catch { failed.append(ReportText.item(item.name, "\(error)")) }
         }
         guard let result = Panels.write(outputs, into: folder) else { note("Packing cancelled; nothing written."); return }
-        failed += result.failed
+        failed += result.failed.map { ReportText.item($0) }
         let written = result.written
         var msg = "Packed \(written) program\(written == 1 ? "" : "s") into \"\(folder.lastPathComponent)\"."
-        // One item per line, a blank line between sections.
+        // Each section: a heading line ending in ":" and one item per line (see ReportText).
         if !blocked.isEmpty { msg += "\n\nNot packed (files missing):\n" + blocked.joined(separator: "\n") }
         if !failed.isEmpty { msg += "\n\nNot packed:\n" + failed.joined(separator: "\n") }
-        if !replaced.isEmpty { msg += "\n\nFactory tables replaced by added files (check these are meant):\n" + replaced.joined(separator: "\n") }
+        if !replaced.isEmpty { msg += "\n\nFactory tables replaced by input files (check these are meant):\n" + replaced.joined(separator: "\n") }
         if !unfamiliar.isEmpty { msg += "\n\nPacked, but check these on the 3rd Wave (unfamiliar layout or a cut name; see each program's notes):\n" + unfamiliar.joined(separator: "\n") }
         let unused = unusedContent
         if !unused.isEmpty {
-            msg += "\n\nAdded files that no program uses (left out):\n" + contentFiles.filter { unused[$0.id] != nil }
-                .map { "\($0.url.lastPathComponent) (\(unused[$0.id]!.lowercased()))" }.joined(separator: "\n")
+            msg += "\n\nInput files that no program uses (left out):\n" + contentFiles.filter { unused[$0.id] != nil }
+                .map { ReportText.item($0.url.lastPathComponent, ReportText.lowerFirst(unused[$0.id]!)) }.joined(separator: "\n")
         }
         note(msg + " (\(folder.path))")
         alertReveal = folder
@@ -438,9 +438,26 @@ final class AppState: ObservableObject {
         }
         guard let result = Panels.write(outputs, into: folder) else { note("Unpacking cancelled; nothing written."); return }
         var msg = "Unpacked \(items.count) file\(items.count == 1 ? "" : "s") into \"\(folder.lastPathComponent)\": \(result.written) file\(result.written == 1 ? "" : "s") written."
-        if !result.failed.isEmpty { msg += "\n\nNot written:\n" + result.failed.joined(separator: "\n") }
+        if !result.failed.isEmpty { msg += "\n\nNot written:\n" + result.failed.map { ReportText.item($0) }.joined(separator: "\n") }
         note(msg + " (\(folder.path))")
         alertReveal = folder
         alertMessage = msg
+    }
+}
+
+/// The report texts shown in alerts and written to the log: paragraphs separated by a blank line;
+/// a paragraph whose first line ends in ":" is a heading for the item lines under it. An item line
+/// starts with "• " and may carry an explanation after a tab, which the alert shows in a lighter
+/// style and the log joins with a dash.
+enum ReportText {
+    static func item(_ name: String, _ detail: String? = nil) -> String {
+        "• " + name + (detail.map { "\t" + $0 } ?? "")
+    }
+    static func plain(_ s: String) -> String { s.replacingOccurrences(of: "\t", with: " — ") }
+    /// "Not used: …" → "not used: …" for an explanation that follows a dash; a label such as "U50 …"
+    /// is left alone.
+    static func lowerFirst(_ s: String) -> String {
+        guard let a = s.first, a.isUppercase, s.dropFirst().first?.isLowercase == true else { return s }
+        return a.lowercased() + s.dropFirst()
     }
 }
