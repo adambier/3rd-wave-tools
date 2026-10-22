@@ -1,3 +1,5 @@
+<img src="Resources/AppIcon.png" width="128" alt="pgdata Packer app icon">
+
 # pgdata Packer
 
 *for the Groove Synthesis 3rd Wave*
@@ -9,6 +11,8 @@ A macOS app that packs Groove Synthesis 3rd Wave programs (`.pro`) together with
 Not affiliated with or endorsed by Groove Synthesis. Everything here was worked out from files and
 checked on one 8M running OS 2.0d. The Formats and Tests sections say what was confirmed on
 the 3rd Wave and what is inferred.
+
+![The Pack page: the programs added on the left; for the selected program, what each oscillator source will play and whether it is embedded; below, the wavetables and multisamples added and the slots they go to](docs/pack-window.png)
 
 ## Build
 
@@ -117,6 +121,8 @@ play:
 The Source column then shows, for example, **U01 → U56**, with a button to undo. Only the
 `.pgdata` changes; the `.pro` is not modified. Multisample oscillators are not repointed.
 
+![The sheet for changing what oscillators play: oscillators to change on the left, and on the right the files added, the factory slots and the analog waves](docs/change-what-plays.png)
+
 Parts 3 and 4 play only on the 4-part models (24K, 24M). In every program saved on an 8M seen so
 far, they hold filler (P02, U01 and an analog wave).
 
@@ -148,6 +154,8 @@ Within title case:
 Every proposal is shown, can be edited, and can be unticked. New names go into the `.pgdata` and
 its file name. Source files are not changed, and unpacking keeps names as they are.
 
+![Clean Up Names: options at the top, and each current name with its proposed new name](docs/clean-up-names.png)
+
 Name fields hold 31 characters, and the 3rd Wave displays all 31 for programs, wavetables and
 multisamples. A longer name is flagged next to the name, in the program's notes and in the report
 after packing, and is cut to 31.
@@ -163,6 +171,8 @@ section can come out a little larger. Each embedded U table adds about 0.5 MB, e
 **Pack Selected…** and **Pack All…** (⌘⇧S) ask for a folder. If some programs can't be packed yet,
 the app asks first whether to pack the others. Existing files are never replaced without asking,
 and the report at the end can open the folder in the Finder.
+
+![The report after packing, listing the input files no packed program uses and, where it is not obvious, why](docs/pack-report.png)
 
 Files are named in Groove Synthesis's own pattern, with the program location first:
 `B05P87_Glass_Bells.pgdata`, as in Groove Synthesis's `B05P06_Glass_Cow_Bell_Transients.pgdata`.
@@ -300,6 +310,7 @@ Sources/PgdataFormats/   formats and packing logic, no UI (tested on Linux and m
   ByteIO.swift              byte reading and writing, 32-byte name fields
 Sources/PgdataPacker/       the app (SwiftUI)
 Resources/                  app icon, drawn by tools/make-icon.py (needs cairosvg and Pillow)
+docs/                       screenshots used in this README
 Sources/tw3pg/              developer harness: inspect, roundtrip, unpack, repack, compare, wtcheck,
                             factory-catalog, pack, and the 3rd Wave-test builders
 Tests/PgdataFormatsTests/
