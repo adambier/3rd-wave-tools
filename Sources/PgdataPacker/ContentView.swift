@@ -115,10 +115,11 @@ struct EmptyHint: View {
 struct StatusText: View {
     let status: PackPlan.Status
     var body: some View {
+        // The full text on hover, since the Status column can cut a long one short.
         switch status {
-        case .ok(let s): Text(s).foregroundStyle(.secondary)
-        case .warning(let s): Label(s, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
-        case .missing(let s): Label(s, systemImage: "xmark.octagon").foregroundStyle(.red)
+        case .ok(let s): Text(s).foregroundStyle(.secondary).help(s)
+        case .warning(let s): Label(s, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).help(s)
+        case .missing(let s): Label(s, systemImage: "xmark.octagon").foregroundStyle(.red).help(s)
         }
     }
 }

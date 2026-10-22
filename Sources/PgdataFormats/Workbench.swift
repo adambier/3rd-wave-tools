@@ -331,7 +331,7 @@ public struct PackPlan {
                              + (assigned.count > distinct.count ? " (the added file is identical to it)" : ""))
             case .builtIn?: status = .ok("Built in")
             case nil where wasUserSlot:
-                status = .missing("Probably the author's own wavetable: \(ref.label) was a user slot when this program was made. See the note above.")
+                status = .missing("Probably the author's own wavetable; see the note above")
             case nil:
                 status = .missing(ref.isSample
                     ? "Needs the multisample for \(ref.label): add its .bin file and assign it to \(ref.label)"
@@ -341,7 +341,7 @@ public struct PackPlan {
                             choice: choice, options: options, status: status, embeds: embeds, bytes: bytes,
                             mayNeedSlot: mayNeedSlot, wasUserSlot: wasUserSlot && choice == nil))
         }
-        let missing = rows.filter { $0.choice == nil }.map(\.ref)
+        let missing = rows.filter { $0.choice == nil }.map(\.ref).sorted()
         let verdict: Verdict
         if !missing.isEmpty { verdict = .blocked(missing) }
         else if rows.contains(where: \.embeds) { verdict = .embedsContent }

@@ -142,8 +142,9 @@ struct ProgramDetail: View {
                 TableColumn("Used by") { (row: PackPlan.Row) in UsedByCell(usedBy: row.usedBy) }
                     .width(min: 90, ideal: 110, max: 220)
                 TableColumn("Content") { (row: PackPlan.Row) in ChoiceCell(state: st, itemID: item.id, row: row) }
-                    .width(min: 200, ideal: 260)
+                    .width(min: 200, ideal: 240)
                 TableColumn("Status") { (row: PackPlan.Row) in StatusText(status: row.status).lineLimit(2) }
+                    .width(min: 240, ideal: 320)
             }
         }
         .padding(12)
@@ -151,19 +152,46 @@ struct ProgramDetail: View {
 }
 
 /// Why U48–U55 are missing in a program made before they were factory slots, and the choices.
+/// Paragraphs are separated by blank lines in the note; lines starting with "• " are bullets, set
+/// with a hanging indent and half a line of space above and below each.
 struct UserSlotNoteBox: View {
     let note: PackPlan.Note
+    /// Half the height of a line of body text.
+    private let halfLine: CGFloat = 8
+
     var body: some View {
         GroupBox {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 10) {
                 Label(note.title, systemImage: "questionmark.circle")
                     .font(.headline).foregroundStyle(.red)
-                Text(note.body)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(Array(note.body.components(separatedBy: "\n\n").enumerated()), id: \.offset) { _, para in
+                    paragraph(para)
+                }
             }
+            .textSelection(.enabled)
             .frame(maxWidth: 820, alignment: .leading)
             .padding(4)
+        }
+    }
+
+    @ViewBuilder private func paragraph(_ text: String) -> some View {
+        let lines = text.components(separatedBy: "\n")
+        let lead = lines.filter { !$0.hasPrefix("• ") }.joined(separator: "\n")
+        let bullets = lines.filter { $0.hasPrefix("• ") }.map { String($0.dropFirst(2)) }
+        VStack(alignment: .leading, spacing: 0) {
+            if !lead.isEmpty { Text(lead).fixedSize(horizontal: false, vertical: true) }
+            if !bullets.isEmpty {
+                VStack(alignment: .leading, spacing: halfLine) {
+                    ForEach(Array(bullets.enumerated()), id: \.offset) { _, b in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("•")
+                            Text(b).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .padding(.vertical, halfLine)
+                .padding(.leading, 4)
+            }
         }
     }
 }
