@@ -310,7 +310,7 @@ final class AppState: ObservableObject {
         switch choice {
         case .builtIn: return ref.description
         case .reference:
-            return "Factory \(factory.name(ref) ?? ref.label) (listed, not embedded)"
+            return "Factory \(factory.name(ref) ?? ref.label) (the synth's own copy)"
         case .file(let id):
             let f = contentFiles.first { $0.id == id }
             return "\(f.map(displayName) ?? "?") — from \(f?.url.lastPathComponent ?? "?")"
@@ -373,7 +373,7 @@ final class AppState: ObservableObject {
         guard let result = Panels.write(outputs, into: folder) else { note("Packing cancelled; nothing written."); return }
         failed += result.failed
         let written = result.written
-        var msg = "Packed \(written) program\(written == 1 ? "" : "s") into \(folder.lastPathComponent)."
+        var msg = "Packed \(written) program\(written == 1 ? "" : "s") into \"\(folder.lastPathComponent)\"."
         // One item per line, a blank line between sections.
         if !blocked.isEmpty { msg += "\n\nNot packed (files missing):\n" + blocked.joined(separator: "\n") }
         if !failed.isEmpty { msg += "\n\nNot packed:\n" + failed.joined(separator: "\n") }
@@ -434,7 +434,7 @@ final class AppState: ObservableObject {
             }
         }
         guard let result = Panels.write(outputs, into: folder) else { note("Unpacking cancelled; nothing written."); return }
-        var msg = "Unpacked \(items.count) file\(items.count == 1 ? "" : "s") into \(folder.lastPathComponent): \(result.written) file\(result.written == 1 ? "" : "s") written."
+        var msg = "Unpacked \(items.count) file\(items.count == 1 ? "" : "s") into \"\(folder.lastPathComponent)\": \(result.written) file\(result.written == 1 ? "" : "s") written."
         if !result.failed.isEmpty { msg += "\n\nNot written:\n" + result.failed.joined(separator: "\n") }
         note(msg + " (\(folder.path))")
         alertReveal = folder

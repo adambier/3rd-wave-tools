@@ -321,7 +321,7 @@ public struct PackPlan {
             let wasUserSlot = isFactory && predates && is2025FactorySlot(ref) && assigned.count == distinct.count
             // The reverse: a program saved since U48–U55 became factory slots means the factory table
             // there, so a file added for that slot (typically an older set's own table) is not used by
-            // default. It stays in the Content menu.
+            // default. It stays in the Plays menu.
             let keepsFactory = isFactory && !predates && is2025FactorySlot(ref) && !distinct.isEmpty
             // An added file in a factory slot replaces the factory table: expected for U48–U55 in an
             // older program, worth a warning anywhere else.
@@ -376,7 +376,7 @@ public struct PackPlan {
                 status = .ok("Factory \(factoryName); not embedded"
                              + (assigned.count > distinct.count ? " (the added file is identical to it)" : "")
                              + (keepsFactory ? ". This program is from after \(ref.label) became a factory slot, so the added file is not used; choose it in this menu to use it" : ""))
-                brief = keepsFactory ? "Factory table, listed; added file not used" : "Factory table, listed"
+                brief = keepsFactory ? "Uses the synth's own factory table; added file not used" : "Uses the synth's own factory table (not embedded)"
             case .builtIn?: status = .ok("Built in"); brief = "Built in"
             case nil where wasUserSlot:
                 status = .missing("Probably the author's own wavetable; see the note above")
@@ -451,9 +451,9 @@ public struct PackPlan {
         Until 2025, U48–U55 were user slots, where people loaded their own wavetables. Groove Synthesis then made them factory slots. Loaded as it is, this program would play the factory \(one ? "table" : "tables") \(factoryList) instead of the \(one ? "one" : "ones") the author used.
 
         To fix it, do one of these:
-        • Add the author's wavetable \(one ? "file" : "files") for \(list). Program sets that use these slots usually include them, often named with the slot (for example "\(first.label) Name.wt"). A file whose name starts with the slot is assigned to it automatically; otherwise, choose Point to another slot… in the slot's Content menu and pick the file. \(one ? "The table is" : "The tables are") then included in the .pgdata, and the synth stores \(one ? "it in a free slot" : "them in free slots") when it imports the file.
-        • Point the oscillators to a different wavetable you have: Point to another slot… in the slot's Content menu.
-        • Use the factory \(one ? "table" : "tables") anyway: \(one ? "in the slot's Content menu, choose Factory \(fname(first))" : "in each slot's Content menu, choose its factory table (Factory \(fname(first)) for \(first.label), and so on)"). Choose this if you know the program was made for \(one ? "it" : "them"), or you accept a different sound.
+        • Add the author's wavetable \(one ? "file" : "files") for \(list). Program sets that use these slots usually include them, often named with the slot (for example "\(first.label) Name.wt"). A file whose name starts with the slot is assigned to it automatically; otherwise, choose Choose what to play… in the slot's Plays menu and pick the file. \(one ? "The table is" : "The tables are") then included in the .pgdata, and the synth stores \(one ? "it in a free slot" : "them in free slots") when it imports the file.
+        • Point the oscillators to a different wavetable you have: Choose what to play… in the slot's Plays menu.
+        • Use the factory \(one ? "table" : "tables") anyway: \(one ? "in the slot's Plays menu, choose Factory \(fname(first))" : "in each slot's Plays menu, choose its factory table (Factory \(fname(first)) for \(first.label), and so on)"). Choose this if you know the program was made for \(one ? "it" : "them"), or you accept a different sound.
         """
         return Note(title: title, body: body)
     }
@@ -468,7 +468,7 @@ public struct PackPlan {
             guard let slot = f.slot else { out[f.id] = "Not used by any program here"; continue }
             let slotUsed = plans.contains { $0.rows.contains { $0.ref == slot } }
             if !slotUsed { out[f.id] = "Not used by any program here" }
-            else if factory.tables[slot]?.fingerprint == f.fingerprint { out[f.id] = "Identical to factory \(slot.label); listed, not embedded" }
+            else if factory.tables[slot]?.fingerprint == f.fingerprint { out[f.id] = "Identical to factory \(slot.label); the synth's own copy is used, so it is not embedded" }
             else if plans.contains(where: { $0.rows.contains { $0.ref == slot && $0.heldBack.contains(f.id) } }) {
                 out[f.id] = "Not used: the programs here that use \(slot.label) are from after it became a factory slot, so they use the factory table"
             }

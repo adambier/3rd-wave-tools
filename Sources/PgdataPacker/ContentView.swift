@@ -86,10 +86,12 @@ struct LogBar: View {
                 .controlSize(.small)
                 .help(showLog ? "Hide the log" : "Show the log: everything the app has done in this session")
                 Divider().frame(height: 14)
-                Text(state.log.last ?? "Drop .pro, .wt, .bin or .pgdata files anywhere in the window.")
+                Text(state.log.last ?? "Nothing added yet.")
                     .lineLimit(1).truncationMode(.tail)
                     .foregroundStyle(.secondary)
                 Spacer()
+                Label("Drop .pro, .wt, .bin or .pgdata files anywhere in the window to add them", systemImage: "arrow.down.doc")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
             if showLog {
@@ -125,6 +127,19 @@ enum DropSupport {
             }
         }
         group.notify(queue: .main) { done(urls) }
+    }
+}
+
+/// A short placeholder over an empty list or table.
+struct ListPlaceholder: View {
+    let text: String
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "arrow.down.doc").font(.title2).foregroundStyle(.tertiary)
+            Text(text).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 360)
+        }
+        .padding(20)
+        .allowsHitTesting(false)
     }
 }
 

@@ -148,7 +148,9 @@ struct RepointSheet: View {
         state.contentFiles.compactMap { f in
             guard !f.isSample else { return nil }
             if let s = f.slot {
-                return Target(id: "f" + f.id.uuidString, ref: s, title: "\(s.label)  \(state.displayName(f))", detail: f.url.lastPathComponent, file: f)
+                var name = state.displayName(f)
+                if name.uppercased().hasPrefix(s.label) { name = String(name.dropFirst(s.label.count)).trimmingCharacters(in: CharacterSet(charactersIn: " _-")) }
+                return Target(id: "f" + f.id.uuidString, ref: s, title: "\(s.label)  \(name)", detail: f.url.lastPathComponent, file: f)
             }
             guard let s = fileSlots[f.id] else { return nil }
             return Target(id: "f" + f.id.uuidString, ref: s, title: state.displayName(f), detail: f.url.lastPathComponent, file: f)

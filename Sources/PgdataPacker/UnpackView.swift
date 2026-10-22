@@ -94,7 +94,7 @@ struct UnpackDetail: View {
             .visibleScrollers()
             .frame(minHeight: 140)
             if !item.plan.referenced.isEmpty {
-                Text("Listed without data (the synth plays what it has in these slots): "
+                Text("Not embedded (the synth plays what it has in these slots): "
                      + item.plan.referenced.map(\.description).joined(separator: ", "))
                     .font(.callout).foregroundStyle(.secondary)
             }

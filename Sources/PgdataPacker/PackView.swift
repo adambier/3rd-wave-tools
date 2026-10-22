@@ -101,6 +101,13 @@ struct PackView: View {
             }
             .visibleScrollers()
             .onDeleteCommand { state.removePrograms(selection); selection = [] }
+            .overlay {
+                if state.programs.isEmpty {
+                    ListPlaceholder(text: "No programs yet. Drop .pro files anywhere in the window, or click Add Files or Folders…")
+                } else if shownPrograms.isEmpty {
+                    ListPlaceholder(text: "No programs match the filter.")
+                }
+            }
             if shownPrograms.count != state.programs.count {
                 Text("\(shownPrograms.count) of \(state.programs.count) programs").font(.caption).foregroundStyle(.secondary).padding(4)
             }
@@ -117,7 +124,8 @@ struct PackView: View {
         if let id = state.selectedProgram, let item = state.programs.first(where: { $0.id == id }) {
             ProgramDetail(item: item)
         } else {
-            Text("Select a program").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+            Text(state.programs.isEmpty ? "Add a program to see what it will pack" : "Select a program")
+                .foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }
@@ -337,7 +345,7 @@ struct ContentFilesTable: View {
         let unused = st.unusedContent
         VStack(alignment: .leading, spacing: 4) {
             Text("Added wavetables and samples").font(.headline).padding(.horizontal, 12).padding(.top, 8)
-            Text("A file assigned to a slot is used by every program here that uses that slot (for U48–U55, by programs from before 2025). In any other factory slot it replaces the factory table; the report after packing lists those.")
+            Text("A file assigned to a slot is used by every program here that uses that slot, with two exceptions for factory slots. In U48–U55, a file is used only by programs from before 2025, when those were user slots; later programs keep the factory table unless you choose the file in their Plays menu. In any other factory slot, the file replaces the factory table, and the report after packing says where.")
                 .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12)
             Table(st.contentFiles) {
                 // Most important first: what the file is, its slot, and whether anything uses it.
@@ -363,6 +371,11 @@ struct ContentFilesTable: View {
                 .width(28)
             }
             .visibleScrollers()
+            .overlay {
+                if st.contentFiles.isEmpty {
+                    ListPlaceholder(text: "No wavetables or samples yet. Drop .wt and .bin files anywhere in the window, or click Add Files or Folders…")
+                }
+            }
         }
     }
 }
@@ -383,21 +396,28 @@ struct SlotPickerCell: View {
         return (0..<SourceRef.factoryUCount).map { SourceRef.u($0) }
     }
 
+    private func item(_ s: SourceRef?, _ title: String) -> some View {
+        Button { state.setSlot(file.id, s) } label: {
+            if s == file.slot { Label(title, systemImage: "checkmark") } else { Text(title) }
+        }
+    }
+
     var body: some View {
-        Picker("", selection: Binding<SourceRef?>(
-            get: { file.slot },
-            set: { state.setSlot(file.id, $0) }
-        )) {
-            Text("No slot").tag(SourceRef?.none)
-            ForEach(userSlots, id: \.self) { s in Text(s.label).tag(SourceRef?.some(s)) }
+        // The closed button shows only the slot; the factory names are in the menu.
+        Menu {
+            item(nil, "No slot")
+            ForEach(userSlots, id: \.self) { s in item(s, s.label) }
             if !factorySlots.isEmpty {
                 Divider()
-                ForEach(factorySlots, id: \.self) { s in
-                    Text("\(s.label)  \(state.slotName(s))  (factory)").tag(SourceRef?.some(s))
-                }
+                ForEach(factorySlots, id: \.self) { s in item(s, "\(s.label)  \(state.slotName(s))  (factory)") }
             }
+        } label: {
+            Text(file.slot?.label ?? "No slot").monospacedDigit()
         }
-        .labelsHidden()
+        .menuStyle(.button)
+        .buttonStyle(.bordered)
+        .menuIndicator(.visible)
+        .help(file.slot.map { $0.isFactorySlot ? "\($0.label): factory slot, \(state.slotName($0))" : "\($0.label): user slot" } ?? "Choose the slot this file is for")
     }
 }
 
@@ -406,10 +426,18 @@ struct UsageCell: View {
     let file: ContentFile
     let note: String?
 
+    /// A few words for the cell; the full reason is the tooltip.
+    private func short(_ note: String) -> String {
+        if note.hasPrefix("Identical to factory") { return "Same as the factory table; not embedded" }
+        if note.hasPrefix("Not used: another choice") { return "Not used: the slot plays something else" }
+        if note.hasPrefix("Not used: the programs here") { return "Not used: the programs are from after 2025" }
+        return "Not used"
+    }
+
     var body: some View {
         if let note {
             HStack(spacing: 6) {
-                Label(note, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).lineLimit(1).help(note)
+                Label(short(note), systemImage: "exclamationmark.triangle").foregroundStyle(.orange).lineLimit(1).help(note)
                 if !file.isSample, !state.programs.isEmpty {
                     Button("Point a program here…") { state.repointRequest = .init(fileID: file.id) }
                         .buttonStyle(.link)
