@@ -10,11 +10,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     @objc func showAbout(_ sender: Any?) {
+        // Centred paragraphs with a blank line's space between them.
+        let para = NSMutableParagraphStyle()
+        para.alignment = .center
+        para.paragraphSpacing = NSFont.smallSystemFontSize
         let credits = NSAttributedString(
             string: "Packs and unpacks unified program data (.pgdata) files for the Groove Synthesis 3rd Wave.\n"
-                + "Not affiliated with or endorsed by Groove Synthesis.",
+                + "Not affiliated with or endorsed by Groove Synthesis.\n"
+                + "MIT licence. Source: github.com/adambier/pgdata-packer",
             attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
-                         .foregroundColor: NSColor.secondaryLabelColor])
+                         .foregroundColor: NSColor.secondaryLabelColor,
+                         .paragraphStyle: para])
         NSApplication.shared.orderFrontStandardAboutPanel(options: [.applicationName: appName, .credits: credits])
     }
 }
