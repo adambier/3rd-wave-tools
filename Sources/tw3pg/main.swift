@@ -67,6 +67,10 @@ func reserialize(_ u: URL, _ d: Data) throws -> Data {
 }
 
 let args = Array(CommandLine.arguments.dropFirst())
+/// Stops with a usage line when a command has fewer arguments than it needs.
+func need(_ n: Int, _ rest: [String], _ usage: String) {
+    if rest.count < n { print("usage: tw3pg " + usage); exit(2) }
+}
 guard let cmd = args.first else { print("usage: tw3pg inspect|roundtrip|unpack|repack|compare|factory-catalog|pack ..."); exit(2) }
 let rest = Array(args.dropFirst())
 
@@ -89,6 +93,9 @@ case "pack":
     let files = try rest.dropFirst(2).map { try ContentFile.load(URL(fileURLWithPath: $0)) }
     let plan = PackPlan.make(program: pro, files: files, factory: .builtIn)
     plan.warnings.forEach { print("warning: \($0)") }
+    for (id, why) in PackPlan.unusedFiles(files, plans: [plan], factory: .builtIn) {
+        if let f = files.first(where: { $0.id == id }) { print("not used: \(f.url.lastPathComponent) (\(why))") }
+    }
     for r in plan.rows { print("  \(r.ref.label): \(r.status)") }
     if let n = plan.userSlotNote { print("\n" + n.title + "\n\n" + n.body + "\n") }
     if let m = plan.missingSummary { print("report line: \(pro.name) (\(m))") }
@@ -113,12 +120,13 @@ case "roundtrip":
     print("roundtrip: \(ok) identical, \(bad) different, \(failed) unreadable")
 
 case "unpack":
+    need(2, rest, "unpack <file.pgdata> <outdir>")
     let u = URL(fileURLWithPath: rest[0]), out = URL(fileURLWithPath: rest[1])
     try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
     let up = Unpacker.unpack(try UnifiedProgram(data: try load(u)))
-    try up.program.serialized().write(to: out.appendingPathComponent(up.program.name + ".pro"))
-    for (r, w) in up.wavetables { try w.serialized().write(to: out.appendingPathComponent("\(r.label)_\(w.name).wt")) }
-    for (r, m) in up.multisamples { try m.binData().write(to: out.appendingPathComponent("\(r.label)_\(m.name).bin")) }
+    try up.program.serialized().write(to: out.appendingPathComponent(OutputNames.program(up.program)))
+    for (r, w) in up.wavetables { try w.serialized().write(to: out.appendingPathComponent(OutputNames.wavetable(r, w))) }
+    for (r, m) in up.multisamples { try m.binData().write(to: out.appendingPathComponent(OutputNames.multisample(r, m))) }
     print("wrote \(1 + up.wavetables.count + up.multisamples.count) files; referenced only: \(up.referenced.map(\.label))")
     up.notes.forEach { print("note: \($0)") }
 
@@ -156,6 +164,7 @@ case "repack":
     print("repack: \(same) identical, \(diff) different, \(failed) unreadable")
 
 case "compare":
+    need(2, rest, "compare <file.pgdata> <file.pro> [wt dirs...]")
     // Pack a .pro using the content embedded in a matching .pgdata (plus .wt dirs for
     // references), then report every difference from the real .pgdata.
     let g = try UnifiedProgram(data: try load(URL(fileURLWithPath: rest[0])))
@@ -213,6 +222,7 @@ case "wtcheck":
     print("wtcheck: \(exact) bit-exact, \(mismatch) mismatched; no .wt found for: \(unmatched.sorted())")
 
 case "maketests":
+    need(4, rest, "maketests <factory .pro using U07> <a .wt already on the synth> <a W3_PROG_4 .pro> <outdir>")
     // tw3pg maketests <factory .pro using U07> <a .wt already on the synth> <a W3_PROG_4 .pro> <outdir>
     // Builds the hardware-test .pgdata files described in the README's "synth tests" section.
     let base = try ProgramFile(data: try load(URL(fileURLWithPath: rest[0])))
@@ -258,6 +268,7 @@ case "maketests":
     try v4.serialized().write(to: out.appendingPathComponent("TW3_T4_original.pro"))
 
 case "maketest6":
+    need(3, rest, "maketest6 <factory .pro> <a small .bin> <outdir>")
     // tw3pg maketest6 <factory .pro using U07> <a small .bin> <outdir>
     // Name-length test: every name is 31 characters (the most a name field holds), in a pattern
     // that shows where a display cuts it off: digits 1–10, lower case 11–20, capitals 21–31.
@@ -290,6 +301,7 @@ case "maketest6":
     print("T6b: \"\(b.name)\" sources \(gb.sources.map { $0.ref.label + ($0.hasData ? "*" : "") })")
 
 case "maketest5":
+    need(2, rest, "maketest5 <.pro using a sample slot> <outdir>")
     // tw3pg maketest5 <program using a sample slot> <outdir>
     // T5a: the program's sample slot listed without its samples. T5b: the same, pointed at empty S20.
     var p = try ProgramFile(data: try load(URL(fileURLWithPath: rest[0])))

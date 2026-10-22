@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Draws the pgdata Packer app icon: a wavetable (a stack of morphing waveforms seen in
-perspective) rising out of an open box, on a dark rounded-square tile.
+perspective) rising out of an open box, on a blue rounded-square tile.
 
     python3 tools/make-icon.py            # writes Resources/AppIcon.icns and Resources/AppIcon.png
 
@@ -50,8 +50,8 @@ def frames():
             y = base - amp * wave(t, x * 2 * math.pi)
             pts.append((cx - width / 2 + x * width, y))
         d = "M" + " L".join("%.1f,%.1f" % p for p in pts)
-        colour = mix("#5ad1ff", "#ff5fd2", t)
-        opacity = lerp(0.55, 1.0, t)
+        colour = mix("#eaf6ff", "#ff5fd2", t)
+        opacity = lerp(0.6, 1.0, t)
         stroke = lerp(12, 17, t)
         paths.append(f'<path d="{d}" fill="none" stroke="{colour}" stroke-width="{stroke:.1f}" '
                      f'stroke-linecap="round" stroke-linejoin="round" opacity="{opacity:.2f}"/>')
@@ -64,10 +64,10 @@ def svg():
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{S}" height="{S}" viewBox="0 0 {S} {S}">
 <defs>
   <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0" stop-color="#2a1d5c"/><stop offset="1" stop-color="#0b2442"/>
+    <stop offset="0" stop-color="#4674c2"/><stop offset="1" stop-color="#2243a3"/>
   </linearGradient>
   <radialGradient id="glow" cx="0.5" cy="0.40" r="0.55">
-    <stop offset="0" stop-color="#6b4bd6" stop-opacity="0.55"/><stop offset="1" stop-color="#6b4bd6" stop-opacity="0"/>
+    <stop offset="0" stop-color="#7fb0ff" stop-opacity="0.35"/><stop offset="1" stop-color="#7fb0ff" stop-opacity="0"/>
   </radialGradient>
   <linearGradient id="boxFront" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0" stop-color="#f4b552"/><stop offset="1" stop-color="#c97a1c"/>
@@ -118,14 +118,15 @@ if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     master = render(S)
     master.save(os.path.join(OUT, "AppIcon.png"))
-    master.save(os.path.join(OUT, "AppIcon.icns"), sizes=[(16, 16), (32, 32), (64, 64), (128, 128), (256, 256), (512, 512), (1024, 1024)])
+    smaller = [render(s) for s in (16, 32, 64, 128, 256, 512)]   # each drawn at its own size, not downscaled
+    master.save(os.path.join(OUT, "AppIcon.icns"), append_images=smaller)
     if len(sys.argv) > 1:   # preview sheet: the icon at several sizes on light and dark
         sheet = Image.new("RGBA", (1500, 620), (236, 236, 236, 255))
         dark = Image.new("RGBA", (750, 310), (40, 40, 44, 255)); sheet.paste(dark, (750, 310))
         sheet.alpha_composite(master.resize((512, 512), Image.LANCZOS), (40, 54))
         xo = 600
         for s in (256, 128, 64, 32, 16):
-            im = render(s) if s >= 64 else master.resize((s, s), Image.LANCZOS)
+            im = render(s)
             sheet.alpha_composite(im, (xo, 40)); sheet.alpha_composite(im, (xo + 150, 330)) if xo + 150 + s < 1500 else None
             xo += s + 30
         sheet.save(sys.argv[1])

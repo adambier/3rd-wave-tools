@@ -18,6 +18,9 @@ final class AppState: ObservableObject {
     struct PackItem: Identifiable {
         let id = UUID()
         var url: URL
+        /// Bank and program from the file name or its "Bank n" folder, as the synth shows it ("B4-P029").
+        var location: (bank: Int, program: Int)? { OutputNames.programLocation(of: url) }
+        var locationLabel: String? { location.map { String(format: "B%d-P%03d", $0.bank, $0.program) } }
         var program: ProgramFile
         var overrides: [SourceRef: PackPlan.Choice] = [:]
         /// Oscillators the user pointed at another slot: position 0...11 → new source.
@@ -53,7 +56,16 @@ final class AppState: ObservableObject {
         var plan: UnpackPlan
     }
 
-    @Published var section: Section? = .pack
+    @Published var section: Section = .pack
+    /// Text typed into the filter field above the program list.
+    @Published var programFilter = ""
+    /// Show only programs that cannot be packed yet or carry a warning.
+    @Published var onlyAttention = false
+    /// Files being read in the background: how many of how many so far.
+    struct LoadProgress { var done: Int; var total: Int }
+    @Published var loading: LoadProgress?
+    /// A folder the current alert can open in the Finder.
+    @Published var alertReveal: URL?
 
     // Shared settings
     /// Names and fingerprints of the factory wavetables, built into the app.
@@ -118,7 +130,17 @@ final class AppState: ObservableObject {
 
     // MARK: Adding files
 
-    /// Accepts any mix of .pro, .wt, .bin and .pgdata files (folders are searched).
+    /// What reading one file produced, on the background queue.
+    private enum Loaded {
+        case program(URL, ProgramFile)
+        case content(ContentFile)
+        case unified(URL, UnifiedProgram, UnpackPlan)
+        case problem(String)
+    }
+
+    /// Accepts any mix of .pro, .wt, .bin and .pgdata files (folders are searched). Files are read
+    /// on a background queue, with progress shown, since a folder of wavetables is many megabytes
+    /// of text; the results are added on the main thread in one go.
     func add(urls: [URL]) {
         var all: [URL] = []
         let fm = FileManager.default
@@ -129,29 +151,53 @@ final class AppState: ObservableObject {
                 for case let f as URL in e { all.append(f) }
             } else { all.append(u) }
         }
+        let known = Set(programs.map(\.url) + contentFiles.map(\.url) + unpacks.map(\.url))
+        let todo = all.sorted { $0.path < $1.path }
+            .filter { ["pro", "wt", "bin", "pgdata"].contains($0.pathExtension.lowercased()) && !known.contains($0) }
+        guard !todo.isEmpty else { return }
+        loading = LoadProgress(done: 0, total: todo.count)
+        let factory = self.factory, skip = self.skipFactoryDuplicates
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            var results: [Loaded] = []
+            for (i, u) in todo.enumerated() {
+                do {
+                    switch u.pathExtension.lowercased() {
+                    case "pro": results.append(.program(u, try ProgramFile(data: Data(contentsOf: u))))
+                    case "wt", "bin": results.append(.content(try ContentFile.load(u)))
+                    case "pgdata":
+                        let g = try UnifiedProgram(data: Data(contentsOf: u))
+                        results.append(.unified(u, g, UnpackPlan.make(g, factory: factory, skipFactoryDuplicates: skip)))
+                    default: break
+                    }
+                } catch { results.append(.problem("\(u.lastPathComponent): \(error)")) }
+                if i % 5 == 4 || i == todo.count - 1 {
+                    let done = i + 1
+                    DispatchQueue.main.async { self?.loading = LoadProgress(done: done, total: todo.count) }
+                }
+            }
+            DispatchQueue.main.async { self?.finishAdding(results) }
+        }
+    }
+
+    private func finishAdding(_ results: [Loaded]) {
+        loading = nil
         var problems: [String] = []
         var addedPrograms = 0, addedContent = 0, addedUnified = 0
-        for u in all.sorted(by: { $0.path < $1.path }) {
-            let ext = u.pathExtension.lowercased()
-            do {
-                switch ext {
-                case "pro":
-                    if programs.contains(where: { $0.url == u }) { continue }
-                    let p = try ProgramFile(data: Data(contentsOf: u))
-                    programs.append(PackItem(url: u, program: p)); addedPrograms += 1
-                case "wt", "bin":
-                    if contentFiles.contains(where: { $0.url == u }) { continue }
-                    contentFiles.append(try ContentFile.load(u)); addedContent += 1
-                case "pgdata":
-                    if unpacks.contains(where: { $0.url == u }) { continue }
-                    let g = try UnifiedProgram(data: Data(contentsOf: u))
-                    unpacks.append(UnpackItem(url: u, unified: g,
-                                              plan: UnpackPlan.make(g, factory: factory, skipFactoryDuplicates: skipFactoryDuplicates)))
-                    addedUnified += 1
-                default: continue
-                }
-            } catch {
-                problems.append("\(u.lastPathComponent): \(error)")
+        for r in results {
+            switch r {
+            case let .program(u, p): programs.append(PackItem(url: u, program: p)); addedPrograms += 1
+            case let .content(c): contentFiles.append(c); addedContent += 1
+            case let .unified(u, g, plan): unpacks.append(UnpackItem(url: u, unified: g, plan: plan)); addedUnified += 1
+            case let .problem(s): problems.append(s)
+            }
+        }
+        // Programs in bank and program order, as on the synth; files without a location after them.
+        programs.sort { a, b in
+            switch (a.location, b.location) {
+            case let (x?, y?): return (x.bank, x.program) < (y.bank, y.program)
+            case (nil, _?): return false
+            case (_?, nil): return true
+            default: return a.url.path < b.url.path
             }
         }
         if selectedProgram == nil { selectedProgram = programs.first?.id }
@@ -161,7 +207,9 @@ final class AppState: ObservableObject {
         if addedContent > 0 { parts.append("\(addedContent) wavetable/sample file\(addedContent == 1 ? "" : "s")") }
         if addedUnified > 0 { parts.append("\(addedUnified) .pgdata file\(addedUnified == 1 ? "" : "s")") }
         if !parts.isEmpty { note("Added " + parts.joined(separator: ", ") + ".") }
+        // Show the page the dropped files belong to.
         if addedUnified > 0 && addedPrograms == 0 && addedContent == 0 { section = .unpack }
+        else if addedUnified == 0 && addedPrograms + addedContent > 0 { section = .pack }
         if !problems.isEmpty {
             problems.forEach { note("Could not read \($0)") }
             alertMessage = "Some files could not be read:\n\n" + problems.prefix(8).joined(separator: "\n")
@@ -173,7 +221,7 @@ final class AppState: ObservableObject {
 
     func plan(for item: PackItem) -> PackPlan {
         PackPlan.make(program: item.effectiveProgram, files: contentFiles, factory: factory,
-                      overrides: item.overrides, original: item.program)
+                      overrides: item.overrides, original: item.program, names: contentNames)
     }
 
     /// The name an added file will be packed under.
@@ -192,7 +240,7 @@ final class AppState: ObservableObject {
 
     /// Why each added file is not used by any loaded program (absent when it is used).
     var unusedContent: [UUID: String] {
-        PackPlan.unusedFiles(contentFiles, plans: programs.map { plan(for: $0) })
+        PackPlan.unusedFiles(contentFiles, plans: programs.map { plan(for: $0) }, factory: factory)
     }
 
     /// Points the given oscillators of a program at `ref`. Pointing one back at its original source
@@ -262,10 +310,10 @@ final class AppState: ObservableObject {
         switch choice {
         case .builtIn: return ref.description
         case .reference:
-            return "Factory " + (factory.name(ref).map { "\"\($0)\"" } ?? "table") + " — not embedded"
+            return "Factory \(factory.name(ref) ?? ref.label) (listed, not embedded)"
         case .file(let id):
             let f = contentFiles.first { $0.id == id }
-            return "\"\(f?.name ?? "?")\" (\(f?.url.lastPathComponent ?? "?"))"
+            return "\(f.map(displayName) ?? "?") — from \(f?.url.lastPathComponent ?? "?")"
         }
     }
 
@@ -282,27 +330,27 @@ final class AppState: ObservableObject {
         if !missing.isEmpty {
             let ok = items.count - missing.count
             if ok == 0 {
-                alertMessage = (items.count == 1 ? "This program is missing content, so it can't be written."
-                                                 : "None of these programs can be written: all are missing content.")
+                alertMessage = (items.count == 1 ? "This program can't be packed yet: it needs files that aren't here."
+                                                 : "None of these programs can be packed yet: they need files that aren't here.")
                     + "\n\n" + missing.joined(separator: "\n")
-                    + "\n\nAdd the .wt or .bin files they need and assign them to the slots shown."
-                    + (oldTables ? " For the author's own wavetables from before 2025, the note shown with each program explains the choices." : "")
+                    + "\n\nAdd the .wt or .bin files they need."
+                    + (oldTables ? " For wavetables from before 2025, the note with each program explains the choices." : "")
                 return
             }
             let n = missing.count
             guard Panels.confirm(
-                title: "\(n) of \(items.count) programs \(n == 1 ? "is" : "are") missing content",
-                message: "\(n == 1 ? "It" : "They") will not be written. Write the other \(ok)?",
+                title: "\(n) of \(items.count) programs can't be packed yet",
+                message: "\(n == 1 ? "It needs files that aren't here and" : "They need files that aren't here and") will be left out. Pack the other \(ok)?",
                 details: missing.joined(separator: "\n"),
-                ok: "Write \(ok)") else { return }
+                ok: "Pack \(ok)") else { return }
         }
-        guard let folder = Panels.chooseFolder(prompt: "Write Here", message: "Choose where to write the .pgdata files") else { return }
+        guard let folder = Panels.chooseFolder(prompt: "Pack Here", message: "Choose where to put the .pgdata files") else { return }
         var outputs: [(name: String, data: Data)] = []
-        var blocked: [String] = [], failed: [String] = [], unfamiliar: [String] = []
-        // Prefix each file with its program location (or list position) so the synth's alphabetical
-        // bulk import keeps the programs in order. Positions count over the whole list.
-        let prefixes = OutputNames.orderPrefixes(fileNames: programs.map { $0.url.lastPathComponent })
-        let prefixByID = Dictionary(uniqueKeysWithValues: zip(programs.map(\.id), prefixes))
+        var blocked: [String] = [], failed: [String] = [], unfamiliar: [String] = [], replaced: [String] = []
+        // Prefix each file with its program location (or its position among the files written) so
+        // the synth's alphabetical bulk import keeps the programs in order.
+        let prefixes = OutputNames.orderPrefixes(urls: items.map(\.url))
+        let prefixByID = Dictionary(uniqueKeysWithValues: zip(items.map(\.id), prefixes))
         for item in items {
             let plan = plan(for: item)
             switch plan.verdict {
@@ -314,22 +362,31 @@ final class AppState: ObservableObject {
                 let content = plan.content(files: contentFiles, names: contentNames)
                 let g = try Packer.pack(item.effectiveProgram, content: content)
                 outputs.append((name: OutputNames.unified(item.effectiveProgram, prefix: prefixByID[item.id]), data: g.serialized()))
-                if !plan.warnings.isEmpty { unfamiliar.append("\(item.name) (\(item.program.version), \(item.program.valuesPerPart) values per part)") }
+                if !plan.warnings.isEmpty { unfamiliar.append(item.name) }
+                for r in plan.rows where r.replacesFactory {
+                    if case .file(let id)? = r.choice, let f = contentFiles.first(where: { $0.id == id }) {
+                        replaced.append("\(item.name): \(r.ref.label) uses \(f.url.lastPathComponent) instead of factory \(factory.name(r.ref).map { "\"\($0)\"" } ?? "table")")
+                    }
+                }
             } catch { failed.append("\(item.name): \(error)") }
         }
-        let written = Panels.write(outputs, into: folder)
-        var msg = "Wrote \(written) .pgdata file\(written == 1 ? "" : "s") to \(folder.path)."
+        guard let result = Panels.write(outputs, into: folder) else { note("Packing cancelled; nothing written."); return }
+        failed += result.failed
+        let written = result.written
+        var msg = "Packed \(written) program\(written == 1 ? "" : "s") into \(folder.lastPathComponent)."
         // One item per line, a blank line between sections.
-        if !blocked.isEmpty { msg += "\n\nNot written, content missing:\n" + blocked.joined(separator: "\n") }
-        if !failed.isEmpty { msg += "\n\nFailed:\n" + failed.joined(separator: "\n") }
-        if !unfamiliar.isEmpty { msg += "\n\nWritten from an unfamiliar program layout (check them on the synth):\n" + unfamiliar.joined(separator: "\n") }
+        if !blocked.isEmpty { msg += "\n\nNot packed (files missing):\n" + blocked.joined(separator: "\n") }
+        if !failed.isEmpty { msg += "\n\nNot packed:\n" + failed.joined(separator: "\n") }
+        if !replaced.isEmpty { msg += "\n\nFactory tables replaced by added files (check these are meant):\n" + replaced.joined(separator: "\n") }
+        if !unfamiliar.isEmpty { msg += "\n\nPacked, but check these on the synth (unfamiliar layout or a cut name; see each program's notes):\n" + unfamiliar.joined(separator: "\n") }
         let unused = unusedContent
         if !unused.isEmpty {
-            msg += "\n\nAdded files not used by any program (and not added to any .pgdata file):\n" + contentFiles.filter { unused[$0.id] != nil }
+            msg += "\n\nAdded files that no program uses (left out):\n" + contentFiles.filter { unused[$0.id] != nil }
                 .map { "\($0.url.lastPathComponent) (\(unused[$0.id]!.lowercased()))" }.joined(separator: "\n")
         }
-        note(msg)
-        if !blocked.isEmpty || !failed.isEmpty || !unfamiliar.isEmpty || !unused.isEmpty { alertMessage = msg }
+        note(msg + " (\(folder.path))")
+        alertReveal = folder
+        alertMessage = msg
     }
 
     // MARK: Unpack
@@ -353,14 +410,21 @@ final class AppState: ObservableObject {
         guard let i = unpacks.firstIndex(where: { $0.id == unpackID }),
               let j = unpacks[i].plan.items.firstIndex(where: { $0.id == itemID }) else { return }
         if let w = write { unpacks[i].plan.items[j].write = w }
-        if let n = fileName { unpacks[i].plan.items[j].fileName = n }
+        // An edited name is cleaned the way generated ones are ("/" and the like become "_");
+        // an empty one falls back to the generated name.
+        if let n = fileName {
+            let cleaned = OutputNames.sanitize(n)
+            unpacks[i].plan.items[j].fileName = cleaned == "Untitled" && n.trimmingCharacters(in: .whitespaces).isEmpty
+                ? UnpackPlan.make(unpacks[i].unified, factory: factory, skipFactoryDuplicates: skipFactoryDuplicates).items[j].fileName
+                : cleaned
+        }
     }
 
     func removeUnpacks(_ ids: Set<UUID>) { unpacks.removeAll { ids.contains($0.id) }; if let s = selectedUnpack, ids.contains(s) { selectedUnpack = unpacks.first?.id } }
 
     func unpack(_ ids: [UUID]) {
         let items = unpacks.filter { ids.contains($0.id) }
-        guard !items.isEmpty, let folder = Panels.chooseFolder(prompt: "Unpack Here", message: "Choose where to write the unpacked files") else { return }
+        guard !items.isEmpty, let folder = Panels.chooseFolder(prompt: "Unpack Here", message: "Choose where to put the unpacked files") else { return }
         // Identical files (same name and content) shared by several programs are written once.
         var outputs: [(name: String, data: Data)] = []
         for item in items {
@@ -369,7 +433,11 @@ final class AppState: ObservableObject {
                 outputs.append((name: f.fileName, data: f.data))
             }
         }
-        let written = Panels.write(outputs, into: folder)
-        note("Unpacked \(items.count) file\(items.count == 1 ? "" : "s"): wrote \(written) file\(written == 1 ? "" : "s") to \(folder.path).")
+        guard let result = Panels.write(outputs, into: folder) else { note("Unpacking cancelled; nothing written."); return }
+        var msg = "Unpacked \(items.count) file\(items.count == 1 ? "" : "s") into \(folder.lastPathComponent): \(result.written) file\(result.written == 1 ? "" : "s") written."
+        if !result.failed.isEmpty { msg += "\n\nNot written:\n" + result.failed.joined(separator: "\n") }
+        note(msg + " (\(folder.path))")
+        alertReveal = folder
+        alertMessage = msg
     }
 }

@@ -45,7 +45,7 @@ public struct UnifiedProgram: Equatable {
             throw FormatError.truncated(at: 0, need: 17, have: bytes.count)
         }
         magic = Array(bytes[0..<16])
-        guard magic.latin1.hasPrefix(Self.magicText) else {
+        guard NameField(raw: magic).text == Self.magicText else {
             throw FormatError.badMagic(expected: "3rd Wave unified program (.pgdata)", found: String(magic.latin1.prefix(12)))
         }
         var r = ByteReader(bytes, offset: 16)
@@ -90,6 +90,10 @@ public struct UnifiedProgram: Equatable {
         ws.reserveCapacity(r.remaining / 4)
         while r.remaining > 0 { ws.append(try r.u32()) }
         words = ws
+        // The program block must at least hold the 12 oscillator words its first word implies.
+        guard valuesPerPart > 0, oscillatorWordIndices.allSatisfy({ $0 < words.count }) else {
+            throw FormatError.invalid("Program \"\(programName.text)\" is too short for its declared layout (\(valuesPerPart) values per part).")
+        }
     }
 
     public func serialized() -> Data {
@@ -122,7 +126,7 @@ public struct UnifiedProgram: Equatable {
     /// The source each oscillator points at (nil if the stored index is out of range).
     public var oscillatorSources: [SourceRef?] {
         oscillatorWordIndices.map { i in
-            guard i < words.count else { return nil }
+            guard words.indices.contains(i) else { return nil }
             let k = Int(words[i]); return k < sources.count ? sources[k].ref : nil
         }
     }

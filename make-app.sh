@@ -26,6 +26,7 @@ done
 
 APP="pgdata Packer.app"
 BUNDLE_ID="org.biers.pgdatapacker"
+ARCH="$(uname -m)"
 VERSION="1.0"
 DEPLOYMENT_TARGET="13.0"
 
@@ -41,7 +42,6 @@ else
         echo "Could not locate the macOS SDK. Run: xcode-select --install" >&2
         exit 1
     fi
-    ARCH="$(uname -m)"
     BIN="build/PgdataPacker"
 
     if [ "$CONFIG" = "release" ]; then
@@ -97,8 +97,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-codesign --force --sign - "$APP" 2>/dev/null || \
-    echo "note: ad-hoc codesign skipped (not fatal)"
+# An unsigned arm64 app is killed at launch, so on Apple Silicon the ad-hoc signature is required.
+if ! codesign --force --sign - "$APP" 2>/dev/null; then
+    if [ "$ARCH" = "arm64" ]; then
+        echo "codesign failed: on Apple Silicon the app will not launch without an ad-hoc signature." >&2
+        exit 1
+    fi
+    echo "note: ad-hoc codesign skipped"
+fi
 
 echo
 echo "Built $APP"

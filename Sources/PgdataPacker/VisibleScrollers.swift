@@ -33,6 +33,8 @@ struct VisibleScrollers: NSViewRepresentable {
             scheduleApply()
         }
 
+        deinit { if let o = observer { NotificationCenter.default.removeObserver(o) } }
+
         /// Runs after SwiftUI has finished building the views for this pass.
         func scheduleApply() {
             guard !pending else { return }

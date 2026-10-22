@@ -48,7 +48,7 @@ public struct Multisample: Equatable {
     public init(binData data: Data) throws {
         let bytes = [UInt8](data)
         guard bytes.count >= 49 else { throw FormatError.truncated(at: 0, need: 49, have: bytes.count) }
-        let magic = Array(bytes[0..<12]).latin1
+        let magic = NameField(raw: Array(bytes[0..<16])).text        // up to the first NUL
         guard magic.hasPrefix("W3_MSAMPLE_"), let v = Int(magic.dropFirst(11)) else {
             throw FormatError.badMagic(expected: "3rd Wave multisample (.bin)", found: magic)
         }

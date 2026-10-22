@@ -13,12 +13,16 @@ public struct ContentFile: Identifiable, Equatable {
 
     public let id: UUID
     public var url: URL
-    public var body: Body
+    public let body: Body
     /// Slot the user assigned it to (pre-filled from the filename when it names one).
     public var slot: SourceRef?
+    /// Identity of the content (a hash of its values), computed once: it is compared on every
+    /// plan, and computing it means re-serialising the whole table.
+    public let fingerprint: UInt64
 
     public init(url: URL, body: Body, slot: SourceRef?) {
         id = UUID(); self.url = url; self.body = body; self.slot = slot
+        switch body { case let .wavetable(w): fingerprint = w.fingerprint; case let .multisample(m): fingerprint = m.fingerprint }
     }
 
     public static func load(_ url: URL) throws -> ContentFile {
@@ -49,9 +53,6 @@ public struct ContentFile: Identifiable, Equatable {
         case let .wavetable(w): return "\(w.kind.letter) wavetable"
         case let .multisample(m): return "Multisample, \(m.samples.count) sample\(m.samples.count == 1 ? "" : "s")"
         }
-    }
-    public var fingerprint: UInt64 {
-        switch body { case let .wavetable(w): return w.fingerprint; case let .multisample(m): return m.fingerprint }
     }
     public func fits(_ ref: SourceRef) -> Bool {
         switch (ref, body) {
@@ -188,6 +189,8 @@ public struct PackPlan {
         public var choice: Choice?
         public var options: [Choice]
         public var status: Status
+        /// The status in a few words, for a table cell; `status` carries the full sentence.
+        public var brief: String = ""
         public var embeds: Bool
         /// Approximate bytes this source adds to the .pgdata.
         public var bytes: Int = 3
@@ -198,6 +201,13 @@ public struct PackPlan {
         /// U48–U55 in a program saved before they became factory slots, with no table added: most
         /// likely the author's own wavetable (see `PackPlan.userSlotNote`).
         public var wasUserSlot = false
+        /// Fingerprint of the embedded wavetable, for counting the slots a program needs.
+        public var embeddedFingerprint: UInt64? = nil
+        /// An added file is embedded in place of the factory table of this slot.
+        public var replacesFactory = false
+        /// Added files for this slot that this program does not use by default because it was
+        /// saved after the slot became a factory slot (U48–U55 in a current program).
+        public var heldBack: [UUID] = []
     }
 
     /// Why some U48–U55 sources are missing, and what to do about it: title and body.
@@ -220,6 +230,11 @@ public struct PackPlan {
     public var userSlotNote: Note? = nil
     /// Approximate size of the .pgdata this plan would produce.
     public var estimatedBytes: Int
+    /// How many wavetables and multisamples the .pgdata will carry.
+    public var embeddedCounts: (wavetables: Int, multisamples: Int) {
+        (rows.filter { $0.embeds && !$0.ref.isSample }.count, rows.filter { $0.embeds && $0.ref.isSample }.count)
+    }
+
     /// What a blocked program needs, for reports: "needs U57" or
     /// "needs U48, U50: probably the author's own wavetables from before 2025".
     public var missingSummary: String? {
@@ -237,8 +252,12 @@ public struct PackPlan {
 
     /// Embedded wavetables that may need a free U / P slot on import (see Row.mayNeedSlot).
     public var slotsNeeded: (u: Int, p: Int) {
-        let r = rows.filter(\.mayNeedSlot)
-        return (r.filter { if case .u = $0.ref { return true }; return false }.count, r.filter(\.ref.isP).count)
+        var u = Set<UInt64>(), p = Set<UInt64>()
+        for r in rows where r.mayNeedSlot {
+            guard let fp = r.embeddedFingerprint else { continue }
+            if r.ref.isP { p.insert(fp) } else { u.insert(fp) }
+        }
+        return (u.count, p.count)
     }
 
     static let uTableBytes = 3 + 32 + 131_072 * 4
@@ -260,12 +279,17 @@ public struct PackPlan {
     ///  3. otherwise (a user slot or a multisample with no file added) nothing: the source is
     ///     reported missing and packing is blocked
     public static func make(program: ProgramFile, files: [ContentFile], factory: FactoryLibrary,
-                            overrides: [SourceRef: Choice] = [:], original: ProgramFile? = nil) -> PackPlan {
+                            overrides: [SourceRef: Choice] = [:], original: ProgramFile? = nil,
+                            names: [UUID: String] = [:]) -> PackPlan {
         let srcs = program.sources
+        /// The name a file will be packed under (renamed in Clean Up Names, or its own).
+        func packedName(_ f: ContentFile) -> String { names[f.id] ?? f.name }
+        var warnings: [String] = [program.layoutWarning].compactMap { $0 }
+        if program.name.count > NameCleaner.fieldLimit {
+            warnings.append("The program name is \(program.name.count) characters; the synth keeps \(NameCleaner.fieldLimit), so it is cut to \"\(String(program.name.prefix(NameCleaner.fieldLimit)))\".")
+        }
         let originalSrcs = original?.sources ?? srcs
         let predates = predates2025FactoryTables(program)
-        // Content a synth is expected to have: the factory tables.
-        let onSynth = Set(factory.tables.values.map(\.fingerprint))
         var rows: [Row] = []
         for ref in program.distinctSources {
             let positions = srcs.indices.filter { srcs[$0] == ref }
@@ -274,14 +298,16 @@ public struct PackPlan {
             for p in positions where p < originalSrcs.count && originalSrcs[p] != ref && !from.contains(originalSrcs[p]) { from.append(originalSrcs[p]) }
             if ref.isBuiltIn {
                 rows.append(Row(ref: ref, usedBy: users, oscillators: positions, repointedFrom: from,
-                                choice: .builtIn, options: [.builtIn], status: .ok("Built in"), embeds: false))
+                                choice: .builtIn, options: [.builtIn], status: .ok("Built in"), brief: "Built in", embeds: false))
                 continue
             }
             if case let .unknown(id) = ref {
+                let why = id == -1 ? "The value at these oscillators is not a whole number, so the layout is probably not what this app expects."
+                                   : "Unknown source number \(id): not a wavetable, analog wave or sample slot."
                 rows.append(Row(ref: ref, usedBy: users, oscillators: positions, repointedFrom: from,
                                 choice: nil, options: [],
-                                status: .missing("Unknown source number \(id): not a wavetable, analog shape or sample slot. Point these oscillators to another slot."),
-                                embeds: false))
+                                status: .missing(why + " Point these oscillators to another slot."),
+                                brief: "Unknown source: point elsewhere", embeds: false))
                 continue
             }
             let factoryTable = factory.tables[ref]
@@ -293,18 +319,27 @@ public struct PackPlan {
             // A slot that was a user slot when this program was saved (U48–U55 before 2025): the
             // program meant the author's own table there, unless the added file is the factory table.
             let wasUserSlot = isFactory && predates && is2025FactorySlot(ref) && assigned.count == distinct.count
+            // The reverse: a program saved since U48–U55 became factory slots means the factory table
+            // there, so a file added for that slot (typically an older set's own table) is not used by
+            // default. It stays in the Content menu.
+            let keepsFactory = isFactory && !predates && is2025FactorySlot(ref) && !distinct.isEmpty
+            // An added file in a factory slot replaces the factory table: expected for U48–U55 in an
+            // older program, worth a warning anywhere else.
+            let replacingIsExpected = predates && is2025FactorySlot(ref)
             if isFactory { options.append(.reference) }
             // Tables in user slots and multisamples are always embedded from an added file: a program
             // is never packed without them.
 
             var choice: Choice? = overrides[ref].flatMap { options.contains($0) ? $0 : nil }
             if choice == nil {
-                if let f = distinct.first { choice = .file(f.id) }
+                if keepsFactory { choice = .reference }
+                else if let f = distinct.first { choice = .file(f.id) }
                 else if isFactory && !wasUserSlot { choice = .reference }
             }
 
             let factoryName = factory.name(ref).map { "\"\($0)\"" } ?? "table"
             var status: Status
+            var brief = ""
             var embeds = false
             var mayNeedSlot = false
             let tableBytes = ref.isP ? pTableBytes : uTableBytes
@@ -313,33 +348,51 @@ public struct PackPlan {
             case .file(let id)?:
                 let f = files.first { $0.id == id }!
                 embeds = true
+                let name = packedName(f)
+                if name.count > NameCleaner.fieldLimit {
+                    warnings.append("\(f.url.lastPathComponent): the name \"\(name)\" is \(name.count) characters; the synth keeps \(NameCleaner.fieldLimit), so it is cut to \"\(String(name.prefix(NameCleaner.fieldLimit)))\".")
+                }
                 if case let .multisample(m) = f.body {
                     bytes = multisampleBytes(m)
-                    status = .ok("Embeds \"\(f.name)\" from \(f.url.lastPathComponent); goes into a free S slot on import")
+                    status = .ok("Embeds \"\(name)\" (\(f.url.lastPathComponent)); stored in a free S slot on import")
+                    brief = "Embedded; needs a free S slot"
                 } else {
                     bytes = tableBytes
                     if let same = factory.slot(withFingerprint: f.fingerprint) {
-                        status = .ok("Embeds \"\(f.name)\", identical to factory \(same.label); a synth that has it reuses it")
+                        status = .ok("Embeds \"\(name)\", identical to factory \(same.label); a synth that has it reuses it")
+                        brief = "Embedded; same as factory \(same.label), reused"
+                    } else if isFactory && !replacingIsExpected {
+                        mayNeedSlot = true
+                        status = .warning("Embeds \"\(name)\" (\(f.url.lastPathComponent)) in place of factory \(factoryName); stored in a free \(ref.isP ? "P" : "U") slot on import")
+                        brief = "Embedded, replacing the factory table"
                     } else {
-                        mayNeedSlot = !onSynth.contains(f.fingerprint)
-                        status = .ok("Embeds \"\(f.name)\" from \(f.url.lastPathComponent); goes into a free \(ref.isP ? "P" : "U") slot on import")
+                        mayNeedSlot = true
+                        status = .ok("Embeds \"\(name)\" (\(f.url.lastPathComponent)); stored in a free \(ref.isP ? "P" : "U") slot on import")
+                        brief = "Embedded; needs a free \(ref.isP ? "P" : "U") slot"
                     }
                 }
             case .reference?:
                 // Offered only for factory slots: listed without data, the synth plays its own table.
                 status = .ok("Factory \(factoryName); not embedded"
-                             + (assigned.count > distinct.count ? " (the added file is identical to it)" : ""))
-            case .builtIn?: status = .ok("Built in")
+                             + (assigned.count > distinct.count ? " (the added file is identical to it)" : "")
+                             + (keepsFactory ? ". This program is from after \(ref.label) became a factory slot, so the added file is not used; choose it in this menu to use it" : ""))
+                brief = keepsFactory ? "Factory table, listed; added file not used" : "Factory table, listed"
+            case .builtIn?: status = .ok("Built in"); brief = "Built in"
             case nil where wasUserSlot:
                 status = .missing("Probably the author's own wavetable; see the note above")
+                brief = "Missing: the author's table (see note)"
             case nil:
                 status = .missing(ref.isSample
-                    ? "Needs the multisample for \(ref.label): add its .bin file and assign it to \(ref.label)"
-                    : "Needs the wavetable for \(ref.label) (a user slot): add its .wt file, or point these oscillators to another slot")
+                    ? "Needs the multisample for \(ref.label): add its .bin file"
+                    : "Needs the wavetable for \(ref.label), a user slot: add its .wt file, or point these oscillators elsewhere")
+                brief = ref.isSample ? "Missing: add the .bin file" : "Missing: add the .wt file or point elsewhere"
             }
             rows.append(Row(ref: ref, usedBy: users, oscillators: positions, repointedFrom: from,
-                            choice: choice, options: options, status: status, embeds: embeds, bytes: bytes,
-                            mayNeedSlot: mayNeedSlot, wasUserSlot: wasUserSlot && choice == nil))
+                            choice: choice, options: options, status: status, brief: brief, embeds: embeds, bytes: bytes,
+                            mayNeedSlot: mayNeedSlot, wasUserSlot: wasUserSlot && choice == nil,
+                            embeddedFingerprint: { if case .file(let id)? = choice, let f = files.first(where: { $0.id == id }), !f.isSample { return f.fingerprint }; return nil }(),
+                            replacesFactory: { if case .file? = choice, isFactory, !replacingIsExpected { return true }; return false }(),
+                            heldBack: keepsFactory && choice == .reference ? distinct.map(\.id) : []))
         }
         let missing = rows.filter { $0.choice == nil }.map(\.ref).sorted()
         let verdict: Verdict
@@ -348,7 +401,7 @@ public struct PackPlan {
         else { verdict = .factoryOnly }
         let total = 17 + 4 * rows.count + rows.reduce(0) { $0 + $1.bytes } + 32 + 4 * program.values.count
         let userSlots = rows.filter(\.wasUserSlot).map(\.ref)
-        return PackPlan(rows: rows, verdict: verdict, warnings: [program.layoutWarning].compactMap { $0 },
+        return PackPlan(rows: rows, verdict: verdict, warnings: warnings,
                         userSlotNote: userSlots.isEmpty ? nil : userSlotNote(program: program, slots: userSlots, factory: factory),
                         estimatedBytes: total)
     }
@@ -372,6 +425,14 @@ public struct PackPlan {
         (1...4).contains(p.versionNumber) || p.floatBlockCount < currentFloatBlockCount
     }
 
+    /// Why a program counts as saved before OS 1.9, for the note.
+    static func layoutReason(_ p: ProgramFile) -> String {
+        if (1...4).contains(p.versionNumber) {
+            return "it is in the \(p.version) format, older than the W3_PROG_5 the synth has saved since OS 1.9"
+        }
+        return "its layout is older than what the synth has saved since OS 1.9 (\(p.floatBlockCount) values in its float block rather than \(currentFloatBlockCount))"
+    }
+
     /// The explanation shown with a program whose U48–U55 sources are missing because it predates them.
     static func userSlotNote(program: ProgramFile, slots: [SourceRef], factory: FactoryLibrary) -> Note {
         let slots = slots.sorted()
@@ -385,7 +446,7 @@ public struct PackPlan {
             : "\(list) probably held the author's own wavetables, which are not included"
         let factoryList = and(slots.map { "\($0.label) \(fname($0))" })
         let body = """
-        This program was most likely made before 2025. Its layout is older than what the synth has saved since OS 1.9 (\(program.version), with \(program.floatBlockCount) values in its float block rather than \(currentFloatBlockCount)). The file itself carries no date, so this is an inference.
+        This program was most likely made before 2025: \(layoutReason(program)). The file itself carries no date, so this is an inference.
 
         Until 2025, U48–U55 were user slots, where people loaded their own wavetables. Groove Synthesis then made them factory slots. Loaded as it is, this program would play the factory \(one ? "table" : "tables") \(factoryList) instead of the \(one ? "one" : "ones") the author used.
 
@@ -399,15 +460,19 @@ public struct PackPlan {
 
     /// For each content file that no plan uses, why: not used by any program (whether or not it has a
     /// slot), or another file or choice is used for its slot.
-    public static func unusedFiles(_ files: [ContentFile], plans: [PackPlan]) -> [UUID: String] {
+    public static func unusedFiles(_ files: [ContentFile], plans: [PackPlan], factory: FactoryLibrary = FactoryLibrary()) -> [UUID: String] {
         var used = Set<UUID>()
         for p in plans { for r in p.rows { if case .file(let id)? = r.choice { used.insert(id) } } }
         var out: [UUID: String] = [:]
         for f in files where !used.contains(f.id) {
             guard let slot = f.slot else { out[f.id] = "Not used by any program here"; continue }
             let slotUsed = plans.contains { $0.rows.contains { $0.ref == slot } }
-            out[f.id] = slotUsed ? "Not used: another choice is made for \(slot.label)"
-                                 : "Not used by any program here"
+            if !slotUsed { out[f.id] = "Not used by any program here" }
+            else if factory.tables[slot]?.fingerprint == f.fingerprint { out[f.id] = "Identical to factory \(slot.label); listed, not embedded" }
+            else if plans.contains(where: { $0.rows.contains { $0.ref == slot && $0.heldBack.contains(f.id) } }) {
+                out[f.id] = "Not used: the programs here that use \(slot.label) are from after it became a factory slot, so they use the factory table"
+            }
+            else { out[f.id] = "Not used: another choice is made for \(slot.label)" }
         }
         return out
     }
@@ -418,7 +483,7 @@ public struct PackPlan {
         for r in rows {
             switch r.choice {
             case .file(let id)?:
-                let c = files.first { $0.id == id }!.content
+                guard let c = files.first(where: { $0.id == id })?.content else { continue }
                 out[r.ref] = names[id].map { c.renamed($0) } ?? c
             case .reference?: out[r.ref] = .reference
             case .builtIn?, nil: break
@@ -475,18 +540,35 @@ public enum OutputNames {
         return (bank, prog)
     }
 
-    /// File-name prefixes for programs written together, in list order. When every file name carries
-    /// a location: Groove Synthesis's "B05P18" form, two-digit program, or three digits for the whole batch if
+    private static let bankFolderPattern = try! NSRegularExpression(pattern: #"^[Bb]ank\s*0?([1-5])$"#)
+
+    /// Program location of a file: from its name, or from Groove Synthesis's older layout of a
+    /// "Bank 1" folder holding "001.PRO" … "100.PRO" (the 24-voice Factory Banks v1).
+    public static func programLocation(of url: URL) -> (bank: Int, program: Int)? {
+        if let l = programLocation(inFileName: url.lastPathComponent) { return l }
+        let base = url.deletingPathExtension().lastPathComponent
+        let folder = url.deletingLastPathComponent().lastPathComponent
+        guard base.count <= 3, base.allSatisfy(\.isNumber), let prog = Int(base), (1...100).contains(prog),
+              let m = bankFolderPattern.firstMatch(in: folder, range: NSRange(folder.startIndex..., in: folder)),
+              let b = Range(m.range(at: 1), in: folder), let bank = Int(folder[b]) else { return nil }
+        return (bank, prog)
+    }
+
+    /// File-name prefixes for programs written together, in list order. When every file carries a
+    /// location: Groove Synthesis's "B05P18" form, two-digit program, or three digits for the whole batch if
     /// it includes a program 100 ("B05P100" would sort between P10 and P11). Otherwise "001", "002"…
     /// by position in the list.
-    public static func orderPrefixes(fileNames: [String]) -> [String] {
-        let locs = fileNames.map { programLocation(inFileName: $0) }
+    public static func orderPrefixes(locations locs: [(bank: Int, program: Int)?]) -> [String] {
         if !locs.isEmpty, locs.allSatisfy({ $0 != nil }) {
             let wide = locs.contains { $0!.program >= 100 }
             return locs.map { String(format: wide ? "B%02dP%03d" : "B%02dP%02d", $0!.bank, $0!.program) }
         }
-        return fileNames.indices.map { String(format: "%03d", $0 + 1) }
+        return locs.indices.map { String(format: "%03d", $0 + 1) }
     }
+    public static func orderPrefixes(fileNames: [String]) -> [String] {
+        orderPrefixes(locations: fileNames.map { programLocation(inFileName: $0) })
+    }
+    public static func orderPrefixes(urls: [URL]) -> [String] { orderPrefixes(locations: urls.map(programLocation(of:))) }
 }
 
 // MARK: - Unpack plan
@@ -541,7 +623,7 @@ public enum Oscillator {
     /// Wavetable slots and analog shapes an oscillator can be pointed at (samples are not offered).
     public static var repointTargets: [SourceRef] {
         (0..<SourceRef.uCount).map { SourceRef.u($0) } + (0..<SourceRef.pCount).map { SourceRef.p($0) }
-            + (0..<SourceRef.analogNames.count).map { SourceRef.analog($0) }
+            + (0..<SourceRef.analogCount).map { SourceRef.analog($0) }
     }
 }
 

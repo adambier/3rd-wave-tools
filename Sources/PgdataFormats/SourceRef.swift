@@ -58,7 +58,9 @@ public enum SourceRef: Hashable, Comparable, CustomStringConvertible {
         }
     }
 
-    public static let analogNames = ["Sine", "Sawtooth", "Triangle", "Supersaw", "Pulse", "White noise", "Pink noise"]
+    /// The seven analog-modelled waves, labelled A00–A06 in the manual (sawtooth, pulse, triangle,
+    /// sine, supersaw and two noise types, in an order not yet checked against the labels).
+    public static let analogCount = 7
 
     /// Slot label as the synth shows it: P07, U50, S10.
     public var label: String {
@@ -66,13 +68,13 @@ public enum SourceRef: Hashable, Comparable, CustomStringConvertible {
         case let .p(n): return String(format: "P%02d", n)
         case let .u(n): return String(format: "U%02d", n)
         case let .s(n): return String(format: "S%02d", n)
-        case let .analog(n): return "A\(n)"
+        case let .analog(n): return String(format: "A%02d", n)
         case let .unknown(v): return "?\(v)"
         }
     }
 
     public var description: String {
-        if case let .analog(n) = self { return n < Self.analogNames.count ? "Analog \(Self.analogNames[n])" : "Analog \(n)" }
+        if case .analog = self { return "Analog \(label)" }
         return label
     }
 
@@ -95,7 +97,8 @@ public enum SourceRef: Hashable, Comparable, CustomStringConvertible {
     /// Parse "P07", "U50", "S10", "S010", case-insensitive.
     public init?(label: String) {
         let t = label.trimmingCharacters(in: .whitespaces).uppercased()
-        guard let k = t.first, let n = Int(t.dropFirst()) else { return nil }
+        let digits = t.dropFirst()
+        guard let k = t.first, !digits.isEmpty, digits.allSatisfy(\.isNumber), let n = Int(digits) else { return nil }
         switch k {
         case "P" where (0..<Self.pCount).contains(n): self = .p(n)
         case "U" where (0..<Self.uCount).contains(n): self = .u(n)

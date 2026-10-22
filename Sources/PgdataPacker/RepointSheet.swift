@@ -58,8 +58,8 @@ struct RepointSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Point oscillators to another slot").font(.title3).bold()
-            Text("Tick the oscillators to change on the left, then select what they should play on the right.")
+            Text("Change what oscillators play").font(.title3).bold()
+            Text("Tick the oscillators to change, then select what they should play.")
                 .foregroundStyle(.secondary)
             if request.itemID == nil {
                 Picker("Program", selection: $itemID) {
@@ -76,13 +76,13 @@ struct RepointSheet: View {
             }
             .frame(height: 400)
             HStack {
-                Text("Only the .pgdata written here changes; the .pro file is not modified.")
+                Text("Changes apply to the .pgdata only; the .pro file is left as it is.")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button(applyTitle) { apply() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(picked.isEmpty || target == nil || item == nil)
+                    .disabled((picked.isEmpty && !assignsOnly) || target == nil || item == nil)
             }
         }
         .padding(20)
@@ -171,7 +171,7 @@ struct RepointSheet: View {
     }
     private var analogTargets: [Target] {
         Oscillator.repointTargets.filter(\.isBuiltIn).map { r in
-            Target(id: "a\(r.id)", ref: r, title: r.description, detail: "built in")
+            Target(id: "a\(r.id)", ref: r, title: r.description, detail: "built in; the manual's label, A00–A06")
         }
     }
     private func matches(_ t: Target) -> Bool {
@@ -183,8 +183,8 @@ struct RepointSheet: View {
             Text("2  What they should play").font(.headline)
             List(selection: $selectedID) {
                 targetSection("Files you added", fileTargets.filter(matches))
-                targetSection("Factory wavetables", slotTargets.filter(matches))
-                targetSection("Analog shapes", analogTargets.filter(matches))
+                targetSection("Factory slots", slotTargets.filter(matches))
+                targetSection("Analog waves", analogTargets.filter(matches))
             }
             .visibleScrollers()
             .focused($focus, equals: .list)
@@ -211,7 +211,7 @@ struct RepointSheet: View {
                             Text("→ \(t.ref.label)").font(.caption).foregroundStyle(.secondary)
                                 .help(t.ref == request.from
                                       ? "Will be assigned to \(t.ref.label), the slot this program uses."
-                                      : "Assigned a free slot automatically. The synth decides where a new table goes when it imports the file.")
+                                      : "Given a free slot automatically; the synth chooses the real slot on import.")
                         }
                         Text(t.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
@@ -224,14 +224,21 @@ struct RepointSheet: View {
     // MARK: Apply
 
     private var applyTitle: String {
-        guard let t = target else { return "Point" }
+        guard let t = target else { return "Apply" }
+        let n = picked.count
+        let who = "\(n) oscillator\(n == 1 ? "" : "s")"
         if let fid = targetFile, let f = state.contentFiles.first(where: { $0.id == fid }) {
             if f.slot == nil, let from = request.from, t == from { return "Use \(state.displayName(f)) for \(from.label)" }
-            let n = picked.count
-            return "Point \(n) oscillator\(n == 1 ? "" : "s") to \(state.displayName(f)) (\(t.label))"
+            return "Use \(state.displayName(f)) for \(who)"
         }
-        let n = picked.count
-        return "Point \(n) oscillator\(n == 1 ? "" : "s") to \(t.isBuiltIn ? t.description : t.label)"
+        return "Use \(t.isBuiltIn ? t.description : t.label) for \(who)"
+    }
+
+    /// Assigning an unassigned file to the slot the program already uses needs no oscillator ticked.
+    private var assignsOnly: Bool {
+        guard let fid = targetFile, let f = state.contentFiles.first(where: { $0.id == fid }), f.slot == nil,
+              let from = request.from, target == from else { return false }
+        return true
     }
 
     private func apply() {
@@ -241,7 +248,9 @@ struct RepointSheet: View {
             state.setSlot(fid, t)
             state.note("\(f.url.lastPathComponent) assigned to \(t.label).")
         }
-        state.repoint(id, positions: Array(picked), to: t)
+        if !picked.isEmpty { state.repoint(id, positions: Array(picked), to: t) }
+        // Pointing at a file means that file, even when another file or the factory table holds its slot.
+        if let fid = targetFile { state.setOverride(id, t, .file(fid)) }
         state.selectedProgram = id
         dismiss()
     }

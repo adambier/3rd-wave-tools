@@ -16,8 +16,8 @@ public struct WavetableFile: Equatable {
     }
 
     public var kind: Kind
-    public var name: String
-    public var values: [Float]
+    public var name: String { didSet { originalBytes = nil } }
+    public var values: [Float] { didSet { originalBytes = nil } }
     /// Original file bytes, kept so an unmodified file is written back unchanged.
     public var originalBytes: [UInt8]?
 

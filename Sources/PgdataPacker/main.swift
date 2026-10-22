@@ -35,12 +35,25 @@ private func buildMainMenu() -> NSMenu {
 
     let editMenuItem = NSMenuItem()
     let editMenu = NSMenu(title: "Edit")
+    editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+    editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+    editMenu.addItem(.separator())
     editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
     editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
     editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
     editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
     editMenuItem.submenu = editMenu
     mainMenu.addItem(editMenuItem)
+
+    let windowMenuItem = NSMenuItem()
+    let windowMenu = NSMenu(title: "Window")
+    windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m")
+    windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.zoom(_:)), keyEquivalent: "")
+    windowMenu.addItem(.separator())
+    windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+    windowMenuItem.submenu = windowMenu
+    mainMenu.addItem(windowMenuItem)
+    NSApplication.shared.windowsMenu = windowMenu
 
     return mainMenu
 }

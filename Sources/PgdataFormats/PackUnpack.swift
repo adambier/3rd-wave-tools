@@ -109,12 +109,14 @@ public enum Unpacker {
         var values: [ProgramFile.Value] = u.words.enumerated().map { i, w in
             (i >= floatStart && i < floatStart + floatCount) ? .float(Float(bitPattern: w)) : .int(Int32(bitPattern: w))
         }
-        for (slot, i) in u.oscillatorWordIndices.enumerated() where i < values.count {
+        for (slot, i) in u.oscillatorWordIndices.enumerated() where values.indices.contains(i) {
             let k = Int(u.words[i])
             if k < u.sources.count {
                 values[i] = .int(u.sources[k].ref.id)
             } else {
-                notes.append("Oscillator \(slot % 3 + 1) of part \(slot / 3 + 1) points at source \(k), which the file does not list; left as is.")
+                // Kept as it is, so nothing is invented; the synth will read it as source id k.
+                notes.append("Oscillator \(slot % 3 + 1) of part \(slot / 3 + 1) points at source \(k), which the file does not list. "
+                             + "The .pro keeps the value \(k), which the synth reads as \(SourceRef(id: Int32(k)).description).")
             }
         }
         let program = ProgramFile(version: "W3_PROG_5", name: u.programName.text, values: values)

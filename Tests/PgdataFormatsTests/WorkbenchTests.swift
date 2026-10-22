@@ -62,7 +62,7 @@ final class WorkbenchTests: XCTestCase {
         let u = try writeWT("U50 SM OB2", kind: .u, seed: 0.7, file: "U50 SM OB2.WT")
         let cf = try ContentFile.load(u)
         XCTAssertEqual(cf.slot, .u(50))
-        let pro = makeProgram(sources: [2043, 2043, 42] + Array(repeating: 42, count: 9))
+        let pro = makeProgram(sources: [2043, 2043, 42] + Array(repeating: 42, count: 9), version: "W3_PROG_4", floats: 520)
         let plan = PackPlan.make(program: pro, files: [cf], factory: FactoryLibrary())
         XCTAssertEqual(plan.rows.first?.choice, .file(cf.id))
         XCTAssertEqual(plan.verdict, .embedsContent)
@@ -78,6 +78,7 @@ final class WorkbenchTests: XCTestCase {
         dir = save
         let lib = FactoryLibrary(folders: [f])
         let pro = makeProgram(sources: [2043] + Array(repeating: 42, count: 11))
+        let oldPro = makeProgram(sources: [2043] + Array(repeating: 42, count: 11), version: "W3_PROG_4", floats: 520)
 
         let plain = PackPlan.make(program: pro, files: [], factory: lib)
         XCTAssertEqual(plain.rows[0].choice, .reference)
@@ -92,9 +93,9 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertEqual(copy.rows[0].options, [.reference])
         XCTAssertEqual(copy.verdict, .factoryOnly)
 
-        // A different table for U50 (Dynamica's SM OB2): embedded, as the program's author meant.
+        // A different table for U50 in an older program (Dynamica's SM OB2): embedded, as its author meant.
         var ob2 = try ContentFile.load(try writeWT("SM OB2", kind: .u, seed: 0.7, file: "SM OB2.wt")); ob2.slot = .u(50)
-        let p2 = PackPlan.make(program: pro, files: [ob2], factory: lib)
+        let p2 = PackPlan.make(program: oldPro, files: [ob2], factory: lib)
         XCTAssertEqual(p2.rows[0].choice, .file(ob2.id))
         XCTAssertEqual(p2.rows[0].options, [.file(ob2.id), .reference])
         XCTAssertTrue(p2.rows[0].mayNeedSlot)
@@ -115,7 +116,7 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertTrue(u48.wasUserSlot)
         let note = try XCTUnwrap(plan.userSlotNote)
         XCTAssertEqual(note.title, "U48 probably held the author's own wavetable, which is not included")
-        XCTAssertTrue(note.body.contains("(W3_PROG_4, with 520 values in its float block rather than 544)"))
+        XCTAssertTrue(note.body.contains("it is in the W3_PROG_4 format, older than the W3_PROG_5"))
         XCTAssertTrue(note.body.contains("U48 \"FM_Crush\""))
         XCTAssertEqual(plan.missingSummary, "needs U48: probably the author's own wavetable from before 2025")
         XCTAssertEqual(plan.rows.first { $0.ref == .u(7) }!.choice, .reference)   // older factory slots unaffected
@@ -153,6 +154,77 @@ final class WorkbenchTests: XCTestCase {
         obx.slot = .u(48)
         let lib2 = FactoryLibrary([.u(48): .init(name: "FM_Crush", fingerprint: obx.fingerprint)])
         XCTAssertEqual(PackPlan.make(program: old, files: [obx], factory: lib2).rows[0].choice, .reference)
+    }
+
+    func testCorruptUnifiedProgramIsRejectedNotCrashed() throws {
+        let pro = makeProgram(sources: [34] + Array(repeating: 42, count: 11))
+        var g = try Packer.pack(pro, content: [.u(0): .reference])
+        var d = g.serialized()
+        // Patch the first program word (values per part) to -200.
+        let start = d.count - 4 * g.words.count
+        d.replaceSubrange(start..<start + 4, with: [0x38, 0xFF, 0xFF, 0xFF])
+        XCTAssertThrowsError(try UnifiedProgram(data: d))
+        // An oscillator index the file does not list: unpacks with a note, no crash.
+        g = try Packer.pack(pro, content: [.u(0): .reference])
+        let osc = g.oscillatorWordIndices[0]
+        var words = g.words; words[osc] = 7
+        d = g.serialized()
+        let s2 = d.count - 4 * g.words.count + 4 * osc
+        d.replaceSubrange(s2..<s2 + 4, with: [7, 0, 0, 0])
+        let u = try UnifiedProgram(data: d)
+        XCTAssertNil(u.oscillatorSources[0])
+        let up = Unpacker.unpack(u)
+        XCTAssertEqual(up.program.sources[0], .p(7))
+        XCTAssertTrue(up.notes.contains { $0.contains("reads as P07") })
+    }
+
+    func testLongNamesAreWarnedAboutAndFactoryIdenticalFilesExplained() throws {
+        let long = String(repeating: "x", count: 40)
+        var pro = makeProgram(sources: [2050] + Array(repeating: 42, count: 11))
+        pro.name = long
+        var cf = try ContentFile.load(try writeWT("Breathy Vowels", kind: .u, seed: 0.5, file: "02.wt")); cf.slot = .u(57)
+        let plan = PackPlan.make(program: pro, files: [cf], factory: FactoryLibrary(), names: [cf.id: long])
+        XCTAssertEqual(plan.warnings.count, 2)
+        XCTAssertTrue(plan.warnings[0].contains("program name is 40 characters"))
+        XCTAssertTrue(plan.warnings[1].contains("02.wt"))
+        guard case .ok(let st) = plan.rows[0].status else { return XCTFail() }
+        XCTAssertTrue(st.contains(long))                        // status shows the packed name
+        // Two user slots fed the same content need one free slot, not two.
+        let two = makeProgram(sources: [2049, 2050] + Array(repeating: 42, count: 10))
+        var cf2 = cf; cf2.slot = .u(56)
+        let p2 = PackPlan.make(program: two, files: [cf, cf2], factory: FactoryLibrary())
+        XCTAssertEqual(p2.slotsNeeded.u, 1)
+        // A file that is its slot's factory table: explained, not "another choice".
+        let lib = FactoryLibrary([.u(7): .init(name: "Knob Grotto 6", fingerprint: cf.fingerprint)])
+        var fac = cf; fac.slot = .u(7)
+        let p3 = PackPlan.make(program: makeProgram(sources: [2000] + Array(repeating: 42, count: 11)), files: [fac], factory: lib)
+        XCTAssertEqual(PackPlan.unusedFiles([fac], plans: [p3], factory: lib)[fac.id], "Identical to factory U07; listed, not embedded")
+        XCTAssertTrue(p3.content(files: []).isEmpty || p3.content(files: [])[.u(7)] == .reference)   // no crash without the file
+    }
+
+    func testOlderSetsTableIsNotAppliedToCurrentPrograms() throws {
+        // An older set's U48 table loaded beside a current (544-float) program that uses factory U48.
+        let lib = FactoryLibrary([.u(48): .init(name: "FM_Crush", fingerprint: 1), .u(10): .init(name: "MultiWave96k", fingerprint: 2)])
+        let obx = try ContentFile.load(try writeWT("SM OBX8 1", kind: .u, seed: 0.3, file: "U48 SM OBX8 1.WT"))
+        let current = makeProgram(sources: [2041] + Array(repeating: 42, count: 11), version: "W3_PROG_5", floats: 544)
+        let plan = PackPlan.make(program: current, files: [obx], factory: lib)
+        XCTAssertEqual(plan.rows[0].choice, .reference)                 // keeps factory FM_Crush
+        XCTAssertEqual(plan.rows[0].options, [.file(obx.id), .reference]) // the file can still be chosen
+        XCTAssertEqual(plan.rows[0].heldBack, [obx.id])
+        XCTAssertTrue(PackPlan.unusedFiles([obx], plans: [plan], factory: lib)[obx.id]!.contains("from after it became a factory slot"))
+        // The older program in the same session uses the file.
+        let old = makeProgram(sources: [2041] + Array(repeating: 42, count: 11), version: "W3_PROG_4", floats: 520)
+        let p2 = PackPlan.make(program: old, files: [obx], factory: lib)
+        XCTAssertEqual(p2.rows[0].choice, .file(obx.id))
+        XCTAssertFalse(p2.rows[0].replacesFactory)                      // expected here: no warning
+        XCTAssertNil(PackPlan.unusedFiles([obx], plans: [plan, p2], factory: lib)[obx.id])
+        // Another factory slot: the added file is used, with a warning that it replaces the factory table.
+        var other = try ContentFile.load(try writeWT("My Table", kind: .u, seed: 0.9, file: "mine.wt")); other.slot = .u(10)
+        let p3 = PackPlan.make(program: makeProgram(sources: [2003] + Array(repeating: 42, count: 11)), files: [other], factory: lib)
+        XCTAssertEqual(p3.rows[0].choice, .file(other.id))
+        guard case .warning(let w) = p3.rows[0].status else { return XCTFail() }
+        XCTAssertTrue(w.contains("in place of factory \"MultiWave96k\""))
+        XCTAssertTrue(p3.rows[0].replacesFactory)
     }
 
     func testUnfamiliarLayoutAndUnknownSourcesAreFlagged() {
@@ -330,6 +402,11 @@ final class OutputNameTests: XCTestCase {
         // A program 100 in the batch: three digits for all, so P100 sorts last.
         XCTAssertEqual(OutputNames.orderPrefixes(fileNames: ["B05P011.pro", "B05P100.pro"]), ["B05P011", "B05P100"])
         XCTAssertEqual(OutputNames.orderPrefixes(fileNames: ["B05P003.pro", "Lead.pro", "Bass.pro"]), ["001", "002", "003"])
+        // Groove Synthesis's older layout: "Bank 1/001.PRO".
+        let urls = [URL(fileURLWithPath: "/x/Bank 1/001.PRO"), URL(fileURLWithPath: "/x/Bank 5/100.PRO"), URL(fileURLWithPath: "/x/B02P007.pro")]
+        XCTAssertEqual(OutputNames.orderPrefixes(urls: urls), ["B01P001", "B05P100", "B02P007"])
+        XCTAssertNil(OutputNames.programLocation(of: URL(fileURLWithPath: "/x/Sounds/001.PRO")))
+        XCTAssertNil(OutputNames.programLocation(of: URL(fileURLWithPath: "/x/Bank 1/1001.PRO")))
         var p = makeProgram(sources: Array(repeating: 42, count: 12)); p.name = "Ghibli Bell"
         XCTAssertEqual(OutputNames.unified(p, prefix: "B05P87"), "B05P87_Ghibli_Bell.pgdata")
         XCTAssertEqual(OutputNames.unified(p), "Ghibli_Bell.pgdata")

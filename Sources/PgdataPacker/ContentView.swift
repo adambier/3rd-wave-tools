@@ -11,35 +11,62 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavigationSplitView {
-                List(selection: $state.section) {
+            // Two pages, chosen with a segmented control rather than a sidebar, which would take
+            // width the Pack tables need.
+            HStack {
+                Spacer()
+                Picker("", selection: $state.section) {
                     ForEach(AppState.Section.allCases) { s in
                         Label(s.rawValue, systemImage: s.icon).tag(s)
                     }
                 }
-                .navigationSplitViewColumnWidth(min: 150, ideal: 170, max: 220)
-            } detail: {
-                Group {
-                    switch state.section ?? .pack {
-                    case .pack: PackView()
-                    case .unpack: UnpackView()
-                    }
-                }
-                // Each page fills the detail area and no more (a page that asked for its full
-                // content height pushed the top of the window out of view).
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 220)
+                Spacer()
             }
+            .padding(.vertical, 8)
+            Divider()
+            Group {
+                switch state.section {
+                case .pack: PackView()
+                case .unpack: UnpackView()
+                }
+            }
+            // Each page fills the area and no more (a page that asked for its full content height
+            // pushed the top of the window out of view).
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider()
             LogBar(showLog: $showLog)
         }
-        .frame(minWidth: 960, minHeight: 600)
+        .frame(minWidth: 900, minHeight: 600)
         // Standard alert with a scrolling text area (see AlertPresenter): system look, but wide
         // enough for one-item-per-line reports, and long lists scroll.
         .onChange(of: state.alertMessage) { msg in
             guard let msg else { return }
-            AlertPresenter.show(msg) { state.alertMessage = nil }
+            let reveal = state.alertReveal
+            state.alertReveal = nil
+            AlertPresenter.show(msg, reveal: reveal) { state.alertMessage = nil }
         }
     }
+}
+
+/// A blue border while files are dragged over a page, so a drop target is visible.
+struct DropHighlight: ViewModifier {
+    let active: Bool
+    func body(content: Content) -> some View {
+        content.overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(Color.accentColor, lineWidth: 3)
+                .padding(3)
+                .opacity(active ? 1 : 0)
+                .allowsHitTesting(false)
+        )
+    }
+}
+
+extension View {
+    func dropHighlight(_ active: Bool) -> some View { modifier(DropHighlight(active: active)) }
 }
 
 // MARK: - Log
@@ -117,30 +144,54 @@ struct EmptyHint: View {
 
 // MARK: - Shared bits
 
+/// A row's status in a few words, with the full sentence on hover.
 struct StatusText: View {
+    let brief: String
     let status: PackPlan.Status
     var body: some View {
-        // The full text on hover, since the Status column can cut a long one short.
         switch status {
-        case .ok(let s): Text(s).foregroundStyle(.secondary).help(s)
-        case .warning(let s): Label(s, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).help(s)
-        case .missing(let s): Label(s, systemImage: "xmark.octagon").foregroundStyle(.red).help(s)
+        case .ok(let s): Text(brief).foregroundStyle(.secondary).lineLimit(1).help(s)
+        case .warning(let s): Label(brief, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).lineLimit(1).help(s)
+        case .missing(let s): Label(brief, systemImage: "xmark.octagon").foregroundStyle(.red).lineLimit(1).help(s)
         }
     }
 }
 
-struct VerdictBadge: View {
-    let verdict: PackPlan.Verdict
-    var body: some View {
-        switch verdict {
-        case .factoryOnly:
-            Label("Factory content only", systemImage: "checkmark.circle").foregroundStyle(.secondary)
-        case .embedsContent:
-            Label("Embeds wavetables or samples", systemImage: "shippingbox.fill").foregroundStyle(.blue)
+/// One line that says what packing this program produces: what is embedded, the size, and the
+/// free slots it needs; or what stops it being packed.
+struct PlanSummary: View {
+    let plan: PackPlan
+
+    private func count(_ n: Int, _ word: String) -> String { "\(n) \(word)\(n == 1 ? "" : "s")" }
+
+    private var text: String {
+        switch plan.verdict {
         case .blocked(let refs):
-            Label("Missing content for " + refs.map(\.label).joined(separator: ", "), systemImage: "exclamationmark.triangle.fill")
-                .foregroundStyle(.red)
+            let list = refs.map(\.label)
+            let joined = list.count == 1 ? list[0] : list.dropLast().joined(separator: ", ") + " and " + list.last!
+            return "Can't pack yet: \(joined) need\(list.count == 1 ? "s" : "") a file"
+        case .factoryOnly:
+            return "Factory tables only, nothing to embed: \(PackPlan.formatBytes(plan.estimatedBytes))"
+        case .embedsContent:
+            let c = plan.embeddedCounts
+            var parts: [String] = []
+            if c.wavetables > 0 { parts.append(count(c.wavetables, "wavetable")) }
+            if c.multisamples > 0 { parts.append(count(c.multisamples, "multisample")) }
+            var s = "Embeds " + parts.joined(separator: " and ") + ": \(PackPlan.formatBytes(plan.estimatedBytes))"
+            let need = plan.slotsNeeded
+            var slots: [String] = []
+            if need.u > 0 { slots.append("\(need.u) U") }
+            if need.p > 0 { slots.append("\(need.p) P") }
+            if c.multisamples > 0 { slots.append("\(c.multisamples) S") }
+            if !slots.isEmpty { s += "; needs " + slots.joined(separator: ", ") + " free slot\(need.u + need.p + c.multisamples == 1 ? "" : "s") on the synth" }
+            return s
         }
+    }
+
+    var body: some View {
+        Label(text, systemImage: plan.verdict.symbol)
+            .foregroundStyle(plan.verdict.tint)
+            .help("The synth reuses a table it already has (in any slot, under any name) and stores new ones in free slots. With none free, it offers to overwrite its last tables; blank placeholders count as used.")
     }
 }
 
@@ -164,7 +215,8 @@ extension PackPlan.Verdict {
 /// Shows a report as a standard alert sheet. The first paragraph is the alert's bold title; the
 /// rest goes in a selectable text area 520 points wide that scrolls past about 360 points of text.
 enum AlertPresenter {
-    static func show(_ text: String, done: @escaping () -> Void) {
+    /// `reveal`: a folder to offer a "Show in Finder" button for.
+    static func show(_ text: String, reveal: URL? = nil, done: @escaping () -> Void) {
         let parts = text.components(separatedBy: "\n\n")
         let alert = NSAlert()
         alert.alertStyle = .informational
@@ -172,10 +224,15 @@ enum AlertPresenter {
         let rest = parts.dropFirst().joined(separator: "\n\n")
         if !rest.isEmpty { alert.accessoryView = textArea(rest) }
         alert.addButton(withTitle: "OK")
+        if reveal != nil { alert.addButton(withTitle: "Show in Finder") }
+        let finish: (NSApplication.ModalResponse) -> Void = { response in
+            if response == .alertSecondButtonReturn, let url = reveal { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+            done()
+        }
         if let w = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first(where: \.isVisible) {
-            alert.beginSheetModal(for: w) { _ in done() }
+            alert.beginSheetModal(for: w, completionHandler: finish)
         } else {
-            alert.runModal(); done()
+            finish(alert.runModal())
         }
     }
 

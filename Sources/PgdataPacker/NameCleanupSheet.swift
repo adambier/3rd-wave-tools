@@ -46,25 +46,25 @@ struct NameCleanupSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Clean up names").font(.title3).bold()
-            Text("Names are applied to the .pgdata files you write. The .pro, .wt and .bin files are not changed, and factory wavetables are never renamed.")
+            Text("New names go into the .pgdata files you write; the source files are not changed. Factory wavetables keep their names.")
                 .font(.caption).foregroundStyle(.secondary)
 
             HStack(spacing: 18) {
-                Toggle("Remove slot numbers (e.g., B5-P003, U48, S10) at the start or end", isOn: $rules.stripSlots)
+                Toggle("Remove slot prefixes and suffixes (e.g., U48, B5-P003)", isOn: $rules.stripSlots)
                 Toggle("Underscores to spaces", isOn: $rules.underscoresToSpaces)
             }
             HStack(spacing: 18) {
                 Toggle("Title case", isOn: $rules.titleCase)
-                    .help("Only for names that are entirely upper or entirely lower case. Names that already mix cases keep their capitals.")
-                Text("Always spell as:")
+                    .help("Applied to names written entirely in capitals or entirely in lower case. Mixed-case names keep their capitals.")
+                Text("Keep these spellings:")
                 TextField("LFO, MIDI, LoFi…", text: $keepText)
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: keepText) { t in
                         rules.fixedSpellings = t.split(whereSeparator: { $0 == "," || $0 == " " }).map(String.init)
                     }
-                    .help("Words always written exactly as typed here (e.g., LFO, LoFi). Words containing digits (e.g., JP8, TB303) are always kept as they are.")
+                    .help("Words written exactly as typed here (e.g., LFO, LoFi). Words with digits (e.g., JP8, TB303) are kept as they are anyway.")
             }
-            Toggle("Show only names that change", isOn: $onlyChanges)
+            Toggle("Show only changes", isOn: $onlyChanges)
 
             Table(rows) {
                 TableColumn("") { (r: Row) in
@@ -93,16 +93,16 @@ struct NameCleanupSheet: View {
             .frame(minHeight: 300)
 
             HStack {
-                Button("Restore Original Names") {
+                Button("Undo All Renames") {
                     state.contentNames = [:]
                     for p in state.programs { state.setProgramName(p.id, nil) }
                     edited = [:]
                 }
                 .disabled(!anyRenamed)
-                .help("Undo every rename made here, for all programs and files")
+                .help("Undo every rename, for all programs and files")
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Rename \(toApply.count)") { apply() }
+                Button("Apply \(toApply.count) Name\(toApply.count == 1 ? "" : "s")") { apply() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(toApply.isEmpty)
             }
@@ -131,6 +131,7 @@ struct NameLengthNote: View {
     var body: some View {
         if name.count > NameCleaner.fieldLimit {
             Label("Too long: cut to \(NameCleaner.fieldLimit)", systemImage: "xmark.octagon").foregroundStyle(.red)
+                .help("Name fields on the synth hold \(NameCleaner.fieldLimit) characters. This name is \(name.count); it will be cut to \"\(String(name.prefix(NameCleaner.fieldLimit)))\".")
         }
     }
 }

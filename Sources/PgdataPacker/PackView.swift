@@ -8,6 +8,7 @@ import PgdataFormats
 struct PackView: View {
     @EnvironmentObject var state: AppState
     @State private var selection = Set<UUID>()
+    @State private var dropTargeted = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,10 +16,10 @@ struct PackView: View {
             Divider()
             if state.programs.isEmpty && state.contentFiles.isEmpty {
                 EmptyHint(title: "Drop programs and their wavetables or samples here",
-                          detail: "Add .pro files, plus any .wt and .bin files they use. For each program the app works out which wavetables and samples it needs, and whether a .pgdata is needed at all.")
+                          detail: "Add .pro files and the .wt and .bin files they use (folders work too). Each program then shows what its oscillators play and which files will be embedded.")
             } else {
                 HSplitView {
-                    programList.frame(minWidth: 200, idealWidth: 240, maxWidth: 420)
+                    programList.frame(minWidth: 220, idealWidth: 260, maxWidth: 440)
                     VSplitView {
                         detail.frame(minHeight: 220)
                         ContentFilesTable().frame(minHeight: 120, idealHeight: 190)
@@ -26,7 +27,8 @@ struct PackView: View {
                 }
             }
         }
-        .onDrop(of: [UTType.fileURL], isTargeted: nil) { providers in
+        .dropHighlight(dropTargeted)
+        .onDrop(of: [UTType.fileURL], isTargeted: $dropTargeted) { providers in
             DropSupport.load(providers) { state.add(urls: $0) }
             return true
         }
@@ -35,28 +37,78 @@ struct PackView: View {
 
     private var controls: some View {
         HStack(spacing: 14) {
-            Button("Add Files…") { state.add(urls: Panels.chooseFiles(message: "Choose .pro programs and the .wt / .bin files they use")) }
+            Button("Add Files or Folders…") { state.add(urls: Panels.chooseFiles(message: "Choose .pro programs and the .wt and .bin files they use")) }
+                .keyboardShortcut("o")
             Button("Clean Up Names…") { state.showNameCleanup = true }
                 .disabled(state.programs.isEmpty && state.contentFiles.isEmpty)
-                .help("Propose tidier names (slot numbers removed, title case) for the programs and the wavetables and samples you added. Factory wavetables are not renamed.")
+                .help("Propose tidier names for the programs and the files you added (e.g., slot numbers removed, title case). Factory wavetables keep their names.")
                 .sheet(isPresented: $state.showNameCleanup) { NameCleanupSheet(state: state) }
+            if let p = state.loading {
+                ProgressView(value: Double(p.done), total: Double(max(p.total, 1)))
+                    .frame(width: 120)
+                Text("Reading \(p.done) of \(p.total)…").font(.caption).foregroundStyle(.secondary)
+            }
             Spacer()
             Button("Remove") { state.removePrograms(selection); selection = [] }.disabled(selection.isEmpty)
-            Button("Write Selected…") { state.writeUnified(Array(selection)) }.disabled(selection.isEmpty)
-            Button("Write All…") { state.writeUnified(state.programs.map(\.id)) }.disabled(state.programs.isEmpty)
+                .help("Remove the selected programs from this list (the files are not touched)")
+            Button("Pack Selected…") { state.writeUnified(Array(selection)) }.disabled(selection.isEmpty)
+            Button("Pack All…") { state.writeUnified(state.programs.map(\.id)) }.disabled(state.programs.isEmpty)
+                .keyboardShortcut("s", modifiers: [.command, .shift])
+                .buttonStyle(.borderedProminent)
         }
         .padding(10)
     }
 
+    /// Programs matching the filter field and, when asked, only those needing attention.
+    private var shownPrograms: [AppState.PackItem] {
+        let q = state.programFilter.trimmingCharacters(in: .whitespaces)
+        return state.programs.filter { item in
+            if state.onlyAttention {
+                let plan = state.plan(for: item)
+                let blocked: Bool = { if case .blocked = plan.verdict { return true }; return false }()
+                let warned = !plan.warnings.isEmpty || plan.rows.contains { if case .warning = $0.status { return true }; return false }
+                if !blocked && !warned { return false }
+            }
+            guard !q.isEmpty else { return true }
+            return item.name.localizedCaseInsensitiveContains(q)
+                || item.url.lastPathComponent.localizedCaseInsensitiveContains(q)
+                || (item.locationLabel?.localizedCaseInsensitiveContains(q) ?? false)
+        }
+    }
+
     private var programList: some View {
         let st = state
-        return List(selection: $selection) {
-            ForEach(st.programs) { item in
-                ProgramRow(state: st, item: item).tag(item.id)
+        return VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Filter by name or location", text: $state.programFilter)
+                    .textFieldStyle(.plain)
+                if !state.programFilter.isEmpty {
+                    Button { state.programFilter = "" } label: { Image(systemName: "xmark.circle.fill") }
+                        .buttonStyle(.borderless).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            Toggle("Only programs needing attention", isOn: $state.onlyAttention)
+                .toggleStyle(.checkbox).font(.caption)
+                .padding(.horizontal, 10).padding(.bottom, 4)
+                .help("Programs that can't be packed yet, or that carry a warning")
+            Divider()
+            List(selection: $selection) {
+                ForEach(shownPrograms) { item in
+                    ProgramRow(state: st, item: item).tag(item.id)
+                }
+            }
+            .visibleScrollers()
+            .onDeleteCommand { state.removePrograms(selection); selection = [] }
+            if shownPrograms.count != state.programs.count {
+                Text("\(shownPrograms.count) of \(state.programs.count) programs").font(.caption).foregroundStyle(.secondary).padding(4)
             }
         }
-        .visibleScrollers()
-        .onChange(of: selection) { s in state.selectedProgram = s.first }
+        .onChange(of: selection) { s in
+            if let cur = state.selectedProgram, s.contains(cur) { return }
+            state.selectedProgram = st.programs.first { s.contains($0.id) }?.id
+        }
         .onChange(of: state.selectedProgram) { s in if let s, !selection.contains(s) { selection = [s] } }
         .onAppear { if let s = state.selectedProgram { selection = [s] } }
     }
@@ -66,24 +118,6 @@ struct PackView: View {
             ProgramDetail(item: item)
         } else {
             Text("Select a program").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-}
-
-struct SizeLine: View {
-    let plan: PackPlan
-    var body: some View {
-        HStack(spacing: 8) {
-            Text("Estimated .pgdata size: \(PackPlan.formatBytes(plan.estimatedBytes))").foregroundStyle(.secondary)
-        }
-        .font(.callout)
-        let need = plan.slotsNeeded
-        if need.u + need.p > 0 {
-            let parts = [need.u > 0 ? "\(need.u) U" : nil, need.p > 0 ? "\(need.p) P" : nil].compactMap { $0 }
-            Label("New wavetables: importing needs \(parts.joined(separator: " and ")) free slot\(need.u + need.p == 1 ? "" : "s") on the synth. If it has none, it offers to overwrite its last ones (blank placeholder tables count as used).",
-                  systemImage: "info.circle")
-                .font(.callout).foregroundStyle(.secondary)
-                .help("The synth reuses any table whose content it already has, in any slot and whatever its name, and stores new ones in free slots. The slot numbers in the file are only labels.")
         }
     }
 }
@@ -98,7 +132,8 @@ struct ProgramRow: View {
             Image(systemName: verdict.symbol).foregroundStyle(verdict.tint)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.name).lineLimit(1)
-                Text(item.url.lastPathComponent).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text((item.locationLabel.map { $0 + "  ·  " } ?? "") + item.url.lastPathComponent)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
     }
@@ -120,32 +155,31 @@ struct ProgramDetail: View {
                 .textFieldStyle(.roundedBorder)
                 .font(.title2)
                 .frame(maxWidth: 380)
-                .help("The name written into the .pgdata. The .pro file is not changed.")
+                .help("The name written into the .pgdata; the .pro file is not changed. Format \(item.program.version), \(item.program.valuesPerPart) values per part.")
                 if item.name != item.program.name {
                     Text("was \(item.program.name)").font(.caption).foregroundStyle(.secondary)
                     Button { st.setProgramName(item.id, nil) } label: { Image(systemName: "arrow.uturn.backward") }
                         .buttonStyle(.borderless).help("Restore the name from the .pro file")
                 }
                 NameLengthNote(name: item.name)
-                Text(item.program.version).font(.caption).foregroundStyle(.secondary)
+                if let loc = item.locationLabel { Text(loc).font(.caption).foregroundStyle(.secondary).monospacedDigit() }
                 Spacer()
-                Button("Show File") { Panels.reveal(item.url) }.buttonStyle(.link)
+                Button("Show in Finder") { Panels.reveal(item.url) }.buttonStyle(.link)
             }
-            VerdictBadge(verdict: plan.verdict)
+            PlanSummary(plan: plan)
             if let note = plan.userSlotNote { UserSlotNoteBox(note: note) }
             ForEach(plan.warnings, id: \.self) { w in
                 Label(w, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
             }
-            SizeLine(plan: plan)
             Table(plan.rows) {
                 TableColumn("Source") { (row: PackPlan.Row) in SourceCell(state: st, itemID: item.id, row: row) }
                     .width(min: 70, ideal: 110, max: 180)
-                TableColumn("Used by") { (row: PackPlan.Row) in UsedByCell(usedBy: row.usedBy) }
-                    .width(min: 90, ideal: 110, max: 220)
-                TableColumn("Content") { (row: PackPlan.Row) in ChoiceCell(state: st, itemID: item.id, row: row) }
-                    .width(min: 200, ideal: 240)
-                TableColumn("Status") { (row: PackPlan.Row) in StatusText(status: row.status).lineLimit(2) }
-                    .width(min: 240, ideal: 320)
+                TableColumn("Oscillators") { (row: PackPlan.Row) in UsedByCell(usedBy: row.usedBy) }
+                    .width(min: 100, ideal: 150, max: 260)
+                TableColumn("Plays") { (row: PackPlan.Row) in ChoiceCell(state: st, itemID: item.id, row: row) }
+                    .width(min: 200, ideal: 260)
+                TableColumn("Result") { (row: PackPlan.Row) in StatusText(brief: row.brief, status: row.status) }
+                    .width(min: 220, ideal: 300)
             }
             .visibleScrollers()
             // Keeps several rows visible however long the note above is.
@@ -163,13 +197,21 @@ struct UserSlotNoteBox: View {
     /// Half the height of a line of body text.
     private let halfLine: CGFloat = 8
 
+    @State private var expanded = false
+
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                Label(note.title, systemImage: "questionmark.circle")
-                    .font(.headline).foregroundStyle(.red)
-                ForEach(Array(note.body.components(separatedBy: "\n\n").enumerated()), id: \.offset) { _, para in
-                    paragraph(para)
+                HStack(alignment: .firstTextBaseline) {
+                    Label(note.title, systemImage: "questionmark.circle").font(.headline)
+                    Spacer()
+                    Button(expanded ? "Hide" : "Why, and what to do") { withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() } }
+                        .buttonStyle(.link).font(.callout)
+                }
+                if expanded {
+                    ForEach(Array(note.body.components(separatedBy: "\n\n").enumerated()), id: \.offset) { _, para in
+                        paragraph(para)
+                    }
                 }
             }
             .textSelection(.enabled)
@@ -203,7 +245,7 @@ struct UserSlotNoteBox: View {
 struct UsedByCell: View {
     let usedBy: [String]
     var body: some View {
-        Text(usedBy.count <= 2 ? usedBy.joined(separator: ", ") : "\(usedBy[0]) +\(usedBy.count - 1)")
+        Text(usedBy.count <= 2 ? usedBy.joined(separator: ", ") : "\(usedBy[0]) and \(usedBy.count - 1) more")
             .help(usedBy.joined(separator: "\n"))
             .foregroundStyle(.secondary)
     }
@@ -229,8 +271,8 @@ struct SourceCell: View {
     }
 }
 
-/// The Content menu: the choices for this source, plus "Point to another slot…" for wavetables
-/// and analog shapes.
+/// The Plays menu: the choices for this source, plus a way to point the oscillators at something
+/// else (wavetables and analog waves only).
 struct ChoiceCell: View {
     @ObservedObject var state: AppState
     let itemID: UUID
@@ -256,11 +298,11 @@ struct ChoiceCell: View {
             // Nothing for this slot yet: pointing the oscillators elsewhere is the usual fix, so it
             // comes first and is what a click on the button does; the chevron shows the rest.
             Menu {
-                Button("Point to another slot…", action: repoint)
+                Button("Choose what to play…", action: repoint)
                 if !row.options.isEmpty { Divider() }
                 optionItems
             } label: {
-                Text("Point to another slot…").lineLimit(1)
+                Text("Choose what to play…").lineLimit(1)
             } primaryAction: {
                 repoint()
             }
@@ -272,10 +314,10 @@ struct ChoiceCell: View {
                 optionItems
                 if canRepoint {
                     if !row.options.isEmpty { Divider() }
-                    Button("Point to another slot…", action: repoint)
+                    Button("Play something else…", action: repoint)
                 }
             } label: {
-                Text(row.choice.map { state.describe($0, for: row.ref) } ?? "Choose…").lineLimit(1)
+                Text(row.choice.map { state.describe($0, for: row.ref) } ?? "Choose what to play…").lineLimit(1)
             }
             // A bordered pop-up with its chevron, so it reads as a menu rather than as text.
             .menuStyle(.button)
@@ -294,26 +336,29 @@ struct ContentFilesTable: View {
         let st = state
         let unused = st.unusedContent
         VStack(alignment: .leading, spacing: 4) {
-            Text("Wavetables and samples for packing").font(.headline).padding(.horizontal, 12).padding(.top, 8)
-            Text("Assign each file to the slot the programs refer to. A file assigned to a slot is used for every program here that uses that slot.")
+            Text("Added wavetables and samples").font(.headline).padding(.horizontal, 12).padding(.top, 8)
+            Text("A file assigned to a slot is used by every program here that uses that slot (for U48–U55, by programs from before 2025). In any other factory slot it replaces the factory table; the report after packing lists those.")
                 .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12)
             Table(st.contentFiles) {
                 // Most important first: what the file is, its slot, and whether anything uses it.
                 TableColumn("File") { (f: ContentFile) in Text(f.url.lastPathComponent).lineLimit(1).help(f.url.path) }
                     .width(min: 120, ideal: 170)
                 TableColumn("Name") { (f: ContentFile) in
-                    Text(st.displayName(f)).lineLimit(1).help(st.contentNames[f.id] != nil ? "Was \(f.name)" : f.name)
+                    HStack(spacing: 4) {
+                        Text(st.displayName(f)).lineLimit(1).help(st.contentNames[f.id] != nil ? "Was \(f.name)" : f.name)
+                        NameLengthNote(name: st.displayName(f))
+                    }
                 }
-                    .width(min: 90, ideal: 130)
+                    .width(min: 90, ideal: 150)
                 TableColumn("Slot") { (f: ContentFile) in SlotPickerCell(state: st, file: f) }
                     .width(min: 110, ideal: 120)
-                TableColumn("Used") { (f: ContentFile) in UsageCell(state: st, file: f, note: unused[f.id]) }
-                    .width(min: 180, ideal: 300)
-                TableColumn("Kind") { (f: ContentFile) in Text(f.kindLabel).foregroundStyle(.secondary).lineLimit(1).help(f.kindLabel) }
-                    .width(min: 160, ideal: 180)
+                TableColumn("Used by") { (f: ContentFile) in UsageCell(state: st, file: f, note: unused[f.id]) }
+                    .width(min: 200, ideal: 320)
+                TableColumn("Type") { (f: ContentFile) in Text(f.kindLabel).foregroundStyle(.secondary).lineLimit(1).help(f.kindLabel) }
+                    .width(min: 150, ideal: 170)
                 TableColumn("") { (f: ContentFile) in
                     Button { st.removeContent(f.id) } label: { Image(systemName: "minus.circle") }
-                        .buttonStyle(.borderless).help("Remove")
+                        .buttonStyle(.borderless).help("Remove this file from the list")
                 }
                 .width(28)
             }
@@ -326,10 +371,16 @@ struct SlotPickerCell: View {
     @ObservedObject var state: AppState
     let file: ContentFile
 
-    private var slots: [SourceRef] {
+    /// User slots first (the usual case), then the factory slots after a divider.
+    private var userSlots: [SourceRef] {
         if file.isSample { return (0...SourceRef.sMax).map { SourceRef.s($0) } }
-        if file.isPTable { return (0..<SourceRef.pCount).map { SourceRef.p($0) } }
-        return (0..<SourceRef.uCount).map { SourceRef.u($0) }
+        if file.isPTable { return (SourceRef.factoryPCount..<SourceRef.pCount).map { SourceRef.p($0) } }
+        return (SourceRef.factoryUCount..<SourceRef.uCount).map { SourceRef.u($0) }
+    }
+    private var factorySlots: [SourceRef] {
+        if file.isSample { return [] }
+        if file.isPTable { return (0..<SourceRef.factoryPCount).map { SourceRef.p($0) } }
+        return (0..<SourceRef.factoryUCount).map { SourceRef.u($0) }
     }
 
     var body: some View {
@@ -337,9 +388,13 @@ struct SlotPickerCell: View {
             get: { file.slot },
             set: { state.setSlot(file.id, $0) }
         )) {
-            Text("Not assigned").tag(SourceRef?.none)
-            ForEach(slots, id: \.self) { s in
-                Text(s.label + (s.isFactorySlot ? "  (factory slot)" : "")).tag(SourceRef?.some(s))
+            Text("No slot").tag(SourceRef?.none)
+            ForEach(userSlots, id: \.self) { s in Text(s.label).tag(SourceRef?.some(s)) }
+            if !factorySlots.isEmpty {
+                Divider()
+                ForEach(factorySlots, id: \.self) { s in
+                    Text("\(s.label)  \(state.slotName(s))  (factory)").tag(SourceRef?.some(s))
+                }
             }
         }
         .labelsHidden()
@@ -356,12 +411,14 @@ struct UsageCell: View {
             HStack(spacing: 6) {
                 Label(note, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).lineLimit(1).help(note)
                 if !file.isSample, !state.programs.isEmpty {
-                    Button("Use in a program…") { state.repointRequest = .init(fileID: file.id) }
+                    Button("Point a program here…") { state.repointRequest = .init(fileID: file.id) }
                         .buttonStyle(.link)
+                        .help("Choose a program and the oscillators that should play this file")
                 }
             }
         } else {
-            Text("Yes").foregroundStyle(.secondary)
+            let n = state.programs.filter { p in state.plan(for: p).rows.contains { $0.choice == .file(file.id) } }.count
+            Text("\(n) program\(n == 1 ? "" : "s")").foregroundStyle(.secondary)
         }
     }
 }
