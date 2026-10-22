@@ -171,7 +171,7 @@ struct RepointSheet: View {
     }
     private var analogTargets: [Target] {
         Oscillator.repointTargets.filter(\.isBuiltIn).map { r in
-            Target(id: "a\(r.id)", ref: r, title: r.description, detail: "built in; the manual's label, A00–A06")
+            Target(id: "a\(r.id)", ref: r, title: r.description, detail: "built in")
         }
     }
     private func matches(_ t: Target) -> Bool {

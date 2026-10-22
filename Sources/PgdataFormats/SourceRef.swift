@@ -58,9 +58,11 @@ public enum SourceRef: Hashable, Comparable, CustomStringConvertible {
         }
     }
 
-    /// The seven analog-modelled waves, labelled A00–A06 in the manual (sawtooth, pulse, triangle,
-    /// sine, supersaw and two noise types, in an order not yet checked against the labels).
-    public static let analogCount = 7
+    /// The seven analog-modelled waves, as the synth labels and names them [verified on an 8M,
+    /// 2026-10-22]. The wave offset knob sweeps A05 from white through pink to red noise and A06
+    /// from white through blue to violet.
+    public static let analogNames = ["Sawtooth", "Square", "Triangle", "Sine", "Supersaw", "Pink noise", "Blue noise"]
+    public static var analogCount: Int { analogNames.count }
 
     /// Slot label as the synth shows it: P07, U50, S10.
     public var label: String {
@@ -74,7 +76,7 @@ public enum SourceRef: Hashable, Comparable, CustomStringConvertible {
     }
 
     public var description: String {
-        if case .analog = self { return "Analog \(label)" }
+        if case let .analog(n) = self { return n < Self.analogNames.count ? "\(label) \(Self.analogNames[n])" : "Analog \(label)" }
         return label
     }
 

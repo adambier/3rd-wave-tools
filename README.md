@@ -214,16 +214,14 @@ irregular: it looks as if later ranges were added without renumbering the earlie
 |---|---|
 | 0–33 | P00–P33 |
 | 34–40 | U00–U06 |
-| 41–47 | analog waves A00–A06 |
+| 41–47 | analog waves A00–A06 (sawtooth, square, triangle, sine, supersaw, pink noise, blue noise) |
 | 1000+k | P(34+k): P34–P47 |
 | 2000+k | U(7+k): U07–U63 |
 | 4000+n | S n |
 
-Checked on the synth for ids 34 (U00), 1000 (P34) and 2000 (U07); the rest of each range follows
-from the ids seen in files (P36–P47 are inferred). The manual lists the analog waves as sawtooth,
-pulse, triangle, sine, supersaw and two noise types, but which label is which has not been
-checked, so the app shows the labels. An id names a slot, not content: what plays is whatever is
-loaded in that slot.
+Checked on the synth for ids 34 (U00), 1000 (P34) and 2000 (U07), and for the seven analog waves;
+the rest of each range follows from the ids seen in files (P36–P47 are inferred). An id names a
+slot, not content: what plays is whatever is loaded in that slot.
 
 **.pro** — text, one value per line: `W3_PROG_<n>`, the name, then values. Counting lines from 1,
 line 3 is the number of values per part S (173, 174, 179, 180 or 181 seen), part *k* starts at
