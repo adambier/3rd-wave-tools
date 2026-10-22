@@ -387,8 +387,14 @@ final class AppState: ObservableObject {
         // Files none of the packed programs use (other added programs may use them).
         let unused = PackPlan.unusedFiles(contentFiles, plans: packedPlans, factory: factory, programs: "packed")
         if !unused.isEmpty {
+            // The reason is given only when it adds to the heading: an assigned file that is still
+            // not used, or one identical to the factory table of its slot.
             msg += "\n\nInput files that no packed program uses (left out):\n" + contentFiles.filter { unused[$0.id] != nil }
-                .map { ReportText.item($0.url.lastPathComponent, ReportText.lowerFirst(unused[$0.id]!)) }.joined(separator: "\n")
+                .map { f -> String in
+                    let why = unused[f.id]!
+                    return why.hasPrefix("Not used by any") ? ReportText.item(f.url.lastPathComponent)
+                                                           : ReportText.item(f.url.lastPathComponent, ReportText.lowerFirst(why))
+                }.joined(separator: "\n")
         }
         note(msg + " (\(folder.path))")
         alertReveal = folder
