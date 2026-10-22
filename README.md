@@ -120,7 +120,7 @@ The Source column then shows, for example, **U01 → U56**, with a button to und
 Parts 3 and 4 play only on the 4-part models (24K, 24M). In every program saved on an 8M seen so
 far, they hold filler (P02, U01 and an analog wave).
 
-Added files that no program uses are flagged in the files table ("Not used by any program here", or
+Added files that no program uses are flagged in the files table ("Not used by any added program", or
 "another choice is made for U57" when the slot is filled some other way). **Point a program
 here…** opens the same sheet for the file. Unused files are listed again after packing.
 

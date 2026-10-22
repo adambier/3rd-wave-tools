@@ -284,7 +284,8 @@ final class WorkbenchTests: XCTestCase {
         var cf = try ContentFile.load(u); cf.slot = .u(56)
 
         let before = PackPlan.make(program: pro, files: [cf], factory: FactoryLibrary())
-        XCTAssertEqual(PackPlan.unusedFiles([cf], plans: [before])[cf.id], "Not used by any program here")
+        XCTAssertEqual(PackPlan.unusedFiles([cf], plans: [before])[cf.id], "Not used by any added program")
+        XCTAssertEqual(PackPlan.unusedFiles([cf], plans: [before], programs: "packed")[cf.id], "Not used by any packed program")
 
         let moved = pro.repointed([7: .u(56)])
         XCTAssertEqual(moved.sources[7], .u(56))
@@ -308,7 +309,7 @@ final class WorkbenchTests: XCTestCase {
         var unassigned = cf; unassigned.slot = nil
         let p3 = PackPlan.make(program: moved, files: [unassigned], factory: FactoryLibrary(), original: pro)
         XCTAssertEqual(p3.verdict, .blocked([.u(56)]))
-        XCTAssertEqual(PackPlan.unusedFiles([unassigned], plans: [p3])[cf.id], "Not used by any program here")
+        XCTAssertEqual(PackPlan.unusedFiles([unassigned], plans: [p3])[cf.id], "Not used by any added program")
     }
 
     func testUnpackPlanNamesAndFactoryDuplicates() throws {

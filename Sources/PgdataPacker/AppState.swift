@@ -349,6 +349,7 @@ final class AppState: ObservableObject {
         }
         guard let folder = Panels.chooseFolder(prompt: "Pack Here", message: "Choose where to put the .pgdata files") else { return }
         var outputs: [(name: String, data: Data)] = []
+        var packedPlans: [PackPlan] = []
         var blocked: [String] = [], failed: [String] = [], unfamiliar: [String] = [], replaced: [String] = []
         // Prefix each file with its program location (or its position among the files written) so
         // the 3rd Wave's alphabetical bulk import keeps the programs in order.
@@ -365,6 +366,7 @@ final class AppState: ObservableObject {
                 let content = plan.content(files: contentFiles, names: contentNames)
                 let g = try Packer.pack(item.effectiveProgram, content: content)
                 outputs.append((name: OutputNames.unified(item.effectiveProgram, prefix: prefixByID[item.id]), data: g.serialized()))
+                packedPlans.append(plan)
                 if !plan.warnings.isEmpty { unfamiliar.append(ReportText.item(item.name)) }
                 for r in plan.rows where r.replacesFactory {
                     if case .file(let id)? = r.choice, let f = contentFiles.first(where: { $0.id == id }) {
@@ -382,9 +384,10 @@ final class AppState: ObservableObject {
         if !failed.isEmpty { msg += "\n\nNot packed:\n" + failed.joined(separator: "\n") }
         if !replaced.isEmpty { msg += "\n\nFactory tables replaced by input files (check these are meant):\n" + replaced.joined(separator: "\n") }
         if !unfamiliar.isEmpty { msg += "\n\nPacked, but check these on the 3rd Wave (unfamiliar layout or a cut name; see each program's notes):\n" + unfamiliar.joined(separator: "\n") }
-        let unused = unusedContent
+        // Files none of the packed programs use (other added programs may use them).
+        let unused = PackPlan.unusedFiles(contentFiles, plans: packedPlans, factory: factory, programs: "packed")
         if !unused.isEmpty {
-            msg += "\n\nInput files that no program uses (left out):\n" + contentFiles.filter { unused[$0.id] != nil }
+            msg += "\n\nInput files that no packed program uses (left out):\n" + contentFiles.filter { unused[$0.id] != nil }
                 .map { ReportText.item($0.url.lastPathComponent, ReportText.lowerFirst(unused[$0.id]!)) }.joined(separator: "\n")
         }
         note(msg + " (\(folder.path))")

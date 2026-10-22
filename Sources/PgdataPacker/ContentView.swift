@@ -263,11 +263,12 @@ enum AlertPresenter {
         for paragraph in text.components(separatedBy: "\n\n") {
             for line in paragraph.components(separatedBy: "\n") {
                 let para = NSMutableParagraphStyle()
-                para.paragraphSpacingBefore = out.string.isEmpty ? 0 : 10   // before a paragraph or heading
+                para.paragraphSpacingBefore = out.string.isEmpty ? 0 : 14   // before a paragraph or heading
                 if !out.string.isEmpty { out.append(NSAttributedString(string: "\n")) }
                 if line.hasPrefix("• ") {
-                    // A list item: bullet in a hanging indent, then the name and its explanation.
-                    para.paragraphSpacingBefore = 3
+                    // A list item: bullet in a hanging indent, then the name and its explanation,
+                    // half a line below the previous line.
+                    para.paragraphSpacingBefore = 8
                     para.firstLineHeadIndent = 10
                     para.headIndent = 24
                     para.tabStops = [NSTextTab(textAlignment: .left, location: 24)]

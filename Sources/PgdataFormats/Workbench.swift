@@ -459,18 +459,20 @@ public struct PackPlan {
     }
 
     /// For each content file that no plan uses, why: not used by any program (whether or not it has a
-    /// slot), or another file or choice is used for its slot.
-    public static func unusedFiles(_ files: [ContentFile], plans: [PackPlan], factory: FactoryLibrary = FactoryLibrary()) -> [UUID: String] {
+    /// slot), or another file or choice is used for its slot. `programs` names the set the plans
+    /// cover in the wording: the "added" programs in the window, the "packed" ones in a report.
+    public static func unusedFiles(_ files: [ContentFile], plans: [PackPlan], factory: FactoryLibrary = FactoryLibrary(),
+                                   programs: String = "added") -> [UUID: String] {
         var used = Set<UUID>()
         for p in plans { for r in p.rows { if case .file(let id)? = r.choice { used.insert(id) } } }
         var out: [UUID: String] = [:]
         for f in files where !used.contains(f.id) {
-            guard let slot = f.slot else { out[f.id] = "Not used by any program here"; continue }
+            guard let slot = f.slot else { out[f.id] = "Not used by any \(programs) program"; continue }
             let slotUsed = plans.contains { $0.rows.contains { $0.ref == slot } }
-            if !slotUsed { out[f.id] = "Not used by any program here" }
+            if !slotUsed { out[f.id] = "Not used by any \(programs) program" }
             else if factory.tables[slot]?.fingerprint == f.fingerprint { out[f.id] = "Identical to factory \(slot.label); the 3rd Wave's own copy is used, so it is not embedded" }
             else if plans.contains(where: { $0.rows.contains { $0.ref == slot && $0.heldBack.contains(f.id) } }) {
-                out[f.id] = "Not used: the programs here that use \(slot.label) are from after it became a factory slot, so they use the factory table"
+                out[f.id] = "Not used: the \(programs) programs that use \(slot.label) are from after it became a factory slot, so they use the factory table"
             }
             else { out[f.id] = "Not used: another choice is made for \(slot.label)" }
         }

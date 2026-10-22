@@ -430,7 +430,7 @@ struct UsageCell: View {
     private func short(_ note: String) -> String {
         if note.hasPrefix("Identical to factory") { return "Same as the factory table; not embedded" }
         if note.hasPrefix("Not used: another choice") { return "Not used: the slot plays something else" }
-        if note.hasPrefix("Not used: the programs here") { return "Not used: the programs are from after 2025" }
+        if note.hasPrefix("Not used: the added programs") { return "Not used: the programs are from after 2025" }
         return "Not used"
     }
 
