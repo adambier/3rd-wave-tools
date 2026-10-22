@@ -126,6 +126,7 @@ struct RepointSheet: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .visibleScrollers()
             } else {
                 Text("Choose a program").foregroundStyle(.secondary)
             }
@@ -185,6 +186,7 @@ struct RepointSheet: View {
                 targetSection("Factory wavetables", slotTargets.filter(matches))
                 targetSection("Analog shapes", analogTargets.filter(matches))
             }
+            .visibleScrollers()
             .focused($focus, equals: .list)
             .onChange(of: selectedID) { id in select(id) }
             HStack(spacing: 6) {

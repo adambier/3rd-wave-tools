@@ -36,6 +36,7 @@ struct UnpackView: View {
                             .tag(u.id)
                         }
                     }
+                    .visibleScrollers()
                     .frame(minWidth: 230, idealWidth: 270, maxWidth: 420)
                     .onChange(of: selection) { s in state.selectedUnpack = s.first }
                     .onAppear { if let s = state.selectedUnpack { selection = [s] } }
@@ -75,6 +76,7 @@ struct UnpackDetail: View {
                     .width(min: 180, ideal: 260)
                 TableColumn("Contents") { (f: UnpackPlan.Item) in Text(f.description).foregroundStyle(.secondary).lineLimit(2) }
             }
+            .visibleScrollers()
             .frame(minHeight: 140)
             if !item.plan.referenced.isEmpty {
                 Text("Listed but not carried (the synth is expected to have these already): "

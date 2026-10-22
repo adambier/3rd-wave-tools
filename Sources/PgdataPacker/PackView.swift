@@ -55,6 +55,7 @@ struct PackView: View {
                 ProgramRow(state: st, item: item).tag(item.id)
             }
         }
+        .visibleScrollers()
         .onChange(of: selection) { s in state.selectedProgram = s.first }
         .onChange(of: state.selectedProgram) { s in if let s, !selection.contains(s) { selection = [s] } }
         .onAppear { if let s = state.selectedProgram { selection = [s] } }
@@ -146,6 +147,9 @@ struct ProgramDetail: View {
                 TableColumn("Status") { (row: PackPlan.Row) in StatusText(status: row.status).lineLimit(2) }
                     .width(min: 240, ideal: 320)
             }
+            .visibleScrollers()
+            // Keeps several rows visible however long the note above is.
+            .frame(minHeight: 150)
         }
         .padding(12)
     }
@@ -313,6 +317,7 @@ struct ContentFilesTable: View {
                 }
                 .width(28)
             }
+            .visibleScrollers()
         }
     }
 }

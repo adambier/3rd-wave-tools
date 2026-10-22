@@ -19,7 +19,7 @@ Requires macOS 13+ and the Xcode command-line tools (`xcode-select --install`). 
 open "pgdata Packer.app"
 ```
 
-Tests (`./run-tests.sh`) need a full Xcode installation, as in ThirdWaveWT.
+Tests (`./run-tests.sh`) need a full Xcode installation.
 
 ## Using it
 
@@ -41,8 +41,8 @@ stored, not the tables). It uses them to:
 - skip factory tables when unpacking, and never offer them for renaming.
 
 U48–U55 joined the factory set in 2025 (with OS 1.9, which also brought `.pgdata`). Before that
-they were user slots, and older sets used them for their own tables: Dynamica Vol. 2 uses U48–U54
-and ships the tables as `U48 SM OBX8 1.WT` and so on. So in a program saved before OS 1.9, U48–U55
+they were user slots, and some older program sets used them for their own tables, shipped as `.wt`
+files named with the slot (`U48 Warm Pad.wt`). So in a program saved before OS 1.9, U48–U55
 are treated like user slots: missing until you add the table, which is then embedded and goes into
 a free slot on import. A note with the program explains this and the three ways to fix it: add the
 author's tables, point the oscillators elsewhere, or choose the factory table anyway from the
@@ -53,9 +53,9 @@ block has fewer than 544 values. Programs saved since OS 1.9 have 544 (Groove Sy
 banks, August 2025, onwards); every older set seen has fewer, including `W3_PROG_5` programs from
 February 2025. The file has no date, so this is an inference from the layout.
 
-Nothing about your synth is tracked. A table from a user slot (U56–U63, P36–P47) or a multisample
-that a program uses is always included in the `.pgdata`, from the file you add on the Pack screen:
-whoever loads the file will almost certainly not have the same user slots or sample memory.
+A table from a user slot (U56–U63, P36–P47) or a multisample that a program uses is always
+included in the `.pgdata`, from the file you add on the Pack screen: whoever loads the file will
+almost certainly not have the same user slots or sample memory.
 
 ### Pack
 
@@ -63,7 +63,7 @@ Drop `.pro` files, plus the `.wt` / `.bin` files they need. For each program the
 oscillator sources and what each will be:
 
 - a file you added and assigned to that slot (this wins, since it is what the program's author
-  supplied). A file named with a slot (`U48 SM OBX8 1.WT`, `S010_JP8.bin`) is assigned to it
+  supplied). A file named with a slot (`U48 Warm Pad.wt`, `S010_Strings.bin`) is assigned to it
   automatically;
 - for a factory slot: the factory table, listed but not embedded. An added file identical to it is
   listed the same way;
@@ -90,7 +90,7 @@ Each program shows one of:
 repoints oscillators. Tick the oscillators to change, then pick the target:
 
 - a file you added (listed first). A file without a slot is given one automatically: when the
-  program needs a slot that has nothing yet (say Ghibli Bell's U57), the sheet preselects your
+  program needs a slot that has nothing yet (say U57), the sheet preselects your
   unused file and simply assigns it to that slot, so the oscillators stay as they are;
 - any factory U or P slot (searchable by slot or name);
 - an analog shape.
@@ -111,16 +111,16 @@ The program name at the top of the detail area can be edited. **Clean Up Names�
 names for the programs and for the wavetables and multisamples you added (never factory
 wavetables):
 
-- slot numbers removed from the start or end: "U48 SM OBX8 1" → "SM OBX8 1", "S010_JP8_" → "JP8",
+- slot numbers removed from the start or end: "U48 Warm Pad" → "Warm Pad", "S010_Strings_" → "Strings",
   "B5-P003 Name" → "Name";
 - underscores to spaces;
 - title case for names written entirely in capitals or entirely in lower case:
-  "NOSTALGIA RES" → "Nostalgia Res". Names that already mix cases keep their capitals.
+  "GLASS BELLS" → "Glass Bells". Names that already mix cases keep their capitals.
 
 Within title case:
 
-- words with digits stay as they are (JP8, OBX8);
-- words with no vowels are taken to be acronyms (SM, PWM, PPG). Y counts as a vowel, so "SYNTH"
+- words with digits stay as they are (JP8, TB303);
+- words with no vowels are taken to be acronyms (PWM, PPG, FM). Y counts as a vowel, so "SYNTH"
   becomes "Synth";
 - words on an editable list keep a fixed spelling (LFO, MIDI, LoFi…).
 
@@ -140,13 +140,13 @@ rather than text.
 the app asks first whether to write the others.
 
 Files are named in Groove Synthesis's own pattern, with the program location first:
-`B05P87_Ghibli_Bell.pgdata`, as in Groove Synthesis's `B05P06_Glass_Cow_Bell_Transients.pgdata`.
+`B05P87_Glass_Bells.pgdata`, as in Groove Synthesis's `B05P06_Glass_Cow_Bell_Transients.pgdata`.
 
 - The location comes from the `.pro` file name, since a `.pro` does not record it. Every set seen
   names its files that way (`B05P100.pro`).
 - The prefix keeps the synth's alphabetical bulk import in program order.
 - As in the synth's own exports, spaces become underscores and punctuation other than hyphens is
-  dropped ("SM Ripper Bass (MW)" → `SM_Ripper_Bass_MW`). This affects the file name only, not the
+  dropped ("Big Bass (MW)" → `Big_Bass_MW`). This affects the file name only, not the
   program name inside it.
 - A batch that includes a program 100 uses three digits throughout (`B05P087_…`, `B05P100_…`).
   The synth itself writes `B05P09_…` and `B05P100_…`, but in plain alphabetical order `B05P100`
@@ -171,7 +171,7 @@ Checked on an 8M (OS 2.0d):
 ### Unpack
 
 Drop `.pgdata` files. Each becomes a `.pro`, plus a `.wt` per embedded wavetable and a `.bin` per
-multisample, named the way Groove Synthesis names its own files (`U50_SM OB2.wt`, `S010_JP8.bin`).
+multisample, named the way Groove Synthesis names its own files (`U57_Warm Pad.wt`, `S010_Strings.bin`).
 
 Untick anything you don't want, or rename it, before **Unpack…**. Wavetables identical to the
 factory table in their slot are skipped by default: the synth's own export embeds factory tables

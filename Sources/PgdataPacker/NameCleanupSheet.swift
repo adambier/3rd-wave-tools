@@ -57,12 +57,12 @@ struct NameCleanupSheet: View {
                 Toggle("Title case", isOn: $rules.titleCase)
                     .help("Only for names that are entirely upper or entirely lower case. Names that already mix cases keep their capitals.")
                 Text("Always spell as:")
-                TextField("SM, FM, LoFi…", text: $keepText)
+                TextField("LFO, MIDI, LoFi…", text: $keepText)
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: keepText) { t in
                         rules.fixedSpellings = t.split(whereSeparator: { $0 == "," || $0 == " " }).map(String.init)
                     }
-                    .help("Words always written exactly as typed here, e.g. SM, LoFi. Words containing digits (JP8, OBX8) are always kept as they are.")
+                    .help("Words always written exactly as typed here, e.g. LFO, LoFi. Words containing digits (JP8, TB303) are always kept as they are.")
             }
             Toggle("Show only names that change", isOn: $onlyChanges)
 
@@ -89,6 +89,7 @@ struct NameCleanupSheet: View {
                 TableColumn("") { (r: Row) in NameLengthNote(name: proposed(r)) }
                     .width(min: 120, ideal: 200)
             }
+            .visibleScrollers()
             .frame(minHeight: 300)
 
             HStack {

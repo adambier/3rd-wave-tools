@@ -50,11 +50,15 @@ struct LogBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
+            HStack(spacing: 10) {
+                // A labelled button rather than a bare arrow, so it is clear what it opens.
                 Button { showLog.toggle() } label: {
-                    Image(systemName: showLog ? "chevron.down" : "chevron.right")
+                    Label(showLog ? "Hide Log" : "Show Log", systemImage: showLog ? "chevron.down" : "chevron.right")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help(showLog ? "Hide the log" : "Show the log: everything the app has done in this session")
+                Divider().frame(height: 14)
                 Text(state.log.last ?? "Drop .pro, .wt, .bin or .pgdata files anywhere in the window.")
                     .lineLimit(1).truncationMode(.tail)
                     .foregroundStyle(.secondary)
@@ -69,6 +73,7 @@ struct LogBar: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(8)
                 }
+                .visibleScrollers()
                 .frame(height: 140)
             }
         }
@@ -214,9 +219,12 @@ enum AlertPresenter {
         let height = min(max(used, 20), maxHeight)
         tv.frame = NSRect(x: 0, y: 0, width: width, height: max(used, height))
         let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: width, height: height))
-        scroll.hasVerticalScroller = used > maxHeight
+        // A long report scrolls: then show a classic scroll bar and a frame, so that is obvious.
+        let scrolls = used > maxHeight
+        scroll.scrollerStyle = .legacy
+        scroll.hasVerticalScroller = scrolls
         scroll.drawsBackground = false
-        scroll.borderType = .noBorder
+        scroll.borderType = scrolls ? .bezelBorder : .noBorder
         scroll.documentView = tv
         return scroll
     }
