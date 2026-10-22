@@ -123,16 +123,13 @@ struct NameCleanupSheet: View {
     }
 }
 
-/// Warns when a name may not fit: the synth's display limit is not yet known (still to be checked on the synth).
+/// Warns when a name is longer than a name field holds (31 characters). The synth displays all 31
+/// for programs, wavetables and multisamples [verified, T6].
 struct NameLengthNote: View {
     let name: String
     var body: some View {
         if name.count > NameCleaner.fieldLimit {
             Label("Too long: cut to \(NameCleaner.fieldLimit)", systemImage: "xmark.octagon").foregroundStyle(.red)
-        } else if name.count > NameCleaner.longestFactoryName {
-            Label("Longer than any factory name (\(NameCleaner.longestFactoryName)); may not fit the display", systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.orange).lineLimit(1)
-                .help("The synth's display limit is not known. Every factory program name is \(NameCleaner.longestFactoryName) characters or fewer.")
         }
     }
 }

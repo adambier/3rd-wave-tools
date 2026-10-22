@@ -18,17 +18,34 @@ struct RepointSheet: View {
     /// Slot chosen in the sheet for each added file that is not yet assigned to one.
     @State private var fileSlots: [UUID: SourceRef] = [:]
     @State private var search = ""
+    @State private var selectedID: String?
+    @FocusState private var focus: Field?
+    private enum Field { case list, filter }
 
     init(state: AppState, request: AppState.RepointRequest) {
         _state = ObservedObject(wrappedValue: state)
         self.request = request
         let item = request.itemID ?? state.selectedProgram ?? state.programs.first?.id
         _itemID = State(initialValue: item)
-        let file = request.fileID.flatMap { id in state.contentFiles.first { $0.id == id } }
-        let slots = state.suggestedSlots()
+        var file = request.fileID.flatMap { id in state.contentFiles.first { $0.id == id } }
+        var slots = state.suggestedSlots()
+        // Opened from a wavetable slot that has nothing yet (e.g. Ghibli Bell's U57): an added file
+        // without a slot is simply assigned to that slot, so the oscillators need not move. The
+        // first such file that no program uses is preselected.
+        if let from = request.from, from.isWavetable, !from.isFactorySlot,
+           let it = state.programs.first(where: { $0.id == item }),
+           state.plan(for: it).rows.first(where: { $0.ref == from })?.choice == nil {
+            let candidates = state.contentFiles.filter { $0.slot == nil && $0.fits(from) }
+            for f in candidates { slots[f.id] = from }
+            if file == nil {
+                let unused = state.unusedContent
+                file = candidates.first { unused[$0.id] != nil } ?? candidates.first
+            }
+        }
         _fileSlots = State(initialValue: slots)
         _target = State(initialValue: file.flatMap { $0.slot ?? slots[$0.id] })
         _targetFile = State(initialValue: file?.id)
+        _selectedID = State(initialValue: file.map { "f" + $0.id.uuidString })
         var picks = Set<Int>()
         if let from = request.from, let it = state.programs.first(where: { $0.id == item }) {
             for (i, s) in it.effectiveProgram.sources.enumerated() where s == from { picks.insert(i) }
@@ -41,6 +58,8 @@ struct RepointSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Point oscillators to another slot").font(.title3).bold()
+            Text("Tick the oscillators to change on the left, then select what they should play on the right.")
+                .foregroundStyle(.secondary)
             if request.itemID == nil {
                 Picker("Program", selection: $itemID) {
                     ForEach(state.programs) { p in Text(p.name).tag(Optional(p.id)) }
@@ -77,7 +96,7 @@ struct RepointSheet: View {
 
     @ViewBuilder private var oscillatorList: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Oscillators").font(.headline)
+            Text("1  Oscillators to change").font(.headline)
             if let item {
                 let current = item.effectiveProgram.sources
                 let original = item.program.sources
@@ -134,27 +153,14 @@ struct RepointSheet: View {
         }
     }
 
-    private func isChosen(_ t: Target) -> Bool {
-        if let f = t.file { return targetFile == f.id }
-        return targetFile == nil && target == t.ref
-    }
+    private var allTargets: [Target] { fileTargets + slotTargets + analogTargets }
 
-    private func choose(_ t: Target) {
+    private func select(_ id: String?) {
+        guard let id, let t = allTargets.first(where: { $0.id == id }) else { target = nil; targetFile = nil; return }
         target = t.ref
         targetFile = t.file?.id
     }
 
-    /// " — 02.wt" when another added file has (or is about to get) that slot; " (factory)" for factory slots.
-    private func slotNote(_ s: SourceRef, for f: ContentFile) -> String {
-        if let other = state.contentFiles.first(where: { $0.id != f.id && ($0.slot ?? fileSlots[$0.id]) == s }) {
-            return " — " + other.url.lastPathComponent
-        }
-        return s.isFactorySlot ? " (factory)" : ""
-    }
-
-    private func slotChoices(for f: ContentFile) -> [SourceRef] {
-        f.isPTable ? (0..<SourceRef.pCount).map { SourceRef.p($0) } : (0..<SourceRef.uCount).map { SourceRef.u($0) }
-    }
     private var slotTargets: [Target] {
         Oscillator.repointTargets.filter { !$0.isBuiltIn }.map { r in
             Target(id: "s" + r.label, ref: r, title: "\(r.label)  \(state.slotName(r))", detail: r.isFactorySlot ? "factory slot" : "")
@@ -171,14 +177,23 @@ struct RepointSheet: View {
 
     private var targetList: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Point them to").font(.headline)
-            TextField("Search slot or name (\"u56\", \"nost\")", text: $search).textFieldStyle(.roundedBorder)
-            List {
+            Text("2  What they should play").font(.headline)
+            List(selection: $selectedID) {
                 targetSection("Files you added", fileTargets.filter(matches))
                 targetSection("Wavetable slots on your synth", slotTargets.filter(matches))
                 targetSection("Analog shapes", analogTargets.filter(matches))
             }
+            .focused($focus, equals: .list)
+            .onChange(of: selectedID) { id in select(id) }
+            HStack(spacing: 6) {
+                Image(systemName: "line.3.horizontal.decrease.circle").foregroundStyle(.secondary)
+                TextField("Filter the list by slot or name, e.g. U56 or vowel", text: $search)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($focus, equals: .filter)
+            }
         }
+        // Start with the list focused, not the filter field.
+        .onAppear { DispatchQueue.main.async { focus = .list } }
     }
 
     @ViewBuilder private func targetSection(_ title: String, _ items: [Target]) -> some View {
@@ -186,34 +201,17 @@ struct RepointSheet: View {
             Section(title) {
                 ForEach(items) { t in
                     HStack {
-                        Button { choose(t) } label: {
-                            HStack {
-                                Image(systemName: isChosen(t) ? "largecircle.fill.circle" : "circle")
-                                    .foregroundStyle(isChosen(t) ? Color.accentColor : Color.secondary)
-                                Text(t.title).lineLimit(1)
-                                Spacer()
-                                Text(t.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
+                        Text(t.title).lineLimit(1)
+                        Spacer()
                         if let f = t.file, f.slot == nil {
-                            Picker("Slot", selection: Binding<SourceRef>(
-                                get: { fileSlots[f.id] ?? t.ref },
-                                set: { s in
-                                    fileSlots[f.id] = s
-                                    if targetFile == f.id { target = s }
-                                }
-                            )) {
-                                ForEach(slotChoices(for: f), id: \.self) { s in
-                                    Text(s.label + slotNote(s, for: f)).tag(s)
-                                }
-                            }
-                            .labelsHidden()
-                            .frame(width: 110)
-                            .help("Not yet assigned to a slot: it will be assigned to this one")
+                            Text("→ \(t.ref.label)").font(.caption).foregroundStyle(.secondary)
+                                .help(t.ref == request.from
+                                      ? "Will be assigned to \(t.ref.label), the slot this program uses."
+                                      : "Assigned a free slot automatically. The synth decides where a new table goes when it imports the file.")
                         }
+                        Text(t.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
+                    .tag(t.id)
                 }
             }
         }
@@ -224,6 +222,7 @@ struct RepointSheet: View {
     private var applyTitle: String {
         guard let t = target else { return "Point" }
         if let fid = targetFile, let f = state.contentFiles.first(where: { $0.id == fid }) {
+            if f.slot == nil, let from = request.from, t == from { return "Use \(state.displayName(f)) for \(from.label)" }
             let n = picked.count
             return "Point \(n) oscillator\(n == 1 ? "" : "s") to \(state.displayName(f)) (\(t.label))"
         }

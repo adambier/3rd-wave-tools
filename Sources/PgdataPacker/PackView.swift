@@ -41,7 +41,7 @@ struct PackView: View {
                 .help("Propose tidier names (slot numbers removed, title case) for the programs and the wavetables and samples you added. Factory wavetables are not renamed.")
                 .sheet(isPresented: $state.showNameCleanup) { NameCleanupSheet(state: state) }
             Toggle("Embed factory wavetables", isOn: $state.embedFactory)
-                .help("Off (recommended): factory tables are listed but not carried, as in Groove Synthesis's own sample library. On: they are embedded — each U table adds about 0.5 MB and each P table about 65 KB, which makes files slower to copy and import. Useful for sharing with synths whose factory slots may differ. Needs the factory folders set under Synth Slots.")
+                .help("Off (recommended): factory tables are listed but not carried, as in Groove Synthesis's own sample library; the synth plays whatever is in those slots. On: they are embedded, as the synth's own export does. A synth that has the table reuses it (no slot used), and one that doesn't stores it in a free slot. Each U table adds about 0.5 MB and each P table about 65 KB, which makes files slower to copy and import. Needs the factory folders set under Synth Slots.")
             Spacer()
             Button("Remove") { state.removePrograms(selection); selection = [] }.disabled(selection.isEmpty)
             Button("Write Selected…") { state.writeUnified(Array(selection)) }.disabled(selection.isEmpty)
@@ -77,12 +77,20 @@ struct SizeLine: View {
         HStack(spacing: 8) {
             Text("Estimated .pgdata size: \(PackPlan.formatBytes(plan.estimatedBytes))").foregroundStyle(.secondary)
             if plan.factoryBytes > 0 {
-                Label("\(PackPlan.formatBytes(plan.factoryBytes)) of it is factory wavetables, which a factory synth already has. Larger files take longer to copy and import.",
+                Label("\(PackPlan.formatBytes(plan.factoryBytes)) of it is factory wavetables, which a synth that has them simply reuses. Larger files take longer to copy and import.",
                       systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
             }
         }
         .font(.callout)
+        let need = plan.slotsNeeded
+        if need.u + need.p > 0 {
+            let parts = [need.u > 0 ? "\(need.u) U" : nil, need.p > 0 ? "\(need.p) P" : nil].compactMap { $0 }
+            Label("New wavetables: importing needs \(parts.joined(separator: " and ")) free slot\(need.u + need.p == 1 ? "" : "s") on the synth. If it has none, it offers to overwrite its last ones (blank placeholder tables count as used).",
+                  systemImage: "info.circle")
+                .font(.callout).foregroundStyle(.secondary)
+                .help("The synth reuses any table whose content it already has, in any slot and whatever its name, and stores new ones in free slots. The slot numbers in the file are only labels.")
+        }
     }
 }
 

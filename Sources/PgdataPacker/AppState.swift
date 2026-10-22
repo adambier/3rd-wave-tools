@@ -388,7 +388,7 @@ final class AppState: ObservableObject {
         if !failed.isEmpty { msg += "\n\nFailed:\n" + failed.joined(separator: "\n") }
         let unused = unusedContent
         if !unused.isEmpty {
-            msg += "\n\nAdded files not used by any program:\n" + contentFiles.filter { unused[$0.id] != nil }
+            msg += "\n\nAdded files not used by any program (and not added to any .pgdata file):\n" + contentFiles.filter { unused[$0.id] != nil }
                 .map { "\($0.url.lastPathComponent) (\(unused[$0.id]!.lowercased()))" }.joined(separator: "\n")
         }
         note(msg)

@@ -24,9 +24,8 @@ public struct NameCleaner: Equatable {
                                                "LoFi", "HiFi"]
     static let minorWords: Set<String> = ["a", "an", "and", "the", "of", "in", "on", "to", "for", "with", "or", "at", "by"]
 
-    /// Longest program name in Groove Synthesis's 8M factory banks: names up to this length are known to fit.
-    public static let longestFactoryName = 26
-    /// Name fields in .pgdata and .bin files hold 31 characters (32 bytes with the terminator).
+    /// Name fields in .pgdata and .bin files hold 31 characters (32 bytes with the terminator). The
+    /// synth displays all 31 for programs, wavetables and multisamples [verified on an 8M, T6].
     public static let fieldLimit = 31
 
     public init() {}

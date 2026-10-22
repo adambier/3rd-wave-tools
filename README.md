@@ -70,7 +70,9 @@ Each program shows one of:
 **Point to another slot…** (in the Content menu; the first choice when a wavetable is missing)
 repoints oscillators. Tick the oscillators to change, then pick the target:
 
-- a file you added (listed first, with a slot picker if it has no slot yet);
+- a file you added (listed first). A file without a slot is given one automatically: when the
+  program needs a slot that has nothing yet (say Ghibli Bell's U57), the sheet preselects your
+  unused file and simply assigns it to that slot, so the oscillators stay as they are;
 - any U or P slot on your synth (searchable by slot or name);
 - an analog shape.
 
@@ -106,8 +108,8 @@ Within title case:
 Every proposal is shown, can be edited, and can be unticked. New names go into the `.pgdata` and
 its file name. Source files are not changed, and unpacking keeps names as they are.
 
-Names longer than 26 characters (the longest factory program name) are flagged, since the synth's
-display limit is not yet known. Name fields hold 31 characters.
+Name fields hold 31 characters, and the synth displays all 31 for programs, wavetables and
+multisamples. Longer names are flagged and cut to 31.
 
 A table embedded "as on my synth" carries the name recorded in Synth Slots.
 
@@ -126,12 +128,28 @@ Files are named in Groove Synthesis's own pattern, with the program location fir
 - The location comes from the `.pro` file name, since a `.pro` does not record it. Every set seen
   names its files that way (`B05P100.pro`).
 - The prefix keeps the synth's alphabetical bulk import in program order.
-- Spaces become underscores in the file name only, not in the program name inside it.
-- Provisionally (an open question, to be checked on the synth), a batch that includes a program
-  100 uses three digits throughout (`B05P087_…`, `B05P100_…`), since `B05P100` would sort between
-  P10 and P11.
+- As in the synth's own exports, spaces become underscores and punctuation other than hyphens is
+  dropped ("SM Ripper Bass (MW)" → `SM_Ripper_Bass_MW`). This affects the file name only, not the
+  program name inside it.
+- A batch that includes a program 100 uses three digits throughout (`B05P087_…`, `B05P100_…`).
+  The synth itself writes `B05P09_…` and `B05P100_…`, but in plain alphabetical order `B05P100`
+  sorts before `B05P95`, which could put it first in a bulk import.
 - If any program's file name has no location (a renamed file), all are numbered by their place
   in the list instead (`001_…`, `002_…`).
+
+#### What the synth does on import
+
+Checked on an 8M (OS 2.0d):
+
+- **A table the synth already has** (same content, in any slot, whatever its name) is reused. No
+  slot is used and the synth keeps its own name for it.
+- **A new table or multisample** goes into a free slot, and the program is pointed there. The slot
+  number in the file is only a label. With no free slot, the synth offers to overwrite its last
+  ones; blank placeholder tables count as used. The Pack screen shows how many free slots a program
+  may need.
+- **A table or multisample listed without its data** plays whatever is in that slot on the synth,
+  or silence if the slot is empty, with no warning. That is why multisamples are always embedded.
+- Older-format programs (`W3_PROG_4`) import from a `.pgdata` exactly as from their `.pro`.
 
 ### Unpack
 
@@ -192,19 +210,16 @@ Run against 2,000-odd real files: Groove Synthesis's 8M factory banks and sample
   references from unused parts, which this app lists and Groove Synthesis's 8M exporter does not (Groove Synthesis's
   sample library does).
 
-## Not yet known (needs a test on the synth)
-
-- Whether importing a `.pgdata` puts its wavetables back in their original slots or moves them
-  to free ones. Groove Synthesis's own instructions imply that samples are moved to free S slots.
-- Whether a `.pgdata` containing an older `W3_PROG_4` program imports correctly.
-- Whether the synth accepts our `.pgdata` files with factory tables left out. Groove Synthesis's own sample
-  library does this, so it is expected to work.
-
 ## Synth tests
 
-The open questions above are being checked on a synth. `tw3pg maketests`, `maketest5` and
-`maketest6` build the test `.pgdata` files from your own copies of the programs they use (a Groove Synthesis
-factory program and two third-party programs, which are not included here).
+The behaviour described under "What the synth does on import" was checked on an 8M (OS 2.0d), along
+with name lengths and the synth's own export file names. The synth's exports were also unpacked and
+repacked byte for byte. `tw3pg maketests`, `maketest5` and `maketest6` build the test `.pgdata` files
+from your own copies of the programs they use (a Groove Synthesis factory program and two
+third-party programs, which are not included here).
+
+Still unknown: whether the synth reuses a multisample it already has (as it does for wavetables),
+and the meaning of the few program values that differ between exports.
 
 ## Layout
 

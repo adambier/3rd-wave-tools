@@ -195,6 +195,10 @@ public struct PackPlan {
         public var embeds: Bool
         /// Approximate bytes this source adds to the .pgdata.
         public var bytes: Int = 3
+        /// An embedded wavetable the synth is not known to have. On import the synth reuses a table
+        /// whose content it already has (in any slot, whatever its name); anything else goes into a
+        /// free slot, and if there is none it offers to overwrite the last ones. [verified, T2/T6]
+        public var mayNeedSlot = false
     }
 
     public enum Verdict: Equatable {
@@ -207,6 +211,11 @@ public struct PackPlan {
     public var verdict: Verdict
     /// Approximate size of the .pgdata this plan would produce.
     public var estimatedBytes: Int
+    /// Embedded wavetables that may need a free U / P slot on import (see Row.mayNeedSlot).
+    public var slotsNeeded: (u: Int, p: Int) {
+        let r = rows.filter(\.mayNeedSlot)
+        return (r.filter { if case .u = $0.ref { return true }; return false }.count, r.filter(\.ref.isP).count)
+    }
     /// Part of that size taken by embedded factory wavetables.
     public var factoryBytes: Int
 
@@ -230,6 +239,11 @@ public struct PackPlan {
                             overrides: [SourceRef: Choice] = [:], original: ProgramFile? = nil) -> PackPlan {
         let srcs = program.sources
         let originalSrcs = original?.sources ?? srcs
+        // Content the synth is known to have: files recorded in Synth Slots, and factory tables in
+        // slots that still hold their factory table.
+        var onSynth = Set<UInt64>()
+        for (label, e) in profile.entries where e.state == .file { if let fp = e.fingerprint, !label.hasPrefix("S") { onSynth.insert(fp) } }
+        for (r, t) in factory.tables where profile.entry(r).state == .factory { onSynth.insert(t.fingerprint) }
         var rows: [Row] = []
         for ref in program.distinctSources {
             let positions = srcs.indices.filter { srcs[$0] == ref }
@@ -262,22 +276,35 @@ public struct PackPlan {
             let factoryName = factory.name(ref).map { "\"\($0)\"" } ?? "the factory table"
             var status: Status
             var embeds = false
+            var mayNeedSlot = false
             let tableBytes = ref.isP ? pTableBytes : uTableBytes
             var bytes = 3
             switch choice {
             case .file(let id)?:
                 let f = files.first { $0.id == id }!
-                status = .ok("Embeds \"\(f.name)\" from \(f.url.lastPathComponent)")
                 embeds = true
-                if case let .multisample(m) = f.body { bytes = multisampleBytes(m) } else { bytes = tableBytes }
-                if entry.state == .file, let fp = entry.fingerprint, fp != f.fingerprint {
-                    status = .warning("Embeds \"\(f.name)\"; your synth has \"\(entry.name)\" in \(ref.label) (whether importing overwrites that slot is not yet known)")
+                if case let .multisample(m) = f.body {
+                    bytes = multisampleBytes(m)
+                    status = .ok("Embeds \"\(f.name)\" from \(f.url.lastPathComponent); goes into a free S slot on import")
+                } else {
+                    bytes = tableBytes
+                    if onSynth.contains(f.fingerprint) {
+                        status = .ok("Embeds \"\(f.name)\"; your synth already has this table, so it is reused")
+                    } else {
+                        mayNeedSlot = true
+                        status = .ok("Embeds \"\(f.name)\" from \(f.url.lastPathComponent); goes into a free \(ref.isP ? "P" : "U") slot on import")
+                    }
                 }
             case .factory?:
-                status = .ok("Embeds factory \(factoryName) (+\(formatBytes(tableBytes)); already on a factory synth)")
                 embeds = true; bytes = tableBytes
+                if let fp = factory.tables[ref]?.fingerprint, onSynth.contains(fp) {
+                    status = .ok("Embeds factory \(factoryName) (+\(formatBytes(tableBytes)); reused on import, since your synth has it)")
+                } else {
+                    mayNeedSlot = true
+                    status = .ok("Embeds factory \(factoryName) (+\(formatBytes(tableBytes)); goes into a free slot on import unless your synth has it)")
+                }
             case .profile?:
-                status = .ok("Embeds \"\(entry.name)\", as on your synth"); embeds = true
+                status = .ok("Embeds \"\(entry.name)\", as on your synth (reused on import)"); embeds = true
                 if ref.isSample {
                     let size = (try? FileManager.default.attributesOfItem(atPath: entry.path ?? "")[.size] as? Int) ?? nil
                     bytes = (size ?? 0) + 3 - 16
@@ -289,7 +316,7 @@ public struct PackPlan {
                         status = .warning("Expects factory \(factoryName), but your synth has \"\(entry.name)\" in \(ref.label)")
                     }
                 } else {
-                    status = .warning("Not embedded: the synth must already have the right table in \(ref.label)")
+                    status = .warning("Not embedded: plays whatever is in \(ref.label) on the synth that loads it")
                 }
             case .builtIn?: status = .ok("Built in")
             case nil:
@@ -298,7 +325,8 @@ public struct PackPlan {
                     : "Needs a wavetable for \(ref.label) (not a factory slot): add its .wt file and assign it to \(ref.label)")
             }
             rows.append(Row(ref: ref, usedBy: users, oscillators: positions, repointedFrom: from,
-                            choice: choice, options: options, status: status, embeds: embeds, bytes: bytes))
+                            choice: choice, options: options, status: status, embeds: embeds, bytes: bytes,
+                            mayNeedSlot: mayNeedSlot))
         }
         let missing = rows.filter { $0.choice == nil }.map(\.ref)
         let verdict: Verdict
@@ -370,12 +398,22 @@ public enum OutputNames {
     }
     public static func wavetable(_ ref: SourceRef, _ w: WavetableFile) -> String { ref.label + "_" + sanitize(w.name) + ".wt" }
     public static func program(_ p: ProgramFile) -> String { sanitize(p.name) + ".pro" }
-    /// "B05P87_Ghibli_Bell.pgdata", Groove Synthesis's own pattern (B05P06_Glass_Cow_Bell_Transients.pgdata):
-    /// spaces become underscores in the file name only; the name inside the file keeps its spaces.
+    /// "B05P87_Ghibli_Bell.pgdata", as the synth names its own exports: spaces become underscores,
+    /// letters, digits, hyphens and underscores are kept, anything else is dropped
+    /// ("SM Ripper Bass (MW)" → "SM_Ripper_Bass_MW", "SM Cutting Bs&Ld" → "SM_Cutting_BsLd").
+    /// Only the file name changes; the name inside the file keeps its spaces and punctuation.
     /// The synth's bulk import takes files in alphabetical order, so the prefix keeps program order.
     public static func unified(_ p: ProgramFile, prefix: String? = nil) -> String {
-        let name = sanitize(p.name).split(separator: " ", omittingEmptySubsequences: true).joined(separator: "_")
-        return (prefix.map { $0 + "_" } ?? "") + name + ".pgdata"
+        (prefix.map { $0 + "_" } ?? "") + exportName(p.name) + ".pgdata"
+    }
+
+    /// The name part of an exported .pgdata file name (see `unified`). Non-ASCII letters are dropped
+    /// too: how the synth writes them is not known.
+    public static func exportName(_ name: String) -> String {
+        let words = name.split(separator: " ", omittingEmptySubsequences: true).map { w in
+            String(w.unicodeScalars.filter { $0.isASCII && (CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "_") })
+        }.filter { !$0.isEmpty }
+        return words.isEmpty ? "Untitled" : words.joined(separator: "_")
     }
 
     private static let locationPattern = try! NSRegularExpression(

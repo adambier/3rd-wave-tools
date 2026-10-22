@@ -121,6 +121,15 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertEqual(row.choice, .file(cf.id))
         XCTAssertEqual(plan.verdict, .embedsContent)
         XCTAssertTrue(PackPlan.unusedFiles([cf], plans: [plan]).isEmpty)
+        // A table the synth isn't known to have needs a free slot on import...
+        XCTAssertTrue(row.mayNeedSlot)
+        XCTAssertEqual(plan.slotsNeeded.u, 1)
+        // ...but not once Synth Slots records the same content (in any slot): the synth reuses it.
+        var prof = SlotProfile(); prof.assign(cf, to: .u(57))
+        let reused = PackPlan.make(program: moved, files: [cf], profile: prof, factory: FactoryLibrary(),
+                                   embedFactory: false, original: pro)
+        XCTAssertFalse(reused.rows.first { $0.ref == .u(56) }!.mayNeedSlot)
+        XCTAssertEqual(reused.slotsNeeded.u, 0)
 
         var unassigned = cf; unassigned.slot = nil
         let p3 = PackPlan.make(program: moved, files: [unassigned], profile: SlotProfile(), factory: FactoryLibrary(),
@@ -236,5 +245,13 @@ final class OutputNameTests: XCTestCase {
         XCTAssertEqual(OutputNames.unified(p, prefix: "B05P87"), "B05P87_Ghibli_Bell.pgdata")
         XCTAssertEqual(OutputNames.unified(p), "Ghibli_Bell.pgdata")
         XCTAssertEqual(p.name, "Ghibli Bell")      // the name inside the file keeps its spaces
+        // As the synth's own exports (hardware test T7): punctuation other than - and _ is dropped.
+        XCTAssertEqual(OutputNames.exportName("SM Ripper Bass (MW)"), "SM_Ripper_Bass_MW")
+        XCTAssertEqual(OutputNames.exportName("SM Cutting Bs&Ld"), "SM_Cutting_BsLd")
+        XCTAssertEqual(OutputNames.exportName("SM LP-Notch Pad"), "SM_LP-Notch_Pad")
+        XCTAssertEqual(OutputNames.exportName("SM Got 5 On it"), "SM_Got_5_On_it")
+        XCTAssertEqual(OutputNames.exportName("SM Woody Pluck Seq  "), "SM_Woody_Pluck_Seq")
+        XCTAssertEqual(OutputNames.exportName("Oboe & Flute"), "Oboe_Flute")
+        XCTAssertEqual(OutputNames.exportName("(((  )))"), "Untitled")
     }
 }
