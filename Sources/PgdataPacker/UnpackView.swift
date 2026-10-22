@@ -83,6 +83,7 @@ struct UnpackDetail: View {
                 Spacer()
                 Button("Show in Finder") { Panels.reveal(item.url) }.buttonStyle(.link)
             }
+            BeforeImportBox(item: item)
             Text("Files this will produce").font(.headline)
             Table(item.plan.items) {
                 TableColumn("Write") { (f: UnpackPlan.Item) in WriteToggleCell(state: st, unpackID: item.id, file: f) }
@@ -93,18 +94,89 @@ struct UnpackDetail: View {
             }
             .visibleScrollers()
             .frame(minHeight: 140)
-            if !item.plan.referenced.isEmpty {
-                Text("Not embedded (the 3rd Wave plays what it has in these slots): "
-                     + item.plan.referenced.map(\.description).joined(separator: ", "))
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-            ForEach(item.plan.notes, id: \.self) { n in
-                Label(n, systemImage: "info.circle").font(.callout).foregroundStyle(.orange)
-            }
-            Text("Multisamples are named with their S slot. Import them into those slots before importing the .pro, or the program will play whatever is there.")
-                .font(.caption).foregroundStyle(.secondary)
         }
         .padding(12)
+    }
+}
+
+/// What to do on the 3rd Wave before importing the unpacked .pro, above the file table so it is
+/// seen first. Each line appears only when it applies; with nothing to say, the box is left out.
+struct BeforeImportBox: View {
+    @EnvironmentObject var state: AppState
+    let item: AppState.UnpackItem
+
+    var body: some View {
+        let lines = messages
+        if !lines.isEmpty {
+            GroupBox {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Before importing on your 3rd Wave").font(.headline)
+                    ForEach(Array(lines.enumerated()), id: \.offset) { _, m in
+                        line(m.text, warning: m.warning)
+                    }
+                }
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(4)
+            }
+        }
+    }
+
+    /// Multisamples to import first, factory slots the program plays from, other slots it lists
+    /// without data, then the unpacker's notes.
+    private var messages: [(text: String, warning: Bool)] {
+        var out: [(text: String, warning: Bool)] = []
+        let samples = multisamples
+        if samples.count == 1 {
+            let s = samples[0]
+            out.append(("Import multisample \(quoted(s.name)) into slot \(s.slot) before importing the .pro, "
+                        + "or the program will play whatever is in \(s.slot).", false))
+        } else if samples.count > 1 {
+            let list = samples.map { "\($0.slot) \(quoted($0.name))" }.joined(separator: ", ")
+            out.append(("Import these multisamples into their slots before importing the .pro, "
+                        + "or the program will play whatever is there: \(list).", false))
+        }
+        let refs = item.plan.referenced
+        let factory = refs.filter { $0.isFactorySlot }
+        let other = refs.filter { !$0.isFactorySlot }
+        if !factory.isEmpty {
+            let list = factory.map { slotText($0) }.joined(separator: ", ")
+            out.append(("Plays from your 3rd Wave (not in this file): \(list).", false))
+        }
+        if !other.isEmpty {
+            let list = other.map { $0.description }.joined(separator: ", ")
+            out.append(("Not in this file, and not factory slots: \(list). "
+                        + "The program plays whatever your 3rd Wave has there.", true))
+        }
+        for n in item.plan.notes { out.append((n, true)) }
+        return out
+    }
+
+    /// The multisamples the file carries (slot label and name), in the order they are listed.
+    private var multisamples: [(slot: String, name: String)] {
+        var out: [(slot: String, name: String)] = []
+        for src in item.unified.sources {
+            if case let .multisample(m) = src.payload { out.append((src.ref.label, m.name)) }
+        }
+        return out
+    }
+
+    private func quoted(_ s: String) -> String { "\u{201C}\(s)\u{201D}" }
+
+    /// A factory slot with its table name (e.g., "U07 Knob Grotto 6").
+    private func slotText(_ ref: SourceRef) -> String {
+        if let name = state.factory.name(ref) { return "\(ref.label) \(name)" }
+        return ref.label
+    }
+
+    private func line(_ text: String, warning: Bool) -> some View {
+        Label {
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: warning ? "exclamationmark.triangle" : "info.circle")
+                .foregroundStyle(warning ? Color.orange : Color.secondary)
+        }
+        .foregroundStyle(warning ? Color.orange : Color.primary)
     }
 }
 
