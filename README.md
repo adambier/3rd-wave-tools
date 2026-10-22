@@ -58,8 +58,8 @@ Synthesis's factory `.wt` files; only names and fingerprints are stored). It use
 
 **U48–U55.** These joined the factory set in 2025, alongside OS 1.9 (which also brought `.pgdata`).
 The 8M ships with them. 24K and 24M owners download them from Groove Synthesis's support site
-(after logging in) and load them with Global → Bulk wavetable import. The app assumes the 3rd Wave that
-loads a `.pgdata` has them.
+(after logging in) and load them with Global → Bulk wavetable import. The app assumes the 3rd
+Wave that loads a `.pgdata` has them.
 
 Before 2025 those were user slots, and some older program sets used them for their own tables,
 shipped as `.wt` files named with the slot (e.g., `U48 Warm Pad.wt`). So in a program saved before
