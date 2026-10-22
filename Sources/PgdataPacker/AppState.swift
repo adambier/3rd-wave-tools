@@ -63,7 +63,7 @@ final class AppState: ObservableObject {
     @Published var onlyAttention = false
     /// Files being read in the background: how many of how many so far.
     struct LoadProgress { var done: Int; var total: Int }
-    @Published var loading: LoadProgress?
+    @Published var reading: LoadProgress?
     /// A folder the current alert can open in the Finder.
     @Published var alertReveal: URL?
 
@@ -155,7 +155,7 @@ final class AppState: ObservableObject {
         let todo = all.sorted { $0.path < $1.path }
             .filter { ["pro", "wt", "bin", "pgdata"].contains($0.pathExtension.lowercased()) && !known.contains($0) }
         guard !todo.isEmpty else { return }
-        loading = LoadProgress(done: 0, total: todo.count)
+        reading = LoadProgress(done: 0, total: todo.count)
         let factory = self.factory, skip = self.skipFactoryDuplicates
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             var results: [Loaded] = []
@@ -172,7 +172,7 @@ final class AppState: ObservableObject {
                 } catch { results.append(.problem("\(u.lastPathComponent): \(error)")) }
                 if i % 5 == 4 || i == todo.count - 1 {
                     let done = i + 1
-                    DispatchQueue.main.async { self?.loading = LoadProgress(done: done, total: todo.count) }
+                    DispatchQueue.main.async { self?.reading = LoadProgress(done: done, total: todo.count) }
                 }
             }
             DispatchQueue.main.async { self?.finishAdding(results) }
@@ -180,7 +180,7 @@ final class AppState: ObservableObject {
     }
 
     private func finishAdding(_ results: [Loaded]) {
-        loading = nil
+        reading = nil
         var problems: [String] = []
         var addedPrograms = 0, addedContent = 0, addedUnified = 0
         for r in results {

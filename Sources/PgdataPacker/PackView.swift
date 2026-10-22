@@ -43,7 +43,7 @@ struct PackView: View {
                 .disabled(state.programs.isEmpty && state.contentFiles.isEmpty)
                 .help("Propose tidier names for the programs and the files you added (e.g., slot numbers removed, title case). Factory wavetables keep their names.")
                 .sheet(isPresented: $state.showNameCleanup) { NameCleanupSheet(state: state) }
-            if let p = state.loading {
+            if let p = state.reading {
                 ProgressView(value: Double(p.done), total: Double(max(p.total, 1)))
                     .frame(width: 120)
                 Text("Reading \(p.done) of \(p.total)…").font(.caption).foregroundStyle(.secondary)
