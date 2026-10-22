@@ -8,10 +8,10 @@ import PgdataFormats   // SwiftPM build; absent in the single-module swiftc buil
 /// All app state. Plain ObservableObject, used only from the main thread (as in ThirdWaveWT).
 final class AppState: ObservableObject {
     enum Section: String, CaseIterable, Identifiable {
-        case pack = "Pack", unpack = "Unpack", slots = "Synth Slots"
+        case pack = "Pack", unpack = "Unpack"
         var id: String { rawValue }
         var icon: String {
-            switch self { case .pack: return "shippingbox"; case .unpack: return "tray.and.arrow.up"; case .slots: return "square.grid.3x3" }
+            switch self { case .pack: return "shippingbox"; case .unpack: return "tray.and.arrow.up" }
         }
     }
 
@@ -56,10 +56,8 @@ final class AppState: ObservableObject {
     @Published var section: Section? = .pack
 
     // Shared settings
-    @Published var profile = SlotProfile() { didSet { saveProfile() } }
-    @Published var factoryFolders: [URL] = [] { didSet { saveSettings(); reloadFactory() } }
-    @Published private(set) var factory = FactoryLibrary()
-    @Published var embedFactory = false { didSet { saveSettings() } }
+    /// Names and fingerprints of the factory wavetables, built into the app.
+    let factory = FactoryLibrary.builtIn
     @Published var skipFactoryDuplicates = true { didSet { saveSettings(); rebuildUnpackPlans() } }
 
     // Pack
@@ -84,11 +82,6 @@ final class AppState: ObservableObject {
     private var loading = true
 
     init() {
-        Self.migrateFromOldName(defaults)
-        if let paths = defaults.stringArray(forKey: "factoryFolders") {
-            factoryFolders = paths.map { URL(fileURLWithPath: $0) }
-        }
-        embedFactory = defaults.bool(forKey: "embedFactory")
         if defaults.object(forKey: "cleanStripSlots") != nil {
             var c = NameCleaner()
             c.stripSlots = defaults.bool(forKey: "cleanStripSlots")
@@ -100,74 +93,20 @@ final class AppState: ObservableObject {
         if defaults.object(forKey: "skipFactoryDuplicates") != nil {
             skipFactoryDuplicates = defaults.bool(forKey: "skipFactoryDuplicates")
         }
-        if let d = try? Data(contentsOf: profileURL), let p = try? SlotProfile.decoded(d) { profile = p }
+        // Settings from versions that asked for the factory .wt files and tracked the synth's slots.
+        for key in ["factoryFolders", "embedFactory", "synthHasAllFactory"] { defaults.removeObject(forKey: key) }
         loading = false
-        reloadFactory()
     }
 
     // MARK: Persistence
 
-    private static var supportBase: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-    }
-    private var supportDir: URL { Self.supportBase.appendingPathComponent("pgdata Packer", isDirectory: true) }
-
-    /// The app was first built as "ThirdWavePG" (bundle id org.biers.thirdwavepg). Carry its
-    /// settings and slot list over once, leaving the old copies in place.
-    private static func migrateFromOldName(_ defaults: UserDefaults) {
-        if defaults.object(forKey: "factoryFolders") == nil, let old = UserDefaults(suiteName: "org.biers.thirdwavepg") {
-            for key in ["factoryFolders", "embedFactory", "skipFactoryDuplicates"] {
-                if let v = old.object(forKey: key) { defaults.set(v, forKey: key) }
-            }
-        }
-        let fm = FileManager.default
-        let oldFile = supportBase.appendingPathComponent("ThirdWavePG/synth-slots.json")
-        let newDir = supportBase.appendingPathComponent("pgdata Packer", isDirectory: true)
-        let newFile = newDir.appendingPathComponent("synth-slots.json")
-        if !fm.fileExists(atPath: newFile.path), fm.fileExists(atPath: oldFile.path) {
-            try? fm.createDirectory(at: newDir, withIntermediateDirectories: true)
-            try? fm.copyItem(at: oldFile, to: newFile)
-        }
-    }
-    private var profileURL: URL { supportDir.appendingPathComponent("synth-slots.json") }
-
-    private func saveProfile() {
-        guard !loading else { return }
-        do {
-            try FileManager.default.createDirectory(at: supportDir, withIntermediateDirectories: true)
-            try profile.encoded().write(to: profileURL, options: .atomic)
-        } catch { note("Could not save the slot list: \(error.localizedDescription)") }
-    }
-
     private func saveSettings() {
         guard !loading else { return }
-        defaults.set(factoryFolders.map(\.path), forKey: "factoryFolders")
-        defaults.set(embedFactory, forKey: "embedFactory")
         defaults.set(skipFactoryDuplicates, forKey: "skipFactoryDuplicates")
         defaults.set(nameCleaner.stripSlots, forKey: "cleanStripSlots")
         defaults.set(nameCleaner.underscoresToSpaces, forKey: "cleanUnderscores")
         defaults.set(nameCleaner.titleCase, forKey: "cleanTitleCase")
         defaults.set(nameCleaner.fixedSpellings, forKey: "cleanFixedSpellings")
-    }
-
-    /// Reading the factory .wt files takes a moment (about 92 text files), so it runs off the main thread.
-    @Published private(set) var loadingFactory = false
-    private var factoryGeneration = 0
-
-    func reloadFactory() {
-        let folders = factoryFolders
-        factoryGeneration += 1
-        let generation = factoryGeneration
-        loadingFactory = true
-        DispatchQueue.global(qos: .userInitiated).async {
-            let lib = FactoryLibrary(folders: folders)
-            DispatchQueue.main.async {
-                guard generation == self.factoryGeneration else { return }
-                self.factory = lib
-                self.loadingFactory = false
-                self.rebuildUnpackPlans()
-            }
-        }
     }
 
     // MARK: Messages
@@ -233,8 +172,8 @@ final class AppState: ObservableObject {
     // MARK: Pack
 
     func plan(for item: PackItem) -> PackPlan {
-        PackPlan.make(program: item.effectiveProgram, files: contentFiles, profile: profile, factory: factory,
-                      embedFactory: embedFactory, overrides: item.overrides, original: item.program)
+        PackPlan.make(program: item.effectiveProgram, files: contentFiles, factory: factory,
+                      overrides: item.overrides, original: item.program)
     }
 
     /// The name an added file will be packed under.
@@ -275,14 +214,12 @@ final class AppState: ObservableObject {
     }
 
     /// A slot to offer for an unassigned wavetable file: the first user slot of the right kind
-    /// (U56–U63, P36–P47) that no other added file is assigned to and that Synth Slots does not
-    /// record as holding another file. The user can change it.
+    /// (U56–U63, P36–P47) that no other added file is assigned to. The user can change it.
     func suggestedSlot(for file: ContentFile, alsoTaken: Set<SourceRef> = []) -> SourceRef? {
         guard !file.isSample else { return nil }
         let taken = Set(contentFiles.compactMap { $0.id == file.id ? nil : $0.slot }).union(alsoTaken)
         let candidates: [SourceRef] = file.isPTable ? (36..<SourceRef.pCount).map { .p($0) } : (56..<SourceRef.uCount).map { .u($0) }
-        return candidates.first { !taken.contains($0) && profile.entry($0).state != .file }
-            ?? candidates.first { !taken.contains($0) } ?? candidates.first
+        return candidates.first { !taken.contains($0) } ?? candidates.first
     }
 
     /// Suggestions for every unassigned wavetable file, in list order, each one different
@@ -300,13 +237,12 @@ final class AppState: ObservableObject {
     func slotName(_ ref: SourceRef) -> String {
         if ref.isBuiltIn { return ref.description }
         if ref.isSample { return "Multisample" }
-        let e = profile.entry(ref)
-        switch e.state {
-        case .file: return e.name
-        case .factory: return factory.name(ref) ?? "Factory table"
-        case .empty: return "Blank"
-        case .unknown: return ref.isFactorySlot ? (factory.name(ref) ?? "Factory table") : "Unknown"
+        if case .unknown = ref { return "unknown source" }
+        if !ref.isFactorySlot {
+            // User slots are not tracked: name the added file assigned to it, if any.
+            return contentFiles.first { $0.slot == ref }.map { displayName($0) } ?? "no file added"
         }
+        return factory.name(ref) ?? "Factory table"
     }
 
     func setOverride(_ itemID: UUID, _ ref: SourceRef, _ choice: PackPlan.Choice?) {
@@ -326,13 +262,10 @@ final class AppState: ObservableObject {
         switch choice {
         case .builtIn: return ref.description
         case .reference:
-            return ref.isFactorySlot ? "Factory " + (factory.name(ref).map { "\"\($0)\"" } ?? "table") + " — not embedded"
-                                     : "Leave to the synth — not embedded"
-        case .factory: return "Factory " + (factory.name(ref).map { "\"\($0)\"" } ?? "table") + " — embedded"
+            return "Factory " + (factory.name(ref).map { "\"\($0)\"" } ?? "table") + " — not embedded"
         case .file(let id):
             let f = contentFiles.first { $0.id == id }
             return "\"\(f?.name ?? "?")\" (\(f?.url.lastPathComponent ?? "?"))"
-        case .profile: return "As on my synth: \"\(profile.entry(ref).name)\""
         }
     }
 
@@ -342,9 +275,10 @@ final class AppState: ObservableObject {
         guard !items.isEmpty else { return }
         // Programs missing content cannot be packed: ask before writing the rest.
         let missing: [String] = items.compactMap { item in
-            guard case .blocked(let refs) = plan(for: item).verdict else { return nil }
-            return "\(item.name) (needs \(refs.map(\.label).joined(separator: ", ")))"
+            guard let needs = plan(for: item).missingSummary else { return nil }
+            return "\(item.name) (\(needs))"
         }
+        let oldTables = items.contains { plan(for: $0).userSlotNote != nil }
         if !missing.isEmpty {
             let ok = items.count - missing.count
             if ok == 0 {
@@ -352,6 +286,7 @@ final class AppState: ObservableObject {
                                                  : "None of these programs can be written: all are missing content.")
                     + "\n\n" + missing.joined(separator: "\n")
                     + "\n\nAdd the .wt or .bin files they need and assign them to the slots shown."
+                    + (oldTables ? " For the author's own wavetables from before 2025, the note shown with each program explains the choices." : "")
                 return
             }
             let n = missing.count
@@ -363,7 +298,7 @@ final class AppState: ObservableObject {
         }
         guard let folder = Panels.chooseFolder(prompt: "Write Here", message: "Choose where to write the .pgdata files") else { return }
         var outputs: [(name: String, data: Data)] = []
-        var blocked: [String] = [], failed: [String] = []
+        var blocked: [String] = [], failed: [String] = [], unfamiliar: [String] = []
         // Prefix each file with its program location (or list position) so the synth's alphabetical
         // bulk import keeps the programs in order. Positions count over the whole list.
         let prefixes = OutputNames.orderPrefixes(fileNames: programs.map { $0.url.lastPathComponent })
@@ -371,14 +306,15 @@ final class AppState: ObservableObject {
         for item in items {
             let plan = plan(for: item)
             switch plan.verdict {
-            case .blocked(let refs):
-                blocked.append("\(item.name) (needs \(refs.map(\.label).joined(separator: ", ")))"); continue
+            case .blocked:
+                blocked.append("\(item.name) (\(plan.missingSummary ?? "content missing"))"); continue
             default: break
             }
             do {
-                let content = try plan.content(files: contentFiles, profile: profile, factory: factory, names: contentNames)
+                let content = plan.content(files: contentFiles, names: contentNames)
                 let g = try Packer.pack(item.effectiveProgram, content: content)
                 outputs.append((name: OutputNames.unified(item.effectiveProgram, prefix: prefixByID[item.id]), data: g.serialized()))
+                if !plan.warnings.isEmpty { unfamiliar.append("\(item.name) (\(item.program.version), \(item.program.valuesPerPart) values per part)") }
             } catch { failed.append("\(item.name): \(error)") }
         }
         let written = Panels.write(outputs, into: folder)
@@ -386,13 +322,14 @@ final class AppState: ObservableObject {
         // One item per line, a blank line between sections.
         if !blocked.isEmpty { msg += "\n\nNot written, content missing:\n" + blocked.joined(separator: "\n") }
         if !failed.isEmpty { msg += "\n\nFailed:\n" + failed.joined(separator: "\n") }
+        if !unfamiliar.isEmpty { msg += "\n\nWritten from an unfamiliar program layout (check them on the synth):\n" + unfamiliar.joined(separator: "\n") }
         let unused = unusedContent
         if !unused.isEmpty {
             msg += "\n\nAdded files not used by any program (and not added to any .pgdata file):\n" + contentFiles.filter { unused[$0.id] != nil }
                 .map { "\($0.url.lastPathComponent) (\(unused[$0.id]!.lowercased()))" }.joined(separator: "\n")
         }
         note(msg)
-        if !blocked.isEmpty || !failed.isEmpty || !unused.isEmpty { alertMessage = msg }
+        if !blocked.isEmpty || !failed.isEmpty || !unfamiliar.isEmpty || !unused.isEmpty { alertMessage = msg }
     }
 
     // MARK: Unpack
@@ -434,53 +371,5 @@ final class AppState: ObservableObject {
         }
         let written = Panels.write(outputs, into: folder)
         note("Unpacked \(items.count) file\(items.count == 1 ? "" : "s"): wrote \(written) file\(written == 1 ? "" : "s") to \(folder.path).")
-    }
-
-    // MARK: Synth slots
-
-    func assignFile(to ref: SourceRef) {
-        guard ref.isWavetable else { return }   // sample slots are not tracked
-        guard let url = Panels.chooseFile(types: ["wt"],
-                                          message: "Choose the wavetable (.wt) that is in \(ref.label) on your synth") else { return }
-        do {
-            let f = try ContentFile.load(url)
-            guard f.fits(ref) else { alertMessage = "\(url.lastPathComponent) is a \(f.kindLabel.lowercased()); \(ref.label) needs a \(ref.isP ? "P wavetable" : "U wavetable")."; return }
-            profile.assign(f, to: ref)
-            note("\(ref.label) set to \"\(f.name)\" (\(url.lastPathComponent)).")
-        } catch { alertMessage = "\(url.lastPathComponent): \(error)" }
-    }
-
-    func setSlotState(_ ref: SourceRef, _ state: SlotEntry.State) {
-        var e = profile.entry(ref)
-        e.state = state
-        if state != .file { e.path = nil; e.fingerprint = nil }
-        if state == .factory || state == .unknown { e.name = "" }
-        profile.set(ref, e)
-    }
-
-    func renameSlot(_ ref: SourceRef, _ name: String) {
-        var e = profile.entry(ref); e.name = name; profile.set(ref, e)
-    }
-
-    /// Assigns dropped wavetable files to the slots their names suggest ("U48 SM OBX8 1.WT"),
-    /// after the user confirms the list. Multisamples are not tracked here; they go on the Pack screen.
-    func assignByFilename(_ urls: [URL]) {
-        var pairs: [(SourceRef, ContentFile)] = []
-        var unplaced: [String] = []
-        for u in urls {
-            guard let f = try? ContentFile.load(u) else { unplaced.append(u.lastPathComponent + " (unreadable)"); continue }
-            if f.isSample { unplaced.append(u.lastPathComponent + " (multisamples are added on the Pack screen)"); continue }
-            if let s = f.slot, f.fits(s) { pairs.append((s, f)) } else { unplaced.append(u.lastPathComponent) }
-        }
-        guard !pairs.isEmpty else {
-            alertMessage = "Nothing to assign" + (unplaced.isEmpty ? ": no files." : ":\n" + unplaced.joined(separator: "\n")) + "\n\nWavetable file names must start with a slot (\"U48 …\"); otherwise use Set… → Assign File… on a slot. Multisamples are added on the Pack screen."
-            return
-        }
-        let list = pairs.map { "\($0.0.label)  ←  \($0.1.url.lastPathComponent)" }.joined(separator: "\n")
-        let extra = unplaced.isEmpty ? "" : "\n\nNot assigned:\n" + unplaced.joined(separator: "\n")
-        if Panels.confirm(title: "Assign these files to slots?", message: list + extra, ok: "Assign") {
-            for (s, f) in pairs { profile.assign(f, to: s) }
-            note("Assigned \(pairs.count) file\(pairs.count == 1 ? "" : "s") to slots by name.")
-        }
     }
 }

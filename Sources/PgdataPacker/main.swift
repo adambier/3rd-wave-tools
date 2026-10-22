@@ -54,8 +54,6 @@ application.delegate = appDelegate
 
 let appState = AppState()
 
-// Wide enough for the sidebar, the program list and every column of the Pack tables
-// (about 1,400 points), but never larger than the screen.
 // Wide enough for the sidebar, the program list and every column of the Pack tables, but never
 // larger than the screen.
 let visible = NSScreen.main?.visibleFrame.size ?? NSSize(width: 1512, height: 900)

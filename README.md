@@ -23,45 +23,64 @@ Tests (`./run-tests.sh`) need a full Xcode installation, as in ThirdWaveWT.
 
 ## Using it
 
-The window has three sections: **Synth Slots**, **Pack** and **Unpack**.
+The window has two sections, **Pack** and **Unpack**. There is nothing to set up.
 
-### Synth Slots
+### Factory wavetables
 
-Tell the app what your synth's wavetable slots hold.
+The app never embeds factory wavetables. A program that uses a factory slot (U00–U55, P00–P35)
+lists that slot without data, and the synth that loads the file plays its own factory table.
 
-- Factory slots (P00–P35, U00–U55) are assumed to hold their factory tables unless you say
-  otherwise.
-- Other slots are "unknown" until you assign the `.wt` file that is in them. Use
-  **Set… → Assign File…** on a row, or drop files whose names start with a slot
-  (`U48 SM OBX8 1.WT`) to assign several at once.
-- Sample (S) slots are not tracked: sample memory changes too often for a record of it to stay
-  right. Add the `.bin` a program needs on the Pack screen instead.
+The app knows the factory tables by name and by a fingerprint of their content, built in from
+Groove Synthesis's factory `.wt` files (`tw3pg factory-catalog`; only names and fingerprints are
+stored, not the tables). It uses them to:
 
-Also add the folders of Groove Synthesis's factory `.wt` files here. The app uses them to embed factory tables
-when asked, and to recognise factory tables when unpacking.
+- show factory slot names ("U00 Additive_Bell_17");
+- recognise a factory table among the files you add (for example one unpacked from the synth's own
+  export, which carries every table it uses), so it is listed rather than embedded;
+- leave factory tables out of the free-slot estimate, since a synth that has them reuses them;
+- skip factory tables when unpacking, and never offer them for renaming.
 
-The slot list is saved in `~/Library/Application Support/pgdata Packer/synth-slots.json`.
+U48–U55 joined the factory set in 2025 (with OS 1.9, which also brought `.pgdata`). Before that
+they were user slots, and older sets used them for their own tables: Dynamica Vol. 2 uses U48–U54
+and ships the tables as `U48 SM OBX8 1.WT` and so on. So in a program saved before OS 1.9, U48–U55
+are treated like user slots: missing until you add the table, which is then embedded and goes into
+a free slot on import. A note with the program explains this and the three ways to fix it: add the
+author's tables, point the oscillators elsewhere, or choose the factory table anyway from the
+Content menu.
+
+A program counts as saved before OS 1.9 when its format is older than `W3_PROG_5`, or its float
+block has fewer than 544 values. Programs saved since OS 1.9 have 544 (Groove Synthesis's 8M factory
+banks, August 2025, onwards); every older set seen has fewer, including `W3_PROG_5` programs from
+February 2025. The file has no date, so this is an inference from the layout.
+
+Nothing about your synth is tracked. A table from a user slot (U56–U63, P36–P47) or a multisample
+that a program uses is always included in the `.pgdata`, from the file you add on the Pack screen:
+whoever loads the file will almost certainly not have the same user slots or sample memory.
 
 ### Pack
 
-Drop `.pro` files, plus any `.wt` / `.bin` files they need. For each program the app lists its
+Drop `.pro` files, plus the `.wt` / `.bin` files they need. For each program the app lists its
 oscillator sources and what each will be:
 
 - a file you added and assigned to that slot (this wins, since it is what the program's author
-  supplied);
-- for a factory slot: the factory table, not embedded by default ("Embed factory wavetables"
-  embeds them);
-- for any other wavetable slot: the file the Synth Slots list says is there;
-- otherwise **missing**, and that program is not written.
+  supplied). A file named with a slot (`U48 SM OBX8 1.WT`, `S010_JP8.bin`) is assigned to it
+  automatically;
+- for a factory slot: the factory table, listed but not embedded. An added file identical to it is
+  listed the same way;
+- for a user slot or a multisample with no file added: **missing**, and that program is not
+  written until you add the file or point the oscillators elsewhere.
 
-You can change any choice from the Content menu. A warning appears where your synth differs from
-what the program expects, for example a factory slot you have overwritten.
+You can change any choice from the Content menu.
 
-A multisample a program uses is always embedded; there is no option to leave it out.
+Programs in a layout not seen before (a format other than `W3_PROG_3` to `_5`, or an unusual
+number of values per part) get a warning: the app finds the oscillator sources from the layout, so
+check them, and check the program on the synth after importing. The warning is repeated when you
+write. A source number outside every known range shows as an unknown source, and the program is
+not written until those oscillators are pointed elsewhere.
 
 Each program shows one of:
 
-- **factory content only**: nothing to embed;
+- **factory content only**;
 - **embeds wavetables or samples**;
 - **missing content**: not written until you add the file.
 
@@ -73,7 +92,7 @@ repoints oscillators. Tick the oscillators to change, then pick the target:
 - a file you added (listed first). A file without a slot is given one automatically: when the
   program needs a slot that has nothing yet (say Ghibli Bell's U57), the sheet preselects your
   unused file and simply assigns it to that slot, so the oscillators stay as they are;
-- any U or P slot on your synth (searchable by slot or name);
+- any factory U or P slot (searchable by slot or name);
 - an analog shape.
 
 The Source column then shows, for example, **U01 → U56**, with a button to undo it. Only the
@@ -110,8 +129,6 @@ its file name. Source files are not changed, and unpacking keeps names as they a
 
 Name fields hold 31 characters, and the synth displays all 31 for programs, wavetables and
 multisamples. Longer names are flagged and cut to 31.
-
-A table embedded "as on my synth" carries the name recorded in Synth Slots.
 
 #### Writing
 
@@ -157,7 +174,8 @@ Drop `.pgdata` files. Each becomes a `.pro`, plus a `.wt` per embedded wavetable
 multisample, named the way Groove Synthesis names its own files (`U50_SM OB2.wt`, `S010_JP8.bin`).
 
 Untick anything you don't want, or rename it, before **Unpack…**. Wavetables identical to the
-factory table in their slot are skipped by default.
+factory table in their slot are skipped by default: the synth's own export embeds factory tables
+too, and a repack lists them anyway.
 
 ## Formats
 
@@ -231,9 +249,10 @@ Sources/PgdataFormats/   formats and packing logic, no UI (tested on Linux and m
   Multisample.swift         .bin and the shared sample record
   UnifiedProgram.swift      .pgdata
   PackUnpack.swift          Packer / Unpacker
-  Workbench.swift           slot profile, factory library, pack and unpack plans
+  Workbench.swift           factory library, pack and unpack plans
+  FactoryCatalog.swift      factory table names and fingerprints (generated)
 Sources/PgdataPacker/       the app (SwiftUI)
-Sources/tw3pg/              developer harness: inspect, roundtrip, repack, compare, wtcheck
+Sources/tw3pg/              developer harness: inspect, roundtrip, repack, compare, wtcheck, factory-catalog, pack
 Tests/PgdataFormatsTests/
 ```
 

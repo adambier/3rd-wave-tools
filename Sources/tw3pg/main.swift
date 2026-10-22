@@ -8,6 +8,8 @@ import PgdataFormats
 //   tw3pg unpack <file.pgdata> <outdir>
 //   tw3pg repack <dir>...               unpack every .pgdata and pack it again; must be byte-identical
 //   tw3pg compare <file.pgdata> <file.pro> [wt dirs...]   pack the .pro with the .pgdata's content; diff
+//   tw3pg factory-catalog <out.swift> <factory dirs...>   write FactoryCatalog.swift from the factory .wt files
+//   tw3pg pack <file.pro> <out.pgdata> [.wt/.bin files...]  pack as the app would (defaults, built-in factory list)
 
 func files(under paths: [String], ext: Set<String>) -> [URL] {
     var out: [URL] = []
@@ -31,7 +33,8 @@ func describe(_ u: URL) throws -> String {
     switch u.pathExtension.lowercased() {
     case "pro":
         let p = try ProgramFile(data: d)
-        return "\(p.version) \"\(p.name)\" \(p.values.count) values, \(p.valuesPerPart)/part; sources: "
+        return "\(p.version) \"\(p.name)\" \(p.values.count) values, \(p.valuesPerPart)/part, \(p.floatBlockCount) floats"
+            + (PackPlan.predates2025FactoryTables(p) ? " (pre-2025)" : "") + "; sources: "
             + p.sources.map(\.description).joined(separator: " ")
     case "pgdata":
         let g = try UnifiedProgram(data: d)
@@ -64,10 +67,36 @@ func reserialize(_ u: URL, _ d: Data) throws -> Data {
 }
 
 let args = Array(CommandLine.arguments.dropFirst())
-guard let cmd = args.first else { print("usage: tw3pg inspect|roundtrip|unpack|repack|compare ..."); exit(2) }
+guard let cmd = args.first else { print("usage: tw3pg inspect|roundtrip|unpack|repack|compare|factory-catalog|pack ..."); exit(2) }
 let rest = Array(args.dropFirst())
 
 switch cmd {
+case "factory-catalog":
+    guard rest.count >= 2 else { print("usage: tw3pg factory-catalog <out.swift> <factory dirs...>"); exit(2) }
+    let lib = FactoryLibrary(folders: rest.dropFirst().map { URL(fileURLWithPath: $0) })
+    lib.problems.forEach { print("warning: \($0)") }
+    let u = lib.tables.keys.filter { !$0.isP }.count, p = lib.tables.keys.filter(\.isP).count
+    print("\(u) U and \(p) P factory tables")
+    guard lib.isComplete else { print("error: expected 56 U and 36 P"); exit(1) }
+    let dupes = Dictionary(grouping: lib.tables, by: { $0.value.fingerprint }).filter { $0.value.count > 1 }
+    for (_, d) in dupes { print("note: identical content in " + d.map(\.key.label).sorted().joined(separator: ", ")) }
+    try lib.catalogSource(note: "56 U (U00–U55) and 36 P (P00–P35) tables.").write(toFile: rest[0], atomically: true, encoding: .utf8)
+    print("wrote \(rest[0])")
+
+case "pack":
+    guard rest.count >= 2 else { print("usage: tw3pg pack <file.pro> <out.pgdata> [.wt/.bin files...]"); exit(2) }
+    let pro = try ProgramFile(data: load(URL(fileURLWithPath: rest[0])))
+    let files = try rest.dropFirst(2).map { try ContentFile.load(URL(fileURLWithPath: $0)) }
+    let plan = PackPlan.make(program: pro, files: files, factory: .builtIn)
+    plan.warnings.forEach { print("warning: \($0)") }
+    for r in plan.rows { print("  \(r.ref.label): \(r.status)") }
+    if let n = plan.userSlotNote { print("\n" + n.title + "\n\n" + n.body + "\n") }
+    if let m = plan.missingSummary { print("report line: \(pro.name) (\(m))") }
+    if case .blocked(let refs) = plan.verdict { print("error: missing " + refs.map(\.label).joined(separator: ", ")); exit(1) }
+    let g = try Packer.pack(pro, content: plan.content(files: files))
+    try g.serialized().write(to: URL(fileURLWithPath: rest[1]))
+    print("wrote \(rest[1]) (\(pro.version), \(pro.valuesPerPart) values per part)")
+
 case "inspect":
     for u in files(under: rest, ext: ["pro", "pgdata", "bin", "wt"]) {
         do { print(u.lastPathComponent + ": " + (try describe(u))) } catch { print(u.lastPathComponent + ": ERROR \(error)") }

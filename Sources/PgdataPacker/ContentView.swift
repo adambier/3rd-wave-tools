@@ -19,11 +19,15 @@ struct ContentView: View {
                 }
                 .navigationSplitViewColumnWidth(min: 150, ideal: 170, max: 220)
             } detail: {
-                switch state.section ?? .pack {
-                case .pack: PackView()
-                case .unpack: UnpackView()
-                case .slots: SlotsView()
+                Group {
+                    switch state.section ?? .pack {
+                    case .pack: PackView()
+                    case .unpack: UnpackView()
+                    }
                 }
+                // Each page fills the detail area and no more (a page that asked for its full
+                // content height pushed the top of the window out of view).
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             Divider()
             LogBar(showLog: $showLog)
@@ -124,7 +128,7 @@ struct VerdictBadge: View {
     var body: some View {
         switch verdict {
         case .factoryOnly:
-            Label("Factory content only — nothing to embed", systemImage: "checkmark.circle").foregroundStyle(.secondary)
+            Label("Factory content only", systemImage: "checkmark.circle").foregroundStyle(.secondary)
         case .embedsContent:
             Label("Embeds wavetables or samples", systemImage: "shippingbox.fill").foregroundStyle(.blue)
         case .blocked(let refs):

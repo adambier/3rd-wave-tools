@@ -34,6 +34,17 @@ enum Panels {
     }
 
     /// `details`, when given, goes in a scrolling text area below the message (one item per line).
+    /// An alert with several buttons (first one is the default). Returns the index of the button
+    /// pressed. `details`, when given, goes in a scrolling text area.
+    static func choose(title: String, message: String, details: String? = nil, buttons: [String]) -> Int {
+        let a = NSAlert()
+        a.messageText = title
+        a.informativeText = message
+        if let d = details, !d.isEmpty { a.accessoryView = AlertPresenter.textArea(d) }
+        for b in buttons { a.addButton(withTitle: b) }
+        return a.runModal().rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
+    }
+
     static func confirm(title: String, message: String, details: String? = nil, ok: String) -> Bool {
         let a = NSAlert()
         a.messageText = title

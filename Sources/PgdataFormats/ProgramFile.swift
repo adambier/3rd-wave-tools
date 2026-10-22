@@ -82,6 +82,32 @@ public struct ProgramFile: Equatable {
     /// Format generation number from the tag (5 for "W3_PROG_5").
     public var versionNumber: Int { Int(version.dropFirst("W3_PROG_".count)) ?? 0 }
 
+    /// Number of float values in the float block, which starts at file line 4S + 6 (counting from 0,
+    /// as `Unpacker` does): 504, 508, 520 or
+    /// 544 seen. Programs saved since OS 1.9 (2025) have 544; all older ones have fewer.
+    public var floatBlockCount: Int {
+        let start = 4 * valuesPerPart + 4          // values index of file line 4S + 6 (0-based)
+        guard valuesPerPart > 0, start < values.count else { return 0 }
+        return values[start...].prefix { $0.isFloat }.count
+    }
+
+    /// Layouts seen in real files (1,843 programs: Groove Synthesis factory banks and nine
+    /// third-party sets). The reader finds the oscillator sources from the values-per-part count,
+    /// which is verified only for these.
+    public static let knownVersions = 3...5
+    public static let knownValuesPerPart: Set<Int> = [173, 174, 179, 180, 181]
+
+    /// Why this program's layout is unfamiliar, or nil when it is one seen before.
+    public var layoutWarning: String? {
+        let v = Self.knownVersions.contains(versionNumber)
+        let s = Self.knownValuesPerPart.contains(valuesPerPart)
+        if v && s { return nil }
+        var what: [String] = []
+        if !v { what.append("format \(version)") }
+        if !s { what.append("\(valuesPerPart) values per part") }
+        return "Unfamiliar program layout (\(what.joined(separator: ", "))): its oscillator sources may be misread. Check them, and check the program on the synth after importing."
+    }
+
     public var valuesPerPart: Int {
         if case let .int(v, _)? = values.first { return Int(v) }
         return 0

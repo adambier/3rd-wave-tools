@@ -14,7 +14,7 @@ struct UnpackView: View {
             HStack(spacing: 14) {
                 Button("Add Files…") { state.add(urls: Panels.chooseFiles(message: "Choose .pgdata files to unpack")) }
                 Toggle("Skip wavetables identical to the factory table in their slot", isOn: $state.skipFactoryDuplicates)
-                    .help("Needs the factory folders set under Synth Slots. Each table can still be ticked individually.")
+                    .help("The synth embeds every table a program uses in its own exports, factory ones included. Skipped, they are not written out, and a repack lists the factory slot instead of embedding it. Each table can still be ticked individually.")
                 Spacer()
                 Button("Remove") { state.removeUnpacks(selection); selection = [] }.disabled(selection.isEmpty)
                 Button("Unpack Selected…") { state.unpack(Array(selection)) }.disabled(selection.isEmpty)

@@ -96,7 +96,8 @@ public struct UnpackedProgram {
 
 public enum Unpacker {
     /// Float-block length by values-per-part, from 1,800+ program files.
-    /// 181 has two layouts that share the "W3_PROG_5" tag: 520 (older) and 544 (OS 2.x).
+    /// 181 has two layouts that share the "W3_PROG_5" tag: 520 (older; Sam Gutman's, Feb 2025) and
+    /// 544 (from OS 1.9; Groove Synthesis's 8M factory banks, Aug 2025).
     static let floatCounts: [Int: [Int]] = [173: [504], 174: [508], 179: [508], 180: [520], 181: [544, 520]]
 
     public static func unpack(_ u: UnifiedProgram) -> UnpackedProgram {

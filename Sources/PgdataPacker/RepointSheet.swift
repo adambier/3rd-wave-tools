@@ -29,10 +29,11 @@ struct RepointSheet: View {
         _itemID = State(initialValue: item)
         var file = request.fileID.flatMap { id in state.contentFiles.first { $0.id == id } }
         var slots = state.suggestedSlots()
-        // Opened from a wavetable slot that has nothing yet (e.g. Ghibli Bell's U57): an added file
+        // Opened from a wavetable slot that has nothing yet (e.g. Ghibli Bell's U57, or U48 in a
+        // Dynamica program, which predates the factory U48): an added file
         // without a slot is simply assigned to that slot, so the oscillators need not move. The
         // first such file that no program uses is preselected.
-        if let from = request.from, from.isWavetable, !from.isFactorySlot,
+        if let from = request.from, from.isWavetable,
            let it = state.programs.first(where: { $0.id == item }),
            state.plan(for: it).rows.first(where: { $0.ref == from })?.choice == nil {
             let candidates = state.contentFiles.filter { $0.slot == nil && $0.fits(from) }
@@ -161,9 +162,10 @@ struct RepointSheet: View {
         targetFile = t.file?.id
     }
 
+    /// Factory slots only: a user-slot table always comes from a file you added (listed above).
     private var slotTargets: [Target] {
-        Oscillator.repointTargets.filter { !$0.isBuiltIn }.map { r in
-            Target(id: "s" + r.label, ref: r, title: "\(r.label)  \(state.slotName(r))", detail: r.isFactorySlot ? "factory slot" : "")
+        Oscillator.repointTargets.filter { !$0.isBuiltIn && $0.isFactorySlot }.map { r in
+            Target(id: "s" + r.label, ref: r, title: "\(r.label)  \(state.slotName(r))", detail: "factory")
         }
     }
     private var analogTargets: [Target] {
@@ -180,7 +182,7 @@ struct RepointSheet: View {
             Text("2  What they should play").font(.headline)
             List(selection: $selectedID) {
                 targetSection("Files you added", fileTargets.filter(matches))
-                targetSection("Wavetable slots on your synth", slotTargets.filter(matches))
+                targetSection("Factory wavetables", slotTargets.filter(matches))
                 targetSection("Analog shapes", analogTargets.filter(matches))
             }
             .focused($focus, equals: .list)

@@ -40,8 +40,6 @@ struct PackView: View {
                 .disabled(state.programs.isEmpty && state.contentFiles.isEmpty)
                 .help("Propose tidier names (slot numbers removed, title case) for the programs and the wavetables and samples you added. Factory wavetables are not renamed.")
                 .sheet(isPresented: $state.showNameCleanup) { NameCleanupSheet(state: state) }
-            Toggle("Embed factory wavetables", isOn: $state.embedFactory)
-                .help("Off (recommended): factory tables are listed but not carried, as in Groove Synthesis's own sample library; the synth plays whatever is in those slots. On: they are embedded, as the synth's own export does. A synth that has the table reuses it (no slot used), and one that doesn't stores it in a free slot. Each U table adds about 0.5 MB and each P table about 65 KB, which makes files slower to copy and import. Needs the factory folders set under Synth Slots.")
             Spacer()
             Button("Remove") { state.removePrograms(selection); selection = [] }.disabled(selection.isEmpty)
             Button("Write Selected…") { state.writeUnified(Array(selection)) }.disabled(selection.isEmpty)
@@ -76,11 +74,6 @@ struct SizeLine: View {
     var body: some View {
         HStack(spacing: 8) {
             Text("Estimated .pgdata size: \(PackPlan.formatBytes(plan.estimatedBytes))").foregroundStyle(.secondary)
-            if plan.factoryBytes > 0 {
-                Label("\(PackPlan.formatBytes(plan.factoryBytes)) of it is factory wavetables, which a synth that has them simply reuses. Larger files take longer to copy and import.",
-                      systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
-            }
         }
         .font(.callout)
         let need = plan.slotsNeeded
@@ -138,6 +131,10 @@ struct ProgramDetail: View {
                 Button("Show File") { Panels.reveal(item.url) }.buttonStyle(.link)
             }
             VerdictBadge(verdict: plan.verdict)
+            if let note = plan.userSlotNote { UserSlotNoteBox(note: note) }
+            ForEach(plan.warnings, id: \.self) { w in
+                Label(w, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+            }
             SizeLine(plan: plan)
             Table(plan.rows) {
                 TableColumn("Source") { (row: PackPlan.Row) in SourceCell(state: st, itemID: item.id, row: row) }
@@ -150,6 +147,24 @@ struct ProgramDetail: View {
             }
         }
         .padding(12)
+    }
+}
+
+/// Why U48–U55 are missing in a program made before they were factory slots, and the choices.
+struct UserSlotNoteBox: View {
+    let note: PackPlan.Note
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 6) {
+                Label(note.title, systemImage: "questionmark.circle")
+                    .font(.headline).foregroundStyle(.red)
+                Text(note.body)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: 820, alignment: .leading)
+            .padding(4)
+        }
     }
 }
 

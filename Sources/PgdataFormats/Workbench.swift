@@ -2,8 +2,7 @@ import Foundation
 
 // Decision logic behind the app, kept free of UI code so it can be unit-tested.
 //
-//   SlotProfile     what the user's synth holds in each slot (default: factory where factory)
-//   FactoryLibrary  the factory .wt files, indexed by slot
+//   FactoryLibrary  names and fingerprints of the factory wavetables, indexed by slot (built in)
 //   ContentFile     a .wt or .bin the user added, with the slot it is assigned to
 //   PackPlan        for one program: what each source will be, and whether a .pgdata is needed
 
@@ -67,71 +66,52 @@ public struct ContentFile: Identifiable, Equatable {
     }
 }
 
-// MARK: - Synth profile
-
-/// What one slot on the user's synth holds.
-public struct SlotEntry: Codable, Equatable {
-    public enum State: String, Codable { case factory, file, empty, unknown }
-    public var state: State
-    /// Display name as the synth shows it (may differ from the file's own name).
-    public var name: String
-    /// File holding the content, when state == .file.
-    public var path: String?
-    public var fingerprint: UInt64?
-
-    public init(state: State, name: String = "", path: String? = nil, fingerprint: UInt64? = nil) {
-        self.state = state; self.name = name; self.path = path; self.fingerprint = fingerprint
-    }
-}
-
-public struct SlotProfile: Codable, Equatable {
-    /// Keyed by slot label ("U50"). Missing entries take the default.
-    /// Only wavetable slots are tracked. Sample memory is swapped too often for a record of it to
-    /// stay true, so sample slots always read as unknown and their .bin must be supplied when packing.
-    public var entries: [String: SlotEntry] = [:]
-
-    public init() {}
-
-    public static func defaultEntry(_ ref: SourceRef) -> SlotEntry {
-        ref.isFactorySlot ? SlotEntry(state: .factory) : SlotEntry(state: .unknown)
-    }
-
-    public func entry(_ ref: SourceRef) -> SlotEntry {
-        ref.isSample ? Self.defaultEntry(ref) : (entries[ref.label] ?? Self.defaultEntry(ref))
-    }
-
-    public mutating func set(_ ref: SourceRef, _ e: SlotEntry?) {
-        if ref.isSample { entries[ref.label] = nil; return }
-        if let e, e != Self.defaultEntry(ref) { entries[ref.label] = e } else { entries[ref.label] = nil }
-    }
-
-    public mutating func assign(_ file: ContentFile, to ref: SourceRef, displayName: String? = nil) {
-        set(ref, SlotEntry(state: .file, name: displayName ?? file.name, path: file.url.path, fingerprint: file.fingerprint))
-    }
-
-    public func encoded() throws -> Data {
-        let e = JSONEncoder(); e.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try e.encode(self)
-    }
-    public static func decoded(_ d: Data) throws -> SlotProfile { try JSONDecoder().decode(SlotProfile.self, from: d) }
-}
-
 // MARK: - Factory library
 
-/// The factory wavetables, read from the folders Groove Synthesis distributes ("00-Additive_Bell_17.wt",
-/// "00P.wt", "P34_VS_0-63.wt"). The slot comes from the number at the start of the file name;
-/// the kind from the file's own header.
+/// The factory wavetables, as names and content fingerprints by slot. The app uses the built-in
+/// list (`FactoryLibrary.builtIn`, generated from Groove Synthesis's factory .wt files by
+/// `tw3pg factory-catalog`); it never embeds factory tables, so it does not need their data.
+/// `init(folders:)` reads the .wt files themselves, for that generator and for tests.
 public struct FactoryLibrary {
-    public private(set) var tables: [SourceRef: (url: URL, name: String, fingerprint: UInt64)] = [:]
+    public struct Table: Equatable {
+        public var name: String
+        public var fingerprint: UInt64
+        public init(name: String, fingerprint: UInt64) { self.name = name; self.fingerprint = fingerprint }
+    }
+    public private(set) var tables: [SourceRef: Table] = [:]
     public private(set) var problems: [String] = []
 
     public init() {}
 
+    public init(_ tables: [SourceRef: Table]) { self.tables = tables }
+
+    /// The factory set built into the app (U00–U55, P00–P35; U48–U55 added in 2025).
+    public static let builtIn: FactoryLibrary = {
+        var t: [SourceRef: Table] = [:]
+        for e in FactoryCatalog.entries {
+            if let r = SourceRef(label: e.slot), r.isFactorySlot { t[r] = Table(name: e.name, fingerprint: e.fingerprint) }
+        }
+        return FactoryLibrary(t)
+    }()
+
+    /// All 56 factory U tables and 36 factory P tables present.
+    public var isComplete: Bool {
+        tables.keys.filter { if case .u = $0 { return true }; return false }.count >= 56 && tables.keys.filter(\.isP).count >= 36
+    }
+
+    /// Reads the .wt files in each folder and in its immediate subfolders, as Groove Synthesis
+    /// distributes them ("00-Additive_Bell_17.wt", "00P.wt", "P34_VS_0-63.wt"). The slot comes from
+    /// the number at the start of the file name; the kind from the file's own header.
     public init(folders: [URL]) {
         let fm = FileManager.default
         for folder in folders {
-            guard let items = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else {
+            guard let top = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isDirectoryKey],
+                                                         options: [.skipsHiddenFiles]) else {
                 problems.append("Could not read \(folder.path)."); continue
+            }
+            var items = top
+            for sub in top where (try? sub.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                items += (try? fm.contentsOfDirectory(at: sub, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])) ?? []
             }
             for url in items where url.pathExtension.lowercased() == "wt" {
                 guard let w = try? WavetableFile(data: Data(contentsOf: url)) else {
@@ -144,14 +124,9 @@ public struct FactoryLibrary {
                 guard let n else { problems.append("\(url.lastPathComponent): no slot number in the name."); continue }
                 let ref: SourceRef = w.kind == .p ? .p(n) : .u(n)
                 guard ref.isFactorySlot else { problems.append("\(url.lastPathComponent): \(ref.label) is not a factory slot."); continue }
-                tables[ref] = (url, w.name, w.fingerprint)
+                tables[ref] = Table(name: w.name, fingerprint: w.fingerprint)
             }
         }
-    }
-
-    public func wavetable(_ ref: SourceRef) -> WavetableFile? {
-        guard let t = tables[ref] else { return nil }
-        return try? WavetableFile(data: Data(contentsOf: t.url))
     }
 
     public func name(_ ref: SourceRef) -> String? { tables[ref]?.name }
@@ -159,6 +134,29 @@ public struct FactoryLibrary {
     /// Factory slot whose table has this content, if any.
     public func slot(withFingerprint f: UInt64) -> SourceRef? {
         tables.first { $0.value.fingerprint == f }?.key
+    }
+
+    /// Swift source for `FactoryCatalog`, listing these tables in slot order.
+    public func catalogSource(note: String) -> String {
+        let refs = tables.keys.sorted()
+        var s = """
+        // Generated by `tw3pg factory-catalog`. Do not edit by hand.
+        // \(note)
+        //
+        // Names and content fingerprints (FNV-1a 64 of the table's values) of the factory wavetables.
+        // Only these are stored, not the wavetables themselves.
+
+        enum FactoryCatalog {
+            static let entries: [(slot: String, name: String, fingerprint: UInt64)] = [
+
+        """
+        for r in refs {
+            let t = tables[r]!
+            let name = t.name.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+            s += "        (\"\(r.label)\", \"\(name)\", 0x" + String(format: "%016llX", t.fingerprint) + "),\n"
+        }
+        s += "    ]\n}\n"
+        return s
     }
 }
 
@@ -168,10 +166,8 @@ public struct PackPlan {
     /// What the user (or the defaults) chose for one source.
     public enum Choice: Hashable {
         case builtIn                 // analog shape
-        case reference               // list the slot only; the synth supplies the content
-        case factory                 // embed the factory table
+        case reference               // list the slot only; the synth supplies its factory table
         case file(UUID)              // embed a content file from this session
-        case profile                 // embed the file the synth profile says is in that slot
     }
 
     public enum Status: Equatable {
@@ -199,6 +195,15 @@ public struct PackPlan {
         /// whose content it already has (in any slot, whatever its name); anything else goes into a
         /// free slot, and if there is none it offers to overwrite the last ones. [verified, T2/T6]
         public var mayNeedSlot = false
+        /// U48–U55 in a program saved before they became factory slots, with no table added: most
+        /// likely the author's own wavetable (see `PackPlan.userSlotNote`).
+        public var wasUserSlot = false
+    }
+
+    /// Why some U48–U55 sources are missing, and what to do about it: title and body.
+    public struct Note: Equatable {
+        public var title: String
+        public var body: String
     }
 
     public enum Verdict: Equatable {
@@ -209,15 +214,32 @@ public struct PackPlan {
 
     public var rows: [Row]
     public var verdict: Verdict
+    /// Things to check that do not stop the program being written (an unfamiliar layout).
+    public var warnings: [String] = []
+    /// Set when U48–U55 are missing because the program predates them as factory slots.
+    public var userSlotNote: Note? = nil
     /// Approximate size of the .pgdata this plan would produce.
     public var estimatedBytes: Int
+    /// What a blocked program needs, for reports: "needs U57" or
+    /// "needs U48, U50: probably the author's own wavetables from before 2025".
+    public var missingSummary: String? {
+        guard case .blocked(let refs) = verdict else { return nil }
+        let old = rows.filter(\.wasUserSlot).map(\.ref).sorted()
+        let other = refs.filter { !old.contains($0) }
+        var parts: [String] = []
+        if !other.isEmpty { parts.append(other.map(\.label).joined(separator: ", ")) }
+        if !old.isEmpty {
+            parts.append(old.map(\.label).joined(separator: ", ")
+                         + ": probably the author's own wavetable\(old.count == 1 ? "" : "s") from before 2025")
+        }
+        return "needs " + parts.joined(separator: "; ")
+    }
+
     /// Embedded wavetables that may need a free U / P slot on import (see Row.mayNeedSlot).
     public var slotsNeeded: (u: Int, p: Int) {
         let r = rows.filter(\.mayNeedSlot)
         return (r.filter { if case .u = $0.ref { return true }; return false }.count, r.filter(\.ref.isP).count)
     }
-    /// Part of that size taken by embedded factory wavetables.
-    public var factoryBytes: Int
 
     static let uTableBytes = 3 + 32 + 131_072 * 4
     static let pTableBytes = 3 + 32 + 16_384 * 4
@@ -228,22 +250,22 @@ public struct PackPlan {
 
     /// Builds the plan for a program.
     ///
-    /// Default choice per source, in order:
-    ///  1. a content file assigned to that slot in this session (the program's author supplied it)
-    ///  2. for a factory slot: the factory table — embedded only if `embedFactory` — with a warning
-    ///     if the synth profile says that slot now holds something else
-    ///  3. for a non-factory wavetable slot: the file the synth profile has there (samples: never)
-    ///  4. otherwise nothing: the source is reported missing and packing is blocked
-    public static func make(program: ProgramFile, files: [ContentFile], profile: SlotProfile,
-                            factory: FactoryLibrary, embedFactory: Bool,
+    /// Default choice per source:
+    ///  1. a content file assigned to that slot in this session (the program's author supplied it),
+    ///     unless it is identical to the factory table of that slot: then the slot is listed only
+    ///  2. for a factory slot: listed without data; the receiving synth plays its own factory table.
+    ///     Factory tables are never embedded. Exception: in a program saved before the 2025 factory
+    ///     tables (see `predates2025FactoryTables`), U48–U55 were user slots, so they are treated
+    ///     like user slots; the factory table stays available as a choice, not as the default.
+    ///  3. otherwise (a user slot or a multisample with no file added) nothing: the source is
+    ///     reported missing and packing is blocked
+    public static func make(program: ProgramFile, files: [ContentFile], factory: FactoryLibrary,
                             overrides: [SourceRef: Choice] = [:], original: ProgramFile? = nil) -> PackPlan {
         let srcs = program.sources
         let originalSrcs = original?.sources ?? srcs
-        // Content the synth is known to have: files recorded in Synth Slots, and factory tables in
-        // slots that still hold their factory table.
-        var onSynth = Set<UInt64>()
-        for (label, e) in profile.entries where e.state == .file { if let fp = e.fingerprint, !label.hasPrefix("S") { onSynth.insert(fp) } }
-        for (r, t) in factory.tables where profile.entry(r).state == .factory { onSynth.insert(t.fingerprint) }
+        let predates = predates2025FactoryTables(program)
+        // Content a synth is expected to have: the factory tables.
+        let onSynth = Set(factory.tables.values.map(\.fingerprint))
         var rows: [Row] = []
         for ref in program.distinctSources {
             let positions = srcs.indices.filter { srcs[$0] == ref }
@@ -255,25 +277,33 @@ public struct PackPlan {
                                 choice: .builtIn, options: [.builtIn], status: .ok("Built in"), embeds: false))
                 continue
             }
-            let entry = profile.entry(ref)
-            let assigned = files.filter { $0.slot == ref && $0.fits(ref) }
-            var options: [Choice] = assigned.map { .file($0.id) }
-            if ref.isWavetable, ref.isFactorySlot {
-                options.append(.reference)
-                if factory.tables[ref] != nil { options.append(.factory) }
+            if case let .unknown(id) = ref {
+                rows.append(Row(ref: ref, usedBy: users, oscillators: positions, repointedFrom: from,
+                                choice: nil, options: [],
+                                status: .missing("Unknown source number \(id): not a wavetable, analog shape or sample slot. Point these oscillators to another slot."),
+                                embeds: false))
+                continue
             }
-            if entry.state == .file, entry.path != nil { options.append(.profile) }
-            if ref.isWavetable, !ref.isFactorySlot, !options.contains(.reference) { options.append(.reference) }
-            // Samples are always embedded: a program is never packed without its multisample.
+            let factoryTable = factory.tables[ref]
+            let assigned = files.filter { $0.slot == ref && $0.fits(ref) }
+            // A file identical to this slot's factory table is the factory table: listed, not embedded.
+            let distinct = assigned.filter { $0.fingerprint != factoryTable?.fingerprint }
+            var options: [Choice] = distinct.map { .file($0.id) }
+            let isFactory = ref.isWavetable && ref.isFactorySlot
+            // A slot that was a user slot when this program was saved (U48–U55 before 2025): the
+            // program meant the author's own table there, unless the added file is the factory table.
+            let wasUserSlot = isFactory && predates && is2025FactorySlot(ref) && assigned.count == distinct.count
+            if isFactory { options.append(.reference) }
+            // Tables in user slots and multisamples are always embedded from an added file: a program
+            // is never packed without them.
 
             var choice: Choice? = overrides[ref].flatMap { options.contains($0) ? $0 : nil }
             if choice == nil {
-                if let f = assigned.first { choice = .file(f.id) }
-                else if ref.isWavetable && ref.isFactorySlot { choice = embedFactory && factory.tables[ref] != nil ? .factory : .reference }
-                else if entry.state == .file, entry.path != nil { choice = .profile }
+                if let f = distinct.first { choice = .file(f.id) }
+                else if isFactory && !wasUserSlot { choice = .reference }
             }
 
-            let factoryName = factory.name(ref).map { "\"\($0)\"" } ?? "the factory table"
+            let factoryName = factory.name(ref).map { "\"\($0)\"" } ?? "table"
             var status: Status
             var embeds = false
             var mayNeedSlot = false
@@ -288,54 +318,83 @@ public struct PackPlan {
                     status = .ok("Embeds \"\(f.name)\" from \(f.url.lastPathComponent); goes into a free S slot on import")
                 } else {
                     bytes = tableBytes
-                    if onSynth.contains(f.fingerprint) {
-                        status = .ok("Embeds \"\(f.name)\"; your synth already has this table, so it is reused")
+                    if let same = factory.slot(withFingerprint: f.fingerprint) {
+                        status = .ok("Embeds \"\(f.name)\", identical to factory \(same.label); a synth that has it reuses it")
                     } else {
-                        mayNeedSlot = true
+                        mayNeedSlot = !onSynth.contains(f.fingerprint)
                         status = .ok("Embeds \"\(f.name)\" from \(f.url.lastPathComponent); goes into a free \(ref.isP ? "P" : "U") slot on import")
                     }
                 }
-            case .factory?:
-                embeds = true; bytes = tableBytes
-                if let fp = factory.tables[ref]?.fingerprint, onSynth.contains(fp) {
-                    status = .ok("Embeds factory \(factoryName) (+\(formatBytes(tableBytes)); reused on import, since your synth has it)")
-                } else {
-                    mayNeedSlot = true
-                    status = .ok("Embeds factory \(factoryName) (+\(formatBytes(tableBytes)); goes into a free slot on import unless your synth has it)")
-                }
-            case .profile?:
-                status = .ok("Embeds \"\(entry.name)\", as on your synth (reused on import)"); embeds = true
-                if ref.isSample {
-                    let size = (try? FileManager.default.attributesOfItem(atPath: entry.path ?? "")[.size] as? Int) ?? nil
-                    bytes = (size ?? 0) + 3 - 16
-                } else { bytes = tableBytes }
             case .reference?:
-                if ref.isFactorySlot {
-                    status = .ok("Factory \(factoryName); not embedded")
-                    if entry.state == .file {
-                        status = .warning("Expects factory \(factoryName), but your synth has \"\(entry.name)\" in \(ref.label)")
-                    }
-                } else {
-                    status = .warning("Not embedded: plays whatever is in \(ref.label) on the synth that loads it")
-                }
+                // Offered only for factory slots: listed without data, the synth plays its own table.
+                status = .ok("Factory \(factoryName); not embedded"
+                             + (assigned.count > distinct.count ? " (the added file is identical to it)" : ""))
             case .builtIn?: status = .ok("Built in")
+            case nil where wasUserSlot:
+                status = .missing("Probably the author's own wavetable: \(ref.label) was a user slot when this program was made. See the note above.")
             case nil:
                 status = .missing(ref.isSample
                     ? "Needs the multisample for \(ref.label): add its .bin file and assign it to \(ref.label)"
-                    : "Needs a wavetable for \(ref.label) (not a factory slot): add its .wt file and assign it to \(ref.label)")
+                    : "Needs the wavetable for \(ref.label) (a user slot): add its .wt file, or point these oscillators to another slot")
             }
             rows.append(Row(ref: ref, usedBy: users, oscillators: positions, repointedFrom: from,
                             choice: choice, options: options, status: status, embeds: embeds, bytes: bytes,
-                            mayNeedSlot: mayNeedSlot))
+                            mayNeedSlot: mayNeedSlot, wasUserSlot: wasUserSlot && choice == nil))
         }
         let missing = rows.filter { $0.choice == nil }.map(\.ref)
         let verdict: Verdict
         if !missing.isEmpty { verdict = .blocked(missing) }
-        else if rows.contains(where: { $0.embeds && !($0.choice == .factory) }) { verdict = .embedsContent }
+        else if rows.contains(where: \.embeds) { verdict = .embedsContent }
         else { verdict = .factoryOnly }
         let total = 17 + 4 * rows.count + rows.reduce(0) { $0 + $1.bytes } + 32 + 4 * program.values.count
-        let factoryTotal = rows.filter { $0.choice == .factory }.reduce(0) { $0 + $1.bytes }
-        return PackPlan(rows: rows, verdict: verdict, estimatedBytes: total, factoryBytes: factoryTotal)
+        let userSlots = rows.filter(\.wasUserSlot).map(\.ref)
+        return PackPlan(rows: rows, verdict: verdict, warnings: [program.layoutWarning].compactMap { $0 },
+                        userSlotNote: userSlots.isEmpty ? nil : userSlotNote(program: program, slots: userSlots, factory: factory),
+                        estimatedBytes: total)
+    }
+
+    /// U48–U55: user slots until Groove Synthesis added them to the factory set in 2025 (files dated
+    /// April 2025, shipped with OS 1.9).
+    public static func is2025FactorySlot(_ ref: SourceRef) -> Bool {
+        if case let .u(n) = ref { return (48...55).contains(n) }
+        return false
+    }
+
+    /// Float-block length of programs saved since OS 1.9 (2025).
+    public static let currentFloatBlockCount = 544
+
+    /// A program saved before OS 1.9, and so before U48–U55 held factory tables: an older format
+    /// (W3_PROG_1 to _4) or fewer than 544 values in its float block.
+    /// [inferred from the sets seen: every 544-float set dates from 2025 on (8M factory, Matt Johnson,
+    /// Miles Away Vol. 3) and every set with fewer predates it (Dynamica, Frank Pels, Euphonic Wave,
+    /// Analog Core, Miles Away Vol. 2, Sam Gutman's v5). The 2025 tables shipped with OS 1.9.]
+    public static func predates2025FactoryTables(_ p: ProgramFile) -> Bool {
+        (1...4).contains(p.versionNumber) || p.floatBlockCount < currentFloatBlockCount
+    }
+
+    /// The explanation shown with a program whose U48–U55 sources are missing because it predates them.
+    static func userSlotNote(program: ProgramFile, slots: [SourceRef], factory: FactoryLibrary) -> Note {
+        let slots = slots.sorted()
+        let one = slots.count == 1
+        func and(_ xs: [String]) -> String { xs.count == 1 ? xs[0] : xs.dropLast().joined(separator: ", ") + " and " + xs.last! }
+        func fname(_ r: SourceRef) -> String { "\"\(factory.name(r) ?? "factory table")\"" }
+        let list = and(slots.map(\.label))
+        let first = slots[0]
+        let title = one
+            ? "\(list) probably held the author's own wavetable, which is not included"
+            : "\(list) probably held the author's own wavetables, which are not included"
+        let factoryList = and(slots.map { "\($0.label) \(fname($0))" })
+        let body = """
+        This program was most likely made before 2025. Its layout is older than what the synth has saved since OS 1.9 (\(program.version), with \(program.floatBlockCount) values in its float block rather than \(currentFloatBlockCount)). The file itself carries no date, so this is an inference.
+
+        Until 2025, U48–U55 were user slots, where people loaded their own wavetables. Groove Synthesis then made them factory slots. Loaded as it is, this program would play the factory \(one ? "table" : "tables") \(factoryList) instead of the \(one ? "one" : "ones") the author used.
+
+        To fix it, do one of these:
+        • Add the author's wavetable \(one ? "file" : "files") for \(list). Program sets that use these slots usually include them, often named with the slot (for example "\(first.label) Name.wt"). A file whose name starts with the slot is assigned to it automatically; otherwise, choose Point to another slot… in the slot's Content menu and pick the file. \(one ? "The table is" : "The tables are") then included in the .pgdata, and the synth stores \(one ? "it in a free slot" : "them in free slots") when it imports the file.
+        • Point the oscillators to a different wavetable you have: Point to another slot… in the slot's Content menu.
+        • Use the factory \(one ? "table" : "tables") anyway: \(one ? "in the slot's Content menu, choose Factory \(fname(first))" : "in each slot's Content menu, choose its factory table (Factory \(fname(first)) for \(first.label), and so on)"). Choose this if you know the program was made for \(one ? "it" : "them"), or you accept a different sound.
+        """
+        return Note(title: title, body: body)
     }
 
     /// For each content file that no plan uses, why: not used by any program (whether or not it has a
@@ -353,25 +412,14 @@ public struct PackPlan {
         return out
     }
 
-    /// Content for the packer, loading profile files from disk as needed.
-    /// `names` renames added files (by file id). A table taken from the synth profile carries the
-    /// name the profile records, i.e. the name the synth shows.
-    public func content(files: [ContentFile], profile: SlotProfile, factory: FactoryLibrary,
-                        names: [UUID: String] = [:]) throws -> [SourceRef: SourceContent] {
+    /// Content for the packer. `names` renames added files (by file id).
+    public func content(files: [ContentFile], names: [UUID: String] = [:]) -> [SourceRef: SourceContent] {
         var out: [SourceRef: SourceContent] = [:]
         for r in rows {
             switch r.choice {
             case .file(let id)?:
                 let c = files.first { $0.id == id }!.content
                 out[r.ref] = names[id].map { c.renamed($0) } ?? c
-            case .factory?:
-                guard let w = factory.wavetable(r.ref) else { throw FormatError.invalid("Factory table for \(r.ref.label) could not be read.") }
-                out[r.ref] = .wavetable(w)
-            case .profile?:
-                let path = profile.entry(r.ref).path ?? ""
-                let c = try ContentFile.load(URL(fileURLWithPath: path)).content
-                let shown = profile.entry(r.ref).name
-                out[r.ref] = shown.isEmpty ? c : c.renamed(shown)
             case .reference?: out[r.ref] = .reference
             case .builtIn?, nil: break
             }

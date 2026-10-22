@@ -108,10 +108,10 @@ final class PackTests: XCTestCase {
         let g = try Packer.pack(pro, content: [.s(0): .reference])
         XCTAssertFalse(g.sources[0].hasData)
         // The app's plan offers no way to leave it out, even when asked.
-        let plan = PackPlan.make(program: pro, files: [], profile: SlotProfile(), factory: FactoryLibrary(), embedFactory: false)
+        let plan = PackPlan.make(program: pro, files: [], factory: FactoryLibrary())
         XCTAssertEqual(plan.verdict, .blocked([.s(0)]))
         XCTAssertFalse(plan.rows[0].options.contains(.reference))
-        let forced = PackPlan.make(program: pro, files: [], profile: SlotProfile(), factory: FactoryLibrary(), embedFactory: false,
+        let forced = PackPlan.make(program: pro, files: [], factory: FactoryLibrary(),
                                    overrides: [.s(0): .reference])
         XCTAssertEqual(forced.verdict, .blocked([.s(0)]))
     }
