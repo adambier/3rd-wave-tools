@@ -191,7 +191,7 @@ struct RepointSheet: View {
             .onChange(of: selectedID) { id in select(id) }
             HStack(spacing: 6) {
                 Image(systemName: "line.3.horizontal.decrease.circle").foregroundStyle(.secondary)
-                TextField("Filter the list by slot or name, e.g. U56 or vowel", text: $search)
+                TextField("Filter the list by slot or name (e.g., U56 or vowel)", text: $search)
                     .textFieldStyle(.roundedBorder)
                     .focused($focus, equals: .filter)
             }

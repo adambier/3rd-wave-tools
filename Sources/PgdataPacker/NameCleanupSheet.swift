@@ -50,7 +50,7 @@ struct NameCleanupSheet: View {
                 .font(.caption).foregroundStyle(.secondary)
 
             HStack(spacing: 18) {
-                Toggle("Remove slot numbers (B5-P003, U48, S10) at the start or end", isOn: $rules.stripSlots)
+                Toggle("Remove slot numbers (e.g., B5-P003, U48, S10) at the start or end", isOn: $rules.stripSlots)
                 Toggle("Underscores to spaces", isOn: $rules.underscoresToSpaces)
             }
             HStack(spacing: 18) {
@@ -62,7 +62,7 @@ struct NameCleanupSheet: View {
                     .onChange(of: keepText) { t in
                         rules.fixedSpellings = t.split(whereSeparator: { $0 == "," || $0 == " " }).map(String.init)
                     }
-                    .help("Words always written exactly as typed here, e.g. LFO, LoFi. Words containing digits (JP8, TB303) are always kept as they are.")
+                    .help("Words always written exactly as typed here (e.g., LFO, LoFi). Words containing digits (e.g., JP8, TB303) are always kept as they are.")
             }
             Toggle("Show only names that change", isOn: $onlyChanges)
 

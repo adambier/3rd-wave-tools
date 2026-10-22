@@ -34,7 +34,7 @@ The app knows the factory tables by name and by a fingerprint of their content, 
 Groove Synthesis's factory `.wt` files (`tw3pg factory-catalog`; only names and fingerprints are
 stored, not the tables). It uses them to:
 
-- show factory slot names ("U00 Additive_Bell_17");
+- show factory slot names (e.g., "U00 Additive_Bell_17");
 - recognise a factory table among the files you add (for example one unpacked from the synth's own
   export, which carries every table it uses), so it is listed rather than embedded;
 - leave factory tables out of the free-slot estimate, since a synth that has them reuses them;
@@ -42,7 +42,7 @@ stored, not the tables). It uses them to:
 
 U48–U55 joined the factory set in 2025 (with OS 1.9, which also brought `.pgdata`). Before that
 they were user slots, and some older program sets used them for their own tables, shipped as `.wt`
-files named with the slot (`U48 Warm Pad.wt`). So in a program saved before OS 1.9, U48–U55
+files named with the slot (e.g., `U48 Warm Pad.wt`). So in a program saved before OS 1.9, U48–U55
 are treated like user slots: missing until you add the table, which is then embedded and goes into
 a free slot on import. A note with the program explains this and the three ways to fix it: add the
 author's tables, point the oscillators elsewhere, or choose the factory table anyway from the
@@ -63,7 +63,7 @@ Drop `.pro` files, plus the `.wt` / `.bin` files they need. For each program the
 oscillator sources and what each will be:
 
 - a file you added and assigned to that slot (this wins, since it is what the program's author
-  supplied). A file named with a slot (`U48 Warm Pad.wt`, `S010_Strings.bin`) is assigned to it
+  supplied). A file named with a slot (e.g., `U48 Warm Pad.wt`, `S010_Strings.bin`) is assigned to it
   automatically;
 - for a factory slot: the factory table, listed but not embedded. An added file identical to it is
   listed the same way;
@@ -90,7 +90,7 @@ Each program shows one of:
 repoints oscillators. Tick the oscillators to change, then pick the target:
 
 - a file you added (listed first). A file without a slot is given one automatically: when the
-  program needs a slot that has nothing yet (say U57), the sheet preselects your
+  program needs a slot that has nothing yet (e.g., U57), the sheet preselects your
   unused file and simply assigns it to that slot, so the oscillators stay as they are;
 - any factory U or P slot (searchable by slot or name);
 - an analog shape.
@@ -119,10 +119,10 @@ wavetables):
 
 Within title case:
 
-- words with digits stay as they are (JP8, TB303);
-- words with no vowels are taken to be acronyms (PWM, PPG, FM). Y counts as a vowel, so "SYNTH"
+- words with digits stay as they are (e.g., JP8, TB303);
+- words with no vowels are taken to be acronyms (e.g., PWM, PPG, FM). Y counts as a vowel, so "SYNTH"
   becomes "Synth";
-- words on an editable list keep a fixed spelling (LFO, MIDI, LoFi…).
+- words on an editable list keep a fixed spelling (e.g., LFO, MIDI, LoFi).
 
 Every proposal is shown, can be edited, and can be unticked. New names go into the `.pgdata` and
 its file name. Source files are not changed, and unpacking keeps names as they are.
@@ -143,16 +143,16 @@ Files are named in Groove Synthesis's own pattern, with the program location fir
 `B05P87_Glass_Bells.pgdata`, as in Groove Synthesis's `B05P06_Glass_Cow_Bell_Transients.pgdata`.
 
 - The location comes from the `.pro` file name, since a `.pro` does not record it. Every set seen
-  names its files that way (`B05P100.pro`).
+  names its files that way (e.g., `B05P100.pro`).
 - The prefix keeps the synth's alphabetical bulk import in program order.
 - As in the synth's own exports, spaces become underscores and punctuation other than hyphens is
-  dropped ("Big Bass (MW)" → `Big_Bass_MW`). This affects the file name only, not the
+  dropped (e.g., "Big Bass (MW)" → `Big_Bass_MW`). This affects the file name only, not the
   program name inside it.
-- A batch that includes a program 100 uses three digits throughout (`B05P087_…`, `B05P100_…`).
+- A batch that includes a program 100 uses three digits throughout (e.g., `B05P087_…`, `B05P100_…`).
   The synth itself writes `B05P09_…` and `B05P100_…`, but in plain alphabetical order `B05P100`
   sorts before `B05P95`, which could put it first in a bulk import.
-- If any program's file name has no location (a renamed file), all are numbered by their place
-  in the list instead (`001_…`, `002_…`).
+- If any program's file name has no location (for example, a renamed file), all are numbered by their place
+  in the list instead (e.g., `001_…`, `002_…`).
 
 #### What the synth does on import
 
@@ -171,7 +171,7 @@ Checked on an 8M (OS 2.0d):
 ### Unpack
 
 Drop `.pgdata` files. Each becomes a `.pro`, plus a `.wt` per embedded wavetable and a `.bin` per
-multisample, named the way Groove Synthesis names its own files (`U57_Warm Pad.wt`, `S010_Strings.bin`).
+multisample, named the way Groove Synthesis names its own files (e.g., `U57_Warm Pad.wt`, `S010_Strings.bin`).
 
 Untick anything you don't want, or rename it, before **Unpack…**. Wavetables identical to the
 factory table in their slot are skipped by default: the synth's own export embeds factory tables
@@ -201,7 +201,7 @@ of values per part (173, 174, 179, 180 or 181 seen), and part *k* starts at line
 its three oscillator ids at offsets 3–5. A float block starts at line 4S + 6 (504, 508, 520 or
 544 floats depending on version), followed by a variable-length integer tail (sequencer data).
 
-**.wt** — text: `PNAME`/`UNAME`, the name, then one float per line (`0.963237f`). P tables hold
+**.wt** — text: `PNAME`/`UNAME`, the name, then one float per line (e.g., `0.963237f`). P tables hold
 64 × 128 (sample, delta-to-next) pairs = 16,384 values; U tables 131,072 values.
 
 **.bin** — `W3_MSAMPLE_<v>` (1, 4, 5 seen), sample count, 32-byte slot name, then the samples:
@@ -216,17 +216,21 @@ indices.
 
 ## Verification
 
-Run against 2,000-odd real files: Groove Synthesis's 8M factory banks and sample library, Groove Synthesis's
-1.8 examples and the Bank Arranger banks, plus nine third-party sound sets.
+Run against about 2,500 real files: Groove Synthesis's factory banks (8M, and 24-voice versions 1
+and 2b; version 1 is also what the Bank Arranger ships), sample library and 1.8 examples, plus nine
+third-party sound sets.
 
 - Every `.pro`, `.bin`, `.wt` and `.pgdata` reads and rewrites byte for byte.
-- All 202 intact `.pgdata` unpack and repack identically, up to the `.pro` format's six-decimal
+- All 221 intact `.pgdata` unpack and repack identically, up to the `.pro` format's six-decimal
   float precision (the synth's own `.pro` export has the same limit).
-- All 280 embedded wavetables are bit-identical to Groove Synthesis's `.wt` files.
-- Packing Groove Synthesis's 19 factory `.pro` files reproduces Groove Synthesis's `.pgdata`. The differences are
-  three values that appear to be state captured at export time, and the leftover source
-  references from unused parts, which this app lists and Groove Synthesis's 8M exporter does not (Groove Synthesis's
-  sample library does).
+- All 314 embedded wavetables are bit-identical to Groove Synthesis's `.wt` files.
+- Packing Groove Synthesis's factory `.pro` files reproduces their `.pgdata` (19 for the 8M, 19 for
+  the 24-voice models): the same wavetables and samples, in the same order. What differs is a few
+  values that appear to be state captured at export time (one per part), small rounding where the
+  `.pro` holds six decimals and the `.pgdata` the exact value, and the leftover source references
+  from unused parts, which this app lists and Groove Synthesis's 8M exporter does not (their
+  24-voice and sample-library files do). One 24-voice program's `.pro` and `.pgdata` differ in real
+  settings; they appear to be different editions of the program.
 
 ## Synth tests
 
