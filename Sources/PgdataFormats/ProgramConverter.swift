@@ -4,18 +4,20 @@ import Foundation
 /// W3_PROG_5 with 181 integers and 137 floats per part, 182 global values, then the event records.
 ///
 /// The rules reproduce what the 3rd Wave's Import program (and Bulk program import, which converts
-/// the same way) did to 299 programs on an 8M: 100 W3_PROG_3, 76 W3_PROG_4 and 123 older W3_PROG_5,
-/// in ten layouts. With `.eightM`, 292 of the 299 come out identical, value for value; the other 7
-/// (all W3_PROG_3) differ in one to six values that no rule found so far explains, apart from one
-/// program whose part 2 the 8M replaced with a copy of part 1. See docs/FORMATS.md.
+/// the same way) did to programs on two models running OS 2.0d: 299 on an 8M (100 W3_PROG_3, 76
+/// W3_PROG_4, 123 older W3_PROG_5, ten layouts) and 300 on a 24M (the same 2022 factory bank and
+/// third-party programs, plus Groove Synthesis's 2025 factory bank 1). 292 of the 299 and 292 of
+/// the 300 come out identical, value for value. The rest are all W3_PROG_3 and differ in one to
+/// six values that no rule found so far explains, apart from one program whose part 2 both models
+/// replaced with a copy of part 1. See docs/FORMATS.md.
 ///
 /// A .pgdata import converts an old layout's structure but skips several of these value changes:
 /// a W3_PROG_3 program packed unconverted played silent [verified on hardware].
 public enum ProgramConverter {
-    /// The 3rd Wave the program is converted for. An 8M has two parts: its import replaces parts 3
-    /// and 4 with fixed filler and limits everything else to parts 1 and 2. The 24-voice models
-    /// keep all four parts; for them the 8M-only steps are left out [inferred: no 24K or 24M
-    /// imports were available to compare].
+    /// The 3rd Wave whose Import program the result reproduces. `.twentyFour` (24K or 24M) keeps
+    /// all four parts and is what pgdata Packer writes: an 8M fits such a program to its two parts
+    /// when it imports the .pgdata [verified]. `.eightM` adds the 8M's own two-part steps; it is
+    /// used to check the rules against the 8M's exports.
     public enum Model: String, CaseIterable, Sendable {
         case eightM = "8M"
         case twentyFour = "24K / 24M"
@@ -83,10 +85,14 @@ public enum ProgramConverter {
         var g = oldG + globalDefaults[(l.globals - 73)...]
 
         for k in parts {
-            // Set in every converted program [observed in 299/299].
+            // Set in every converted program [observed in all 599 conversions, both models].
             floats[k][85] = "0.000000"
-            floats[k][102] = "1.000000"
             floats[k][116] = "0.000000"
+            // Float 102 is 1.0 after every conversion, except that a 24M gives W3_PROG_3 programs
+            // 0.446233 [observed: 100 on each model].
+            floats[k][102] = (v == 3 && !eightM) ? "0.446233" : "1.000000"
+            // 0 became 1.0 [observed in 12 parts 3–4 on the 24M; 1.0 in every other part seen].
+            if floats[k][115] == "0.000000" { floats[k][115] = "1.000000" }
             // 2.0 became 1.0 [observed twice, W3_PROG_3].
             for j in [91, 95] where (Double(floats[k][j]) ?? 0) > 1 { floats[k][j] = "1.000000" }
             // 0 became 1 [observed in all 53 parts that had 0].
@@ -104,6 +110,9 @@ public enum ProgramConverter {
         }
 
         for (j, x) in globalsSet { g[j] = x }
+        // Values each model sets its own way on every import [observed: 299 on the 8M, 300 on the 24M].
+        let stamp: [(Int, Int32)] = eightM ? [(0, 3), (80, 1), (174, 1)] : [(0, 2), (80, 0), (174, 0)]
+        for (j, x) in stamp { g[j] = x }
         // Velocity: W3_PROG_3's 5 became 2 in 89 programs and 3 in 4 others, which no rule found
         // so far separates [observed].
         if v == 3, g[1] == 5 { g[1] = 2 }
@@ -114,16 +123,15 @@ public enum ProgramConverter {
 
         // Event records: [target, a, type, b, time, 0]. Type 1 is automation, type 2 a note
         // (b = velocity · 256 + note). Formats 3 and 4 give the part as an index (0...3); format 5
-        // gives a part mask (1, 2, 4, 8). Other types were dropped [observed once].
+        // gives a part mask (1, 2, 4, 8). A target outside 0...3 becomes mask 0, which an 8M drops
+        // [observed once: 335 records of type 255 with target 255, kept by the 24M].
         let splits = eightM ? min(Int(oldG[18]), 1) : min(Int(oldG[18]), 3)
         let layer = oldG[24]
         var events: [[Int32]] = []
         for var e in oldEvents {
             var mask: Int32
             if v <= 4 {
-                guard e[2] == 1 || e[2] == 2 else { continue }
                 let index = Int(e[0])
-                guard (0...3).contains(index) else { continue }
                 if e[2] == 2 && splits > 0 {
                     // Keyboard split: the note goes to the part mask of the zone its key falls in,
                     // whatever part it was recorded on [observed in 10 programs].
@@ -132,7 +140,7 @@ public enum ProgramConverter {
                     mask = oldG[24 + zone]
                 } else {
                     if eightM && index >= 2 { continue }
-                    mask = 1 << index
+                    mask = (0...3).contains(index) ? 1 << index : 0
                     // A note for a part in the layer (global 24) plays the whole layer [observed in 60 programs].
                     if e[2] == 2 && mask & layer != 0 { mask = layer }
                 }
@@ -149,7 +157,6 @@ public enum ProgramConverter {
             let split = splits > 0
             g[24] &= 3; g[25] &= 3                       // part masks
             g[18] = min(g[18], 1); g[19] = min(g[19], 1)
-            g[36] = 0
             if g[11] >= 2 {                              // the selected part was 3 or 4
                 g[11] = split ? 1 : 0
                 if g[24] != 0 || split { g[37 + Int(g[11])] = 1 }
@@ -157,6 +164,9 @@ public enum ProgramConverter {
             g[39] = 0; g[40] = 0
             for j in [124, 125, 127] { g[j] = min(g[j], 8) }
         }
+
+        // A 24M writes negative zero as 0.000000; an 8M keeps -0.000000 [observed in 11 parts].
+        if !eightM { for k in parts { for j in floats[k].indices where floats[k][j] == "-0.000000" { floats[k][j] = "0.000000" } } }
 
         var out: [ProgramFile.Value] = [.int(Int32(current.ints)), .int(Int32(current.floats)),
                                         .int(Int32(current.globals)), .int(Int32(events.count))]
@@ -174,10 +184,11 @@ public enum ProgramConverter {
         }
     }
 
-    /// Globals every converted program had with these values [observed in 299/299].
+    /// Globals every converted program had with these values [observed in all 599 conversions].
+    /// (0, 80 and 174 differ by model: see `convert`.)
     static let globalsSet: [(Int, Int32)] = [
-        (0, 3), (2, 0), (75, 1), (76, 2), (77, 2), (78, 0), (79, 0), (80, 1), (81, 1), (82, 1),
-        (115, 1), (140, 0), (142, 0), (152, 1), (153, 0), (173, 0), (174, 1), (175, 2), (178, 1),
+        (2, 0), (36, 0), (75, 1), (76, 2), (77, 2), (78, 0), (79, 0), (81, 1), (82, 1),
+        (115, 1), (140, 0), (142, 0), (152, 1), (153, 0), (173, 0), (175, 2), (177, 0), (178, 1),
     ]
 
     /// Values OS 2.0d gives the global positions older layouts lack (73...181), from 299 bulk imports.

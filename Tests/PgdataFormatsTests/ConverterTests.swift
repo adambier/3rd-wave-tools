@@ -73,11 +73,11 @@ final class ConverterTests: XCTestCase {
         let c = try ProgramConverter.convert(p, for: .twentyFour)
         XCTAssertEqual(ints(c, part: 0)[63...64], [1, 2])
         XCTAssertEqual(floats(c, part: 0)[91], "1.000000")
-        XCTAssertEqual(floats(c, part: 0)[102], "1.000000")
+        XCTAssertEqual(floats(c, part: 0)[102], "0.446233")   // W3_PROG_3 on a 24-voice model
         XCTAssertEqual(floats(c, part: 0)[127], "4.000000")
         XCTAssertEqual(ints(c, part: 1)[0...2], [43, 43, 41])
         let g = globals(c)
-        XCTAssertEqual(g[0], 3); XCTAssertEqual(g[1], 2)
+        XCTAssertEqual(g[0], 2); XCTAssertEqual(g[1], 2)
         XCTAssertEqual(Array(g[120...123]), [1, 1, 1, 1])
         XCTAssertEqual(Array(g[124...127]), [4, 4, 4, 4])
         XCTAssertEqual(Array(g[132...135]), [13, 13, 13, 13])
@@ -90,11 +90,11 @@ final class ConverterTests: XCTestCase {
                              [2, 108, 1, 0, 20, 0], [3, 100, 2, 100 << 8 | 64, 30, 0], [255, 255, 255, 0, 0, 0]]
         // Parts 1 and 2 layered (mask 3): their notes play both.
         let layered = makeV3(events: ev) { _, _, g in g[24] = 3 }
-        XCTAssertEqual(try events(ProgramConverter.convert(layered, for: .twentyFour)).map { $0[0] }, [3, 3, 4, 8])
+        XCTAssertEqual(try events(ProgramConverter.convert(layered, for: .twentyFour)).map { $0[0] }, [3, 3, 4, 8, 0])
         XCTAssertEqual(try events(ProgramConverter.convert(layered, for: .eightM)).map { $0[0] }, [3, 3])
         // Split at key 61 (one split): notes go by key, whatever part they were recorded on.
         let split = makeV3(events: ev) { _, _, g in g[18] = 1; g[21] = 61 }
-        XCTAssertEqual(try events(ProgramConverter.convert(split, for: .twentyFour)).map { $0[0] }, [1, 2, 4, 2])
+        XCTAssertEqual(try events(ProgramConverter.convert(split, for: .twentyFour)).map { $0[0] }, [1, 2, 4, 2, 0])
         XCTAssertEqual(try events(ProgramConverter.convert(split, for: .eightM)).map { $0[0] }, [1, 2, 2])
     }
 
@@ -104,6 +104,7 @@ final class ConverterTests: XCTestCase {
         XCTAssertEqual(ints(c, part: 2)[0...2], [2, 35, 42])          // P02, U01, A01
         XCTAssertEqual(ints(c, part: 2), ints(c, part: 3))
         let g = globals(c)
+        XCTAssertEqual(g[0], 3); XCTAssertEqual(floats(c, part: 0)[102], "1.000000")
         XCTAssertEqual(g[24], 3); XCTAssertEqual(g[11], 0); XCTAssertEqual(Array(g[37...40]), [1, 0, 0, 0])
         let full = try ProgramConverter.convert(p, for: .twentyFour)
         XCTAssertEqual(ints(full, part: 2)[0...2], [15, 15, 15])

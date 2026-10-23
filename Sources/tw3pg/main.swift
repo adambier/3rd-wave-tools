@@ -11,7 +11,7 @@ import PgdataFormats
 //   tw3pg factory-catalog <out.swift> <factory dirs...>   write FactoryCatalog.swift from the factory .wt files
 //   tw3pg pack <file.pro> <out.pgdata> [.wt/.bin files...]  pack as the app would (defaults, built-in factory list)
 //   tw3pg convert <in.pro> <out.pro> [8m|24]         convert an older program to the OS 2.0d layout
-//   tw3pg convertcheck <in dir> <3rd Wave export dir>   convert each input (sorted) and compare with
+//   tw3pg convertcheck <in dir> <3rd Wave export dir> [8m|24]   convert each input (sorted) and compare with
 //                                        what the 3rd Wave's bulk import made of it (B05P001… in order)
 
 func files(under paths: [String], ext: Set<String>) -> [URL] {
@@ -87,7 +87,8 @@ case "convert":
     print("\(p.version) \(ProgramConverter.layout(of: p).map(\.description) ?? "?") -> \(c.version) \(ProgramConverter.layout(of: c)!)")
 
 case "convertcheck":
-    need(2, rest, "convertcheck <in dir> <export dir>")
+    need(2, rest, "convertcheck <in dir> <export dir> [8m|24]")
+    let checkModel: ProgramConverter.Model = rest.count > 2 && rest[2] == "24" ? .twentyFour : .eightM
     let ins = files(under: [rest[0]], ext: ["pro"]), outs = files(under: [rest[1]], ext: ["pro"])
     var same = 0
     for (a, b) in zip(ins, outs) {
@@ -95,7 +96,7 @@ case "convertcheck":
         guard p.name.trimmingCharacters(in: .whitespaces) == want.name.trimmingCharacters(in: .whitespaces) else {
             print("\(b.lastPathComponent): name \"\(want.name)\", expected \"\(p.name)\" (skipped)"); continue
         }
-        let got = try ProgramConverter.convert(p, for: .eightM)
+        let got = try ProgramConverter.convert(p, for: checkModel)
         if got.serialized() == want.serialized() { same += 1; continue }
         let diffs = zip(got.values, want.values).enumerated().filter { $0.element.0.text != $0.element.1.text }
         print("\(b.lastPathComponent) \"\(p.name)\" \(p.version) \(ProgramConverter.layout(of: p)!): \(diffs.count) values differ"
