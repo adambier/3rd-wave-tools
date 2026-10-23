@@ -161,12 +161,14 @@ case "unpack":
     up.notes.forEach { print("note: \($0)") }
 
 case "repack":
-    var same = 0, diff = 0, failed = 0
+    var same = 0, diff = 0, failed = 0, converted = 0
     for u in files(under: rest, ext: ["pgdata"]) {
         do {
             let d = try load(u)
             let g = try UnifiedProgram(data: d)
             let up = Unpacker.unpack(g)
+            // An older layout is converted on unpack, so it cannot come back byte for byte.
+            if up.notes.contains(where: { $0.contains("older layout") }) { converted += 1; continue }
             // reparse the unpacked .pro from text, as the app would after writing it
             let pro = try ProgramFile(data: up.program.serialized())
             var content: [SourceRef: SourceContent] = [:]
@@ -191,7 +193,7 @@ case "repack":
             }
         } catch { failed += 1; print("FAILED \(u.lastPathComponent): \(error)") }
     }
-    print("repack: \(same) identical, \(diff) different, \(failed) unreadable")
+    print("repack: \(same) identical, \(diff) different, \(failed) unreadable, \(converted) in an older layout (converted, not compared)")
 
 case "compare":
     need(2, rest, "compare <file.pgdata> <file.pro> [wt dirs...]")

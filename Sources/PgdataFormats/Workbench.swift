@@ -226,6 +226,8 @@ public struct PackPlan {
     public var verdict: Verdict
     /// Things to check that do not stop the program being written (an unfamiliar layout).
     public var warnings: [String] = []
+    /// Set when the program is in an older format and will be converted as it is packed.
+    public var conversion: String? = nil
     /// Set when U48–U55 are missing because the program predates them as factory slots.
     public var userSlotNote: Note? = nil
     /// Approximate size of the .pgdata this plan would produce.
@@ -285,6 +287,12 @@ public struct PackPlan {
         /// The name a file will be packed under (renamed in Clean Up Names, or its own).
         func packedName(_ f: ContentFile) -> String { names[f.id] ?? f.name }
         var warnings: [String] = [program.layoutWarning].compactMap { $0 }
+        // (A program whose header does not add up is left to `layoutWarning`.)
+        if ProgramConverter.needsConversion(program), ProgramConverter.layout(of: program) != nil,
+           let why = ProgramConverter.unsupportedReason(program) {
+            warnings.append("This program is not in the current format and cannot be converted: \(why) It is packed as it is, "
+                            + "and the 3rd Wave may not play it as it would after Import program.")
+        }
         if program.name.count > NameCleaner.fieldLimit {
             warnings.append("The program name is \(program.name.count) characters; the 3rd Wave keeps \(NameCleaner.fieldLimit), so it is cut to \"\(String(program.name.prefix(NameCleaner.fieldLimit)))\".")
         }
@@ -401,7 +409,7 @@ public struct PackPlan {
         else { verdict = .factoryOnly }
         let total = 17 + 4 * rows.count + rows.reduce(0) { $0 + $1.bytes } + 32 + 4 * program.values.count
         let userSlots = rows.filter(\.wasUserSlot).map(\.ref)
-        return PackPlan(rows: rows, verdict: verdict, warnings: warnings,
+        return PackPlan(rows: rows, verdict: verdict, warnings: warnings, conversion: ProgramConverter.summary(program),
                         userSlotNote: userSlots.isEmpty ? nil : userSlotNote(program: program, slots: userSlots, factory: factory),
                         estimatedBytes: total)
     }

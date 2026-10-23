@@ -107,6 +107,16 @@ check them, and check the program on the 3rd Wave after importing. A source numb
 known range shows as an unknown source, and the program is not written until those oscillators are
 pointed elsewhere.
 
+**Programs in an older format are converted as they are packed.** A program saved by older
+firmware (`W3_PROG_3`, `W3_PROG_4`, or a `W3_PROG_5` from before OS 2.0) is brought up to the
+current format the way the 3rd Wave's **Import program** converts it, and a line under the program
+name says so. This matters because the 3rd Wave's `.pgdata` import does only part of that
+conversion: a 2022 factory program packed unconverted played silent. The converter was checked
+against 599 conversions made by an 8M and a 24M; it matches the 3rd Wave's own result value for
+value in all but 15, all of them 2022 factory programs (details in
+[`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs)). The packed program keeps all
+four parts, so one file works on every model: an 8M fits it to its two parts when it imports it.
+
 #### Changing what oscillators play
 
 **Play something else…** in the Plays menu (or **Choose what to play…**, the first choice when a
@@ -206,13 +216,12 @@ Checked on an 8M (OS 2.0d):
 - **A table or multisample listed without its data** plays whatever is in that slot on the 3rd Wave,
   with no warning; an empty sample slot plays silence. That is why multisamples are always
   embedded.
-- **Programs in an older format** (`W3_PROG_3`, `W3_PROG_4`) are converted to the current one on
-  import, but the `.pgdata` import does not convert them fully. A `W3_PROG_3` program packed into a
-  `.pgdata` imported without an error but played silent, because settings that **Import Program**
-  fixes were left as they were. Until this app converts old programs itself, import them on the
-  3rd Wave with **Import Program** and export a `.pgdata` from there. A `W3_PROG_4` program sounded
-  the same from both; whether it matched in every setting is still being checked. Details are in
+- **Programs in an older format** are converted on import: fully by **Import program** and **Bulk
+  program import**, only in part by the `.pgdata` import. That is why this app converts them before
+  packing (see Pack). Details are in
   [`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs).
+- **The `.pgdata` import takes the first `.pgdata` in `PROGRAMS`**, alphabetically, without asking;
+  leave only the one you want there.
 
 ### Unpack
 
@@ -237,9 +246,10 @@ Wavetables identical to the factory table in their slot are skipped by default: 
 export embeds factory tables too, and a repack lists them anyway. Unpacked names are kept as they
 are.
 
-A `.pgdata` does not record the program's format, so the unpacked `.pro` is always tagged
-`W3_PROG_5`, the current format, whatever its layout. Whether the 3rd Wave's **Import Program**
-accepts that tag on an older layout has not been tried; the `.pgdata` itself imports either way.
+A `.pgdata` does not record the program's format. One that holds a program in an older layout
+(built by another tool; the 3rd Wave's own exports are always current) is converted as it is
+unpacked, as **Import program** would convert it, and the box says so. The app works out the old
+format from the layout, so the unpacked `.pro` is always in the current format, `W3_PROG_5`.
 
 ## Formats
 
@@ -248,9 +258,10 @@ accepts that tag on an older layout has not been tried; the `.pgdata` itself imp
 what is still open. Each statement there says whether it was checked on a 3rd Wave, seen in files,
 or inferred. In brief:
 
-- **.pro**: text, one value per line: the format tag (`W3_PROG_3` to `_5`), the name, the number of
-  values per part, three header values, four part blocks (each with its three oscillator source ids),
-  a block of floats and an integer tail.
+- **.pro**: text, one value per line: the format tag (`W3_PROG_3` to `_5`), the name, four sizes
+  (integers and floats per part, global values, sequence events), then four integer part blocks
+  (each starting with its three oscillator source ids), four float part blocks, the globals and the
+  sequence events.
 - **.pgdata**: `W3_UNIPROG_1`, a table of the sources the program uses (each with its embedded `.wt`
   values or multisample, or listed without data), then the program name and the `.pro` values as
   32-bit words. It has no format tag.
@@ -283,16 +294,17 @@ factory tables instead of embedding them, so its output differs there by design.
 ## Tests on the 3rd Wave
 
 The behaviour under "What the 3rd Wave does on import" was checked on an 8M (OS 2.0d), along with
-name lengths and the 3rd Wave's own export file names. The 3rd Wave's exports were also unpacked and
+name lengths and the 3rd Wave's own export file names. The conversion of older programs was worked
+out from 599 programs bulk-imported and exported again on an 8M and a 24M (both OS 2.0d), and
+programs converted and packed by this app were imported on both. The 3rd Wave's exports were also unpacked and
 repacked byte for byte with `tw3pg`. The test `.pgdata` files are built with `tw3pg` from files that are not
 included here (a Groove Synthesis factory program and one of its `.wt` files, two third-party
 programs, and a small `.bin`).
 
 Still unknown: whether the 3rd Wave reuses a multisample it already has (as it does for wavetables);
 whether its bulk import sorts file names plainly or by number; how it writes non-ASCII letters in
-file names; how exactly **Import Program** converts older programs; whether **Import Program**
-accepts an unpacked `.pro` tagged `W3_PROG_5` on an older layout; and the meaning of the few
-program values that differ between exports.
+file names; whether a 24K converts older programs exactly as the 24M does; and the meaning of most
+program values.
 
 ## Layout
 

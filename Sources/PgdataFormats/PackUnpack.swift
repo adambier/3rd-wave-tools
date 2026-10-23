@@ -32,7 +32,15 @@ public enum Packer {
     /// source included, as Groove Synthesis's sample library does. Analog shapes never carry data.
     /// Multisamples are normally carried. Listing an S slot without its samples is allowed only when
     /// asked for explicitly: no such file has been seen, and the 3rd Wave's handling is untested.
+    ///
+    /// A program saved in an older layout is converted to the current one first (see
+    /// `ProgramConverter`), because the 3rd Wave's .pgdata import does not convert it fully. One in
+    /// a layout the converter does not know is packed as it is.
     public static func pack(_ program: ProgramFile, content: [SourceRef: SourceContent]) throws -> UnifiedProgram {
+        var program = program
+        if ProgramConverter.needsConversion(program), ProgramConverter.unsupportedReason(program) == nil {
+            program = try ProgramConverter.convert(program)
+        }
         let refs = program.distinctSources
         if let bad = refs.first(where: { if case .unknown = $0 { return true }; return false }) {
             throw PackError.unknownSource(bad.id)
@@ -120,7 +128,16 @@ public enum Unpacker {
                              + "The .pro keeps the value \(k), which the 3rd Wave reads as \(SourceRef(id: Int32(k)).description).")
             }
         }
-        let program = ProgramFile(version: "W3_PROG_5", name: u.programName.text, values: values)
+        var program = ProgramFile(version: "W3_PROG_5", name: u.programName.text, values: values)
+        // A .pgdata built from an older program by another tool: write the .pro in the current layout,
+        // as Import program would have made it.
+        if let format = ProgramConverter.inferredFormat(program), let l = ProgramConverter.layout(of: program),
+           let converted = try? ProgramConverter.convert(program, format: format) {
+            program = converted
+            notes.append("This file holds a program in an older layout (\(l), probably W3_PROG_\(format)). The .pro written here "
+                         + "is converted to the current format, as the 3rd Wave's Import program would convert it"
+                         + (format == 3 ? "; the 3rd Wave's own .pgdata import leaves such a program silent." : "."))
+        }
 
         var wts: [(SourceRef, WavetableFile)] = []
         var mss: [(SourceRef, Multisample)] = []

@@ -173,6 +173,9 @@ struct ProgramDetail: View {
                 Button("Show in Finder") { Panels.reveal(item.url) }.buttonStyle(.link)
             }
             PlanSummary(plan: plan)
+            if let c = plan.conversion {
+                Label(c, systemImage: "arrow.triangle.2.circlepath").foregroundStyle(.secondary)
+            }
             if let note = plan.userSlotNote { UserSlotNoteBox(note: note) }
             ForEach(plan.warnings, id: \.self) { w in
                 Label(w, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)

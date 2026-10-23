@@ -61,11 +61,13 @@ public enum ProgramConverter {
     }
 
     /// The converted program. A program already in the current layout comes back unchanged.
-    public static func convert(_ p: ProgramFile, for model: Model) throws -> ProgramFile {
+    /// `format` overrides the format number in the tag (3, 4 or 5), for a program unpacked from a
+    /// .pgdata, which has no tag (see `inferredFormat`).
+    public static func convert(_ p: ProgramFile, for model: Model = .twentyFour, format: Int? = nil) throws -> ProgramFile {
         guard needsConversion(p) else { return p }
         if let why = unsupportedReason(p) { throw FormatError.invalid("\(p.name): \(why)") }
         let l = layout(of: p)!
-        let v = p.versionNumber
+        let v = format ?? p.versionNumber
         let eightM = model == .eightM
         let parts = 0..<ProgramFile.partCount
 
@@ -175,6 +177,38 @@ public enum ProgramConverter {
         out += g.map { .int($0) }
         for e in events { out += e.map { .int($0) } }
         return ProgramFile(version: "W3_PROG_5", name: p.name, values: out)
+    }
+
+    /// One line saying what converting this program means, for the app; nil when it needs nothing.
+    public static func summary(_ p: ProgramFile) -> String? {
+        guard needsConversion(p), unsupportedReason(p) == nil, let l = layout(of: p) else { return nil }
+        return "Saved in an older format (\(p.version), layout \(l)). It is converted to the current format "
+            + "(W3_PROG_5, \(current)) as it is packed, the way the 3rd Wave's Import program converts it."
+    }
+
+    /// The format a program unpacked from a .pgdata was probably saved in. A .pgdata has no format
+    /// tag, so it is read from the layout: 173 or 174 integers per part = W3_PROG_3, 179 or 180 =
+    /// W3_PROG_4 [observed in every file seen]. 181 with fewer than 136 floats was written as both
+    /// W3_PROG_4 and W3_PROG_5; the two differ only in how event records name parts, so a record
+    /// for part index 0 means W3_PROG_4 and a part mask above 3 means W3_PROG_5 [inferred]. Without
+    /// either, W3_PROG_5 is assumed. Nil when the layout is current or unknown.
+    public static func inferredFormat(_ p: ProgramFile) -> Int? {
+        guard let l = layout(of: p), l != current else { return nil }
+        switch l.ints {
+        case 173, 174: return 3
+        case 179, 180: return 4
+        case 181 where l.floats >= 136: return 5
+        case 181:
+            let start = 4 + 4 * l.ints + 4 * l.floats + l.globals
+            var sawZero = false, sawMask = false
+            for r in stride(from: start, to: p.values.count - 5, by: 6) {
+                guard case let .int(target, _) = p.values[r], case let .int(type, _) = p.values[r + 2],
+                      type == 1 || type == 2 else { continue }
+                if target == 0 { sawZero = true } else if target > 3 { sawMask = true }
+            }
+            return sawZero && !sawMask ? 4 : 5
+        default: return nil
+        }
     }
 
     private static func intOf(_ v: ProgramFile.Value) -> Int32 {

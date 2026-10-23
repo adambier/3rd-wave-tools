@@ -119,4 +119,40 @@ final class ConverterTests: XCTestCase {
         XCTAssertNil(ProgramConverter.layout(of: short))
         XCTAssertThrowsError(try ProgramConverter.convert(short, for: .eightM))
     }
+
+    func testPackConvertsAndUnpackConvertsOldLayouts() throws {
+        let old = makeV3(events: [[0, 100, 2, 100 << 8 | 60, 0, 0]])
+        let refs = Dictionary(uniqueKeysWithValues: old.distinctSources.map { ($0, SourceContent.reference) })
+        // Packing converts: the .pgdata holds the current layout.
+        let packed = try Packer.pack(old, content: refs)
+        XCTAssertEqual(Array(packed.words.prefix(4)), [181, 137, 182, 1])
+        XCTAssertEqual(Unpacker.unpack(packed).program.values, try ProgramConverter.convert(old).values)
+        XCTAssertNotNil(PackPlan.make(program: old, files: [], factory: FactoryLibrary()).conversion)
+        XCTAssertTrue(Unpacker.unpack(packed).notes.isEmpty)
+        // An old-layout .pgdata from elsewhere (no tag): unpacking converts it and says so.
+        var words = old.words
+        for (slot, i) in old.oscillatorIndices.enumerated() { words[i] = UInt32(old.distinctSources.firstIndex(of: old.sources[slot])!) }
+        let raw = UnifiedProgram(sources: old.distinctSources.map { .init(ref: $0, payload: .none) }, programName: NameField("Test"), words: words)
+        let up = Unpacker.unpack(raw)
+        XCTAssertEqual(up.program.values, try ProgramConverter.convert(old).values)
+        XCTAssertTrue(up.notes.contains { $0.contains("older layout") && $0.contains("W3_PROG_3") })
+    }
+
+    func testFormatInferredFromLayout() {
+        func prog(_ s: Int, _ f: Int, _ g: Int, events: [[Int32]]) -> ProgramFile {
+            var v: [ProgramFile.Value] = [.int(Int32(s)), .int(Int32(f)), .int(Int32(g)), .int(Int32(events.count))]
+            v += Array(repeating: .int(0), count: 4 * s)
+            v += Array(repeating: .float(0, text: "0.000000"), count: 4 * f)
+            v += Array(repeating: .int(0), count: g)
+            for e in events { v += e.map { .int($0) } }
+            return ProgramFile(version: "W3_PROG_5", name: "x", values: v)
+        }
+        XCTAssertEqual(ProgramConverter.inferredFormat(prog(173, 126, 73, events: [])), 3)
+        XCTAssertEqual(ProgramConverter.inferredFormat(prog(180, 130, 169, events: [])), 4)
+        XCTAssertEqual(ProgramConverter.inferredFormat(prog(181, 136, 181, events: [])), 5)
+        XCTAssertEqual(ProgramConverter.inferredFormat(prog(181, 130, 177, events: [[0, 1, 2, 60, 0, 0]])), 4)
+        XCTAssertEqual(ProgramConverter.inferredFormat(prog(181, 130, 177, events: [[8, 1, 2, 60, 0, 0]])), 5)
+        XCTAssertEqual(ProgramConverter.inferredFormat(prog(181, 130, 177, events: [])), 5)
+        XCTAssertNil(ProgramConverter.inferredFormat(prog(181, 137, 182, events: [])))
+    }
 }

@@ -268,7 +268,9 @@ id. Everything else is the `.pro`'s values unchanged.
 
 **To unpack** a `.pgdata` into a `.pro`: read the program words; tell floats from integers using
 *S*, *F*, *G* and *E* in the first four words (section 3.2); replace each oscillator's index with the
-source id from the table; write the tag `W3_PROG_5` and the name. Each embedded wavetable becomes a
+source id from the table; write the tag `W3_PROG_5` and the name. If the layout is older (section
+3.3), the program needs converting (section 6); since there is no tag, the format has to be
+worked out from the layout, as `ProgramConverter.inferredFormat` does. Each embedded wavetable becomes a
 `.wt` and each multisample a `.bin`.
 
 **To pack** a `.pro`: list each source the program uses, in order of first use (part 1 oscillator 1
