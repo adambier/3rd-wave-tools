@@ -203,36 +203,6 @@ Files are named in Groove Synthesis's own pattern, with the program location fir
   `.pro` written by Unpack), all of them are numbered by their place in the batch instead (e.g.,
   `001_…`, `002_…`).
 
-#### What the 3rd Wave does on import and export
-
-Checked on an 8M and a 24M (OS 2.0d):
-
-- **A table the 3rd Wave already has** (same content, in any slot, whatever its name) is reused. No
-  slot is used, and the 3rd Wave keeps its own name for it.
-- **A new table or multisample** goes into a free slot, and the program is pointed there. The slot
-  number in the file is only a label. With no free slot, the 3rd Wave offers to overwrite its last
-  ones; blank placeholder tables count as used. The Pack page shows how many free wavetable slots a
-  program may need; each embedded multisample also takes a free S slot. (For multisamples, the
-  3rd Wave's message says it erases the most recently loaded samples; not tried here.)
-- **A table or multisample listed without its data** plays whatever is in that slot on the 3rd Wave,
-  with no warning; an empty sample slot plays silence. That is why multisamples are always
-  embedded.
-- **Programs in an older format** are converted on import: fully by **Import program** and **Bulk
-  program import**, only in part by **Import unified program data file**. That is why this app converts them before
-  packing (see Pack). Details are in
-  [`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs).
-
-> [!WARNING]
-> **Unplug the USB cable from your computer while the 3rd Wave exports.** With the drive mounted on
-> a computer at the same time, an export wrote empty files. Plug it back in when the export has
-> finished.
->
-> **Empty the `PROGRAMS` folder before exporting.** An export onto an existing file of the same name
-> does not shorten it, so a longer old file leaves its tail behind the new program.
->
-> **Leave only one `.pgdata` in `PROGRAMS` when using Import unified program data file.** It takes
-> the first file in alphabetical order without asking.
-
 ### Unpack
 
 Drop `.pgdata` files. Each becomes a `.pro` named after the program, a `.wt` per embedded
@@ -260,6 +230,36 @@ A `.pgdata` does not record the program's format. One that holds a program in an
 (built by another tool; the 3rd Wave's own exports are always current) is converted as it is
 unpacked, in the same way as in Pack, and the box says so. The app works out the old format from
 the layout, so the unpacked `.pro` is always in the current format, `W3_PROG_5`.
+
+## On the 3rd Wave
+
+Checked on an 8M and a 24M (OS 2.0d). What the 3rd Wave does when it imports a file:
+
+- **A table the 3rd Wave already has** (same content, in any slot, whatever its name) is reused. No
+  slot is used, and the 3rd Wave keeps its own name for it.
+- **A new table or multisample** goes into a free slot, and the program is pointed there. The slot
+  number in the file is only a label. With no free slot, the 3rd Wave offers to overwrite its last
+  ones; blank placeholder tables count as used. The Pack page shows how many free wavetable slots a
+  program may need; each embedded multisample also takes a free S slot. (For multisamples, the
+  3rd Wave's message says it erases the most recently loaded samples; not tried here.)
+- **A table or multisample listed without its data** plays whatever is in that slot on the 3rd Wave,
+  with no warning; an empty sample slot plays silence. That is why multisamples are always
+  embedded.
+- **Programs in an older format** are converted on import: fully by **Import program** and **Bulk
+  program import**, only in part by **Import unified program data file**. That is why this app converts them before
+  packing (see Pack). Details are in
+  [`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs).
+
+> [!WARNING]
+> **Unplug the USB cable from your computer while the 3rd Wave exports.** With the drive mounted on
+> a computer at the same time, an export wrote empty files. Plug it back in when the export has
+> finished.
+>
+> **Empty the `PROGRAMS` folder before exporting.** An export onto an existing file of the same name
+> does not shorten it, so a longer old file leaves its tail behind the new program.
+>
+> **Leave only one `.pgdata` in `PROGRAMS` when using Import unified program data file.** It takes
+> the first file in alphabetical order without asking.
 
 ## Formats
 
@@ -303,7 +303,7 @@ factory tables instead of embedding them, so its output differs there by design.
 
 ## Tests on the 3rd Wave
 
-The behaviour under "What the 3rd Wave does on import" was checked on an 8M and a 24M (both
+The behaviour under "On the 3rd Wave" was checked on an 8M and a 24M (both
 OS 2.0d), along with name lengths and the 3rd Wave's own export file names. The conversion of older
 programs was worked out from 599 programs bulk-imported and exported again on the two, and
 programs converted and packed by this app were imported on both. The 3rd Wave's exports were also
