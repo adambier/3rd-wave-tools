@@ -39,6 +39,17 @@ them directly.
 
 The window has two pages, **Pack** and **Unpack**. There is nothing to set up.
 
+> [!WARNING]
+> **Unplug the USB cable from your computer while the 3rd Wave exports.** With the drive mounted on
+> a computer at the same time, an export wrote empty files. Plug it back in when the export has
+> finished.
+>
+> **Empty the `PROGRAMS` folder before exporting.** An export onto an existing file of the same name
+> does not shorten it, so a longer old file leaves its tail behind the new program.
+>
+> **Leave only one `.pgdata` in `PROGRAMS` when using Import unified program data file.** It takes
+> the first file in alphabetical order without asking.
+
 ### Factory wavetables
 
 The app never embeds factory wavetables. A program that uses a factory slot (U00–U55, P00–P35)
@@ -222,10 +233,7 @@ Checked on an 8M and a 24M (OS 2.0d):
   packing (see Pack). Details are in
   [`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs).
 - **Import unified program data file takes the first `.pgdata` in `PROGRAMS`**, alphabetically,
-  without asking; leave only the one you want there.
-- **Exporting while the USB drive is also mounted on a computer** can write empty files. Unplug the
-  USB cable during an export, and empty `PROGRAMS` first: an export does not shorten a longer file
-  of the same name.
+  without asking (see the cautions under "Using it").
 
 ### Unpack
 
