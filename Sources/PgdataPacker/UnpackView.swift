@@ -103,14 +103,29 @@ struct UnpackDetail: View {
             }
             BeforeImportBox(items: items)
             Text(several ? "Files these will produce" : "Files this will produce").font(.headline)
-            Table(rows) {
-                TableColumn("Write") { (r: Row) in WriteToggleCell(state: st, unpackID: r.unpackID, file: r.file) }
-                    .width(44)
-                TableColumn("File name") { (r: Row) in FileNameCell(state: st, unpackID: r.unpackID, file: r.file) }
-                    .width(min: 180, ideal: 260)
-                TableColumn("Program") { (r: Row) in Text(r.programName).lineLimit(1) }
-                    .width(min: 80, ideal: 150)
-                TableColumn("Contents") { (r: Row) in Text(r.file.description).foregroundStyle(.secondary).lineLimit(2) }
+            // Write first (ticks in one line at the left), Contents last (the widest column). The
+            // Program column only with several files; macOS 13 has no conditional table columns,
+            // so there are two tables.
+            Group {
+                if several {
+                    Table(rows) {
+                        TableColumn("Write") { (r: Row) in WriteToggleCell(state: st, unpackID: r.unpackID, file: r.file) }
+                            .width(44)
+                        TableColumn("Program") { (r: Row) in Text(r.programName).lineLimit(1) }
+                            .width(min: 80, ideal: 150)
+                        TableColumn("File name") { (r: Row) in FileNameCell(state: st, unpackID: r.unpackID, file: r.file) }
+                            .width(min: 180, ideal: 260)
+                        TableColumn("Contents") { (r: Row) in Text(r.file.description).foregroundStyle(.secondary).lineLimit(2) }
+                    }
+                } else {
+                    Table(rows) {
+                        TableColumn("Write") { (r: Row) in WriteToggleCell(state: st, unpackID: r.unpackID, file: r.file) }
+                            .width(44)
+                        TableColumn("File name") { (r: Row) in FileNameCell(state: st, unpackID: r.unpackID, file: r.file) }
+                            .width(min: 180, ideal: 260)
+                        TableColumn("Contents") { (r: Row) in Text(r.file.description).foregroundStyle(.secondary).lineLimit(2) }
+                    }
+                }
             }
             .visibleScrollers()
             .frame(minHeight: 140, maxHeight: .infinity)
