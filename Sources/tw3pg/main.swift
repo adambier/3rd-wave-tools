@@ -10,6 +10,9 @@ import PgdataFormats
 //   tw3pg compare <file.pgdata> <file.pro> [wt dirs...]   pack the .pro with the .pgdata's content; diff
 //   tw3pg factory-catalog <out.swift> <factory dirs...>   write FactoryCatalog.swift from the factory .wt files
 //   tw3pg pack <file.pro> <out.pgdata> [.wt/.bin files...]  pack as the app would (defaults, built-in factory list)
+//   tw3pg convert <in.pro> <out.pro> [8m|24]         convert an older program to the OS 2.0d layout
+//   tw3pg convertcheck <in dir> <3rd Wave export dir>   convert each input (sorted) and compare with
+//                                        what the 3rd Wave's bulk import made of it (B05P001… in order)
 
 func files(under paths: [String], ext: Set<String>) -> [URL] {
     var out: [URL] = []
@@ -75,6 +78,32 @@ guard let cmd = args.first else { print("usage: tw3pg inspect|roundtrip|unpack|r
 let rest = Array(args.dropFirst())
 
 switch cmd {
+case "convert":
+    need(2, rest, "convert <in.pro> <out.pro> [8m|24]")
+    let model: ProgramConverter.Model = rest.count > 2 && rest[2] == "24" ? .twentyFour : .eightM
+    let p = try ProgramFile(data: load(URL(fileURLWithPath: rest[0])))
+    let c = try ProgramConverter.convert(p, for: model)
+    try c.serialized().write(to: URL(fileURLWithPath: rest[1]))
+    print("\(p.version) \(ProgramConverter.layout(of: p).map(\.description) ?? "?") -> \(c.version) \(ProgramConverter.layout(of: c)!)")
+
+case "convertcheck":
+    need(2, rest, "convertcheck <in dir> <export dir>")
+    let ins = files(under: [rest[0]], ext: ["pro"]), outs = files(under: [rest[1]], ext: ["pro"])
+    var same = 0
+    for (a, b) in zip(ins, outs) {
+        let p = try ProgramFile(data: load(a)), want = try ProgramFile(data: load(b))
+        guard p.name.trimmingCharacters(in: .whitespaces) == want.name.trimmingCharacters(in: .whitespaces) else {
+            print("\(b.lastPathComponent): name \"\(want.name)\", expected \"\(p.name)\" (skipped)"); continue
+        }
+        let got = try ProgramConverter.convert(p, for: .eightM)
+        if got.serialized() == want.serialized() { same += 1; continue }
+        let diffs = zip(got.values, want.values).enumerated().filter { $0.element.0.text != $0.element.1.text }
+        print("\(b.lastPathComponent) \"\(p.name)\" \(p.version) \(ProgramConverter.layout(of: p)!): \(diffs.count) values differ"
+              + (got.values.count != want.values.count ? ", length \(got.values.count) vs \(want.values.count)" : "")
+              + ": " + diffs.prefix(6).map { "line \($0.offset + 3): \($0.element.0.text) vs \($0.element.1.text)" }.joined(separator: ", "))
+    }
+    print("\(same) of \(min(ins.count, outs.count)) identical")
+
 case "factory-catalog":
     guard rest.count >= 2 else { print("usage: tw3pg factory-catalog <out.swift> <factory dirs...>"); exit(2) }
     let lib = FactoryLibrary(folders: rest.dropFirst().map { URL(fileURLWithPath: $0) })
