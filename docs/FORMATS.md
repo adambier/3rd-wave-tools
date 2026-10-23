@@ -462,7 +462,10 @@ with the 24M's]
 Since each model overwrites them, what a file carries for these does not matter. pgdata Packer
 writes the 24M's **Import program** values (so 0.446233 in float 102 of a converted `W3_PROG_3`
 program), but that one value no file can control: on a 24K/24M the `.pgdata` import sets it to 1.0
-whatever the file says. What float 102 does, and whether the difference is audible, is unknown.
+whatever the file says. The difference is not audible: the same program imported both ways on a
+24M sounded the same, and every parameter shown by an editor was identical; only the sequencer
+piano roll's scroll position differed, which may be what the value stores. [verified; the meaning
+inferred]
 
 ### 6.4 What an 8M does on top
 
@@ -597,8 +600,7 @@ selection-flag exception in section 6.4, were filled in; the appendix now carrie
 ## 10. Open questions
 
 - Whether a 24K converts exactly as the 24M does.
-- Whether the conversions in section 6.5 are per-program corrections keyed by name, and what
-  float 102 does.
+- Whether the conversions in section 6.5 are per-program corrections keyed by name.
 - Whether **Import program** accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
 - Whether multisamples are reused by content, as wavetables are.
 - Whether **Bulk program import** sorts file names plainly or by number (`B05P100` before or after `B05P10`).
