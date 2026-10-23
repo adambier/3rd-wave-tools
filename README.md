@@ -113,8 +113,8 @@ current format in the same way the 3rd Wave's **Import program** function conver
 under the program name says so. This matters because **Import unified program data file** does
 only part of that conversion: a 2022 factory program packed unconverted played silent. The
 converter was checked against 599 conversions made by an 8M and a 24M and matches the 3rd Wave's
-own result value for value, except for eight 2022 factory programs that the 3rd Wave appears to
-correct individually on import (see [`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs)).
+own result value for value, except for eight 2022 factory programs that the 3rd Wave corrects
+individually on import, by name (see [`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs)).
 The packed program keeps all four parts, so one file works on every model: an 8M fits it to its
 two parts when it imports it.
 
@@ -313,8 +313,7 @@ files, two third-party programs, and a small `.bin`).
 
 Still unknown: whether the 3rd Wave reuses a multisample it already has (as it does for wavetables);
 whether its bulk import sorts file names plainly or by number; how it writes non-ASCII letters in
-file names; whether a 24K converts older programs exactly as the 24M does; whether the changes it
-makes to a few 2022 factory programs are corrections keyed by name; and the meaning of most
+file names; whether a 24K converts older programs exactly as the 24M does; and the meaning of most
 program values.
 
 ## Layout

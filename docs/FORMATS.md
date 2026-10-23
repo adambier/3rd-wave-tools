@@ -185,7 +185,9 @@ Only some values are understood. The rest can be copied through unchanged.
 
 | Value | Meaning |
 |---|---|
+| 53 | Tempo in BPM. [observed: 3rd Wave Terminal shows 102.000000 as 102.0 BPM] |
 | 113 | `W3_PROG_3` only: a second amp envelope amount, 0 = full, 1 = none. OS 2.0 folds it into integer 34 when converting. [inferred from 100 conversions] |
+| 124 | Pan: 0 = left, 0.5 = centre, 1 = right. [observed: 3rd Wave Terminal's Pan knob] |
 
 **Global values.** These apply to the whole program. Apart from value 1, the meanings below are
 inferred from how the values change when the 3rd Wave converts or fits a program to an 8M, and from
@@ -194,7 +196,7 @@ how they line up with the event records.
 | Value | Meaning |
 |---|---|
 | 0 | Set by the importing model: 3 on an 8M, 2 on a 24M (section 6.3); 1, 2 or 4 in older files. [verified] |
-| 1 | Velocity curve: 3rd Wave Terminal shows 5 as "Piano" and 2 as "Medium". [observed] |
+| 1 | Velocity curve: 3rd Wave Terminal shows 5 as "Piano", 2 as "Medium" and 3 as "Heavy". [observed] |
 | 11 | The selected part, 0–3. [inferred] |
 | 18 | Number of keyboard split points, 0–3; 0 = no split. [inferred] |
 | 21, 22, 23 | The split points, as note numbers: notes above value 21 belong to zone 2, above 22 to zone 3, above 23 to zone 4. [inferred] |
@@ -503,22 +505,33 @@ The converter matches the 3rd Wave's own export byte for byte for 292 of the 299
 and 292 of the 300 on the 24M, including every `W3_PROG_4` and `W3_PROG_5` program. The rest are
 `W3_PROG_3` factory programs from 2022, the same seven on both models plus one on the 24M:
 
-- in 3, global 1 (velocity) became 3, not 2; no rule found so far separates them from the 89 where
-  it became 2;
-- in 1, the 3rd Wave replaced part 2 with a copy of part 1 and set the layer to parts 1–2 (it also
-  set velocity to 3);
+- in 3, global 1 (velocity) became 3, not 2, with nothing in the file to separate them from the 89
+  where it became 2;
+- in 1, the 3rd Wave replaced part 2 with a copy of part 1 panned the other way (float 124: 1 in
+  part 1, 0 in part 2), set the layer to parts 1–2, the tempo (float 53) to 102 in every part and
+  velocity to 3;
 - in 2, a few values in parts 1–2 changed (integers 30 and 33, floats 17, 44 and 103);
-- in 1, float 53 went from 120 to 122 in parts 1–2 (all four on the 24M);
+- in 1, the tempo went from 120 to 122 in parts 1–2 (all four on the 24M);
 - in 1, on the 24M only, integer 143 went from 8 to 0 in parts 1 and 2.
 
-These do not look like conversion rules. Every changed value started inside the range hundreds of
-untouched programs use, so they are not range checks; the new values cannot be derived from the
-file (the same starting value becomes 0.013 in one part and 0.019 in the other; a tempo goes from
-120 to 122; one program gains a copy of part 1 in part 2, panned left and right); and both models
-make exactly the same changes. The likeliest explanation is that the firmware applies a fixed list
-of corrections to particular 2022 factory programs when they are imported, probably keyed by
-program name. [inferred] If so, no other program will ever trigger them, and there is nothing for a
-converter to reproduce. Importing one of these programs under another name would settle it.
+These are not conversion rules but **corrections to particular programs, keyed by the program's
+name**. [verified on the 24M, one program] The evidence: every changed value started inside the
+range hundreds of untouched programs use, so they are not range checks; the new values cannot be
+derived from the file (the same starting value becomes 0.013 in one part and 0.019 in the other;
+a tempo goes from 120 to 122); both models make exactly the same changes; and a direct test
+settled it. The program that gains a copy of part 1 was put through **Bulk program import** twice:
+once byte for byte as distributed except for one letter of its name, and once under its own name
+with one value of its unused part 3 changed. The renamed one received the ordinary conversion only
+(tempo 120, velocity 2, part 2 off); the one with its own name received every correction (tempo
+102, velocity 3, part 2 a copy of part 1, layered). The corrections are not the 2025 factory
+versions of these programs either: several of those differ from the corrected result in hundreds
+of values.
+
+So the firmware carries a short list of fixes to its own 2022 programs, and no other program will
+ever trigger them. pgdata Packer does not reproduce them: one of these eight programs packed from
+its 2022 file plays as that file describes. The `.pgdata` import did not apply the velocity fix to
+one of them that had already been converted to the current layout (section 9); whether it applies
+the fixes to an unconverted 2022 file has not been tested.
 
 ## 7. What the 3rd Wave does on import
 
@@ -590,6 +603,7 @@ are damaged as distributed (empty or cut short).
 | 2 programs converted with parts 3–4 kept, packed, imported into the 8M | parts, globals and all values identical to **Import program**'s result; sequence notes for parts 3–4 as in section 6.4 |
 | 24M: 300 programs (the same 100 `W3_PROG_3` and 100 third-party programs, and Groove Synthesis's 2025 factory bank 1) bulk-imported and exported | the 4-part conversion in section 6.2 |
 | 24M: 3 programs converted for 24 voices, packed, imported, two of them carrying the 8M's values | the 24M's values restored on import; otherwise identical to **Import program**'s result except float 102 (section 6.3) |
+| 24M: the 2022 program of section 6.5 that gains a copy of part 1, bulk-imported renamed and, separately, under its own name with one unused value changed | renamed: ordinary conversion only; own name: every correction — the corrections are keyed by name |
 
 **Implemented from this document alone.** As a check on completeness, a converter was written by
 someone given only this document (no access to the library or the files) and run against the 599
@@ -600,7 +614,7 @@ selection-flag exception in section 6.4, were filled in; the appendix now carrie
 ## 10. Open questions
 
 - Whether a 24K converts exactly as the 24M does.
-- Whether the conversions in section 6.5 are per-program corrections keyed by name.
+- Whether the `.pgdata` import applies the corrections of section 6.5 to an unconverted 2022 file.
 - Whether **Import program** accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
 - Whether multisamples are reused by content, as wavetables are.
 - Whether **Bulk program import** sorts file names plainly or by number (`B05P100` before or after `B05P10`).
