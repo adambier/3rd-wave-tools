@@ -49,8 +49,11 @@ struct PackView: View {
                 Text("Reading \(p.done) of \(p.total)…").font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button("Remove") { state.removePrograms(selection); selection = [] }.disabled(selection.isEmpty)
+            Button("Remove Selected") { state.removePrograms(selection); selection = [] }.disabled(selection.isEmpty)
                 .help("Remove the selected programs from this list (the files are not touched)")
+            Button("Remove All…") { state.removeAllPack(); if state.programs.isEmpty { selection = [] } }
+                .disabled(state.programs.isEmpty && state.contentFiles.isEmpty)
+                .help("Remove every program and added file from this page (the files are not touched)")
             Button("Pack Selected…") { state.writeUnified(Array(selection)) }.disabled(selection.isEmpty)
             Button("Pack All…") { state.writeUnified(state.programs.map(\.id)) }.disabled(state.programs.isEmpty)
                 .keyboardShortcut("s", modifiers: [.command, .shift])

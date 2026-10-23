@@ -22,8 +22,11 @@ struct UnpackView: View {
                     Text("Reading \(p.done) of \(p.total)…").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Remove") { state.removeUnpacks(selection); selection = [] }.disabled(selection.isEmpty)
+                Button("Remove Selected") { state.removeUnpacks(selection); selection = [] }.disabled(selection.isEmpty)
                     .help("Remove the selected files from this list (the files are not touched)")
+                Button("Remove All…") { state.removeAllUnpacks(); if state.unpacks.isEmpty { selection = [] } }
+                    .disabled(state.unpacks.isEmpty)
+                    .help("Remove every file from this list (the files are not touched)")
                 Button("Unpack Selected…") { state.unpack(Array(selection)) }.disabled(selection.isEmpty)
                 Button("Unpack All…") { state.unpack(state.unpacks.map(\.id)) }.disabled(state.unpacks.isEmpty)
                     .keyboardShortcut("s", modifiers: [.command, .shift])

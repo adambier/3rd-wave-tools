@@ -309,6 +309,21 @@ final class AppState: ObservableObject {
     func removePrograms(_ ids: Set<UUID>) { programs.removeAll { ids.contains($0.id) }; if let s = selectedProgram, ids.contains(s) { selectedProgram = programs.first?.id } }
     func removeContent(_ id: UUID) { contentFiles.removeAll { $0.id == id } }
 
+    /// Empties the Pack page, programs and added files alike, after asking. Files are not touched.
+    func removeAllPack() {
+        let n = programs.count, f = contentFiles.count
+        guard n + f > 0 else { return }
+        var parts: [String] = []
+        if n > 0 { parts.append("\(n) program\(n == 1 ? "" : "s")") }
+        if f > 0 { parts.append("\(f) added file\(f == 1 ? "" : "s")") }
+        let what = parts.joined(separator: " and ")
+        guard Panels.confirm(title: "Remove everything from the Pack page?",
+                             message: "This removes \(what) from the lists, with any slots, choices and names you set for them. The files themselves are not touched.",
+                             ok: "Remove All") else { return }
+        programs = []; contentFiles = []; contentNames = [:]; selectedProgram = nil
+        note("Removed \(what) from the Pack page.")
+    }
+
     func describe(_ choice: PackPlan.Choice, for ref: SourceRef) -> String {
         switch choice {
         case .builtIn: return ref.description
@@ -433,6 +448,18 @@ final class AppState: ObservableObject {
     }
 
     func removeUnpacks(_ ids: Set<UUID>) { unpacks.removeAll { ids.contains($0.id) }; if let s = selectedUnpack, ids.contains(s) { selectedUnpack = unpacks.first?.id } }
+
+    /// Empties the Unpack page after asking. Files are not touched.
+    func removeAllUnpacks() {
+        let n = unpacks.count
+        guard n > 0 else { return }
+        let what = "\(n) .pgdata file\(n == 1 ? "" : "s")"
+        guard Panels.confirm(title: "Remove everything from the Unpack page?",
+                             message: "This removes \(what) from the list, with any ticks and names you changed. The files themselves are not touched.",
+                             ok: "Remove All") else { return }
+        unpacks = []; selectedUnpack = nil
+        note("Removed \(what) from the Unpack page.")
+    }
 
     func unpack(_ ids: [UUID]) {
         let items = unpacks.filter { ids.contains($0.id) }
