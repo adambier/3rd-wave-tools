@@ -110,7 +110,7 @@ pointed elsewhere.
 **Programs in an older format are converted as they are packed.** A program saved by older
 firmware (`W3_PROG_3`, `W3_PROG_4`, or a `W3_PROG_5` from before OS 2.0) is brought up to the
 current format the way the 3rd Wave's **Import program** converts it, and a line under the program
-name says so. This matters because the 3rd Wave's `.pgdata` import does only part of that
+name says so. This matters because the 3rd Wave's **Import unified program data file** function does only part of that
 conversion: a 2022 factory program packed unconverted played silent. The converter was checked
 against 599 conversions made by an 8M and a 24M; it matches the 3rd Wave's own result value for
 value in all but 15, all of them 2022 factory programs (details in
@@ -217,10 +217,10 @@ Checked on an 8M (OS 2.0d):
   with no warning; an empty sample slot plays silence. That is why multisamples are always
   embedded.
 - **Programs in an older format** are converted on import: fully by **Import program** and **Bulk
-  program import**, only in part by the `.pgdata` import. That is why this app converts them before
+  program import**, only in part by **Import unified program data file**. That is why this app converts them before
   packing (see Pack). Details are in
   [`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs).
-- **The `.pgdata` import takes the first `.pgdata` in `PROGRAMS`**, alphabetically, without asking;
+- **Import unified program data file takes the first `.pgdata` in `PROGRAMS`**, alphabetically, without asking;
   leave only the one you want there.
 
 ### Unpack
