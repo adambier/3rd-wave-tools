@@ -220,9 +220,9 @@ USB drive uses: `PROGRAMS` for `.pro`, `WAVES` for `.wt` and `AUDIO` for `.bin`,
 them onto the drive as they are. A batch of programs alone is written straight into the folder
 you choose.
 
-A box above the file list says what to do on your 3rd Wave before importing the `.pro`: which
-multisamples go into which S slots first, and which slots the program plays from your 3rd Wave
-rather than from the file. It appears only when there is something to say. Select several files
+A box above the file list says what the program needs on your 3rd Wave: which multisamples go
+into which S slots before you import the `.pro`, and which slots the program plays from your 3rd
+Wave rather than from the file. It appears only when there is something to say. Select several files
 to see everything they will produce in one list, with the program each file comes from.
 
 Untick anything you don't want, or rename it, before **Unpack Selected…** or **Unpack All…**.

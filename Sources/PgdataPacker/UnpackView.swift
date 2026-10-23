@@ -139,8 +139,8 @@ struct UnpackDetail: View {
     }
 }
 
-/// What to do on the 3rd Wave before importing the unpacked .pro files, above the file table so
-/// it is seen first. Each line appears only when it applies; with nothing to say, the box is left
+/// What the programs need on the 3rd Wave (multisamples to load first, slots they play from),
+/// above the file table so it is seen first. Each line appears only when it applies; with nothing to say, the box is left
 /// out. Its text wraps but never sets the pane's height: a fixed-height Text here once made the
 /// page taller than the window and pushed its top out of view.
 struct BeforeImportBox: View {
@@ -152,7 +152,8 @@ struct BeforeImportBox: View {
         if !lines.isEmpty {
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Before importing on your 3rd Wave").font(.headline)
+                    Text(items.count > 1 ? "What these programs need on your 3rd Wave" : "What this program needs on your 3rd Wave")
+                        .font(.headline)
                     ForEach(Array(lines.enumerated()), id: \.offset) { _, m in
                         line(m.text, warning: m.warning)
                     }
