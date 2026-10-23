@@ -335,12 +335,13 @@ final class AppState: ObservableObject {
         switch choice {
         case .builtIn: return ref.description
         case .reference:
+            // "Factory table — Human Vowel Sweep", matching "Name — from file.wt" for added files.
             // The Source column already shows the slot, so a name that only repeats it
-            // ("Wavetable P02") is left out.
+            // ("Wavetable P02") is left out; the Result column says the 3rd Wave's own copy is used.
             if let name = factory.name(ref), name != "Wavetable \(ref.label)" {
-                return "Factory \(name) (the 3rd Wave's own copy)"
+                return "Factory table \u{2014} \(name)"
             }
-            return "Factory table (the 3rd Wave's own copy)"
+            return "Factory table"
         case .file(let id):
             let f = contentFiles.first { $0.id == id }
             return "\(f.map(displayName) ?? "?") — from \(f?.url.lastPathComponent ?? "?")"
