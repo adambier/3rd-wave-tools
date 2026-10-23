@@ -121,6 +121,16 @@ final class PackTests: XCTestCase {
         XCTAssertEqual(Unpacker.unpack(try Packer.pack(older, content: [:])).program.serialized(), older.serialized())
     }
 
+    func testHeaderGivesFloatCount() throws {
+        // Lines 4–6 give floats per part, global values and event records. A 544-float program whose
+        // globals start with four zeros would look like the 548 layout; the header settles it.
+        var pro = makeProgram(sources: Array(repeating: 42, count: 12), floats: 544)
+        let tail = 4 * 181 + 4 + 544
+        for i in tail..<(tail + 4) { pro.values[i] = .int(0) }
+        pro.values[1] = .int(136); pro.values[2] = .int(40); pro.values[3] = .int(0)
+        XCTAssertEqual(Unpacker.unpack(try Packer.pack(pro, content: [:])).program.serialized(), pro.serialized())
+    }
+
     func testSampleIsNeverLeftOut() throws {
         let pro = makeProgram(sources: [4000] + Array(repeating: 42, count: 11))
         // The low-level packer can still list a sample without data (used only to make synth test files).

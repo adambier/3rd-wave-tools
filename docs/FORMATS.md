@@ -63,31 +63,40 @@ Plain text, one value per line, LF line ends with a trailing newline. [observed]
 |---|---|
 | 1 | Format tag: `W3_PROG_3`, `W3_PROG_4` or `W3_PROG_5` seen |
 | 2 | Program name |
-| 3 | *S*, the number of values per part: 173, 174, 179, 180 or 181 seen |
-| 4–6 | Three header values (see below) |
-| 7 … 6 + 4*S* | Four part blocks of *S* values each; part *k* (0–3) starts at line 7 + *S*·*k* |
-| 4*S* + 7 … | The float block (504 to 548 values, by layout) |
-| after the floats | The integer tail, to the end of the file |
+| 3 | *S*, the number of integer values per part: 173, 174, 179, 180 or 181 seen |
+| 4 | *F*, the number of float values per part: 126, 127, 130, 136 or 137 seen |
+| 5 | *G*, the number of global values: 75, 115, 175, 181 or 182 seen |
+| 6 | *E*, the number of event records |
+| 7 … | Four integer part blocks of *S* values; part *k* (0–3) starts at line 7 + *S*·*k* |
+| 4*S* + 7 … | Four float part blocks of *F* values |
+| then | *G* global integer values |
+| then | *E* event records of 6 values each, to the end of the file |
 
-[observed on about 2,350 programs: Groove Synthesis's factory banks and third-party sets]
+So a `.pro` describes its own layout: lines 3–6 give the size of every section, and the file ends
+exactly where they say. [observed: every file checked (206 programs: Groove Synthesis's 24-voice
+factory banks v1 and v2b, bank 1, and 3rd Wave exports), with no exceptions]
 
 Integers are written as decimal integers, floats with six decimals (`%f`, e.g. `0.385000`), so a `.pro`
 keeps floats to about 1e-6. The 3rd Wave's own `.pro` export does the same. [observed]
 
-### Header values (lines 4–6)
+### Layouts seen
 
-| Program | Line 4 | Line 5 | Line 6 |
-|---|---|---|---|
-| `W3_PROG_5` written by OS 2.0d (three programs) | 137 | 182 | 189, 142, 0 |
-| `W3_PROG_4` (one program) | 130 | 175 | 0 |
-| `W3_PROG_3`, *S* 173 | 126 | 75 | 268 |
-| `W3_PROG_3`, *S* 174 | 127 | 115 | 306 |
+| Format | *S* | *F* | *G* | Floats in all | Where seen |
+|---|---|---|---|---|---|
+| `W3_PROG_3` | 173 | 126 | 75 | 504 | Groove Synthesis's 2022 24-voice factory banks |
+| `W3_PROG_3` | 174 | 127 | 115 | 508 | the same banks (a few programs) |
+| `W3_PROG_4` | 179 | 127 | ? | 508 | third-party sets |
+| `W3_PROG_4` | 180 | 130 | ? | 520 | third-party sets |
+| `W3_PROG_4` | 181 | 130 | 175 | 520 | third-party sets |
+| `W3_PROG_5` | 181 | 130 | ? | 520 | programs saved before mid-2025 |
+| `W3_PROG_5` | 181 | 136 | 181 | 544 | saved from OS 1.9 (8M and 24-voice factory banks, 2025) |
+| `W3_PROG_5` | 181 | 137 | 182 | 548 | written by OS 2.0d (every export seen) |
 
-Lines 4–5: meaning unknown. Every program the 3rd Wave wrote had 137 and 182. [observed] Line 6 is
-the number of 6-value event records at the end of the tail, in every file where it was counted.
-[observed]
+[observed; "?" = not yet read from the header] Earlier versions of pgdata Packer did not use
+lines 4–6 and inferred the float block's length from *S*; that is still how it reads a `.pgdata`
+(see below).
 
-### Part blocks
+### Integer part blocks
 
 Within a part block (value 0 = the block's first line):
 
@@ -101,37 +110,29 @@ oscillators P02, U01 and A01 Square (ids 2, 35, 42). [observed in every 8M facto
 replaced parts 3–4 with that filler, and dropped their automation, in every program imported and
 exported again. [observed, three programs]
 
-### Float block
+### Float part blocks
 
-Its length depends on the layout. Within a layout it is fixed. [observed]
+Four blocks of *F* floats, one per part, in part order. Newer layouts add values at the end of each
+block: the first 126 values of a 137-value block line up with a 126-value one. [observed, two
+conversions by the 3rd Wave]
 
-| *S* | Floats | Where seen |
-|---|---|---|
-| 173 | 504 | `W3_PROG_3` (Groove Synthesis's 2022 24-voice factory banks) |
-| 174 | 508 | `W3_PROG_3` |
-| 179 | 508 | `W3_PROG_4` |
-| 180 | 520 | `W3_PROG_4` |
-| 181 | 520 | `W3_PROG_4`, and `W3_PROG_5` saved before mid-2025 |
-| 181 | 544 | `W3_PROG_5` saved from OS 1.9 (8M and 24-voice factory banks, 2025) |
-| 181 | 548 | `W3_PROG_5` written by OS 2.0d (every export seen; the last 4 were 0 in all of them) |
+### Global values
 
-A `.pgdata` stores the same values as 32-bit words without saying which are floats, so a reader has
-to work out the float block's length. pgdata Packer uses the known lengths for each *S* and, for
-*S* = 181, looks for small non-zero integers where the tail would start in each layout. [observed]
-
-### Integer tail
-
-Global settings, then a list of event records. [observed]
+*G* integers that apply to the whole program. [observed] Newer layouts add values at the end.
+[observed, two conversions]
 
 - Value 0: 3 in everything OS 2.0d wrote; 1 or 2 in older files. Meaning unknown. [observed]
 - Value 1: a velocity setting. The 3rd Wave Terminal shows 5 as "Piano" and 2 as "Medium". [observed]
-- Converting to the current layout inserts further global values. See
-  [Program layouts and their conversion](#program-layouts-and-their-conversion).
-- The tail ends with event records of 6 values each; their number is header line 6. Two kinds were seen:
-  - `p 108 1 <float bits> <step> 0`: one per part *p* and step (steps 0, 64, 128, …), with a float
-    stored as its 32-bit pattern. Probably per-step automation. [inferred]
-  - `<k> <a> 2 <b> <time> 0`: probably sequencer notes. [inferred] *k* was 0 in a `W3_PROG_3` file and
-    3 after the 3rd Wave converted it.
+
+### Event records
+
+*E* records of 6 integers each, at the end of the file. [observed] Groove Synthesis's own Bank
+Arranger script treats a non-zero line 6 as "this program has a sequence". [official] Two kinds were seen:
+
+- `p 108 1 <float bits> <step> 0`: one per part *p* and step (steps 0, 64, 128, …), with a float
+  stored as its 32-bit pattern. Probably per-step automation. [inferred]
+- `<k> <a> 2 <b> <time> 0`: probably sequencer notes. [inferred] *k* was 0 in a `W3_PROG_3` file and
+  3 after the 3rd Wave converted it.
 
 ## Program layouts and their conversion
 
@@ -139,7 +140,7 @@ The 3rd Wave converts an older program to its current layout when importing it. 
 (`.pro`) and **Import Unified Program Data File** (`.pgdata`) do not convert in the same way.
 [verified, one `W3_PROG_3` program, "House Organ 1" from Groove Synthesis's 2022 24-voice factory banks, 2026-10-23]
 
-Both imports produced identical results in the header constants, every part value and all 548
+Both imports produced identical results in header lines 3–5, every part value and all 548
 floats. They differed only where Import Program applies fixes that depend on the format version:
 
 | What | Original `W3_PROG_3` | After Import Program | After `.pgdata` import |
@@ -157,19 +158,22 @@ without error but can play differently. Until pgdata Packer converts old program
 such programs on the 3rd Wave with **Import Program**, then export a `.pgdata` from there. Whether
 `W3_PROG_4` programs are affected in the same way is still being checked; one did play the same.
 
-What Import Program changes when converting, as far as seen [observed]:
+What Import Program changes when converting, as far as seen [observed, two programs]:
 
-- `W3_PROG_3`, *S* 173 → `W3_PROG_5`, *S* 181: each part block gains 8 values at its end (all 0 in
-  the example); part value 34 becomes 100; the float block grows from 504 to 548 values, with values
-  inserted and some changed; header lines 4–5 become 137, 182; tail value 0 becomes 3, tail value 1
-  changes from 5 to 2; global values are inserted in the tail; the event records are rewritten: the notes
-  are kept with *k* = 3, and the automation for parts 1–2 is kept, numbered 1 and 2 where the original
-  numbered parts from 0 [inferred].
-- `W3_PROG_4`, *S* 181 → `W3_PROG_5`: part values unchanged; the float block grows from 520 to 548;
-  header lines 4–5 change from 130, 175 to 137, 182; tail value 0 changes from 1 to 3; global values are
-  inserted in the tail.
+- Every section keeps its old values in place and gains the new ones at its end: integer part blocks
+  173 → 181 (8 values, all 0 in the example), float part blocks 126 or 130 → 137, globals 75 or 175 →
+  182. Header lines 3–5 change to match.
+- A few existing values are reset as well. From `W3_PROG_3`: part value 34 (amp envelope amount)
+  0 → 100, float 102 of each part 0.246 → 1.0, global 0 2 → 3, global 1 (velocity) 5 → 2. From
+  `W3_PROG_4`: float 116 of each part 0.007874 → 0, global 0 1 → 3, globals 75–77 0, 0, 1 → 1, 2, 2,
+  and globals 81, 82, 115, 152 and 174 0 → 1.
+- `W3_PROG_3` event records are rewritten: the notes are kept with *k* = 3, and the automation for
+  parts 1–2 is kept, numbered 1 and 2 where the original numbered parts from 0. [inferred]
 
-These come from one program of each kind. They are not yet enough to reproduce the conversion.
+These come from one program of each kind, so they show the shape of the conversion but not yet all
+of its rules. Groove Synthesis's 2025 factory banks contain most of the 2022 programs again, but
+reworked by hand (amp envelope amounts, for example, differ program by program), so they cannot
+stand in for the 3rd Wave's own conversion.
 
 ## .pgdata: unified program data
 
@@ -190,7 +194,9 @@ Binary, little-endian. [observed: 221 files from Groove Synthesis, third parties
 - The twelve oscillator source ids in the program words are replaced by source-table indices.
   [observed] Sources are listed in order of first use, part 1 oscillator 1 first. [observed]
 - Analog waves are listed with type 2 and never carry data. [observed]
-- There is **no format tag**: the words start with *S*. Unpacking writes `W3_PROG_5`. [observed]
+- There is **no format tag**. The words start with *S*, *F*, *G* and *E* (`.pro` lines 3–6), so the
+  layout can be read from them; pgdata Packer uses them to tell floats from integers. Unpacking
+  writes the tag `W3_PROG_5`. [observed]
 - Embedded wavetables are the `.wt` values as float32, bit-identical to the files they came from
   (325 compared). [observed]
 - The 3rd Wave's own export embeds every wavetable a program uses, factory ones included, and lists
@@ -267,5 +273,5 @@ length, `u8` crossfade type, `f32` pitch, second rate, volume, then `int16` audi
 - Whether Import Program accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
 - Whether multisamples are reused by content, as tables are.
 - Whether the bulk import sorts file names plainly or by number (`B05P100` vs `B05P10`).
-- The meaning of the header constants, of most part, float and tail values, and of the few values
+- The meaning of most part, float and global values, of the event records, and of the few values
   that differ between a program's `.pro` and `.pgdata` exports.

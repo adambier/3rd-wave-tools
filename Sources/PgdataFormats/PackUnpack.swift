@@ -143,6 +143,16 @@ public enum Unpacker {
         func looksLikeSmallInt(_ w: UInt32) -> Bool {
             let i = Int32(bitPattern: w); return i != 0 && abs(Int(i)) < (1 << 20)
         }
+        // The words start with S, F (floats per part), G (global values) and E (6-value event
+        // records), and the program ends exactly where they say [observed on every file checked].
+        // When they add up, F gives the float block directly.
+        if words.count >= 4 {
+            let f = Int(Int32(bitPattern: words[1])), g = Int(Int32(bitPattern: words[2])), e = Int(Int32(bitPattern: words[3]))
+            if f > 0, f < 1000, g >= 0, g < 10_000, e >= 0, e < 1_000_000,
+               4 + 4 * s + 4 * f + g + 6 * e == words.count {
+                return 4 * f
+            }
+        }
         if let options = floatCounts[s] {
             if options.count == 1 { return options[0] }
             // 181: the 24 words after the first 520 floats are floats in the 544 layout, and the 4
