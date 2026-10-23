@@ -33,7 +33,7 @@ done
 APP="pgdata Packer.app"
 BUNDLE_ID="org.biers.pgdatapacker"
 ARCH="$(uname -m)"
-VERSION="1.0"
+VERSION="1.0.1"
 DEPLOYMENT_TARGET="13.0"
 
 mkdir -p build
