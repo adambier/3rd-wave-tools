@@ -409,9 +409,8 @@ global 15 (128–131 still come from the appendix).
   [inferred: OS 2.0 allows two supersaws per part].
 
 In the globals, whatever they were: 2 = 0, 36 = 0, 75 = 1, 76 = 2, 77 = 2, 78 = 0, 79 = 0, 81 = 1,
-82 = 1, 115 = 1, 140 = 0, 142 = 0, 152 = 1, 153 = 0, 173 = 0, 175 = 2, 177 = 0, 178 = 1 (177 was
-non-zero only in files given to the 24M). Globals 0, 80 and 174 are set too, by model: see
-section 6.3.
+82 = 1, 115 = 1, 140 = 0, 142 = 0, 152 = 1, 153 = 0, 173 = 0, 175 = 2, 177 = 0, 178 = 1 (a
+non-zero 177 was seen only on the 24M). Globals 0, 80 and 174 are set too, by model: see section 6.3.
 
 **Step 3. `W3_PROG_3` only:**
 
@@ -598,7 +597,8 @@ selection-flag exception in section 6.4, were filled in; the appendix now carrie
 ## 10. Open questions
 
 - Whether a 24K converts exactly as the 24M does.
-- The conversions in section 6.5, and what float 102 does.
+- Whether the conversions in section 6.5 are per-program corrections keyed by name, and what
+  float 102 does.
 - Whether **Import program** accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
 - Whether multisamples are reused by content, as wavetables are.
 - Whether **Bulk program import** sorts file names plainly or by number (`B05P100` before or after `B05P10`).

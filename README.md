@@ -9,8 +9,8 @@ A macOS app that packs Groove Synthesis 3rd Wave programs (`.pro`) together with
 `.pgdata` files back into those parts.
 
 Not affiliated with or endorsed by Groove Synthesis. Everything here was worked out from files and
-checked on one 8M running OS 2.0d. The Formats and Tests sections say what was confirmed on
-the 3rd Wave and what is inferred.
+checked on an 8M and a 24M, both running OS 2.0d. The Formats and Tests sections say what was
+confirmed on the 3rd Wave and what is inferred.
 
 ![The Pack page: the programs added on the left; for the selected program, what each oscillator source will play and whether it is embedded; below, the wavetables and multisamples added and the slots they go to](docs/pack-window.png)
 
@@ -109,13 +109,14 @@ pointed elsewhere.
 
 **Programs in an older format are converted as they are packed.** A program saved by older
 firmware (`W3_PROG_3`, `W3_PROG_4`, or a `W3_PROG_5` from before OS 2.0) is brought up to the
-current format the way the 3rd Wave's **Import program** converts it, and a line under the program
-name says so. This matters because the 3rd Wave's **Import unified program data file** function does only part of that
-conversion: a 2022 factory program packed unconverted played silent. The converter was checked
-against 599 conversions made by an 8M and a 24M; it matches the 3rd Wave's own result value for
-value in all but 15, all of them 2022 factory programs (details in
-[`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs)). The packed program keeps all
-four parts, so one file works on every model: an 8M fits it to its two parts when it imports it.
+current format in the same way the 3rd Wave's **Import program** function converts it, and a line
+under the program name says so. This matters because **Import unified program data file** does
+only part of that conversion: a 2022 factory program packed unconverted played silent. The
+converter was checked against 599 conversions made by an 8M and a 24M and matches the 3rd Wave's
+own result value for value, except for eight 2022 factory programs that the 3rd Wave appears to
+correct individually on import (see [`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs)).
+The packed program keeps all four parts, so one file works on every model: an 8M fits it to its
+two parts when it imports it.
 
 #### Changing what oscillators play
 
@@ -204,7 +205,7 @@ Files are named in Groove Synthesis's own pattern, with the program location fir
 
 #### What the 3rd Wave does on import
 
-Checked on an 8M (OS 2.0d):
+Checked on an 8M and a 24M (OS 2.0d):
 
 - **A table the 3rd Wave already has** (same content, in any slot, whatever its name) is reused. No
   slot is used, and the 3rd Wave keeps its own name for it.
@@ -220,8 +221,11 @@ Checked on an 8M (OS 2.0d):
   program import**, only in part by **Import unified program data file**. That is why this app converts them before
   packing (see Pack). Details are in
   [`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs).
-- **Import unified program data file takes the first `.pgdata` in `PROGRAMS`**, alphabetically, without asking;
-  leave only the one you want there.
+- **Import unified program data file takes the first `.pgdata` in `PROGRAMS`**, alphabetically,
+  without asking; leave only the one you want there.
+- **Exporting while the USB drive is also mounted on a computer** can write empty files. Unplug the
+  USB cable during an export, and empty `PROGRAMS` first: an export does not shorten a longer file
+  of the same name.
 
 ### Unpack
 
@@ -248,8 +252,8 @@ are.
 
 A `.pgdata` does not record the program's format. One that holds a program in an older layout
 (built by another tool; the 3rd Wave's own exports are always current) is converted as it is
-unpacked, as **Import program** would convert it, and the box says so. The app works out the old
-format from the layout, so the unpacked `.pro` is always in the current format, `W3_PROG_5`.
+unpacked, in the same way as in Pack, and the box says so. The app works out the old format from
+the layout, so the unpacked `.pro` is always in the current format, `W3_PROG_5`.
 
 ## Formats
 
@@ -293,17 +297,18 @@ factory tables instead of embedding them, so its output differs there by design.
 
 ## Tests on the 3rd Wave
 
-The behaviour under "What the 3rd Wave does on import" was checked on an 8M (OS 2.0d), along with
-name lengths and the 3rd Wave's own export file names. The conversion of older programs was worked
-out from 599 programs bulk-imported and exported again on an 8M and a 24M (both OS 2.0d), and
-programs converted and packed by this app were imported on both. The 3rd Wave's exports were also unpacked and
-repacked byte for byte with `tw3pg`. The test `.pgdata` files are built with `tw3pg` from files that are not
-included here (a Groove Synthesis factory program and one of its `.wt` files, two third-party
-programs, and a small `.bin`).
+The behaviour under "What the 3rd Wave does on import" was checked on an 8M and a 24M (both
+OS 2.0d), along with name lengths and the 3rd Wave's own export file names. The conversion of older
+programs was worked out from 599 programs bulk-imported and exported again on the two, and
+programs converted and packed by this app were imported on both. The 3rd Wave's exports were also
+unpacked and repacked byte for byte with `tw3pg`. The test `.pgdata` files are built with `tw3pg`
+from files that are not included here (a Groove Synthesis factory program and one of its `.wt`
+files, two third-party programs, and a small `.bin`).
 
 Still unknown: whether the 3rd Wave reuses a multisample it already has (as it does for wavetables);
 whether its bulk import sorts file names plainly or by number; how it writes non-ASCII letters in
-file names; whether a 24K converts older programs exactly as the 24M does; and the meaning of most
+file names; whether a 24K converts older programs exactly as the 24M does; whether the changes it
+makes to a few 2022 factory programs are corrections keyed by name; and the meaning of most
 program values.
 
 ## Layout
