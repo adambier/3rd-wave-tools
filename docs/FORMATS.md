@@ -244,6 +244,24 @@ Everything else, all 181 part values and 548 floats included, came out identical
 never writes an older layout into a `.pgdata`: its exports are always current. [observed] So a
 program should be converted before it is packed.
 
+A program that is already in the current layout is imported unchanged: five programs converted by
+pgdata Packer, packed and imported into an 8M, exported byte-identical to the converted `.pro`. Four
+of them were also byte-identical to what Import Program had made of the originals; the fifth
+differed only in the unexplained velocity value. [verified, 2026-10-23]
+
+**An 8M fits a 4-part program to two parts on `.pgdata` import too.** Two programs converted for a
+24K/24M (parts 3–4 kept) came out of an 8M's `.pgdata` import with parts 3–4, every global and every
+part value exactly as Import Program had made them. [verified, 2026-10-23] Only sequence notes for
+parts 3 and 4 were handled differently:
+
+- `.pgdata` import drops a note whose part mask names only parts 3–4, and trims the mask of one that
+  also names part 1 or 2;
+- Import Program instead moves the notes of a split's upper zones to part 2 (which then plays them
+  with part 2's sound), and drops a layered note recorded on part 3 or 4.
+
+So one converted file serves every model: a 24K or 24M keeps all four parts, and an 8M keeps parts
+1–2.
+
 ## .pgdata: unified program data
 
 Binary, little-endian. [observed: 221 files from Groove Synthesis, third parties and a 3rd Wave's own exports]
@@ -341,8 +359,6 @@ length, `u8` crossfade type, `f32` pitch, second rate, volume, then `int16` audi
 ## Open questions
 
 - Whether a 24K or 24M converts exactly as an 8M does for parts 1–2, and keeps parts 3–4.
-- What the `.pgdata` import does with a converted (current-layout) program: it should leave it as it
-  is, so that it matches Import Program. [inferred; to be checked]
 - The 7 conversions under [Not explained](#not-explained).
 - Whether Import Program accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
 - Whether multisamples are reused by content, as tables are.
