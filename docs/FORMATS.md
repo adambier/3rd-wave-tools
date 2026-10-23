@@ -509,6 +509,15 @@ and 292 of the 300 on the 24M, including every `W3_PROG_4` and `W3_PROG_5` progr
 - in 1, float 53 went from 120 to 122 in parts 1–2 (all four on the 24M);
 - in 1, on the 24M only, integer 143 went from 8 to 0 in parts 1 and 2.
 
+These do not look like conversion rules. Every changed value started inside the range hundreds of
+untouched programs use, so they are not range checks; the new values cannot be derived from the
+file (the same starting value becomes 0.013 in one part and 0.019 in the other; a tempo goes from
+120 to 122; one program gains a copy of part 1 in part 2, panned left and right); and both models
+make exactly the same changes. The likeliest explanation is that the firmware applies a fixed list
+of corrections to particular 2022 factory programs when they are imported, probably keyed by
+program name. [inferred] If so, no other program will ever trigger them, and there is nothing for a
+converter to reproduce. Importing one of these programs under another name would settle it.
+
 ## 7. What the 3rd Wave does on import
 
 Verified on an 8M (OS 2.0d) unless a note says otherwise.
