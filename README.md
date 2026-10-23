@@ -216,7 +216,7 @@ wavetable named with its slot (e.g., `U57_Warm Pad.wt`), and a `.bin` per multis
 Groove Synthesis's sample library names them (e.g., `S010_Strings.bin`).
 
 When a batch writes any wavetables or multisamples, the files go into the folders your 3rd Wave's
-USB drive uses: `PROGRAM` for `.pro`, `WAVES` for `.wt` and `AUDIO` for `.bin`, so you can copy
+USB drive uses: `PROGRAMS` for `.pro`, `WAVES` for `.wt` and `AUDIO` for `.bin`, so you can copy
 them onto the drive as they are. A batch of programs alone is written straight into the folder
 you choose.
 

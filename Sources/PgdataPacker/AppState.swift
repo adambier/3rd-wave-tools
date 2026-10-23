@@ -473,12 +473,13 @@ final class AppState: ObservableObject {
             }
         }
         // With any wavetables or multisamples, each kind goes in the folder the 3rd Wave's USB drive
-        // uses for it (as the drive shows when mounted), so the output can be copied onto the drive
-        // as it is. Programs alone stay at the top level.
+        // uses for it, named as the drive shows them when mounted (PROGRAMS, WAVES, AUDIO; checked
+        // on Adam's 8M), so the output can be copied onto the drive as it is. Programs alone stay
+        // at the top level.
         let foldered = files.contains { $0.file.ref != nil }
         let outputs: [(name: String, data: Data)] = files.map { f in
             guard foldered else { return (f.name, f.file.data) }
-            let sub = f.file.ref == nil ? "PROGRAM" : (f.file.ref!.isSample ? "AUDIO" : "WAVES")
+            let sub = f.file.ref == nil ? "PROGRAMS" : (f.file.ref!.isSample ? "AUDIO" : "WAVES")
             return (sub + "/" + f.name, f.file.data)
         }
         guard let result = Panels.write(outputs, into: folder) else { note("Unpacking cancelled; nothing written."); return }

@@ -61,7 +61,7 @@ enum Panels {
         var failed: [String]
     }
 
-    /// Writes files into a folder. A name may start with a subfolder ("PROGRAM/Pad.pro"); missing
+    /// Writes files into a folder. A name may start with a subfolder ("PROGRAMS/Pad.pro"); missing
     /// subfolders are created. Within one batch, two outputs with the same path (ignoring case, as
     /// the file system does) get " 2", " 3"… If any of the final paths is already taken, asks once
     /// whether to replace those files, keep both (the new copies get " 2", " 3"…), or cancel.
