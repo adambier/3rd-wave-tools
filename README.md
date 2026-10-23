@@ -215,6 +215,11 @@ Drop `.pgdata` files. Each becomes a `.pro` named after the program, a `.wt` per
 wavetable named with its slot (e.g., `U57_Warm Pad.wt`), and a `.bin` per multisample named as
 Groove Synthesis's sample library names them (e.g., `S010_Strings.bin`).
 
+When a batch writes any wavetables or multisamples, the files go into the folders your 3rd Wave's
+USB drive uses: `PROGRAM` for `.pro`, `WAVES` for `.wt` and `AUDIO` for `.bin`, so you can copy
+them onto the drive as they are. A batch of programs alone is written straight into the folder
+you choose.
+
 A box above the file list says what to do on your 3rd Wave before importing the `.pro`: which
 multisamples go into which S slots first, and which slots the program plays from your 3rd Wave
 rather than from the file. It appears only when there is something to say.

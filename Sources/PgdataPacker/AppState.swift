@@ -465,12 +465,21 @@ final class AppState: ObservableObject {
         let items = unpacks.filter { ids.contains($0.id) }
         guard !items.isEmpty, let folder = Panels.chooseFolder(prompt: "Unpack Here", message: "Choose where to put the unpacked files") else { return }
         // Identical files (same name and content) shared by several programs are written once.
-        var outputs: [(name: String, data: Data)] = []
+        var files: [(file: UnpackPlan.Item, name: String)] = []
         for item in items {
             for f in item.plan.items where f.write {
-                if outputs.contains(where: { $0.name == f.fileName && $0.data == f.data }) { continue }
-                outputs.append((name: f.fileName, data: f.data))
+                if files.contains(where: { $0.file.fileName == f.fileName && $0.file.data == f.data }) { continue }
+                files.append((f, f.fileName))
             }
+        }
+        // With any wavetables or multisamples, each kind goes in the folder the 3rd Wave's USB drive
+        // uses for it (as the drive shows when mounted), so the output can be copied onto the drive
+        // as it is. Programs alone stay at the top level.
+        let foldered = files.contains { $0.file.ref != nil }
+        let outputs: [(name: String, data: Data)] = files.map { f in
+            guard foldered else { return (f.name, f.file.data) }
+            let sub = f.file.ref == nil ? "PROGRAM" : (f.file.ref!.isSample ? "AUDIO" : "WAVES")
+            return (sub + "/" + f.name, f.file.data)
         }
         guard let result = Panels.write(outputs, into: folder) else { note("Unpacking cancelled; nothing written."); return }
         var msg = "Unpacked \(items.count) file\(items.count == 1 ? "" : "s") into \"\(folder.lastPathComponent)\": \(result.written) file\(result.written == 1 ? "" : "s") written."
