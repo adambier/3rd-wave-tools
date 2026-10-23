@@ -335,7 +335,12 @@ final class AppState: ObservableObject {
         switch choice {
         case .builtIn: return ref.description
         case .reference:
-            return "Factory \(factory.name(ref) ?? ref.label) (the 3rd Wave's own copy)"
+            // The Source column already shows the slot, so a name that only repeats it
+            // ("Wavetable P02") is left out.
+            if let name = factory.name(ref), name != "Wavetable \(ref.label)" {
+                return "Factory \(name) (the 3rd Wave's own copy)"
+            }
+            return "Factory table (the 3rd Wave's own copy)"
         case .file(let id):
             let f = contentFiles.first { $0.id == id }
             return "\(f.map(displayName) ?? "?") — from \(f?.url.lastPathComponent ?? "?")"
