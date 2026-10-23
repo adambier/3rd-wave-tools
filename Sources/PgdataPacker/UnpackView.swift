@@ -54,11 +54,16 @@ struct UnpackView: View {
                     .onChange(of: state.selectedUnpack) { s in if let s, !selection.contains(s) { selection = [s] } }
                     .onAppear { if let s = state.selectedUnpack { selection = [s] } }
 
-                    if let id = state.selectedUnpack, let u = state.unpacks.first(where: { $0.id == id }) {
-                        UnpackDetail(item: u)
-                    } else {
-                        Text("Select a file").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // Every selected file, in list order; with several, the detail covers them all.
+                    let chosen = state.unpacks.filter { selection.contains($0.id) }
+                    Group {
+                        if chosen.isEmpty {
+                            Text("Select a file").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            UnpackDetail(items: chosen)
+                        }
                     }
+                    .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
@@ -70,39 +75,62 @@ struct UnpackView: View {
     }
 }
 
+/// The files one or more .pgdata will produce. With several selected, the table lists every file
+/// with the program it comes from, and the box above covers them all.
 struct UnpackDetail: View {
     @EnvironmentObject var state: AppState
-    let item: AppState.UnpackItem
+    let items: [AppState.UnpackItem]
+
+    /// One table row: a file and the .pgdata it comes from.
+    struct Row: Identifiable {
+        let unpackID: UUID
+        let programName: String
+        let file: UnpackPlan.Item
+        var id: UUID { file.id }
+    }
 
     var body: some View {
         let st = state
+        let several = items.count > 1
+        let rows = items.flatMap { u in u.plan.items.map { Row(unpackID: u.id, programName: u.plan.programName, file: $0) } }
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text(item.plan.programName).font(.title2)
+                Text(several ? "\(items.count) files selected" : items[0].plan.programName).font(.title2)
                 Spacer()
-                Button("Show in Finder") { Panels.reveal(item.url) }.buttonStyle(.link)
+                if !several {
+                    Button("Show in Finder") { Panels.reveal(items[0].url) }.buttonStyle(.link)
+                }
             }
-            BeforeImportBox(item: item)
-            Text("Files this will produce").font(.headline)
-            Table(item.plan.items) {
-                TableColumn("Write") { (f: UnpackPlan.Item) in WriteToggleCell(state: st, unpackID: item.id, file: f) }
+            BeforeImportBox(items: items)
+            Text(several ? "Files these will produce" : "Files this will produce").font(.headline)
+            Table(rows) {
+                TableColumn("Write") { (r: Row) in WriteToggleCell(state: st, unpackID: r.unpackID, file: r.file) }
                     .width(44)
-                TableColumn("File name") { (f: UnpackPlan.Item) in FileNameCell(state: st, unpackID: item.id, file: f) }
+                TableColumn("File name") { (r: Row) in FileNameCell(state: st, unpackID: r.unpackID, file: r.file) }
                     .width(min: 180, ideal: 260)
-                TableColumn("Contents") { (f: UnpackPlan.Item) in Text(f.description).foregroundStyle(.secondary).lineLimit(2) }
+                TableColumn("Program") { (r: Row) in Text(r.programName).lineLimit(1) }
+                    .width(min: 80, ideal: 150)
+                TableColumn("Contents") { (r: Row) in Text(r.file.description).foregroundStyle(.secondary).lineLimit(2) }
             }
             .visibleScrollers()
-            .frame(minHeight: 140)
+            .frame(minHeight: 140, maxHeight: .infinity)
+            if several {
+                Text("A file that several programs share, with the same name and contents, is written once.")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            }
         }
         .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
-/// What to do on the 3rd Wave before importing the unpacked .pro, above the file table so it is
-/// seen first. Each line appears only when it applies; with nothing to say, the box is left out.
+/// What to do on the 3rd Wave before importing the unpacked .pro files, above the file table so
+/// it is seen first. Each line appears only when it applies; with nothing to say, the box is left
+/// out. Its text wraps but never sets the pane's height: a fixed-height Text here once made the
+/// page taller than the window and pushed its top out of view.
 struct BeforeImportBox: View {
     @EnvironmentObject var state: AppState
-    let item: AppState.UnpackItem
+    let items: [AppState.UnpackItem]
 
     var body: some View {
         let lines = messages
@@ -121,8 +149,8 @@ struct BeforeImportBox: View {
         }
     }
 
-    /// Multisamples to import first, factory slots the program plays from, other slots it lists
-    /// without data, then the unpacker's notes.
+    /// Multisamples to import first, factory slots the programs play from, other slots listed
+    /// without data, then the unpacker's notes (named by program when several are selected).
     private var messages: [(text: String, warning: Bool)] {
         var out: [(text: String, warning: Bool)] = []
         let samples = multisamples
@@ -132,30 +160,50 @@ struct BeforeImportBox: View {
                         + "or the program will play whatever is in \(s.slot).", false))
         } else if samples.count > 1 {
             let list = samples.map { "\($0.slot) \(quoted($0.name))" }.joined(separator: ", ")
-            out.append(("Import these multisamples into their slots before importing the .pro, "
-                        + "or the program will play whatever is there: \(list).", false))
+            out.append(("Import these multisamples into their slots before importing the .pro files, "
+                        + "or the programs will play whatever is there: \(list).", false))
         }
-        let refs = item.plan.referenced
+        // Different multisamples labelled with the same slot cannot all go in it.
+        var bySlot: [String: [String]] = [:]
+        for s in samples { bySlot[s.slot, default: []].append(s.name) }
+        for slot in bySlot.keys.sorted() {
+            guard let names = bySlot[slot], names.count > 1 else { continue }
+            let list = names.map { quoted($0) }.joined(separator: " and ")
+            let all = names.count == 2 ? "both" : "all"
+            out.append(("\(list) are \(all) labelled \(slot), but only one can be in that slot. "
+                        + "Whichever is there is what every program using \(slot) plays.", true))
+        }
+        var refs: [SourceRef] = []
+        for u in items { for r in u.plan.referenced where !refs.contains(r) { refs.append(r) } }
+        refs.sort()
         let factory = refs.filter { $0.isFactorySlot }
         let other = refs.filter { !$0.isFactorySlot }
+        let several = items.count > 1
+        let file = several ? "these files" : "this file"
+        let plays = several ? "The programs play" : "The program plays"
         if !factory.isEmpty {
             let list = factory.map { slotText($0) }.joined(separator: ", ")
-            out.append(("Plays from your 3rd Wave (not in this file): \(list).", false))
+            out.append(("Plays from your 3rd Wave (not in \(file)): \(list).", false))
         }
         if !other.isEmpty {
             let list = other.map { $0.description }.joined(separator: ", ")
-            out.append(("Not in this file, and not factory slots: \(list). "
-                        + "The program plays whatever your 3rd Wave has there.", true))
+            out.append(("Not in \(file), and not factory slots: \(list). \(plays) whatever your 3rd Wave has there.", true))
         }
-        for n in item.plan.notes { out.append((n, true)) }
+        for u in items {
+            for n in u.plan.notes { out.append((several ? "\(u.plan.programName): \(n)" : n, true)) }
+        }
         return out
     }
 
-    /// The multisamples the file carries (slot label and name), in the order they are listed.
+    /// The multisamples the files carry (slot label and name), each distinct one once, in order.
     private var multisamples: [(slot: String, name: String)] {
         var out: [(slot: String, name: String)] = []
-        for src in item.unified.sources {
-            if case let .multisample(m) = src.payload { out.append((src.ref.label, m.name)) }
+        for u in items {
+            for src in u.unified.sources {
+                guard case let .multisample(m) = src.payload else { continue }
+                let s = (slot: src.ref.label, name: m.name)
+                if !out.contains(where: { $0.slot == s.slot && $0.name == s.name }) { out.append(s) }
+            }
         }
         return out
     }
@@ -170,7 +218,7 @@ struct BeforeImportBox: View {
 
     private func line(_ text: String, warning: Bool) -> some View {
         Label {
-            Text(text).fixedSize(horizontal: false, vertical: true)
+            Text(text)
         } icon: {
             Image(systemName: warning ? "exclamationmark.triangle" : "info.circle")
                 .foregroundStyle(warning ? Color.orange : Color.secondary)
