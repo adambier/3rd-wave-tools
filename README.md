@@ -212,7 +212,7 @@ Checked on an 8M (OS 2.0d):
   fixes were left as they were. Until this app converts old programs itself, import them on the
   3rd Wave with **Import Program** and export a `.pgdata` from there. A `W3_PROG_4` program sounded
   the same from both; whether it matched in every setting is still being checked. Details are in
-  [`docs/FORMATS.md`](docs/FORMATS.md#program-layouts-and-their-conversion).
+  [`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs).
 
 ### Unpack
 
