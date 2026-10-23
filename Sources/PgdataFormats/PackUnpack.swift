@@ -135,7 +135,7 @@ public enum Unpacker {
            let converted = try? ProgramConverter.convert(program, format: format) {
             program = converted
             notes.append("This file holds a program originally saved in an older format (probably W3_PROG_\(format), layout \(l)). "
-                         + "The .pro will be written in the current format, converted in the same way the 3rd Wave's Import program "
+                         + "The .pro will be written in the current format, converted in the same way the 3rd Wave's \u{201C}Import program\u{201D} "
                          + "function handles older programs"
                          + (format == 3 ? "; the 3rd Wave's own .pgdata import leaves such a program silent." : "."))
         }

@@ -183,7 +183,7 @@ public enum ProgramConverter {
     public static func summary(_ p: ProgramFile) -> String? {
         guard needsConversion(p), unsupportedReason(p) == nil, let l = layout(of: p) else { return nil }
         return "Originally saved in an older format (\(p.version), layout \(l)). The program will be converted to the "
-            + "current format (W3_PROG_5, \(current)) as part of packing, in the same way the 3rd Wave's Import program "
+            + "current format (W3_PROG_5, \(current)) as part of packing, in the same way the 3rd Wave's \u{201C}Import program\u{201D} "
             + "function handles older programs."
     }
 

@@ -53,6 +53,10 @@ value. Lines of a `.pro` count from 1, as a text editor shows them.
 1, 2 and 4 bytes; `f32` is an IEEE 754 single-precision float; `char[n]` is a text field of *n*
 bytes (see [Names](#8-names-file-names-and-the-usb-drive)).
 
+**Menu items.** The 3rd Wave's functions are named in bold as its Global menu writes them:
+**Import program**, **Bulk program import**, **Bulk program export**, **Import unified program data
+file** (called "the `.pgdata` import" here).
+
 **Parts.** A program has four parts (layers), numbered 1–4 on the 3rd Wave and 0–3 in the files.
 The 24K and 24M play all four; the 8M plays parts 1 and 2 only. [official]
 
@@ -363,7 +367,7 @@ The 3rd Wave converts a program in an older layout (section 3.3) when it imports
 converts the layout but skips several changes that depend on the format, and a `.pgdata` carries no
 format tag that would tell it which to apply. [verified]
 
-| What | Original `W3_PROG_3` | After Import program | After `.pgdata` import |
+| What | Original `W3_PROG_3` | After **Import program** | After `.pgdata` import |
 |---|---|---|---|
 | Integer 34, parts 1–2 | 0 | **100** | 0: the program is silent |
 | Global 1 (velocity) | 5 | **2** | 5 |
@@ -377,7 +381,7 @@ sets on every import (section 6.3). [verified, section 9]
 
 ### 6.2 The conversion
 
-These are the steps Import program applies, in the form pgdata Packer's converter
+These are the steps **Import program** applies, in the form pgdata Packer's converter
 (`ProgramConverter`) implements them. They produce the **4-part result**: what a 24M makes of the
 program, with parts 3 and 4 kept. An 8M additionally fits the program to two parts (section 6.4),
 and does so by itself when it imports the converted `.pgdata`. [verified]
@@ -453,17 +457,17 @@ with the 24M's]
 | Global 80 | 1 | 0 |
 | Global 174 | 1 | 0 |
 | A float written `-0.000000` | kept | becomes `0.000000` |
-| Float 102 of a `W3_PROG_3` program, by Import program | 1.0 | 0.446233 |
+| Float 102 of a `W3_PROG_3` program, by **Import program** | 1.0 | 0.446233 |
 | Float 102, by the `.pgdata` import | 1.0 | 1.0 |
 
 Since each model overwrites them, what a file carries for these does not matter. pgdata Packer
-writes the 24M's Import program values (so 0.446233 in float 102 of a converted `W3_PROG_3`
+writes the 24M's **Import program** values (so 0.446233 in float 102 of a converted `W3_PROG_3`
 program), but that one value no file can control: on a 24K/24M the `.pgdata` import sets it to 1.0
 whatever the file says. What float 102 does, and whether the difference is audible, is unknown.
 
 ### 6.4 What an 8M does on top
 
-On an 8M, every import (Import program, Bulk program import and the `.pgdata` import) also fits the
+On an 8M, every import (**Import program**, **Bulk program import** and the `.pgdata` import) also fits the
 program to two parts: [verified]
 
 - parts 3 and 4 are replaced with the 8M's filler, the same 181 integers and 137 floats every time
@@ -488,7 +492,7 @@ differently by the two imports:
   only parts 3–4 is dropped, and one that also names part 1 or 2 keeps those.
 
 So one converted file (the 4-part result) serves every model: a 24K or 24M keeps all four parts,
-and an 8M keeps parts 1 and 2. pgdata Packer's converter can also produce Import program's 8M result
+and an 8M keeps parts 1 and 2. pgdata Packer's converter can also produce **Import program**'s 8M result
 directly (`Model.eightM`); that is used only to check the rules against the 8M's exports.
 
 ### 6.5 Accuracy
@@ -519,12 +523,12 @@ Verified on an 8M (OS 2.0d) unless a note says otherwise.
   silence, with no warning.
 - **Import program** asks for a name for the new program (defaulting to the one in the file); the
   `.pgdata` import does not.
-- **Older layouts** are converted fully by Import program and Bulk program import, which give
+- **Older layouts** are converted fully by **Import program** and **Bulk program import**, which give
   byte-identical results, and only in part by the `.pgdata` import (section 6).
 - **An 8M fits every imported program to two parts** (section 6.4), and each model sets a few
   values of its own on every import (section 6.3). [verified on both]
 - **The `.pgdata` import takes the first `.pgdata` file in `PROGRAMS`**, in alphabetical order; it
-  does not offer a choice. [verified on the 24M] Bulk program import takes the files in
+  does not offer a choice. [verified on the 24M] **Bulk program import** takes the files in
   alphabetical order. [verified]
 - **An export onto an existing file does not shorten it.** When a bulk export replaced a longer file
   of the same name, the end of the old file remained after the new program. [observed once, on the
@@ -568,13 +572,13 @@ are damaged as distributed (empty or cut short).
 | Multisample slot listed without data, slot occupied / empty | plays that slot / silent, no warning |
 | 31-character names | displayed in full |
 | The 3rd Wave's own `.pro` and `.pgdata` exports | file names and contents as in sections 4 and 8 |
-| A `W3_PROG_3` program packed unconverted, against Import program | silent; the differences in section 6.1 |
+| A `W3_PROG_3` program packed unconverted, against **Import program** | silent; the differences in section 6.1 |
 | 299 programs (100 `W3_PROG_3`, 76 `W3_PROG_4`, 123 `W3_PROG_5`) bulk-imported and exported | the conversion rules in section 6 |
-| The same program through Import program and Bulk program import | byte-identical |
-| 5 programs converted by pgdata Packer for the 8M, packed, imported | exported exactly as converted; 4 identical to Import program's result, the fifth differing only in the velocity value of section 6.5 |
-| 2 programs converted with parts 3–4 kept, packed, imported into the 8M | parts, globals and all values identical to Import program's result; sequence notes for parts 3–4 as in section 6.4 |
+| The same program through **Import program** and **Bulk program import** | byte-identical |
+| 5 programs converted by pgdata Packer for the 8M, packed, imported | exported exactly as converted; 4 identical to **Import program**'s result, the fifth differing only in the velocity value of section 6.5 |
+| 2 programs converted with parts 3–4 kept, packed, imported into the 8M | parts, globals and all values identical to **Import program**'s result; sequence notes for parts 3–4 as in section 6.4 |
 | 24M: 300 programs (the same 100 `W3_PROG_3` and 100 third-party programs, and Groove Synthesis's 2025 factory bank 1) bulk-imported and exported | the 4-part conversion in section 6.2 |
-| 24M: 3 programs converted for 24 voices, packed, imported, two of them carrying the 8M's values | the 24M's values restored on import; otherwise identical to Import program's result except float 102 (section 6.3) |
+| 24M: 3 programs converted for 24 voices, packed, imported, two of them carrying the 8M's values | the 24M's values restored on import; otherwise identical to **Import program**'s result except float 102 (section 6.3) |
 
 **Implemented from this document alone.** As a check on completeness, a converter was written by
 someone given only this document (no access to the library or the files) and run against the 599
@@ -586,9 +590,9 @@ selection-flag exception in section 6.4, were filled in; the appendix now carrie
 
 - Whether a 24K converts exactly as the 24M does.
 - The conversions in section 6.5, and what float 102 does.
-- Whether Import program accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
+- Whether **Import program** accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
 - Whether multisamples are reused by content, as wavetables are.
-- Whether Bulk program import sorts file names plainly or by number (`B05P100` before or after `B05P10`).
+- Whether **Bulk program import** sorts file names plainly or by number (`B05P100` before or after `B05P10`).
 - The meaning of most part, float and global values, and of event fields *a* and *time*.
 
 ## Appendix: values for new positions

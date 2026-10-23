@@ -291,7 +291,7 @@ public struct PackPlan {
         if ProgramConverter.needsConversion(program), ProgramConverter.layout(of: program) != nil,
            let why = ProgramConverter.unsupportedReason(program) {
             warnings.append("This program is not in the current format and cannot be converted: \(why) It is packed as it is, "
-                            + "and the 3rd Wave may not play it as it would after Import program.")
+                            + "and the 3rd Wave may not play it as it would after its \u{201C}Import program\u{201D} function.")
         }
         if program.name.count > NameCleaner.fieldLimit {
             warnings.append("The program name is \(program.name.count) characters; the 3rd Wave keeps \(NameCleaner.fieldLimit), so it is cut to \"\(String(program.name.prefix(NameCleaner.fieldLimit)))\".")

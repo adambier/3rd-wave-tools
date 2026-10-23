@@ -411,7 +411,7 @@ final class AppState: ObservableObject {
         // Each section: a heading line ending in ":" and one item per line (see ReportText).
         if !blocked.isEmpty { msg += "\n\nNot packed (files missing):\n" + blocked.joined(separator: "\n") }
         if !failed.isEmpty { msg += "\n\nNot packed:\n" + failed.joined(separator: "\n") }
-        if !converted.isEmpty { msg += "\n\nConverted from an older format, in the same way the 3rd Wave's Import program function handles older programs:\n" + converted.joined(separator: "\n") }
+        if !converted.isEmpty { msg += "\n\nConverted from an older format, in the same way the 3rd Wave's \u{201C}Import program\u{201D} function handles older programs:\n" + converted.joined(separator: "\n") }
         if !replaced.isEmpty { msg += "\n\nFactory tables replaced by input files (check these are meant):\n" + replaced.joined(separator: "\n") }
         if !unfamiliar.isEmpty { msg += "\n\nPacked, but check these on the 3rd Wave (unfamiliar layout or a cut name; see each program's notes):\n" + unfamiliar.joined(separator: "\n") }
         // Files none of the packed programs use (other added programs may use them).
