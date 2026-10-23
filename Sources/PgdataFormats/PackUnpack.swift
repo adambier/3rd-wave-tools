@@ -96,9 +96,10 @@ public struct UnpackedProgram {
 
 public enum Unpacker {
     /// Float-block length by values-per-part, from 1,800+ program files.
-    /// 181 has two layouts that share the "W3_PROG_5" tag: 520 (older; Sam Gutman's, Feb 2025) and
-    /// 544 (from OS 1.9; Groove Synthesis's 8M factory banks, Aug 2025).
-    static let floatCounts: [Int: [Int]] = [173: [504], 174: [508], 179: [508], 180: [520], 181: [544, 520]]
+    /// 181 has three layouts that share the "W3_PROG_5" tag: 520 (older; Sam Gutman's, Feb 2025),
+    /// 544 (from OS 1.9; Groove Synthesis's 8M factory banks, Aug 2025) and 548 (written by OS 2.0d,
+    /// whose exports all have 548; the last 4 were 0 in every file seen).
+    static let floatCounts: [Int: [Int]] = [173: [504], 174: [508], 179: [508], 180: [520], 181: [548, 544, 520]]
 
     public static func unpack(_ u: UnifiedProgram) -> UnpackedProgram {
         var notes: [String] = []
@@ -144,9 +145,13 @@ public enum Unpacker {
         }
         if let options = floatCounts[s] {
             if options.count == 1 { return options[0] }
-            // 181: the 24 words after the first 520 floats are floats in the newer layout.
-            let extra = words[min(start + 520, words.count)..<min(start + 544, words.count)]
-            return extra.contains(where: looksLikeSmallInt) ? 520 : 544
+            // 181: the 24 words after the first 520 floats are floats in the 544 layout, and the 4
+            // after those are floats in the 548 layout; the integer tail starts with small integers.
+            func hasInt(_ from: Int, _ to: Int) -> Bool {
+                words[min(start + from, words.count)..<min(start + to, words.count)].contains(where: looksLikeSmallInt)
+            }
+            if hasInt(520, 544) { return 520 }
+            return hasInt(544, 548) ? 544 : 548
         }
         // Unknown layout: floats run until the first small non-zero integer, in whole parts.
         var n = 0

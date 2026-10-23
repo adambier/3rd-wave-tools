@@ -206,8 +206,13 @@ Checked on an 8M (OS 2.0d):
 - **A table or multisample listed without its data** plays whatever is in that slot on the 3rd Wave,
   with no warning; an empty sample slot plays silence. That is why multisamples are always
   embedded.
-- A `W3_PROG_4` program imports from a `.pgdata` and plays the same as from its `.pro` (one
-  program checked). `W3_PROG_3` programs have not been tried on the 3rd Wave.
+- **Programs in an older format** (`W3_PROG_3`, `W3_PROG_4`) are converted to the current one on
+  import, but the `.pgdata` import does not convert them fully. A `W3_PROG_3` program packed into a
+  `.pgdata` imported without an error but played silent, because settings that **Import Program**
+  fixes were left as they were. Until this app converts old programs itself, import them on the
+  3rd Wave with **Import Program** and export a `.pgdata` from there. A `W3_PROG_4` program sounded
+  the same from both; whether it matched in every setting is still being checked. Details are in
+  [`docs/FORMATS.md`](docs/FORMATS.md#program-layouts-and-their-conversion).
 
 ### Unpack
 
@@ -238,40 +243,22 @@ accepts that tag on an older layout has not been tried; the `.pgdata` itself imp
 
 ## Formats
 
-**Source ids.** A program refers to each oscillator's source by an integer. The numbering is
-irregular: it looks as if later ranges were added without renumbering the earlier ones.
+[`docs/FORMATS.md`](docs/FORMATS.md) is the full reference: what is known about `.pro`, `.pgdata`,
+`.wt` and `.bin` files and the oscillator source ids, how the 3rd Wave converts older programs, and
+what is still open. Each statement there says whether it was checked on a 3rd Wave, seen in files,
+or inferred. In brief:
 
-| id | source |
-|---|---|
-| 0–33 | P00–P33 |
-| 34–40 | U00–U06 |
-| 41–47 | analog waves A00–A06 (sawtooth, square, triangle, sine, supersaw, pink noise, blue noise) |
-| 1000+k | P(34+k): P34–P47 |
-| 2000+k | U(7+k): U07–U63 |
-| 4000+n | S n |
-
-Checked on the 3rd Wave for ids 34 (U00), 1000 (P34) and 2000 (U07), and for the seven analog waves;
-the rest of each range follows from the ids seen in files (P36–P47 are inferred). An id names a
-slot, not content: what plays is whatever is loaded in that slot.
-
-**.pro** — text, one value per line: `W3_PROG_<n>`, the name, then values. Counting lines from 1,
-line 3 is the number of values per part S (173, 174, 179, 180 or 181 seen), part *k* starts at
-line 4 + S·k with its three oscillator ids at offsets 3–5, and a block of floats starts at line
-4S + 7 (504, 508, 520 or 544 floats depending on the layout), followed by a variable-length
-integer tail (probably sequencer data).
-
-**.wt** — text: `PNAME` or `UNAME`, the name, then one float per line (e.g., `0.963237f`). P
-tables hold 64 × 128 (sample, delta-to-next) pairs = 16,384 values; U tables 131,072 values.
-
-**.bin** — `W3_MSAMPLE_<v>` (1, 4 and 5 seen), sample count, 32-byte slot name, then the samples:
-length, rate, bit depth, name, start and end, loop start and end, root, low and high note, loop
-mode, crossfade length and type, pitch, second rate, volume, int16 audio. Versions 1 and 4 lack
-some fields; they are upgraded with the values the 3rd Wave itself fills in.
-
-**.pgdata** — `W3_UNIPROG_1`, a source table (index, type, id), one record per source (with the
-embedded `.wt` values as float32, or the multisample in `.bin` v5 layout, or nothing), then the
-program name and the `.pro` values as 32-bit words, with oscillator ids replaced by source-table
-indices.
+- **.pro**: text, one value per line: the format tag (`W3_PROG_3` to `_5`), the name, the number of
+  values per part, three header values, four part blocks (each with its three oscillator source ids),
+  a block of floats and an integer tail.
+- **.pgdata**: `W3_UNIPROG_1`, a table of the sources the program uses (each with its embedded `.wt`
+  values or multisample, or listed without data), then the program name and the `.pro` values as
+  32-bit words. It has no format tag.
+- **.wt**: text: `PNAME` or `UNAME`, the name, then one float per line.
+- **.bin**: `W3_MSAMPLE_<v>`, a slot name and up to eight samples with their settings and 16-bit
+  audio.
+- **Source ids**: each oscillator stores what it plays as one number. The ranges are irregular, and
+  the seven analog waves are not numbered in the order the 3rd Wave lists them.
 
 ## Verification
 
@@ -303,7 +290,7 @@ programs, and a small `.bin`).
 
 Still unknown: whether the 3rd Wave reuses a multisample it already has (as it does for wavetables);
 whether its bulk import sorts file names plainly or by number; how it writes non-ASCII letters in
-file names; whether `W3_PROG_3` programs import from a `.pgdata`; whether **Import Program**
+file names; how exactly **Import Program** converts older programs; whether **Import Program**
 accepts an unpacked `.pro` tagged `W3_PROG_5` on an older layout; and the meaning of the few
 program values that differ between exports.
 
@@ -323,7 +310,7 @@ Sources/PgdataFormats/   formats and packing logic, no UI (tested on Linux and m
   ByteIO.swift              byte reading and writing, 32-byte name fields
 Sources/PgdataPacker/       the app (SwiftUI)
 Resources/                  app icon, drawn by tools/make-icon.py (needs cairosvg and Pillow)
-docs/                       screenshots used in this README
+docs/                       FORMATS.md (format reference) and the screenshots used in this README
 Sources/tw3pg/              developer harness: inspect, roundtrip, unpack, repack, compare, wtcheck,
                             factory-catalog, pack, and the 3rd Wave-test builders
 Tests/PgdataFormatsTests/

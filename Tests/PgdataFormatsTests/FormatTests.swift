@@ -9,6 +9,13 @@ final class SourceRefTests: XCTestCase {
         XCTAssertEqual(SourceRef(id: 1000), .p(34))   // B4-P003 FilString VS, osc 1 → P34
     }
 
+    // Analog waves: each id read from the OSC screen of an 8M (OS 2.0d, 2026-10-23).
+    func testAnalogIdsVerifiedOnHardware() {
+        let shown: [Int32: String] = [41: "A00 Sawtooth", 42: "A01 Square", 43: "A04 Supersaw", 44: "A03 Sine",
+                                      45: "A05 Pink noise", 46: "A06 Blue noise", 47: "A02 Triangle"]
+        for (id, text) in shown { XCTAssertEqual(SourceRef(id: id).description, text) }
+    }
+
     func testIdRoundTripCoversEverySlot() {
         for n in 0..<48 { XCTAssertEqual(SourceRef(id: SourceRef.p(n).id), .p(n)) }
         for n in 0..<64 { XCTAssertEqual(SourceRef(id: SourceRef.u(n).id), .u(n)) }
@@ -80,7 +87,7 @@ final class PackTests: XCTestCase {
         let content: [SourceRef: SourceContent] = [.s(10): .multisample(makeMultisample()), .u(50): .wavetable(wt),
                                                    .p(2): .reference, .u(1): .reference]
         let g = try Packer.pack(pro, content: content)
-        XCTAssertEqual(g.sources.map(\.ref), [.s(10), .u(50), .analog(1), .analog(2), .p(2), .u(1), .analog(0)])
+        XCTAssertEqual(g.sources.map(\.ref), [.s(10), .u(50), .analog(1), .analog(4), .p(2), .u(1), .analog(0)])
         XCTAssertEqual(g.sources.map(\.hasData), [true, true, false, false, false, false, false])
 
         let parsed = try UnifiedProgram(data: g.serialized())
@@ -100,6 +107,18 @@ final class PackTests: XCTestCase {
         for i in (4 * 181 + 4 + 520)..<(4 * 181 + 4 + 544) { pro.values[i] = .int(Int32(i % 5 + 1)) }
         let g = try Packer.pack(pro, content: [:])
         XCTAssertEqual(Unpacker.unpack(g).program.serialized(), pro.serialized())
+    }
+
+    func testOS20FloatLayoutDetected() throws {
+        // OS 2.0d writes 548 floats; in its exports the last 4 are 0. Both forms must come back as floats.
+        let pro = makeProgram(sources: Array(repeating: 42, count: 12), floats: 548)
+        XCTAssertEqual(Unpacker.unpack(try Packer.pack(pro, content: [:])).program.serialized(), pro.serialized())
+        var zeros = pro
+        for i in (4 * 181 + 4 + 544)..<(4 * 181 + 4 + 548) { zeros.values[i] = .float(0) }
+        XCTAssertEqual(Unpacker.unpack(try Packer.pack(zeros, content: [:])).program.serialized(), zeros.serialized())
+        // The 544 layout is still recognised: its integer tail follows directly.
+        let older = makeProgram(sources: Array(repeating: 42, count: 12), floats: 544)
+        XCTAssertEqual(Unpacker.unpack(try Packer.pack(older, content: [:])).program.serialized(), older.serialized())
     }
 
     func testSampleIsNeverLeftOut() throws {

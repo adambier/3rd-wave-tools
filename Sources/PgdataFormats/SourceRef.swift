@@ -7,7 +7,7 @@ import Foundation
 ///
 ///     0–33      P00–P33          (PPG tables)
 ///     34–40     U00–U06
-///     41–47     analog shapes (7)
+///     41–47     analog waves A00–A06, not in display order (see `analogIDs`)
 ///     1000+k    P(34+k)          P34–P47
 ///     2000+k    U(7+k)           U07–U63
 ///     4000+n    Sn               multisample slots
@@ -16,7 +16,7 @@ import Foundation
 public enum SourceRef: Hashable, Comparable, CustomStringConvertible {
     case p(Int)        // 0...47
     case u(Int)        // 0...63
-    case analog(Int)   // 0...6  (id 41...47)
+    case analog(Int)   // 0...6 = A00...A06 as the 3rd Wave shows them (ids 41...47, reordered)
     case s(Int)        // 0...127
     case unknown(Int32)
 
@@ -29,7 +29,7 @@ public enum SourceRef: Hashable, Comparable, CustomStringConvertible {
         switch v {
         case 0...33: self = .p(v)
         case 34...40: self = .u(v - 34)
-        case 41...47: self = .analog(v - 41)
+        case 41...47: self = .analog(Self.analogIDs.firstIndex(of: Int32(v))!)
         case 1000...1013: self = .p(v - 1000 + 34)
         case 2000...2056: self = .u(v - 2000 + 7)
         case 4000...4127: self = .s(v - 4000)
@@ -41,7 +41,7 @@ public enum SourceRef: Hashable, Comparable, CustomStringConvertible {
         switch self {
         case let .p(n): return Int32(n <= 33 ? n : 1000 + n - 34)
         case let .u(n): return Int32(n <= 6 ? 34 + n : 2000 + n - 7)
-        case let .analog(n): return Int32(41 + n)
+        case let .analog(n): return Self.analogIDs.indices.contains(n) ? Self.analogIDs[n] : Int32(41 + n)
         case let .s(n): return Int32(4000 + n)
         case let .unknown(v): return v
         }
@@ -62,6 +62,11 @@ public enum SourceRef: Hashable, Comparable, CustomStringConvertible {
     /// 2026-10-22]. The wave offset knob sweeps A05 from white through pink to red noise and A06
     /// from white through blue to violet.
     public static let analogNames = ["Sawtooth", "Square", "Triangle", "Sine", "Supersaw", "Pink noise", "Blue noise"]
+
+    /// The source id of each analog wave A00–A06. The ids are not in display order: 43 is A04
+    /// Supersaw and 47 is A02 Triangle [verified on an 8M, OS 2.0d, 2026-10-23: each id 41–47 read
+    /// from the OSC screen; the earlier assumption 41 + n was wrong for A02–A04].
+    public static let analogIDs: [Int32] = [41, 42, 47, 44, 43, 45, 46]
     public static var analogCount: Int { analogNames.count }
 
     /// Slot label as the 3rd Wave shows it: P07, U50, S10.

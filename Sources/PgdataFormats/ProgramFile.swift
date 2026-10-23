@@ -83,8 +83,8 @@ public struct ProgramFile: Equatable {
     public var versionNumber: Int { Int(version.dropFirst("W3_PROG_".count)) ?? 0 }
 
     /// Number of float values in the float block, which starts at file line 4S + 6 (counting from 0,
-    /// as `Unpacker` does): 504, 508, 520 or
-    /// 544 seen. Programs saved since OS 1.9 (2025) have 544; all older ones have fewer.
+    /// as `Unpacker` does): 504, 508, 520, 544 or 548 seen. Programs saved since OS 1.9 (2025) have
+    /// 544, and OS 2.0d writes 548; all older ones have fewer.
     public var floatBlockCount: Int {
         let start = 4 * valuesPerPart + 4          // values index of file line 4S + 6 (0-based)
         guard valuesPerPart > 0, start < values.count else { return 0 }
