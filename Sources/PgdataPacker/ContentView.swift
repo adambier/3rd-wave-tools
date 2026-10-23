@@ -86,9 +86,19 @@ struct LogBar: View {
                 .controlSize(.small)
                 .help(showLog ? "Hide the log" : "Show the log: everything the app has done in this session")
                 Divider().frame(height: 14)
-                Text(state.log.last ?? "Nothing added yet.")
-                    .lineLimit(1).truncationMode(.tail)
-                    .foregroundStyle(.secondary)
+                // While files are read, their progress takes the place of the last log line, here
+                // rather than in the page's toolbar, so the toolbar never changes width.
+                if let p = state.reading {
+                    ProgressView(value: Double(p.done), total: Double(max(p.total, 1)))
+                        .frame(width: 120)
+                    Text("Reading \(p.done) of \(p.total)…")
+                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(state.log.last ?? "Nothing added yet.")
+                        .lineLimit(1).truncationMode(.tail)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 Label("Drop .pro, .wt, .bin or .pgdata files anywhere in the window to add them", systemImage: "arrow.down.doc")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)

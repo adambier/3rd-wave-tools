@@ -17,10 +17,6 @@ struct UnpackView: View {
                     .keyboardShortcut("o")
                 Toggle("Skip factory wavetables", isOn: $state.skipFactoryDuplicates)
                     .help("Leave out wavetables that are identical to the factory table in their slot. The 3rd Wave's own exports embed factory tables too; a repack lists the factory slot instead. Any table can still be ticked.")
-                if let p = state.reading {
-                    ProgressView(value: Double(p.done), total: Double(max(p.total, 1))).frame(width: 120)
-                    Text("Reading \(p.done) of \(p.total)…").font(.caption).foregroundStyle(.secondary)
-                }
                 Spacer()
                 Button("Remove Selected") { state.removeUnpacks(selection); selection = [] }.disabled(selection.isEmpty)
                     .help("Remove the selected files from this list (the files are not touched)")
