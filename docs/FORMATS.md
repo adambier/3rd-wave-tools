@@ -9,14 +9,14 @@ This document describes the files the Groove Synthesis 3rd Wave reads and writes
 | `.wt` | one wavetable, as text |
 | `.bin` | one multisample (up to 8 samples with their key ranges and loops) |
 
-It is written for someone who wants to read or write these files: each section starts with the
-layout, then explains the values, then says how the facts were established. It also describes
-how the 3rd Wave converts programs saved by older firmware, because a program has to be converted
-before it can be packed into a `.pgdata` (see [6](#6-converting-older-programs)).
+It is written for someone implementing these formats. Each section gives the layout first, then
+what the values mean, then how the facts were established. Section [6](#6-converting-older-programs)
+describes how the 3rd Wave converts programs saved by older firmware, which anyone writing a
+`.pgdata` has to do as well.
 
 Groove Synthesis has not published these formats. Everything here comes from reading real files
-and from tests on a 3rd Wave 8M and a 24M, both running OS 2.0d. pgdata Packer's library (`Sources/PgdataFormats`)
-implements it, and its tests are the executable form of much of it.
+and from tests on a 3rd Wave 8M and a 24M, both running OS 2.0d. pgdata Packer's library
+(`Sources/PgdataFormats`) implements it, and its tests cover much of it.
 
 ## Contents
 
@@ -41,9 +41,9 @@ implements it, and its tests are the executable form of much of it.
 - **[observed]**: true in every real file examined, but not checked on a 3rd Wave;
 - **[inferred]**: reasoning from the above, not yet checked.
 
-An untagged sentence describes the structure itself, which every file examined follows, so that
-structure is [observed] at least; reading and rewriting every file seen without a byte of difference
-is the test (section [9](#9-how-this-was-established)).
+Untagged statements describe structure that every file examined follows, so they are [observed] at
+least. The test is that every file reads and writes back byte for byte (section
+[9](#9-how-this-was-established)).
 
 **Counting.** Positions inside a block count from 0: "part value 34" is the 35th value of a part
 block. Lines of a `.pro` count from 1, as a text editor shows them.
@@ -188,7 +188,7 @@ how they line up with the event records.
 
 | Value | Meaning |
 |---|---|
-| 0 | Set by the importing model: 3 on an 8M, 2 on a 24M (section 6.2); 1, 2 or 4 in older files. [verified] |
+| 0 | Set by the importing model: 3 on an 8M, 2 on a 24M (section 6.3); 1, 2 or 4 in older files. [verified] |
 | 1 | Velocity curve: 3rd Wave Terminal shows 5 as "Piano" and 2 as "Medium". [observed] |
 | 11 | The selected part, 0–3. [inferred] |
 | 18 | Number of keyboard split points, 0–3; 0 = no split. [inferred] |
@@ -223,7 +223,7 @@ stays between 1 and 128. The type-1 reading is [inferred] from its regular patte
 
 Programs saved on an 8M hold filler in parts 3 and 4: oscillators P02, U01 and A01 Square (ids 2,
 35 and 42), and the same other values every time. [observed in every 8M factory program] An 8M puts
-exactly this filler into parts 3–4 of every program it imports (section [7](#7-what-the-3rd-wave-does-on-import)). [verified]
+exactly this filler into parts 3–4 of every program it imports (section 6.4). [verified]
 
 ### 3.6 Reading and writing a `.pro`
 
@@ -268,10 +268,15 @@ id. Everything else is the `.pro`'s values unchanged.
 
 **To unpack** a `.pgdata` into a `.pro`: read the program words; tell floats from integers using
 *S*, *F*, *G* and *E* in the first four words (section 3.2); replace each oscillator's index with the
-source id from the table; write the tag `W3_PROG_5` and the name. If the layout is older (section
-3.3), the program needs converting (section 6); since there is no tag, the format has to be
-worked out from the layout, as `ProgramConverter.inferredFormat` does. Each embedded wavetable becomes a
+source id from the table; write the tag `W3_PROG_5` and the name. Each embedded wavetable becomes a
 `.wt` and each multisample a `.bin`.
+
+If the program is in an older layout (section 3.3), convert it (section 6). The conversion needs
+the format number, which a `.pgdata` does not carry, so it has to be read from the layout:
+*S* = 173 or 174 means `W3_PROG_3` and 179 or 180 means `W3_PROG_4` [observed in every file seen];
+*S* = 181 with *F* below 136 was written by both `W3_PROG_4` and `W3_PROG_5`, which differ only in
+how event records name parts (section 3.4), so a record with target 0 means `W3_PROG_4` and a
+target above 3 means `W3_PROG_5`; with neither, assume `W3_PROG_5`. [inferred]
 
 **To pack** a `.pro`: list each source the program uses, in order of first use (part 1 oscillator 1
 first), replace the oscillator values with their indices, and embed or just list each source.
@@ -372,10 +377,10 @@ current layout is imported unchanged by the `.pgdata` import. [verified, section
 
 These are the steps Import program applies, in the form pgdata Packer's converter
 (`ProgramConverter`) implements them. They produce the **4-part result**: what a 24M makes of the
-program, with parts 3 and 4 kept. An 8M additionally fits the program to two parts (section 6.3),
-and does so by itself when it imports the converted `.pgdata`. [verified on both]
+program, with parts 3 and 4 kept. An 8M additionally fits the program to two parts (section 6.4),
+and does so by itself when it imports the converted `.pgdata`. [verified]
 
-Let *v* be the format number from the tag (3, 4 or 5) and *S*, *F*, *G* the old sizes.
+Below, "old global *n*" means the value before conversion.
 
 **Step 1. Extend each section.** Keep every old value in its position and append new ones:
 
@@ -386,35 +391,18 @@ Let *v* be the format number from the tag (3, 4 or 5) and *S*, *F*, *G* the old 
 If the old layout had 120 globals or fewer, the per-part globals are filled from the old single
 values instead: globals 120–123 = old global 12, 124–127 = old global 13, 132–135 = old global 15.
 
-**Step 2. Values changed in every layout**, in each of the four parts:
+**Step 2. Values set in every layout.** In each of the four parts:
 
-- floats 85 and 116 become 0.0, and float 102 becomes 1.0 (but see *Values each model sets*,
-  below);
-- float 115 becomes 1.0 where it was 0.0;
+- floats 85 and 116 become 0.0, and float 102 becomes 1.0;
+- float 115 becomes 1.0 where it was 0.0 [observed in 12 parts, all parts 3–4 on the 24M];
 - integers 63, 64 and 65 become 1 where they were 0;
-- if all three oscillators are A04 Supersaw (id 43), oscillator 3 becomes A00 Sawtooth (id 41).
-  [inferred: OS 2.0 allows two supersaws per part]
+- if all three oscillators are A04 Supersaw (id 43), oscillator 3 becomes A00 Sawtooth (id 41)
+  [inferred: OS 2.0 allows two supersaws per part].
 
-And in the globals: 2 = 0, 36 = 0, 75 = 1, 76 = 2, 77 = 2, 78 = 0, 79 = 0, 81 = 1, 82 = 1, 115 = 1,
-140 = 0, 142 = 0, 152 = 1, 153 = 0, 173 = 0, 175 = 2, 177 = 0, 178 = 1, whatever they were.
-
-**Values each model sets.** A few values come out differently on the two models, the same way on
-every import, including the `.pgdata` import of a program that is already current. They seem to
-mark a program as the importing model's own. [verified: a file carrying the 8M's values imported
-into the 24M came out with the 24M's]
-
-| Value | 8M | 24M |
-|---|---|---|
-| Global 0 | 3 | 2 |
-| Global 80 | 1 | 0 |
-| Global 174 | 1 | 0 |
-| A float written `-0.000000` | kept | becomes `0.000000` |
-| Float 102 of a `W3_PROG_3` program, Import program | 1.0 | 0.446233 |
-| Float 102, `.pgdata` import | 1.0 | 1.0 |
-
-So what the converter writes for these makes no difference; it writes the 24M's values. The one
-value no file can control is float 102 of a `W3_PROG_3` program on a 24K/24M: Import program sets
-0.446233, the `.pgdata` import 1.0. Its meaning, and whether the difference is audible, is unknown.
+In the globals, whatever they were: 2 = 0, 36 = 0, 75 = 1, 76 = 2, 77 = 2, 78 = 0, 79 = 0, 81 = 1,
+82 = 1, 115 = 1, 140 = 0, 142 = 0, 152 = 1, 153 = 0, 173 = 0, 175 = 2, 177 = 0, 178 = 1 (177 was
+non-zero only in files given to the 24M). Globals 0, 80 and 174 are set too, by model: see
+section 6.3.
 
 **Step 3. `W3_PROG_3` only:**
 
@@ -423,19 +411,19 @@ value no file can control is float 102 of a `W3_PROG_3` program on a 24K/24M: Im
 - velocity: global 1 becomes 2 where it was 5;
 - floats 91 and 95 become 1.0 where they were above 1.0.
 
-**Step 4. Event records (`W3_PROG_3` and `W3_PROG_4`):** turn each *target* part number *n* into a
-part mask. Keep every record, in order.
+**Step 4. Event records (`W3_PROG_3` and `W3_PROG_4`):** replace each record's *target*, a part
+number *n*, with a part mask. Keep every record, in order. The mask is 2<sup>*n*</sup> (0 when *n*
+is outside 0–3), with two exceptions for notes (type 2):
 
-- Automation (type 1), and any other type: the mask is 2<sup>*n*</sup>, or 0 when *n* is not 0–3.
-  (One program had 335 records of type 255 with target 255; the 24M kept them with mask 0, the 8M
-  dropped them.)
-- A note (type 2) **without a keyboard split** (old global 18 = 0): the mask is 2<sup>*n*</sup>,
-  unless that part is in the layer (old global 24); then the note gets the whole layer.
-- A note **with a split** (old global 18 = 1–3): find the note's zone by counting the split points
-  (old globals 21 up to 20 + global 18) that the note number is above; the note gets that zone's
-  mask (old global 24 + zone), whatever part it was recorded on.
+- **in a layered program** (old global 18 = 0), a note for a part in the layer (old global 24)
+  gets the whole layer's mask;
+- **in a split program** (old global 18 = 1–3), a note gets the mask of the zone its key falls in:
+  count the split points (old globals 21 up to 20 + global 18) the note number is above, and take
+  old global 24 + that count. The part it was recorded on is ignored.
 
-`W3_PROG_5` records already use masks and stay as they are.
+A record of another type with a target outside 0–3 gets mask 0; the 24M keeps such records and the
+8M drops them. [observed once: 335 records of type 255, target 255] `W3_PROG_5` records already use
+masks and stay as they are.
 
 **Step 5. Header:** tag `W3_PROG_5`, sizes 181, 137, 182, and the new number of event records.
 
@@ -443,10 +431,31 @@ part mask. Keep every record, in order.
 (section 9): 299 on an 8M (100 `W3_PROG_3`, 76 `W3_PROG_4`, 123 older `W3_PROG_5`, ten layouts) and
 300 on a 24M (the same 2022 factory bank and third-party programs, plus Groove Synthesis's 2025
 factory bank 1, which uses parts 3–4 throughout). Every step above holds in all of them, except
-where noted in 6.4; the counts of programs each step was seen in are in `ProgramConverter.swift`.
+where noted in 6.5; the counts of programs each step was seen in are in `ProgramConverter.swift`.
 That a 24K converts as the 24M does is [inferred]: no 24K was available.
 
-### 6.3 What an 8M does on top
+### 6.3 Values each model sets
+
+A few values come out differently on the two models, the same way on every import, including the
+`.pgdata` import of a program already in the current layout. They seem to mark a program as the
+importing model's own. [verified: a file carrying the 8M's values, imported into the 24M, came out
+with the 24M's]
+
+| Value | 8M | 24M |
+|---|---|---|
+| Global 0 | 3 | 2 |
+| Global 80 | 1 | 0 |
+| Global 174 | 1 | 0 |
+| A float written `-0.000000` | kept | becomes `0.000000` |
+| Float 102 of a `W3_PROG_3` program, by Import program | 1.0 | 0.446233 |
+| Float 102, by the `.pgdata` import | 1.0 | 1.0 |
+
+Since each model overwrites them, what a file carries for these does not matter; pgdata Packer
+writes the 24M's. The exception is float 102 of a `W3_PROG_3` program on a 24K/24M, which no file
+can control: Import program sets 0.446233 and the `.pgdata` import 1.0. What it does, and whether
+the difference is audible, is unknown.
+
+### 6.4 What an 8M does on top
 
 On an 8M, every import (Import program, Bulk program import and the `.pgdata` import) also fits the
 program to two parts: [verified]
@@ -468,7 +477,7 @@ So one converted file (the 4-part result) serves every model: a 24K or 24M keeps
 and an 8M keeps parts 1 and 2. pgdata Packer's converter can also produce the 8M's result directly
 (`Model.eightM`); that is used only to check the rules against the 8M's exports.
 
-### 6.4 Accuracy
+### 6.5 Accuracy
 
 The converter matches the 3rd Wave's own export byte for byte for 292 of the 299 programs on the 8M
 and 292 of the 300 on the 24M, including every `W3_PROG_4` and `W3_PROG_5` program. The rest are
@@ -479,12 +488,12 @@ and 292 of the 300 on the 24M, including every `W3_PROG_4` and `W3_PROG_5` progr
 - in 1, the 3rd Wave replaced part 2 with a copy of part 1 and set the layer to parts 1–2 (it also
   set velocity to 3);
 - in 2, a few values in parts 1–2 changed (part values 30 and 33, floats 17, 44 and 103);
-- in 1, float 53 went from 120 to 122 in every part;
+- in 1, float 53 went from 120 to 122 in parts 1–2 (all four on the 24M);
 - in 1, on the 24M only, part value 143 went from 8 to 0 in parts 1 and 2.
 
 ## 7. What the 3rd Wave does on import
 
-[verified on an 8M and, where marked, a 24M, both OS 2.0d, unless marked otherwise]
+Verified on an 8M (OS 2.0d) unless a note says otherwise.
 
 - **Wavetables are matched by content.** If the 3rd Wave already has a table with the same values, in
   any slot and under any name, the program is pointed at that slot and nothing is stored; the slot
@@ -498,8 +507,8 @@ and 292 of the 300 on the 24M, including every `W3_PROG_4` and `W3_PROG_5` progr
   `.pgdata` import does not.
 - **Older layouts** are converted fully by Import program and Bulk program import, which give
   byte-identical results, and only in part by the `.pgdata` import (section 6).
-- **An 8M fits every imported program to two parts** (section 6.3), and each model stamps a few
-  values of its own on every import (section 6.2). [verified on both]
+- **An 8M fits every imported program to two parts** (section 6.4), and each model sets a few
+  values of its own on every import (section 6.3). [verified on both]
 - **The `.pgdata` import takes the first `.pgdata` file in `PROGRAMS`**, in alphabetical order; it
   does not offer a choice. [verified on the 24M] Bulk program import takes the files in
   alphabetical order. [verified]
@@ -548,15 +557,15 @@ are damaged as distributed (empty or cut short).
 | A `W3_PROG_3` program packed unconverted, against Import program | silent; the differences in section 6.1 |
 | 299 programs (100 `W3_PROG_3`, 76 `W3_PROG_4`, 123 `W3_PROG_5`) bulk-imported and exported | the conversion rules in section 6 |
 | The same program through Import program and Bulk program import | byte-identical |
-| 5 programs converted by pgdata Packer for the 8M, packed, imported | exported exactly as converted; 4 identical to Import program's result, the fifth differing only in the velocity value of section 6.4 |
-| 2 programs converted with parts 3–4 kept, packed, imported into the 8M | parts, globals and all values identical to Import program's result; sequence notes for parts 3–4 as in section 6.3 |
+| 5 programs converted by pgdata Packer for the 8M, packed, imported | exported exactly as converted; 4 identical to Import program's result, the fifth differing only in the velocity value of section 6.5 |
+| 2 programs converted with parts 3–4 kept, packed, imported into the 8M | parts, globals and all values identical to Import program's result; sequence notes for parts 3–4 as in section 6.4 |
 | 24M: 300 programs (the same 100 `W3_PROG_3` and 100 third-party programs, and Groove Synthesis's 2025 factory bank 1) bulk-imported and exported | the 4-part conversion in section 6.2 |
-| 24M: 3 programs converted for 24 voices, packed, imported, two of them carrying the 8M's values | the 24M's values restored on import; otherwise identical to Import program's result except float 102 (section 6.2) |
+| 24M: 3 programs converted for 24 voices, packed, imported, two of them carrying the 8M's values | the 24M's values restored on import; otherwise identical to Import program's result except float 102 (section 6.3) |
 
 ## 10. Open questions
 
 - Whether a 24K converts exactly as the 24M does.
-- The conversions in section 6.4, and what float 102 does.
+- The conversions in section 6.5, and what float 102 does.
 - Whether Import program accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
 - Whether multisamples are reused by content, as wavetables are.
 - Whether Bulk program import sorts file names plainly or by number (`B05P100` before or after `B05P10`).
@@ -565,8 +574,8 @@ are damaged as distributed (empty or cut short).
 ## Appendix: values for new positions
 
 When a program is converted (section 6.2, step 1), new global positions get these values. Positions
-120–135 are filled from the old file instead when it had 120 globals or fewer, and the values set in
-step 2 override these.
+120–135 are filled from the old file instead when it had 120 globals or fewer; the values set in
+step 2 override these; and 80 and 174 are shown as the 8M sets them, the 24M sets 0 (section 6.3).
 
 | Globals | Values, in order |
 |---|---|
