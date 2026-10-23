@@ -182,8 +182,9 @@ public enum ProgramConverter {
     /// One line saying what converting this program means, for the app; nil when it needs nothing.
     public static func summary(_ p: ProgramFile) -> String? {
         guard needsConversion(p), unsupportedReason(p) == nil, let l = layout(of: p) else { return nil }
-        return "Saved in an older format (\(p.version), layout \(l)). It is converted to the current format "
-            + "(W3_PROG_5, \(current)) as it is packed, the way the 3rd Wave's Import program converts it."
+        return "Originally saved in an older format (\(p.version), layout \(l)). The program will be converted to the "
+            + "current format (W3_PROG_5, \(current)) as part of packing, in the same way the 3rd Wave's Import program "
+            + "function handles older programs."
     }
 
     /// The format a program unpacked from a .pgdata was probably saved in. A .pgdata has no format

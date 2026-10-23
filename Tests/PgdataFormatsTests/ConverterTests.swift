@@ -135,7 +135,7 @@ final class ConverterTests: XCTestCase {
         let raw = UnifiedProgram(sources: old.distinctSources.map { .init(ref: $0, payload: .none) }, programName: NameField("Test"), words: words)
         let up = Unpacker.unpack(raw)
         XCTAssertEqual(up.program.values, try ProgramConverter.convert(old).values)
-        XCTAssertTrue(up.notes.contains { $0.contains("older layout") && $0.contains("W3_PROG_3") })
+        XCTAssertTrue(up.notes.contains { $0.contains("older format") && $0.contains("W3_PROG_3") })
     }
 
     func testFormatInferredFromLayout() {

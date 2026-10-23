@@ -168,7 +168,7 @@ case "repack":
             let g = try UnifiedProgram(data: d)
             let up = Unpacker.unpack(g)
             // An older layout is converted on unpack, so it cannot come back byte for byte.
-            if up.notes.contains(where: { $0.contains("older layout") }) { converted += 1; continue }
+            if up.notes.contains(where: { $0.contains("older format") }) { converted += 1; continue }
             // reparse the unpacked .pro from text, as the app would after writing it
             let pro = try ProgramFile(data: up.program.serialized())
             var content: [SourceRef: SourceContent] = [:]
