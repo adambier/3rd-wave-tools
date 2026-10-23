@@ -296,6 +296,13 @@ final class AppState: ObservableObject {
         return factory.name(ref) ?? "Factory table"
     }
 
+    /// Slot label and what it holds ("U07  Knob Grotto 6"), or the label alone when the name only
+    /// repeats it: the factory P00–P33 tables are named "Wavetable P00" … "Wavetable P33".
+    func labelledSlot(_ ref: SourceRef, separator: String = "  ") -> String {
+        let name = slotName(ref)
+        return name == "Wavetable \(ref.label)" ? ref.label : ref.label + separator + name
+    }
+
     func setOverride(_ itemID: UUID, _ ref: SourceRef, _ choice: PackPlan.Choice?) {
         guard let i = programs.firstIndex(where: { $0.id == itemID }) else { return }
         programs[i].overrides[ref] = choice

@@ -226,11 +226,9 @@ struct BeforeImportBox: View {
 
     private func quoted(_ s: String) -> String { "\u{201C}\(s)\u{201D}" }
 
-    /// A factory slot with its table name (e.g., "U07 Knob Grotto 6").
-    private func slotText(_ ref: SourceRef) -> String {
-        if let name = state.factory.name(ref) { return "\(ref.label) \(name)" }
-        return ref.label
-    }
+    /// A factory slot with its table name (e.g., "U07 Knob Grotto 6"; "P02" alone, not
+    /// "P02 Wavetable P02").
+    private func slotText(_ ref: SourceRef) -> String { state.labelledSlot(ref, separator: " ") }
 
     private func line(_ text: String, warning: Bool) -> some View {
         Label {

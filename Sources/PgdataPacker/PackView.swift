@@ -407,7 +407,7 @@ struct SlotPickerCell: View {
             ForEach(userSlots, id: \.self) { s in item(s, s.label) }
             if !factorySlots.isEmpty {
                 Divider()
-                ForEach(factorySlots, id: \.self) { s in item(s, "\(s.label)  \(state.slotName(s))  (factory)") }
+                ForEach(factorySlots, id: \.self) { s in item(s, "\(state.labelledSlot(s))  (factory)") }
             }
         } label: {
             Text(file.slot?.label ?? "No slot").monospacedDigit()

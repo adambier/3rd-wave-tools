@@ -96,7 +96,7 @@ struct RepointSheet: View {
     // MARK: Oscillators
 
     private func describe(_ r: SourceRef) -> String {
-        r.isBuiltIn ? r.description : (r.isSample ? "\(r.label)  multisample" : "\(r.label)  \(state.slotName(r))")
+        r.isBuiltIn ? r.description : (r.isSample ? "\(r.label)  multisample" : state.labelledSlot(r))
     }
 
     @ViewBuilder private var oscillatorList: some View {
@@ -172,7 +172,7 @@ struct RepointSheet: View {
     /// Factory slots only: a user-slot table always comes from a file you added (listed above).
     private var slotTargets: [Target] {
         Oscillator.repointTargets.filter { !$0.isBuiltIn && $0.isFactorySlot }.map { r in
-            Target(id: "s" + r.label, ref: r, title: "\(r.label)  \(state.slotName(r))", detail: "factory")
+            Target(id: "s" + r.label, ref: r, title: state.labelledSlot(r), detail: "factory")
         }
     }
     private var analogTargets: [Target] {
