@@ -179,7 +179,7 @@ Only some values are understood. The rest can be copied through unchanged.
 | Value | Meaning |
 |---|---|
 | 0, 1, 2 | Source ids of oscillators 1, 2 and 3 (section [2](#2-oscillator-sources)). [verified] |
-| 34 | Amp envelope amount; 100 = +100. [observed: 3rd Wave Terminal labels it Amp Env Amount; a program with 0 here, and float 113 at 0, played silent] |
+| 34 | Amp envelope amount; 100 = +100. [observed: 3rd Wave Terminal labels it Amp Env Amount; a program with 0 here and float 113 at 0 has been observed to play silently] |
 
 **Float part blocks**
 
@@ -394,9 +394,9 @@ level's cutoff and a small gain change; in tables made from recorded audio the s
 also shifted in phase by a constant, so they were made with a real filter, not an ideal resample.
 
 **The 3rd Wave does not use the chain.** A `.wt` carrying a known table with its second half zeroed
-was matched to the loaded table by its first 65,536 values alone (so the content hash covers only
-the table); one carrying a new table with a zeroed chain was stored, played identically from C2 to
-C7, and exported again with the zeros intact. [verified on a 24M, OS 2.0d] So the chain is kept and
+is matched to the loaded table by its first 65,536 values alone (so the content hash covers only
+the table); one carrying a new table with a zeroed chain is stored, plays identically from C2 to
+C7, and exports again with the zeros intact. [verified on a 24M, OS 2.0d] So the chain is kept and
 passed through but neither hashed nor played; a writer should still fill it with band-limited
 resamples of its waves, as the factory files do, in case a later firmware reads it. The P set has
 no such chain: PPG-style playback is meant to alias.
@@ -463,7 +463,7 @@ format tag that would tell it which to apply. [verified]
 | Global 1 (velocity) | 5 | **2** | 5 |
 | Event records | 16 notes + 4 × 63 automation | 16 notes (mask 3) + automation for parts 1–2 | no notes; automation for 3 parts |
 
-(Groove Synthesis's 2022 factory program "House Organ 1"; everything else came out identical.)
+(Groove Synthesis's 2022 factory program "House Organ 1"; every other value comes out identical.)
 
 So a program in an older layout must be converted before it is packed. A program already in the
 current layout comes through the `.pgdata` import unchanged, apart from the few values each model
@@ -541,7 +541,7 @@ That a 24K converts as the 24M does is [inferred]: no 24K was available.
 
 A few values come out differently on the two models, the same way on every import, including the
 `.pgdata` import of a program already in the current layout. They seem to mark a program as the
-importing model's own. [verified: a file carrying the 8M's values, imported into the 24M, came out
+importing model's own. [verified: a file carrying the 8M's values, imported into the 24M, comes out
 with the 24M's]
 
 | Value | 8M | 24M |
@@ -557,8 +557,8 @@ Since each model overwrites them, what a file carries for these does not matter;
 writes the 24M's **Import program** values. Float 102 is the one value a `.pgdata` cannot carry
 into a 24K/24M as **Import program** would set it, since the `.pgdata` import makes it 1.0 whatever
 the file says. The difference is not audible: the same `W3_PROG_3` program imported both ways on a
-24M sounded the same and showed identical parameters in an editor; only the sequencer piano roll's
-scroll position differed, which may be what the value stores. [verified; the meaning inferred]
+24M sounds the same and shows identical parameters in an editor; only the sequencer piano roll's
+scroll position differs, which may be what the value stores. [verified; the meaning inferred]
 
 ### 6.4 What an 8M does on top
 
@@ -611,7 +611,7 @@ it received the ordinary conversion only; under its own name with one value of i
 changed, it received the whole fix. So no other program will ever trigger them, and pgdata Packer
 does not reproduce them: one of these eight programs packed from its 2022 file plays as that file
 describes. The `.pgdata` import does not apply them at all: neither to one of these programs
-already converted to the current layout nor to the unconverted 2022 file, which came through with
+already converted to the current layout nor to the unconverted 2022 file, which comes through with
 its blank part 2, tempo 120 and velocity curve 5. [verified on the 8M and the 24M]
 
 ## 7. What the 3rd Wave does on import
@@ -623,8 +623,8 @@ Verified on an 8M (OS 2.0d) unless a note says otherwise.
   keeps its own name. (The SysEx spec shows the mechanism: the 3rd Wave keeps a hash id for every
   wavetable and multisample "to lookup whether a wavetable or multisample is already loaded".
   [official]) **Multisamples are reused the same way:** a second `.pgdata` carrying the same
-  multisample under another slot label pointed its program at the slot the first import had
-  filled, with no second copy stored. [verified on the 24M]
+  multisample under another slot label is pointed at the slot the first import filled, and no
+  second copy is stored. [verified on the 24M]
 - **A new wavetable or multisample goes into a free slot**, and the program is pointed there: the
   slot in the file is only a label. With no free slot, the 3rd Wave offers to overwrite its last
   table(s). Blank placeholder tables count as used.
@@ -640,11 +640,12 @@ Verified on an 8M (OS 2.0d) unless a note says otherwise.
   does not offer a choice. [verified on the 24M] **Bulk program import** takes the files in plain
   character order, so `B05P100` comes between `B05P10` and `B05P11`; a batch that includes a program
   100 therefore needs three-digit numbers throughout. [verified on the 24M]
-- **An export onto an existing file does not shorten it.** When a bulk export replaced a longer file
-  of the same name, the end of the old file remained after the new program. [observed once, on the
+- **An export onto an existing file does not shorten it.** A bulk export over a longer file of the
+  same name has been observed to leave the end of the old file after the new program. [observed once, on the
   24M] Empty `PROGRAMS` before exporting.
-- **Exporting while the USB drive is mounted on a computer** wrote empty (0-byte) files for the first
-  programs of a bulk export. With the USB cable unplugged during the export, every file was complete.
+- **Exporting while the USB drive is mounted on a computer** has been observed to write empty
+  (0-byte) files for the first programs of a bulk export; with the USB cable unplugged during the
+  export, every file is complete.
   [observed in one session]
 
 ## 8. Names, file names and the USB drive
@@ -656,8 +657,8 @@ Verified on an 8M (OS 2.0d) unless a note says otherwise.
 - **The 3rd Wave's exports** are named `B05P094.pro` (three-digit program) and
   `B05P09_Name.pgdata` / `B05P100_Name.pgdata` (program number with at least two digits; spaces
   become underscores; punctuation other than hyphens is dropped). [verified] **Export Wavetable**
-  names its files `01.wt`, `02.wt`, … from a counter the 3rd Wave keeps (it went on to `03.wt`
-  after the folder had been emptied), not by slot. [verified on the 24M] The 3rd Wave ignores
+  names its files `01.wt`, `02.wt`, … from a counter the 3rd Wave keeps (the counter is not reset
+  by emptying the folder), not by slot. [verified on the 24M] The 3rd Wave ignores
   file names when importing. [official]
 - **The USB drive** (volume `THIRDWAVE`) shows the folders `PROGRAMS` (`.pro` and `.pgdata`), `WAVES`
   (`.wt`), `AUDIO` (`.bin` and exported `.wav`) and `FIRMWARE` when mounted on a Mac. [verified]

@@ -117,7 +117,7 @@ short, or not the kind its extension says) is reported once, with the reason, an
 firmware (`W3_PROG_3`, `W3_PROG_4`, or a `W3_PROG_5` from before OS 2.0) is brought up to the
 current format in the same way the 3rd Wave's **Import program** function converts it, and a line
 under the program name says so. This matters because **Import unified program data file** does
-only part of that conversion: a 2022 factory program packed unconverted played silent. The
+only part of that conversion, and a 2022 factory program packed unconverted plays silently. The
 converter was checked against 599 conversions made by an 8M and a 24M and matches the 3rd Wave's
 own result value for value, except for eight 2022 factory programs that the 3rd Wave corrects
 individually on import, by name (see [`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs)).
@@ -264,7 +264,7 @@ Checked on an 8M (OS 2.0d), and most points on a 24M as well
 
 > [!WARNING]
 > **Unplug the USB cable from your computer while the 3rd Wave exports.** With the drive mounted on
-> a computer at the same time, an export wrote empty files. Plug it back in when the export has
+> a computer at the same time, exports have been observed to write empty files. Plug it back in when the export has
 > finished.
 >
 > **Empty the `PROGRAMS` folder before exporting.** An export onto an existing file of the same name

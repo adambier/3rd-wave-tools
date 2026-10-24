@@ -12,7 +12,7 @@ import Foundation
 /// replaced with a copy of part 1. See docs/FORMATS.md.
 ///
 /// A .pgdata import converts an old layout's structure but skips several of these value changes:
-/// a W3_PROG_3 program packed unconverted played silent [verified on hardware].
+/// a W3_PROG_3 program packed unconverted plays silently [verified on hardware].
 public enum ProgramConverter {
     /// The 3rd Wave whose Import program the result reproduces. `.twentyFour` (24K or 24M) keeps
     /// all four parts and is what pgdata Packer writes: an 8M fits such a program to its two parts
