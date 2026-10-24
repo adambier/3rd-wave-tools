@@ -336,7 +336,7 @@ public struct PackPlan {
             }
             if case let .unknown(id) = ref {
                 let why = id == -1 ? "The value at these oscillators is not a whole number, so the layout is probably not what this app expects."
-                                   : "Unknown source number \(id): not a wavetable, analog wave or sample slot."
+                                   : "Unknown source number \(id): not a wavetable, analog wave, or sample slot."
                 rows.append(Row(ref: ref, usedBy: users, oscillators: positions, repointedFrom: from,
                                 choice: nil, options: [],
                                 status: .missing(why + " Point these oscillators to another slot."),
@@ -485,7 +485,13 @@ public struct PackPlan {
     static func userSlotNote(program: ProgramFile, slots: [SourceRef], factory: FactoryLibrary) -> Note {
         let slots = slots.sorted()
         let one = slots.count == 1
-        func and(_ xs: [String]) -> String { xs.count == 1 ? xs[0] : xs.dropLast().joined(separator: ", ") + " and " + xs.last! }
+        func and(_ xs: [String]) -> String {
+            switch xs.count {
+            case 1: return xs[0]
+            case 2: return xs[0] + " and " + xs[1]
+            default: return xs.dropLast().joined(separator: ", ") + ", and " + xs.last!
+            }
+        }
         func fname(_ r: SourceRef) -> String { "\"\(factory.name(r) ?? "factory table")\"" }
         let list = and(slots.map(\.label))
         let first = slots[0]
@@ -564,7 +570,7 @@ public enum OutputNames {
     public static func wavetable(_ ref: SourceRef, _ w: WavetableFile) -> String { ref.label + "_" + sanitize(w.name) + ".wt" }
     public static func program(_ p: ProgramFile) -> String { sanitize(p.name) + ".pro" }
     /// "B05P87_Ghibli_Bell.pgdata", as the 3rd Wave names its own exports: spaces become underscores,
-    /// letters, digits, hyphens and underscores are kept, anything else is dropped
+    /// letters, digits, hyphens, and underscores are kept, anything else is dropped
     /// ("SM Ripper Bass (MW)" → "SM_Ripper_Bass_MW", "SM Cutting Bs&Ld" → "SM_Cutting_BsLd").
     /// Only the file name changes; the name inside the file keeps its spaces and punctuation.
     /// The 3rd Wave's bulk import takes files in alphabetical order, so the prefix keeps program order.

@@ -370,7 +370,7 @@ final class AppState: ObservableObject {
         if f > 0 { parts.append("\(f) added file\(f == 1 ? "" : "s")") }
         let what = parts.joined(separator: " and ")
         guard Panels.confirm(title: "Remove everything from the Pack page?",
-                             message: "This removes \(what) from the lists, with any slots, choices and names you set for them. The files themselves are not touched.",
+                             message: "This removes \(what) from the lists, with any slots, choices, and names you set for them. The files themselves are not touched.",
                              ok: "Remove All") else { return }
         programs = []; contentFiles = []; contentNames = [:]; selectedProgram = nil
         note("Removed \(what) from the Pack page.")

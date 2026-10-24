@@ -61,7 +61,7 @@ public struct ProgramFile: Equatable {
             throw FormatError.badMagic(expected: "3rd Wave program (.pro)", found: String(lines.first?.prefix(16) ?? ""))
         }
         guard lines.count >= 7 else {
-            throw FormatError.invalid("The program file has only \(lines.count) line\(lines.count == 1 ? "" : "s"); a program has its tag, its name and at least the four header values.")
+            throw FormatError.invalid("The program file has only \(lines.count) line\(lines.count == 1 ? "" : "s"); a program has its tag, its name, and at least the four header values.")
         }
         version = lines[0]
         name = lines[1]
@@ -93,7 +93,7 @@ public struct ProgramFile: Equatable {
         }
     }
 
-    /// The header's S, F, G and E when they are plausible, else nil.
+    /// The header's S, F, G, and E when they are plausible, else nil.
     static func header(_ h: [Int]) -> (s: Int, f: Int, g: Int, e: Int)? {
         guard h.count >= 4, h[0] > 0, h[0] < 1000, h[1] > 0, h[1] < 1000, h[2] >= 0, h[2] < 10_000,
               h[3] >= 0, h[3] < 1_000_000 else { return nil }
@@ -137,7 +137,7 @@ public struct ProgramFile: Equatable {
     public var versionNumber: Int { Int(version.dropFirst("W3_PROG_".count)) ?? 0 }
 
     /// Number of float values in the float block, which starts at file line 4S + 6 (counting from 0,
-    /// as `Unpacker` does): 504, 508, 520, 544 or 548 seen. Programs saved since OS 1.9 (2025) have
+    /// as `Unpacker` does): 504, 508, 520, 544, or 548 seen. Programs saved since OS 1.9 (2025) have
     /// 544, and OS 2.0d writes 548; all older ones have fewer.
     public var floatBlockCount: Int {
         let start = 4 * valuesPerPart + 4          // values index of file line 4S + 6 (0-based)

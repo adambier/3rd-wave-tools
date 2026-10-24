@@ -61,7 +61,7 @@ public enum ProgramConverter {
     }
 
     /// The converted program. A program already in the current layout comes back unchanged.
-    /// `format` overrides the format number in the tag (3, 4 or 5), for a program unpacked from a
+    /// `format` overrides the format number in the tag (3, 4, or 5), for a program unpacked from a
     /// .pgdata, which has no tag (see `inferredFormat`).
     public static func convert(_ p: ProgramFile, for model: Model = .twentyFour, format: Int? = nil) throws -> ProgramFile {
         guard needsConversion(p) else { return p }
@@ -235,7 +235,7 @@ public enum ProgramConverter {
     }
 
     /// Globals every converted program had with these values [observed in all 599 conversions].
-    /// (0, 80 and 174 differ by model: see `convert`.)
+    /// (0, 80, and 174 differ by model: see `convert`.)
     static let globalsSet: [(Int, Int32)] = [
         (2, 0), (36, 0), (75, 1), (76, 2), (77, 2), (78, 0), (79, 0), (81, 1), (82, 1),
         (115, 1), (140, 0), (142, 0), (152, 1), (153, 0), (173, 0), (175, 2), (177, 0), (178, 1),

@@ -139,10 +139,10 @@ play:
 The Source column then shows, for example, **U01 → U56**, with a button to undo. Only the
 `.pgdata` changes; the `.pro` is not modified. Multisample oscillators are not repointed.
 
-![The sheet for changing what oscillators play: oscillators to change on the left, and on the right the files added, the factory slots and the analog waves](docs/change-what-plays.png)
+![The sheet for changing what oscillators play: oscillators to change on the left, and on the right the files added, the factory slots, and the analog waves](docs/change-what-plays.png)
 
 Parts 3 and 4 play only on the 4-part models (24K, 24M). In every program saved on an 8M seen so
-far, they hold filler (P02, U01 and an analog wave).
+far, they hold filler (P02, U01, and an analog wave).
 
 Added files that no program uses are flagged in the files table ("Not used by any added program", or
 "another choice is made for U57" when the slot is filled some other way). **Point a program
@@ -175,10 +175,10 @@ its file name. Source files are not changed, and unpacking keeps names as they a
 
 ![Clean Up Names: options at the top, and each current name with its proposed new name](docs/clean-up-names.png)
 
-Name fields hold 31 characters, and the 3rd Wave displays all 31 for programs, wavetables and
-multisamples. A longer name is flagged next to the name, in the program's notes and in the report
+Name fields hold 31 characters, and the 3rd Wave displays all 31 for programs, wavetables, and
+multisamples. A longer name is flagged next to the name, in the program's notes, and in the report
 after packing, and is cut to 31. The fields hold single-byte characters only, so a name with an
-en dash, curly quotes or an emoji is flagged as well: those characters are written as "?".
+en dash, curly quotes, or an emoji is flagged as well: those characters are written as "?".
 
 #### Writing
 
@@ -202,7 +202,7 @@ Files are named in Groove Synthesis's own pattern, with the program location fir
   is read too.
 - The prefix keeps the 3rd Wave's alphabetical bulk import in program order.
 - As in the 3rd Wave's own exports, spaces become underscores and everything other than ASCII letters,
-  digits, hyphens and underscores is dropped (e.g., "Big Bass (MW)" → `Big_Bass_MW`). This affects
+  digits, hyphens, and underscores is dropped (e.g., "Big Bass (MW)" → `Big_Bass_MW`). This affects
   the file name only, not the program name inside it.
 - A batch that includes a program 100 uses three digits throughout (e.g., `B05P087_…`,
   `B05P100_…`). The 3rd Wave itself writes `B05P09_…` and `B05P100_…`, but its bulk import takes
@@ -228,7 +228,7 @@ into which S slots before you import the `.pro`, and which slots the program pla
 Wave rather than from the file. It appears only when there is something to say. Select several
 files to see everything they will produce in one list, with the program each file comes from.
 
-![The Unpack page with four .pgdata files selected: the factory slots their programs play from your 3rd Wave, and each file they will produce with its program, file name and contents](docs/unpack-window.png)
+![The Unpack page with four .pgdata files selected: the factory slots their programs play from your 3rd Wave, and each file they will produce with its program, file name, and contents](docs/unpack-window.png)
 
 Untick anything you don't want, or rename it, before **Unpack Selected…** or **Unpack All…**.
 Wavetables identical to the factory table in their slot are skipped by default: the 3rd Wave's own
@@ -284,7 +284,7 @@ or inferred. In brief:
 
 - **.pro**: text, one value per line: the format tag (`W3_PROG_3` to `_5`), the name, four sizes
   (integers and floats per part, global values, sequence events), then four integer part blocks
-  (each starting with its three oscillator source ids), four float part blocks, the globals and the
+  (each starting with its three oscillator source ids), four float part blocks, the globals, and the
   sequence events.
 - **.pgdata**: `W3_UNIPROG_1`, a table of the sources the program uses (each with its embedded `.wt`
   values or multisample, or listed without data), then the program name and the `.pro` values as
@@ -298,7 +298,7 @@ or inferred. In brief:
 ## Verification
 
 Run against about 2,700 real files: Groove Synthesis's factory banks (8M, and 24-voice versions 1
-and 2b), sample library and OS 1.8 example files, plus nine third-party program sets. These checks
+and 2b), sample library, and OS 1.8 example files, plus nine third-party program sets. These checks
 use the `tw3pg` developer tool, which keeps each table as it was; the app's own repack lists
 factory tables instead of embedding them, so its output differs there by design.
 

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Proposes tidier names for programs, wavetables and multisamples. Only a proposal: the app
+/// Proposes tidier names for programs, wavetables, and multisamples. Only a proposal: the app
 /// shows every change for approval. Factory wavetables are never offered for renaming.
 ///
 /// Rules, each optional:
@@ -25,7 +25,7 @@ public struct NameCleaner: Equatable {
     static let minorWords: Set<String> = ["a", "an", "and", "the", "of", "in", "on", "to", "for", "with", "or", "at", "by"]
 
     /// Name fields in .pgdata and .bin files hold 31 characters (32 bytes with the terminator). The
-    /// synth displays all 31 for programs, wavetables and multisamples [verified on an 8M, T6].
+    /// synth displays all 31 for programs, wavetables, and multisamples [verified on an 8M, T6].
     public static let fieldLimit = 31
 
     public init() {}
@@ -64,7 +64,7 @@ public struct NameCleaner: Equatable {
         return String(w.map { $0.isLetter ? (it.next() ?? $0) : $0 })
     }
 
-    /// No vowels (Y counts as one, so SYNTH, RHYTHM and FLY are words): an acronym such as PWM or PPG.
+    /// No vowels (Y counts as one, so SYNTH, RHYTHM, and FLY are words): an acronym such as PWM or PPG.
     static func isAcronym(_ letters: String) -> Bool {
         !letters.isEmpty && !letters.lowercased().contains { "aeiouy".contains($0) }
     }

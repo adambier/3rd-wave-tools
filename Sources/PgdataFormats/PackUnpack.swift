@@ -106,7 +106,7 @@ public struct UnpackedProgram {
 public enum Unpacker {
     /// Float-block length by values-per-part, from 1,800+ program files.
     /// 181 has three layouts that share the "W3_PROG_5" tag: 520 (older; Sam Gutman's, Feb 2025),
-    /// 544 (from OS 1.9; Groove Synthesis's 8M factory banks, Aug 2025) and 548 (written by OS 2.0d,
+    /// 544 (from OS 1.9; Groove Synthesis's 8M factory banks, Aug 2025), and 548 (written by OS 2.0d,
     /// whose exports all have 548; the last 4 were 0 in every file seen).
     static let floatCounts: [Int: [Int]] = [173: [504], 174: [508], 179: [508], 180: [520], 181: [548, 544, 520]]
 
@@ -179,7 +179,7 @@ public enum Unpacker {
         func looksLikeSmallInt(_ w: UInt32) -> Bool {
             let i = Int32(bitPattern: w); return i != 0 && abs(Int(i)) < (1 << 20)
         }
-        // The words start with S, F (floats per part), G (global values) and E (6-value event
+        // The words start with S, F (floats per part), G (global values), and E (6-value event
         // records), and the program ends exactly where they say [observed on every file checked].
         // When they add up, F gives the float block directly.
         if words.count >= 4 {

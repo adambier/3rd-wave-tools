@@ -1,8 +1,8 @@
 import Foundation
 
-/// One multisample slot (S): up to 8 samples, each with key range, loop and level settings.
+/// One multisample slot (S): up to 8 samples, each with key range, loop, and level settings.
 ///
-/// Stored in a .bin file ("W3_MSAMPLE_<v>", v = 1, 4 or 5 seen) and, in the v5 layout, inside
+/// Stored in a .bin file ("W3_MSAMPLE_<v>", v = 1, 4, or 5 seen) and, in the v5 layout, inside
 /// a .pgdata. Older versions lack some fields; on upgrade they get the values the 3rd Wave itself
 /// assigns (verified against Groove Synthesis's v1 and v5 copies of "Hanger Drums"): 48 kHz, 16-bit,
 /// pitch 0, second rate = rate, volume 1.0.
@@ -53,11 +53,11 @@ public struct Multisample: Equatable {
         if roots != roots.sorted() { out.append("its samples are not in increasing order of their assigned notes, which the 3rd Wave requires") }
         for (i, s) in samples.enumerated() {
             let n = "sample \(i + 1)"
-            if s.bitDepth > 2 { out.append("\(n) has bit depth code \(s.bitDepth); the 3rd Wave uses 0 (8-bit), 1 (12-bit) or 2 (16-bit)") }
-            if s.loopMode > 2 { out.append("\(n) has loop mode \(s.loopMode); the 3rd Wave uses 0, 1 or 2") }
-            if s.crossfadeType > 2 { out.append("\(n) has crossfade type \(s.crossfadeType); the 3rd Wave uses 0, 1 or 2") }
+            if s.bitDepth > 2 { out.append("\(n) has bit depth code \(s.bitDepth); the 3rd Wave uses 0 (8-bit), 1 (12-bit), or 2 (16-bit)") }
+            if s.loopMode > 2 { out.append("\(n) has loop mode \(s.loopMode); the 3rd Wave uses 0, 1, or 2") }
+            if s.crossfadeType > 2 { out.append("\(n) has crossfade type \(s.crossfadeType); the 3rd Wave uses 0, 1, or 2") }
             if s.lowNote > s.highNote || s.rootNote > 127 || s.lowNote > 127 || s.highNote > 127 { out.append("\(n) has a key range of \(s.lowNote)–\(s.highNote) with root \(s.rootNote), which is not a valid range of MIDI notes") }
-            if max(s.start, s.end, s.loopStart, s.loopEnd) > s.length { out.append("\(n) has start, end or loop points past its \(s.length) frames") }
+            if max(s.start, s.end, s.loopStart, s.loopEnd) > s.length { out.append("\(n) has start, end, or loop points past its \(s.length) frames") }
             if !(s.volume >= 0 && s.volume <= 2) || !(s.pitch >= -1 && s.pitch <= 1) { out.append("\(n) has a volume of \(s.volume) or a pitch of \(s.pitch) outside the 3rd Wave's ranges (0–2 and ±1)") }
         }
         return out
@@ -73,7 +73,7 @@ public struct Multisample: Equatable {
             throw FormatError.badMagic(expected: "3rd Wave multisample (.bin)", found: magic)
         }
         guard [1, 4, 5].contains(v) else {
-            throw FormatError.invalid("Multisample file version \(v) is not one this app knows (1, 4 and 5 are supported).")
+            throw FormatError.invalid("Multisample file version \(v) is not one this app knows (1, 4, and 5 are supported).")
         }
         var r = ByteReader(bytes, offset: 16)
         let n = Int(try r.u8())

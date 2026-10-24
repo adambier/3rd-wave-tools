@@ -8,7 +8,7 @@ import Foundation
 ///
 /// P tables: 16,384 values = 64 waves × 128 × (sample, delta to next sample, wrapping within
 /// the wave). U tables: 131,072 values = 64 waves × 1024 samples, followed by band-limited copies
-/// of the same waves at 512, 256, 128, 64 and 64 samples (see docs/FORMATS.md 5.1). The same
+/// of the same waves at 512, 256, 128, 64, and 64 samples (see docs/FORMATS.md 5.1). The same
 /// values, as little-endian float32, are what a .pgdata embeds.
 public struct WavetableFile: Equatable {
     public enum Kind: String { case p = "PNAME", u = "UNAME"

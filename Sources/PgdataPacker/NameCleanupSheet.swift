@@ -125,7 +125,7 @@ struct NameCleanupSheet: View {
 }
 
 /// Warns when a name is longer than a name field holds (31 characters). The 3rd Wave displays all 31
-/// for programs, wavetables and multisamples [verified, T6].
+/// for programs, wavetables, and multisamples [verified, T6].
 /// Flags a name the 3rd Wave will not store as written: too long for its 31-character fields, or
 /// holding characters outside the single-byte range they use (an en dash, curly quotes, accents
 /// typed as separate marks), which are stored as "?".
