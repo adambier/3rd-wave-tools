@@ -39,7 +39,8 @@ struct ContentView: View {
             Divider()
             LogBar(showLog: $showLog)
         }
-        .frame(minWidth: 900, minHeight: 600)
+        // Tall enough for both Pack panes at their minimum heights with the log open.
+        .frame(minWidth: 900, minHeight: 700)
         // Standard alert with a scrolling text area (see AlertPresenter): system look, but wide
         // enough for one-item-per-line reports, and long lists scroll.
         .onChange(of: state.alertMessage) { msg in

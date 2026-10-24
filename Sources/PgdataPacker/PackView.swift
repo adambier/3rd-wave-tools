@@ -21,7 +21,7 @@ struct PackView: View {
                 HSplitView {
                     programList.frame(minWidth: 220, idealWidth: 260, maxWidth: 440)
                     VSplitView {
-                        detail.frame(minHeight: 220)
+                        detail.frame(minHeight: 300)
                         ContentFilesTable().frame(minHeight: 120, idealHeight: 190)
                     }
                 }
@@ -194,10 +194,14 @@ struct ProgramDetail: View {
                     .width(min: 220, ideal: 300)
             }
             .visibleScrollers()
-            // Keeps several rows visible however long the note above is.
-            .frame(minHeight: 150)
+            // Keeps a few rows visible however long the note above is; the table, which scrolls,
+            // is what gives way when the pane is short.
+            .frame(minHeight: 120, maxHeight: .infinity)
         }
         .padding(12)
+        // Pinned to the top, so a pane too short for the content clips the table's lower rows, not
+        // the name field and notes.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
