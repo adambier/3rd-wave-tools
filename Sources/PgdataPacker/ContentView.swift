@@ -341,23 +341,25 @@ enum AlertPresenter {
     /// Puts the copy icon level with the alert's title, at the right edge of the text column (the
     /// way a chat message carries its copy control). The alert is laid out first, as Apple says
     /// to do before positioning anything relative to its views, and the icon is added to the
-    /// alert's window over the title's line. If the title can't be found, the icon goes over the
-    /// text area's top-right corner.
+    /// alert's window tied to the title and the text area by constraints rather than a frame:
+    /// the alert lays itself out again when it is shown, and the icon follows. If the title
+    /// can't be found, the icon goes over the text area's top-right corner.
     private static func placeCopyIcon(in alert: NSAlert, beside content: NSView, copying text: String) {
         alert.layout()
         guard let contentView = alert.window.contentView else { return }
         let button = CopyButton(text: text)
-        let column = contentView.convert(content.bounds, from: content)
-        var origin = NSPoint(x: column.maxX - button.frame.width - 1, y: column.maxY - button.frame.height - 1)
-        if let title = titleField(in: contentView, text: alert.messageText) {
-            // Centred on the title's first line.
-            let frame = contentView.convert(title.bounds, from: title)
-            let line = title.font.map { $0.ascender - $0.descender + $0.leading } ?? frame.height
-            origin.y = frame.maxY - min(line, frame.height) / 2 - button.frame.height / 2
-        }
-        button.frame.origin = origin
-        button.autoresizingMask = [.minXMargin, .minYMargin]   // stays at the top right
+        let size = button.frame.size
+        button.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(button)
+        let vertical = titleField(in: contentView, text: alert.messageText)
+            .map { button.centerYAnchor.constraint(equalTo: $0.centerYAnchor) }
+            ?? button.topAnchor.constraint(equalTo: content.topAnchor, constant: 1)
+        NSLayoutConstraint.activate([
+            button.widthAnchor.constraint(equalToConstant: size.width),
+            button.heightAnchor.constraint(equalToConstant: size.height),
+            button.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            vertical,
+        ])
     }
 
     /// The text field showing `text` (the alert's title), anywhere under `view`.
