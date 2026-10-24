@@ -76,18 +76,20 @@ struct NameCleanupSheet: View {
                     .disabled(!changes(r))
                 }
                 .width(24)
+                // The preferred widths add up to well under the sheet's minimum width, or the
+                // table grows a horizontal scroll bar for the few points it does not have.
                 TableColumn("Kind") { (r: Row) in Text(r.kind).foregroundStyle(.secondary) }
-                    .width(min: 100, ideal: 110)
+                    .width(min: 90, ideal: 100)
                 TableColumn("Current") { (r: Row) in Text(r.current).lineLimit(1).foregroundStyle(.secondary).help(r.current) }
-                    .width(min: 140, ideal: 220)
+                    .width(min: 140, ideal: 200)
                 TableColumn("New name") { (r: Row) in
                     TextField("", text: Binding(get: { proposed(r) }, set: { edited[r.id] = $0 }))
                         .textFieldStyle(.roundedBorder)
                         .help("Edit to change the proposed name")
                 }
-                .width(min: 160, ideal: 240)
+                .width(min: 160, ideal: 220)
                 TableColumn("") { (r: Row) in NameLengthNote(name: proposed(r)) }
-                    .width(min: 120, ideal: 200)
+                    .width(min: 100, ideal: 140)
             }
             .visibleScrollers()
             .frame(minHeight: 300)
