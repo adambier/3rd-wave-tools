@@ -234,7 +234,7 @@ into which S slots before you import the `.pro`, and which slots the program pla
 Wave rather than from the file. It appears only when there is something to say. Select several
 files to see everything they will produce in one list, with the program each file comes from.
 
-![The Unpack page with four .pgdata files selected: the factory slots their programs play from your 3rd Wave, and each file they will produce with its program, file name, and contents](docs/unpack-window.png)
+![The Unpack page with five .pgdata files selected: the multisamples to import first, the factory slots their programs play from your 3rd Wave, and each file they will produce with its program, file name, and contents](docs/unpack-window.png)
 
 Untick anything you don't want, or rename it, before **Unpack Selected…** or **Unpack All…**.
 Wavetables identical to the factory table in their slot are skipped by default: the 3rd Wave's own
