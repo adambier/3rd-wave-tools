@@ -1,0 +1,84 @@
+{
+  "eventRecords" : 2,
+  "eventRecordsStartAtValue" : 1458,
+  "events" : [
+    [
+      3,
+      0,
+      2,
+      25660,
+      0,
+      0
+    ],
+    [
+      1,
+      108,
+      1,
+      1056964608,
+      64,
+      0
+    ]
+  ],
+  "firstGlobals" : [
+    2,
+    2,
+    0,
+    0,
+    0,
+    0
+  ],
+  "floatBlocksStartAtValue" : 728,
+  "floatsPerPart" : 137,
+  "formatTag" : "W3_PROG_5",
+  "globalValues" : 182,
+  "globalsStartAtValue" : 1276,
+  "integersPerPart" : 181,
+  "name" : "Fixture Current",
+  "oscillatorSourceIDs" : [
+    0,
+    34,
+    41,
+    1000,
+    2049,
+    4000,
+    2,
+    35,
+    42,
+    2,
+    35,
+    42
+  ],
+  "oscillatorSources" : [
+    "P00",
+    "U00",
+    "A00",
+    "P34",
+    "U56",
+    "S00",
+    "P02",
+    "U01",
+    "A01",
+    "P02",
+    "U01",
+    "A01"
+  ],
+  "part1FirstFloats" : [
+    "0.000000",
+    "0.000000",
+    "0.000000",
+    "0.000000"
+  ],
+  "part1FirstIntegers" : [
+    0,
+    34,
+    41,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "programValueCount" : 1470
+}

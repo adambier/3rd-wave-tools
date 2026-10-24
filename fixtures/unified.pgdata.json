@@ -1,0 +1,99 @@
+{
+  "oscillatorWords" : [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    6,
+    7,
+    8
+  ],
+  "programName" : "Fixture Current",
+  "programWordCount" : 1470,
+  "sources" : [
+    {
+      "hasData" : false,
+      "index" : 0,
+      "slot" : "P00",
+      "sourceID" : 0,
+      "typeCode" : 0
+    },
+    {
+      "hasData" : false,
+      "index" : 1,
+      "slot" : "U00",
+      "sourceID" : 34,
+      "typeCode" : 1
+    },
+    {
+      "hasData" : false,
+      "index" : 2,
+      "slot" : "A00",
+      "sourceID" : 41,
+      "typeCode" : 2
+    },
+    {
+      "hasData" : false,
+      "index" : 3,
+      "slot" : "P34",
+      "sourceID" : 1000,
+      "typeCode" : 0
+    },
+    {
+      "embeddedName" : "Fixture U Saw Harmonics",
+      "hasData" : true,
+      "index" : 4,
+      "slot" : "U56",
+      "sourceID" : 2049,
+      "typeCode" : 1
+    },
+    {
+      "embeddedName" : "Fixture Multisample",
+      "hasData" : true,
+      "index" : 5,
+      "slot" : "S00",
+      "sourceID" : 4000,
+      "typeCode" : 4
+    },
+    {
+      "hasData" : false,
+      "index" : 6,
+      "slot" : "P02",
+      "sourceID" : 2,
+      "typeCode" : 0
+    },
+    {
+      "hasData" : false,
+      "index" : 7,
+      "slot" : "U01",
+      "sourceID" : 35,
+      "typeCode" : 1
+    },
+    {
+      "hasData" : false,
+      "index" : 8,
+      "slot" : "A01",
+      "sourceID" : 42,
+      "typeCode" : 2
+    }
+  ],
+  "unpackedOscillatorSourceIDs" : [
+    0,
+    34,
+    41,
+    1000,
+    2049,
+    4000,
+    2,
+    35,
+    42,
+    2,
+    35,
+    42
+  ]
+}

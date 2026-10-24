@@ -1,0 +1,84 @@
+{
+  "eventRecords" : 2,
+  "eventRecordsStartAtValue" : 1458,
+  "events" : [
+    [
+      3,
+      0,
+      2,
+      25660,
+      0,
+      0
+    ],
+    [
+      2,
+      108,
+      1,
+      1048576000,
+      0,
+      0
+    ]
+  ],
+  "firstGlobals" : [
+    2,
+    2,
+    0,
+    0,
+    0,
+    0
+  ],
+  "floatBlocksStartAtValue" : 728,
+  "floatsPerPart" : 137,
+  "formatTag" : "W3_PROG_5",
+  "globalValues" : 182,
+  "globalsStartAtValue" : 1276,
+  "integersPerPart" : 181,
+  "name" : "Fixture 2022 Layout",
+  "oscillatorSourceIDs" : [
+    15,
+    34,
+    41,
+    15,
+    34,
+    41,
+    15,
+    34,
+    41,
+    15,
+    34,
+    41
+  ],
+  "oscillatorSources" : [
+    "P15",
+    "U00",
+    "A00",
+    "P15",
+    "U00",
+    "A00",
+    "P15",
+    "U00",
+    "A00",
+    "P15",
+    "U00",
+    "A00"
+  ],
+  "part1FirstFloats" : [
+    "0.000000",
+    "0.000000",
+    "0.000000",
+    "0.000000"
+  ],
+  "part1FirstIntegers" : [
+    15,
+    34,
+    41,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "programValueCount" : 1470
+}

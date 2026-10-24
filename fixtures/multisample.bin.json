@@ -1,0 +1,56 @@
+{
+  "samples" : [
+    {
+      "bitDepthCode" : 2,
+      "crossfadeLength" : 0,
+      "crossfadeType" : 0,
+      "end" : 63,
+      "firstFrames" : [
+        0,
+        1560,
+        3061,
+        4444
+      ],
+      "highNote" : 59,
+      "length" : 64,
+      "loopEnd" : 63,
+      "loopMode" : 2,
+      "loopStart" : 0,
+      "lowNote" : 0,
+      "name" : "Fixture Sine C3",
+      "pitch" : 0,
+      "rootNote" : 48,
+      "sampleRate" : 48000,
+      "secondRate" : 48000,
+      "start" : 0,
+      "volume" : 1
+    },
+    {
+      "bitDepthCode" : 2,
+      "crossfadeLength" : 4,
+      "crossfadeType" : 2,
+      "end" : 63,
+      "firstFrames" : [
+        8000,
+        8000,
+        8000,
+        8000
+      ],
+      "highNote" : 127,
+      "length" : 64,
+      "loopEnd" : 63,
+      "loopMode" : 1,
+      "loopStart" : 16,
+      "lowNote" : 60,
+      "name" : "Fixture Square C5",
+      "pitch" : 0,
+      "rootNote" : 72,
+      "sampleRate" : 48000,
+      "secondRate" : 48000,
+      "start" : 0,
+      "volume" : 1
+    }
+  ],
+  "slotName" : "Fixture Multisample",
+  "version" : 5
+}
