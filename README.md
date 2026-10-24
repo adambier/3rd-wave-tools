@@ -49,9 +49,9 @@ so it needs a network connection; later builds work offline. An app built on you
 signed only for that Mac (an "ad-hoc" signature); it opens normally there, and macOS warns about
 it elsewhere.
 
-The tests (`./run-tests.sh`) need a full Xcode installation (15 or later) on a Mac; on Linux,
-`swift test` runs them directly. (`Package.swift` includes the test target only when
-`PGDATA_TESTS=1` is set, which the script does, so that a plain `swift build` works with the
+The tests (`./run-tests.sh`) need a full Xcode installation (15 or later) on a Mac; on Linux and
+Windows, `swift test` runs them directly. (On a Mac, `Package.swift` includes the test target only
+when `PGDATA_TESTS=1` is set, which the script does, so that a plain `swift build` works with the
 command-line tools alone. Such a build has no Sparkle, so no **Check for Updates…**.)
 
 ## Using it

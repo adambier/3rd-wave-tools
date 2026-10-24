@@ -36,7 +36,8 @@ bank 3"), or share only your own programs and exports.
 - **The app** (macOS 13 or later, Xcode command-line tools): `./make-app.sh`, then
   `open "pgdata Packer.app"`. The first build downloads Sparkle.
 - **The tests:** `./run-tests.sh` on a Mac with a full Xcode installation (15 or later), or
-  `swift test` on Linux (Swift 5.9 or later; tested with 6.0).
+  `swift test` on Linux or Windows (Swift 5.9 or later; tested with 6.0 on Linux and macOS and 6.2
+  on Windows, where 6.0 cannot build against the current Windows SDK).
 - **The test files** in [`fixtures/`](fixtures/): after a deliberate change to what the library
   writes, rebuild them with
   `PGDATA_TESTS=1 PGDATA_REGENERATE_FIXTURES=1 swift test --filter FixtureTests` and include the

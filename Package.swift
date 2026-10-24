@@ -8,7 +8,7 @@ import Foundation
 //
 //   PgdataFormats      the library for other projects: the 3rd Wave's file formats, packing and
 //                      unpacking, program conversion, factory table fingerprints; Foundation only,
-//                      builds on Linux too
+//                      builds on macOS, Linux, and Windows
 //   PgdataPackerCore   pgdata Packer's own decisions (pack and unpack plans, file names, Clean Up
 //                      Names), without UI, for other front ends (a command-line tool, or a GUI on
 //                      another platform) that should behave like the app; its API may change more
@@ -16,18 +16,20 @@ import Foundation
 //   PgdataPacker       the macOS app ("pgdata Packer") (SwiftUI); declared only when building on macOS
 //   tw3pg              developer harness used to verify the library against real files
 //
-// The test target is opt-in (PGDATA_TESTS=1), as in ThirdWaveWT: on a Mac with only the
-// Command Line Tools, SwiftPM fails while looking for XCTest even for a plain `swift build`.
+// On a Mac the test target is opt-in (PGDATA_TESTS=1), as in ThirdWaveWT: with only the Command
+// Line Tools, SwiftPM fails while looking for XCTest even for a plain `swift build`.
 // The app does not need SwiftPM at all — see make-app.sh.
 
-let onLinux: Bool = {
-    #if os(Linux)
+// Only a Mac may lack XCTest (with the Command Line Tools alone), so elsewhere the tests are
+// always included.
+let onMac: Bool = {
+    #if os(macOS)
     return true
     #else
     return false
     #endif
 }()
-let includeTests = onLinux || ProcessInfo.processInfo.environment["PGDATA_TESTS"] != nil
+let includeTests = !onMac || ProcessInfo.processInfo.environment["PGDATA_TESTS"] != nil
 // The documentation plugin is needed only to build the PgdataFormats documentation site
 // (PGDATA_DOCS=1 swift package generate-documentation …); projects that depend on this package
 // don't fetch it.
