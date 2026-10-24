@@ -14,18 +14,19 @@
 #                              the result, and staple the ticket; needs --sign and a notarytool
 #                              keychain profile named "pgdata-packer", made once with
 #                              xcrun notarytool store-credentials "pgdata-packer" --apple-id … --team-id …
-#   ./make-app.sh --appcast    after --zip, add the zip to ./appcast.xml with Sparkle's generate_appcast
-#                              (signs it with the EdDSA key in your keychain; the download URL is
-#                              the GitHub release for tag v<version>); commit appcast.xml to main
-#                              once the release is published
+#   ./make-app.sh --appcast    with --zip and --universal, add the zip to ./appcast.xml with Sparkle's
+#                              generate_appcast (signs it with the EdDSA key in your keychain; the
+#                              download URL is the GitHub release for tag v<version>); commit
+#                              appcast.xml to main once the release is published
 #   ./make-app.sh --feed-url=URL
 #                              use this update feed instead of the public one (to test updates
-#                              against a local appcast)
+#                              against a local appcast; not allowed with --notarize or --appcast)
 #
 # A release build for distribution: ./make-app.sh --universal --sign "…" --notarize --zip --appcast
 #
-# In-app updates use Sparkle 2. The script downloads the pinned Sparkle release into build/ (once,
-# checked against its SHA-256), links against it, and embeds Sparkle.framework in the app.
+# In-app updates use Sparkle 2. The first build downloads the pinned Sparkle release into build/
+# (checked against its SHA-256), so it needs a network connection; later builds reuse it. The app
+# links against it and embeds Sparkle.framework.
 #
 # The result is "./pgdata Packer.app" — double-clickable, no Xcode needed; the Command Line
 # Tools are enough (xcode-select --install). Same approach as ThirdWaveWT: SwiftPM looks
@@ -46,6 +47,7 @@ NOTARY_PROFILE="pgdata-packer"   # xcrun notarytool store-credentials "pgdata-pa
 MAKE_APPCAST=0
 # Sparkle reads the update feed from here. Permanent once a release with it has shipped.
 FEED_URL="https://raw.githubusercontent.com/adambier/3rd-wave-tools/main/appcast.xml"
+FEED_OVERRIDDEN=0
 EXPECT_IDENTITY=0
 for arg in "$@"; do
     if [ "$EXPECT_IDENTITY" -eq 1 ]; then
@@ -61,7 +63,7 @@ for arg in "$@"; do
         --sign=*) SIGN_IDENTITY="${arg#--sign=}" ;;
         --notarize) NOTARIZE=1 ;;
         --appcast) MAKE_APPCAST=1 ;;
-        --feed-url=*) FEED_URL="${arg#--feed-url=}" ;;
+        --feed-url=*) FEED_URL="${arg#--feed-url=}"; FEED_OVERRIDDEN=1 ;;
         *) echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
@@ -75,6 +77,11 @@ if [ "$MAKE_APPCAST" -eq 1 ] && { [ "$MAKE_ZIP" -eq 0 ] || [ "$UNIVERSAL" -eq 0 
     echo "--appcast needs --zip and --universal." >&2
     exit 2
 fi
+if [ "$FEED_OVERRIDDEN" -eq 1 ] && { [ "$NOTARIZE" -eq 1 ] || [ "$MAKE_APPCAST" -eq 1 ]; }; then
+    # A released app with a test feed would never see another update.
+    echo "--feed-url is for test builds; it cannot be combined with --notarize or --appcast." >&2
+    exit 2
+fi
 
 APP="pgdata Packer.app"
 BUNDLE_ID="org.biers.pgdatapacker"
@@ -83,6 +90,15 @@ VERSION="1.0.4"
 # The build number must rise with every release (an updater compares it): the number of commits.
 BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 DEPLOYMENT_TARGET="13.0"
+
+# A second item for the same version would carry a new build number and signature but point at the
+# same download, which then fails to verify if the uploaded zip is not this run's. Checked before
+# the build so that a long notarization is not wasted.
+if [ "$MAKE_APPCAST" -eq 1 ] && [ -f appcast.xml ] \
+    && grep -q "<sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>" appcast.xml; then
+    echo "appcast.xml already has an item for $VERSION. Remove that item first if it should be replaced." >&2
+    exit 2
+fi
 
 # Sparkle 2, for in-app updates. The public half of the EdDSA key that signs each update (the
 # private half is in the release signer's keychain; Sparkle's generate_keys made it).
@@ -106,6 +122,7 @@ if [ ! -d "$SPARKLE_DIR/Sparkle.framework" ]; then
     rm -rf "$SPARKLE_DIR.partial"
     mkdir -p "$SPARKLE_DIR.partial"
     tar -xf "$SPARKLE_ARCHIVE" -C "$SPARKLE_DIR.partial"
+    rm -rf "$SPARKLE_DIR"
     mv "$SPARKLE_DIR.partial" "$SPARKLE_DIR"
     rm -f "$SPARKLE_ARCHIVE"
 fi
@@ -266,18 +283,24 @@ fi
 if [ "$MAKE_APPCAST" -eq 1 ]; then
     # generate_appcast works on a folder of archives and updates the appcast.xml in it: a fresh
     # folder holding the current appcast.xml (if any) and only this release's zip, so the download
-    # URL prefix applies to this release alone and the earlier items keep their URLs. A release
-    # notes file next to the zip, pgdata-Packer-<version>.html or .md, becomes the update's notes.
+    # URL prefix applies to this release alone and the earlier items keep their URLs. The release
+    # notes, hw-tests/release-notes-<version>.md if present, go next to the zip under its base name
+    # and are embedded in the item for Sparkle's update window (a linked notes file on GitHub would
+    # be served as a download, not shown).
     APPCAST_DIR="build/appcast"
     rm -rf "$APPCAST_DIR"
     mkdir -p "$APPCAST_DIR"
     if [ -f appcast.xml ]; then cp appcast.xml "$APPCAST_DIR/appcast.xml"; fi
     cp "$ZIP" "$APPCAST_DIR/"
-    for NOTES in "pgdata-Packer-$VERSION.html" "pgdata-Packer-$VERSION.md"; do
-        if [ -f "$NOTES" ]; then cp "$NOTES" "$APPCAST_DIR/"; fi
-    done
+    NOTES="hw-tests/release-notes-$VERSION.md"
+    if [ -f "$NOTES" ]; then
+        cp "$NOTES" "$APPCAST_DIR/pgdata-Packer-$VERSION.md"
+    else
+        echo "No $NOTES: the update will have no release notes." >&2
+    fi
     "$SPARKLE_DIR/bin/generate_appcast" \
         --download-url-prefix "https://github.com/adambier/3rd-wave-tools/releases/download/v$VERSION/" \
+        --embed-release-notes \
         --maximum-versions 0 \
         --maximum-deltas 0 \
         "$APPCAST_DIR"
