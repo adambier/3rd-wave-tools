@@ -25,13 +25,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let para = NSMutableParagraphStyle()
         para.alignment = .center
         para.paragraphSpacing = NSFont.smallSystemFontSize
-        let credits = NSAttributedString(
+        let source = "github.com/adambier/3rd-wave-tools"
+        let credits = NSMutableAttributedString(
             string: "Packs and unpacks unified program data (.pgdata) files for the Groove Synthesis 3rd Wave.\n"
                 + "Not affiliated with or endorsed by Groove Synthesis.\n"
-                + "MIT licence. Source: github.com/adambier/3rd-wave-tools",
+                + "MIT licence. Source: \(source)",
             attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
                          .foregroundColor: NSColor.secondaryLabelColor,
                          .paragraphStyle: para])
+        // The address is a link; the About panel's credits view opens it when clicked.
+        if let url = URL(string: "https://\(source)") {
+            credits.addAttribute(.link, value: url, range: (credits.string as NSString).range(of: source))
+        }
         NSApplication.shared.orderFrontStandardAboutPanel(options: [.applicationName: appName, .credits: credits])
     }
 
