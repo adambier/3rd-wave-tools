@@ -1,0 +1,42 @@
+# Runs the library's tests on Linux, macOS, and Windows on every push and pull request, so that
+# PgdataFormats and PgdataPackerCore keep building everywhere Swift runs. The macOS app itself is
+# built and released separately with make-app.sh.
+
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    container: swift:6.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: swift test
+
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: PGDATA_TESTS=1 swift test
+
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: compnerd/gha-setup-swift@main
+        with:
+          branch: swift-6.0.3-release
+          tag: 6.0.3-RELEASE
+      - name: Test
+        env:
+          PGDATA_TESTS: "1"
+        run: swift test
