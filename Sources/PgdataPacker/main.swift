@@ -40,23 +40,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.orderFrontStandardAboutPanel(options: [.applicationName: appName, .credits: credits])
     }
 
+    private static let repository = "https://github.com/adambier/3rd-wave-tools"
+
+    /// The running version, from the Info.plist that make-app.sh writes; nil in a build without it.
+    private var runningVersion: String? {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+    }
+
+    /// Opens `url` if GitHub answers for it, and `fallback` if it does not or cannot be reached.
+    /// Pages for the running version do not exist yet in a build of a version not yet released.
+    private func openIfAvailable(_ url: URL, orElse fallback: URL) {
+        Task { @MainActor in
+            var request = URLRequest(url: url, timeoutInterval: 5)
+            request.httpMethod = "HEAD"
+            let exists = ((try? await URLSession.shared.data(for: request))?.1 as? HTTPURLResponse)?.statusCode == 200
+            NSWorkspace.shared.open(exists ? url : fallback)
+        }
+    }
+
     /// Opens the GitHub release page for the running version. Falls back to the list of all
     /// releases when that page does not exist (a build of a version not yet released), when the
     /// version is unknown (a build without make-app.sh's Info.plist), or when GitHub cannot be
     /// reached to check.
     @objc func showReleaseNotes(_ sender: Any?) {
-        guard let allReleases = URL(string: "https://github.com/adambier/3rd-wave-tools/releases") else { return }
-        guard let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String else {
+        guard let allReleases = URL(string: "\(Self.repository)/releases") else { return }
+        guard let version = runningVersion else {
             NSWorkspace.shared.open(allReleases)
             return
         }
-        let releasePage = allReleases.appendingPathComponent("tag").appendingPathComponent("v\(version)")
-        Task {
-            var request = URLRequest(url: releasePage, timeoutInterval: 5)
-            request.httpMethod = "HEAD"
-            let exists = ((try? await URLSession.shared.data(for: request))?.1 as? HTTPURLResponse)?.statusCode == 200
-            NSWorkspace.shared.open(exists ? releasePage : allReleases)
+        openIfAvailable(allReleases.appendingPathComponent("tag").appendingPathComponent("v\(version)"), orElse: allReleases)
+    }
+
+    /// Opens the README as it was at the running version's tag, since it describes the app; falls
+    /// back to the current README on main, as Release Notes does.
+    @objc func showReadMe(_ sender: Any?) {
+        guard let current = URL(string: "\(Self.repository)/blob/main/README.md") else { return }
+        guard let version = runningVersion,
+              let tagged = URL(string: "\(Self.repository)/blob/v\(version)/README.md") else {
+            NSWorkspace.shared.open(current)
+            return
         }
+        openIfAvailable(tagged, orElse: current)
+    }
+
+    /// Opens the current file format reference on main. It describes the 3rd Wave's files, not
+    /// this version of the app, so the latest corrections apply whatever version is running.
+    @objc func showFormats(_ sender: Any?) {
+        guard let url = URL(string: "\(Self.repository)/blob/main/docs/FORMATS.md") else { return }
+        NSWorkspace.shared.open(url)
     }
 }
 
@@ -104,6 +135,9 @@ private func buildMainMenu(appDelegate: AppDelegate) -> NSMenu {
 
     let helpMenuItem = NSMenuItem()
     let helpMenu = NSMenu(title: "Help")
+    helpMenu.addItem(withTitle: "Read Me", action: #selector(AppDelegate.showReadMe(_:)), keyEquivalent: "")
+    helpMenu.addItem(withTitle: "File Format Reference", action: #selector(AppDelegate.showFormats(_:)), keyEquivalent: "")
+    helpMenu.addItem(.separator())
     helpMenu.addItem(withTitle: "Release Notes", action: #selector(AppDelegate.showReleaseNotes(_:)), keyEquivalent: "")
     helpMenuItem.submenu = helpMenu
     mainMenu.addItem(helpMenuItem)
