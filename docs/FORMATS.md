@@ -36,16 +36,12 @@ tests cover much of it; "the library" below means this library.
 
 ## 1. Conventions
 
-**How sure each statement is.** Statements carry a tag:
-
-- **[verified]**: checked on a 3rd Wave (what it displays, plays, imports, or exports);
-- **[official]**: stated by Groove Synthesis (manual, support pages, its own files, and scripts);
-- **[observed]**: true in every real file examined, but not checked on a 3rd Wave;
-- **[inferred]**: reasoning from the above, not yet checked.
-
-Untagged statements describe structure that every file examined follows, so they are [observed] at
-least. The test is that every file reads and writes back byte for byte (section
-[9](#9-how-this-was-established)).
+**How sure each statement is.** A plain statement describes what every file examined does; the
+test is that every file reads and writes back byte for byte (section
+[9](#9-how-this-was-established)). A statement that rests on more than the files has a footnote
+saying where it comes from: a test on a 3rd Wave, or Groove Synthesis's own documents and files.
+Where something is reasoning that has not been checked, the text says so in words ("probably",
+"not yet checked").
 
 **Counting and naming.** Positions inside a block count from 0: integer 34 is the 35th value of a
 part's integer block, and likewise for floats and globals. Lines of a `.pro` count from 1.
@@ -59,7 +55,9 @@ bytes (see [Names](#8-names-file-names-and-the-usb-drive)).
 file** (called "the `.pgdata` import" here).
 
 **Parts.** A program has four parts (layers), numbered 1–4 on the 3rd Wave and 0–3 in the files.
-The 24K and 24M play all four; the 8M plays parts 1 and 2 only. [official]
+The 24K and 24M play all four; the 8M plays parts 1 and 2 only.[^parts]
+
+[^parts]: Stated by Groove Synthesis.
 
 ## 2. Oscillator sources
 
@@ -74,9 +72,9 @@ id*. The same ids appear in a `.pgdata`'s source table.
 | 41–47 | analog waves (order below) | A00 … A06 |
 | 1000 + *k* | wavetable slot P(34 + *k*) | P34 … P47 (ids 1000–1013) |
 | 2000 + *k* | wavetable slot U(7 + *k*) | U07 … U63 (ids 2000–2056) |
-| 4000 + *n* | multisample slot S*n* | S00 … (the library accepts S00–S127, ids 4000–4127 [inferred]) |
+| 4000 + *n* | multisample slot S*n* | S00 … (the library accepts S00–S127, ids 4000–4127; the upper limit is not yet checked) |
 
-The ranges look as if later slots were added without renumbering the earlier ones. [inferred]
+The ranges look as if later slots were added without renumbering the earlier ones.
 
 The analog ids are not in the order the 3rd Wave displays them:
 
@@ -91,16 +89,23 @@ The analog ids are not in the order the 3rd Wave displays them:
 | 47 | A02 Triangle |
 
 **An id names a slot, not its content.** What plays is whatever that 3rd Wave has loaded in the
-slot, so two 3rd Waves can play different tables for the same program. [verified]
+slot, so two 3rd Waves can play different tables for the same program.[^slot-content]
 
 **Factory slots.** P00–P35 and U00–U55 hold Groove Synthesis's factory tables; P36–P47 and U56–U63
-are free for the user's own. [official] U48–U55 became factory slots in 2025; before that, some
-program sets used them for their own tables. [observed: file dates and third-party sets]
+are free for the user's own.[^factory-slots] U48–U55 became factory slots in 2025 (the factory
+files for them are dated April 2025); before that, some program sets used them for their own tables.
 
 *How this was established:* ids 34 (U00), 1000 (P34), 2000 (U07), and all seven analog ids were read
-from the 3rd Wave's OSC screen for programs that use them [verified]. The rest of each range
-follows from those and from the names of tables embedded in `.pgdata` files ("Wavetable P15" under
-id 15, for example) [observed]. P36–P47 = ids 1002–1013 is [inferred]; no file using them has been seen.
+from the 3rd Wave's OSC screen for programs that use them.[^osc-ids] The rest of each range follows
+from those and from the names of tables embedded in `.pgdata` files ("Wavetable P15" under id 15,
+for example). P36–P47 as ids 1002–1013 is an assumption: no file using them has been seen.
+
+[^slot-content]: Tested on an 8M (OS 2.0d), October 2026: a `.pgdata` that lists a slot without
+    its data plays whatever that 3rd Wave holds in the slot, or plays silently if the slot is
+    empty (section [9](#9-how-this-was-established)).
+[^factory-slots]: Groove Synthesis's support page lists U00–U55 as the factory U tables and
+    offers U48–U55 as a separate download. The user manual (v1.9) still gives U00–U47.
+[^osc-ids]: Read on an 8M's OSC screen (OS 2.0d), 21–23 October 2026.
 
 ## 3. Program (.pro)
 
