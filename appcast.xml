@@ -1,0 +1,34 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>pgdata Packer</title>
+        <item>
+            <title>1.0.4</title>
+            <pubDate>Sat, 24 Oct 2026 13:29:30 -0700</pubDate>
+            <sparkle:version>140</sparkle:version>
+            <sparkle:shortVersionString>1.0.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## Updates
+
+- pgdata Packer now updates itself, using Sparkle. On its second launch it asks whether to check for updates automatically; **Check for Updates…** in the app menu checks at any time. Updates are signed, and the app installs only an update signed with this project's key.
+- **Release Notes** in the Help menu opens the notes for the version you have.
+
+## Pack
+
+- The report after packing opens at the top, and lists converted programs by name, or in one line for a whole bank.
+- **Clean Up Names…**: the columns fit the sheet without a horizontal scroll bar.
+
+## Also
+
+- The project is now called 3rd-wave-tools on GitHub (the old address redirects); the About box links to it.
+- [`docs/FORMATS.md`](https://github.com/adambier/3rd-wave-tools/blob/v1.0.4/docs/FORMATS.md): corrections checked against the code, and shorter.
+- Building from source: the first `./make-app.sh` downloads Sparkle, so it needs a network connection.
+
+## Download
+
+`pgdata-Packer-1.0.4.zip` below is signed with a Developer ID and notarized by Apple, for Apple Silicon and Intel Macs. Requires macOS 13 or later. From this version on, the app offers later versions itself.
+]]></description>
+            <enclosure url="https://github.com/adambier/3rd-wave-tools/releases/download/v1.0.4/pgdata-Packer-1.0.4.zip" length="2547568" type="application/octet-stream" sparkle:edSignature="qgyDpqgwHGve46UEc71T3vOWbWumg6AYGWCr7YBIT0IQnG5eLLs6NAms5/mvkK1x9z0Ufr0KsN3C+UX9VS3TBg=="/>
+        </item>
+    </channel>
+</rss>
