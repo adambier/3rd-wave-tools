@@ -341,7 +341,8 @@ be inferences. In brief:
   sequence events.
 - **.pgdata**: `W3_UNIPROG_1`, a table of the sources the program uses (each with its embedded `.wt`
   values or multisample, or listed without data), then the program name and the `.pro` values as
-  32-bit words. It has no format tag.
+  32-bit words. It has no format tag. The container is fully known; the program values inside it
+  are the `.pro`'s, and most of their meanings are not.
 - **.wt**: text: `PNAME` or `UNAME`, the name, then one float per line.
 - **.bin**: `W3_MSAMPLE_<v>`, a slot name and up to eight samples with their settings and 16-bit
   audio.

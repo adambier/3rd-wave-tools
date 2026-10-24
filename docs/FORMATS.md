@@ -275,6 +275,10 @@ A `.pgdata` is a program together with the wavetables and multisamples it uses, 
 same on another 3rd Wave. It has no format tag: its program part is always expected to be in the
 current layout (see [6](#6-converting-older-programs)).
 
+It is a container. Its own layout is fully known, but the program inside it is the same program
+values as a `.pro`, so knowing the container says where those values are, not what they mean: most
+of them are as unknown here as in a `.pro` (section [3.4](#34-what-the-values-mean)).
+
 ### 4.1 Layout
 
 ```
