@@ -43,6 +43,26 @@ public struct Multisample: Equatable {
     public var name: String { slotName.text }
     public var totalFrames: Int { samples.reduce(0) { $0 + Int($1.length) } }
 
+    /// Departures from what the 3rd Wave's SysEx specification allows for a multisample, each as
+    /// a phrase for a warning: samples out of key order (the specification requires increasing
+    /// assigned notes), more than 8 samples, codes outside their ranges, offsets past the audio.
+    public var problems: [String] {
+        var out: [String] = []
+        if samples.count > 8 { out.append("it holds \(samples.count) samples; the 3rd Wave allows 8") }
+        let roots = samples.map(\.rootNote)
+        if roots != roots.sorted() { out.append("its samples are not in increasing order of their assigned notes, which the 3rd Wave requires") }
+        for (i, s) in samples.enumerated() {
+            let n = "sample \(i + 1)"
+            if s.bitDepth > 2 { out.append("\(n) has bit depth code \(s.bitDepth); the 3rd Wave uses 0 (8-bit), 1 (12-bit) or 2 (16-bit)") }
+            if s.loopMode > 2 { out.append("\(n) has loop mode \(s.loopMode); the 3rd Wave uses 0, 1 or 2") }
+            if s.crossfadeType > 2 { out.append("\(n) has crossfade type \(s.crossfadeType); the 3rd Wave uses 0, 1 or 2") }
+            if s.lowNote > s.highNote || s.rootNote > 127 || s.lowNote > 127 || s.highNote > 127 { out.append("\(n) has a key range of \(s.lowNote)–\(s.highNote) with root \(s.rootNote), which is not a valid range of MIDI notes") }
+            if max(s.start, s.end, s.loopStart, s.loopEnd) > s.length { out.append("\(n) has start, end or loop points past its \(s.length) frames") }
+            if !(s.volume >= 0 && s.volume <= 2) || !(s.pitch >= -1 && s.pitch <= 1) { out.append("\(n) has a volume of \(s.volume) or a pitch of \(s.pitch) outside the 3rd Wave's ranges (0–2 and ±1)") }
+        }
+        return out
+    }
+
     // MARK: .bin
 
     public init(binData data: Data) throws {

@@ -19,10 +19,21 @@ public struct ContentFile: Identifiable, Equatable {
     /// Identity of the content (a hash of its values), computed once: it is compared on every
     /// plan, and computing it means re-serialising the whole table.
     public let fingerprint: UInt64
+    /// Things about the content worth a warning when it is packed (see `Multisample.problems`
+    /// and `WavetableFile.peak`), computed once.
+    public let problems: [String]
 
     public init(url: URL, body: Body, slot: SourceRef?) {
         id = UUID(); self.url = url; self.body = body; self.slot = slot
-        switch body { case let .wavetable(w): fingerprint = w.fingerprint; case let .multisample(m): fingerprint = m.fingerprint }
+        switch body {
+        case let .wavetable(w):
+            fingerprint = w.fingerprint
+            let peak = w.peak
+            problems = peak > 1.0001 ? ["its values reach ±\(String(format: "%.2f", peak)); the 3rd Wave's own tables stay within ±1, so the file may be damaged or not normalised"] : []
+        case let .multisample(m):
+            fingerprint = m.fingerprint
+            problems = m.problems
+        }
     }
 
     public static func load(_ url: URL) throws -> ContentFile {
@@ -372,6 +383,7 @@ public struct PackPlan {
                 embeds = true
                 let name = packedName(f)
                 warnings += nameWarnings(name, what: "\(f.url.lastPathComponent): the name \"\(name)\"")
+                warnings += f.problems.map { "\(f.url.lastPathComponent): \($0)." }
                 if case let .multisample(m) = f.body {
                     bytes = multisampleBytes(m)
                     status = .ok("Embeds \"\(name)\" (\(f.url.lastPathComponent)); stored in a free S slot on import")
@@ -629,6 +641,8 @@ public struct UnpackPlan {
         /// without re-serialising the table.
         public var fingerprint: UInt64? = nil
         public var contentName: String? = nil
+        /// Something wrong with the content worth showing (see `ContentFile.problems`).
+        public var problem: String? = nil
     }
 
     public var programName: String
@@ -646,16 +660,19 @@ public struct UnpackPlan {
         for (ref, w) in up.wavetables {
             let fp = w.fingerprint
             let name = OutputNames.wavetable(ref, w)
+            let peak = w.peak
             items.append(Item(ref: ref, fileName: name, data: w.serialized(), description: "",
-                              isFactoryDuplicate: false, write: true, defaultFileName: name, fingerprint: fp, contentName: w.name))
+                              isFactoryDuplicate: false, write: true, defaultFileName: name, fingerprint: fp, contentName: w.name,
+                              problem: peak > 1.0001 ? "values reach ±\(String(format: "%.2f", peak)), beyond the ±1 of the 3rd Wave's own tables" : nil))
         }
         for (ref, m) in up.multisamples {
             let secs = m.samples.reduce(0.0) { $0 + Double($1.length) / Double(max($1.sampleRate, 1)) }
             let name = OutputNames.multisample(ref, m)
+            let problems = m.problems
             items.append(Item(ref: ref, fileName: name, data: m.binData(),
                               description: "\(ref.label) multisample \"\(m.name)\", \(m.samples.count) sample\(m.samples.count == 1 ? "" : "s"), "
-                                + String(format: "%.1f s", secs),
-                              isFactoryDuplicate: false, write: true, defaultFileName: name))
+                                + String(format: "%.1f s", secs) + (problems.isEmpty ? "" : " — " + problems.joined(separator: "; ")),
+                              isFactoryDuplicate: false, write: true, defaultFileName: name, problem: problems.first))
         }
         return UnpackPlan(programName: up.program.name, items: items, referenced: up.referenced, notes: up.notes)
             .refreshed(factory: factory, skipFactoryDuplicates: skipFactoryDuplicates, resetWrite: true)
@@ -672,6 +689,7 @@ public struct UnpackPlan {
             var desc = "\(ref.label) wavetable \"\(name)\""
             if dup { desc += " — identical to the factory table" }
             else if let f = factory.slot(withFingerprint: fp) { desc += " — identical to factory \(f.label)" }
+            if let problem = plan.items[j].problem { desc += " — " + problem }
             plan.items[j].description = desc
             plan.items[j].isFactoryDuplicate = dup
             if dup || resetWrite { plan.items[j].write = !(dup && skipFactoryDuplicates) }

@@ -41,7 +41,7 @@ public struct WavetableFile: Equatable {
             let s = raw.trimmingCharacters(in: .whitespaces)
             if s.isEmpty || s.hasPrefix("//") { continue }
             let t = s.hasSuffix("f") || s.hasSuffix("F") ? String(s.dropLast()) : s
-            guard let f = Float(t) else { throw FormatError.invalid("Line \(i + 3) of wavetable \"\(name)\" is not a number: \"\(s)\".") }
+            guard let f = Float(t), f.isFinite else { throw FormatError.invalid("Line \(i + 3) of wavetable \"\(name)\" is not a number: \"\(s)\".") }
             vals.append(f)
         }
         guard vals.count == k.valueCount else {
@@ -60,6 +60,10 @@ public struct WavetableFile: Equatable {
 
     /// Identity of the table's content, independent of its name and text formatting.
     public var fingerprint: UInt64 { fnv1a64(dataBytes) }
+
+    /// The largest absolute value. The 3rd Wave's own tables stay within ±1 [observed: every
+    /// factory table, and SysEx dumps from an 8M], so more suggests a damaged or unnormalised file.
+    public var peak: Float { values.reduce(0) { max($0, abs($1)) } }
 
     public func serialized() -> Data {
         if let o = originalBytes { return Data(o) }

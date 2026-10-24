@@ -367,10 +367,13 @@ sample rate when a P table is selected. None of this is needed to read or write 
 why a P table's last four waves look unrelated to the rest.
 
 **U tables** hold 64 waves of 2,048 plain samples (no differences), floats within ±1. [observed]
-Over SysEx, however, the 3rd Wave sends a U table as 64 × 1,024 float32 samples, and the manual
-describes the Wave Maker's import of 2,048-sample waves as "96 kHz" tables; how the file's 2,048
-relate to the 1,024 the 3rd Wave holds (every other sample, a resample, or something else) has not
-been checked (section 10). [SysEx: observed on an 8M, OS 2.0]
+Inside the 3rd Wave, however, a U table is 64 waves of 1,024 samples: its SysEx spec defines the
+U payload as 65,536 floats, "64 different waveforms ... each with a length of 1024 samples" (and
+the P payload as 8,192: 64 × 128), and the dumps agree. [official; observed on an 8M, OS 2.0] How
+the file's 2,048 become the 3rd Wave's 1,024 (every other sample, a resample, or something else)
+has not been checked (section 10). It matters for one thing: the 3rd Wave identifies a table by a
+hash of the samples as it holds them, so a `.wt` is matched against loaded tables only after that
+reduction.
 
 *Background.* The PPG's own tables were mostly defined by a few stored key waves with the rest
 interpolated between them, and its wavetable 31 was a sample table (piano and saxophone) that the
@@ -395,18 +398,24 @@ Each sample (version 5):
 | Field | Type | Notes |
 |---|---|---|
 | length | u32 | in frames |
-| sample rate | f32 | e.g., 48000 |
-| bit depth | u8 | probably 0 = 8-bit, 1 = 12-bit, 2 = 16-bit [inferred] |
+| sample rate | f32 | the recording's rate, e.g., 48000 |
+| bit depth | u8 | the recording's: 0 = 8-bit, 1 = 12-bit, 2 = 16-bit |
 | name | char[32] | |
 | start, end, loop start, loop end | u32 × 4 | frame positions |
-| root note, low note, high note | u8 × 3 | key range, as note numbers |
-| loop mode | u8 | 0 off; 1 and 2 probably "while the key is held" and "always" [inferred] |
-| crossfade length | u32 | |
-| crossfade type | u8 | 0 off; 1 and 2 probably equal volume and equal power [inferred] |
-| pitch | f32 | |
-| second rate | f32 | meaning uncertain |
-| volume | f32 | |
+| root note, low note, high note | u8 × 3 | the note the recording is assigned to, and the key range it plays, as MIDI note numbers |
+| loop mode | u8 | 0 off, 1 on while the note is held, 2 always on |
+| crossfade length | u32 | in frames |
+| crossfade type | u8 | 0 off, 1 equal volume, 2 equal power |
+| pitch | f32 | −1.0 to 1.0 |
+| second rate | f32 | not in the SysEx record. Equal to the sample rate in all but 40 of 1,270 samples seen; in those it is another standard rate (12,000, 22,050, 44,100 or 48,000), so it is probably the rate the sample is played back or was resampled at [inferred] |
+| volume | f32 | multiplier, 0.0 to 2.0 |
 | audio | int16 × length | |
+
+The field meanings and ranges come from Groove Synthesis's *3rd Wave MIDI CC + SysEx Spec* (v2a),
+whose "set multisample" message carries the same fields in a different order, without the name
+and the second rate. [official] It also requires a multisample's samples to be in increasing order
+of assigned note; all 278 multisamples seen (1,270 samples, in `.bin` files and `.pgdata`
+records) are, their volumes lie within 0.6–2.0 and their pitches within ±1. [observed]
 
 Version 4 lacks the volume. Version 1 also lacks the sample rate and bit depth (after the length),
 and the pitch and second rate. To upgrade an older file, fill in what the 3rd Wave itself uses:
@@ -585,7 +594,9 @@ Verified on an 8M (OS 2.0d) unless a note says otherwise.
 
 - **Wavetables are matched by content.** If the 3rd Wave already has a table with the same values, in
   any slot and under any name, the program is pointed at that slot and nothing is stored; the slot
-  keeps its own name.
+  keeps its own name. (The SysEx spec shows the mechanism: the 3rd Wave keeps a hash id for every
+  wavetable and multisample "to lookup whether a wavetable or multisample is already loaded".
+  [official] That it does so for multisamples on import is still untested.)
 - **A new wavetable or multisample goes into a free slot**, and the program is pointed there: the
   slot in the file is only a label. With no free slot, the 3rd Wave offers to overwrite its last
   table(s). Blank placeholder tables count as used.
@@ -626,7 +637,9 @@ Verified on an 8M (OS 2.0d) unless a note says otherwise.
 **Files examined.** Groove Synthesis's factory banks (the 2022 and 2025 banks for the 24-voice
 models and the 2025 8M banks: 1,500 `.pro` and 38 `.pgdata`), its sample library (45 `.pgdata`) and
 sampling examples, its Bank Arranger script, nine third-party program sets (about 850 `.pro` and
-138 `.pgdata`) and programs exported by a 3rd Wave 8M. pgdata Packer's reader is tested by reading
+138 `.pgdata`) and programs exported by a 3rd Wave 8M. **Documents:** the user manual (v1.9) and the
+*3rd Wave MIDI CC + SysEx Spec* (v2a), whose wavetable and multisample messages carry the same
+data as the files; statements from them are [official]. pgdata Packer's reader is tested by reading
 files and writing them back: every file checked comes back byte for byte (`.wt` files value for
 value), most recently 703 files in one run. The exceptions are 12 third-party `.pgdata` files that
 are damaged as distributed (empty or cut short).

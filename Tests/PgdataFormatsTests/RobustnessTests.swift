@@ -170,6 +170,34 @@ final class RobustnessTests: XCTestCase {
         XCTAssertTrue(PackPlan.make(program: p, files: [], factory: FactoryLibrary()).warnings.contains { $0.contains("is 40 characters") })
     }
 
+    func testImplausibleContentIsFlagged() throws {
+        // A wavetable whose values exceed ±1: the 3rd Wave's own never do.
+        var vals = Array(repeating: Float(0.25), count: 131_072); vals[100] = 3.5
+        let loud = WavetableFile(kind: .u, name: "Loud", values: vals)
+        XCTAssertEqual(loud.peak, 3.5)
+        let f = ContentFile(url: URL(fileURLWithPath: "/x/U56_Loud.wt"), body: .wavetable(loud), slot: .u(56))
+        XCTAssertEqual(f.problems.count, 1)
+        let plan = PackPlan.make(program: makeCurrentProgram(sources: [2049] + Array(repeating: 42, count: 11)), files: [f], factory: FactoryLibrary())
+        XCTAssertTrue(plan.warnings.contains { $0.contains("U56_Loud.wt: its values reach ±3.50") }, "\(plan.warnings)")
+        // Not-a-number lines are refused outright.
+        XCTAssertThrowsError(try WavetableFile(data: Data(("UNAME\nBad\n" + String(repeating: "0.5f\n", count: 131_071) + "inf\n").utf8)))
+        // A multisample out of key order, with codes outside the specification's ranges.
+        var m = makeMultisample()
+        var second = m.samples[0]; second.rootNote = 36; second.lowNote = 24; second.highNote = 47; second.loopMode = 7; second.bitDepth = 3
+        m.samples.append(second)
+        let problems = m.problems
+        XCTAssertTrue(problems.contains { $0.contains("not in increasing order") }, "\(problems)")
+        XCTAssertTrue(problems.contains { $0.contains("sample 2 has bit depth code 3") })
+        XCTAssertTrue(problems.contains { $0.contains("sample 2 has loop mode 7") })
+        XCTAssertTrue(makeMultisample().problems.isEmpty)
+        // The unpack plan carries the same notes in its descriptions.
+        let g = try Packer.pack(makeCurrentProgram(sources: [2049, 4000, 42] + Array(repeating: 42, count: 9)),
+                                content: [.u(56): .wavetable(loud), .s(0): .multisample(m)])
+        let up = UnpackPlan.make(g, factory: FactoryLibrary(), skipFactoryDuplicates: true)
+        XCTAssertTrue(up.items[1].description.contains("values reach ±3.50"), up.items[1].description)
+        XCTAssertTrue(up.items[2].description.contains("not in increasing order"), up.items[2].description)
+    }
+
     func testFileNamesSafeForTheDrive() {
         XCTAssertEqual(OutputNames.sanitize("What? * \"Quoted\" <a|b>: c/d\\e."), "What_ _ _Quoted_ _a_b__ c_d_e")
         XCTAssertEqual(OutputNames.sanitize("  ..  "), "Untitled")

@@ -107,7 +107,10 @@ A program in a layout not seen before (a format other than `W3_PROG_3` to `_5`, 
 number of values per part) gets a warning: the app finds the oscillator sources from the layout, so
 check them, and check the program on the 3rd Wave after importing. A source number outside every
 known range shows as an unknown source, and the program is not written until those oscillators are
-pointed elsewhere.
+pointed elsewhere. Content that does not look like the 3rd Wave's own is flagged too: a wavetable
+whose values go beyond ±1, or a multisample whose samples are out of key order or carry values
+outside the ranges Groove Synthesis specifies. A file that cannot be read at all (empty, cut
+short, or not the kind its extension says) is reported once, with the reason, and left out.
 
 **Programs in an older format are converted as they are packed.** A program saved by older
 firmware (`W3_PROG_3`, `W3_PROG_4`, or a `W3_PROG_5` from before OS 2.0) is brought up to the
@@ -173,7 +176,8 @@ its file name. Source files are not changed, and unpacking keeps names as they a
 
 Name fields hold 31 characters, and the 3rd Wave displays all 31 for programs, wavetables and
 multisamples. A longer name is flagged next to the name, in the program's notes and in the report
-after packing, and is cut to 31.
+after packing, and is cut to 31. The fields hold single-byte characters only, so a name with an
+en dash, curly quotes or an emoji is flagged as well: those characters are written as "?".
 
 #### Writing
 
