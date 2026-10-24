@@ -325,8 +325,7 @@ files, two third-party programs, and a small `.bin`).
 
 Still unknown: whether the 3rd Wave reuses a multisample it already has (as it does for wavetables);
 how it writes non-ASCII letters in file names; whether a 24K converts older programs exactly as
-the 24M does; whether **Import unified program data file** applies the 3rd Wave's fixes to its 2022
-factory programs; and the meaning of most program values.
+the 24M does; and the meaning of most program values.
 
 ## Layout
 

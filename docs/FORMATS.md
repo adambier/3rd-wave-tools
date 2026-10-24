@@ -605,9 +605,9 @@ second program above twice: byte for byte as distributed but with one letter of 
 it received the ordinary conversion only; under its own name with one value of its unused part 3
 changed, it received the whole fix. So no other program will ever trigger them, and pgdata Packer
 does not reproduce them: one of these eight programs packed from its 2022 file plays as that file
-describes. The `.pgdata` import did not apply the velocity fix to one of them that had already been
-converted to the current layout (section 9); whether it applies the fixes to an unconverted 2022
-file has not been tested.
+describes. The `.pgdata` import does not apply them at all: neither to one of these programs
+already converted to the current layout nor to the unconverted 2022 file, which came through with
+its blank part 2, tempo 120 and velocity curve 5. [verified on the 8M and the 24M]
 
 ## 7. What the 3rd Wave does on import
 
@@ -690,6 +690,7 @@ are damaged as distributed (empty or cut short).
 | 24M: three `.pro` files named `B05P10`, `B05P100`, `B05P11`, bulk-imported | landed in that order: plain character order |
 | 24M: a `.pgdata` carrying factory U08 with its mipmap chain zeroed | matched to U08: the hash covers the table only |
 | 24M: a `.pgdata` carrying a new U table (U08 at half level) with its chain zeroed, then **Export Wavetable** | stored in U56, played the same from C2 to C7, exported with the zeros intact: the chain is not used |
+| 24M: the 2022 program of section 6.5 that gains a copy of part 1, packed unconverted (`W3_PROG_3` layout) and imported with the `.pgdata` import | part 2 still blank, tempo 120, velocity 5: the fixes are not applied; parts 1 and 2 both shown active [observed, cause not examined] |
 
 **Implemented from this document alone.** As a check on completeness, a converter was written by
 someone given only this document (no access to the library or the files) and run against the 599
@@ -699,7 +700,6 @@ in section 6.5, plus float 102 on the 24M (section 6.3).
 ## 10. Open questions
 
 - Whether a 24K converts exactly as the 24M does.
-- Whether the `.pgdata` import applies the corrections of section 6.5 to an unconverted 2022 file.
 - Whether **Import program** accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
 - Whether multisamples are reused by content, as wavetables are.
 - The meaning of most part, float and global values, and of event fields *a* and *time*.
