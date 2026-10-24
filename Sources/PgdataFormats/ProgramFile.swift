@@ -156,7 +156,7 @@ public struct ProgramFile: Equatable {
         return values[start...].prefix { $0.isFloat }.count
     }
 
-    /// Layouts seen in real files (1,843 programs: Groove Synthesis factory banks and nine
+    /// Layouts seen in real files (2,348 programs: Groove Synthesis factory banks and nine
     /// third-party sets). The reader finds the oscillator sources from the values-per-part count,
     /// which is verified only for these.
     public static let knownVersions = 3...5

@@ -147,8 +147,8 @@ To find a value:
 For the current layout (*S* = 181, *F* = 137, *G* = 182), the float blocks start at v[728] (line
 731), the globals at v[1276] (line 1279), and the event records at v[1458] (line 1461).
 
-*How this was established:* the sizes add up exactly in every `.pro` examined: 1,843 files from
-Groove Synthesis's factory banks and nine third-party sets, and the 3rd Wave's own exports. [observed]
+*How this was established:* the sizes add up exactly in every `.pro` examined: 2,348 files from
+Groove Synthesis (1,505) and nine third-party sets (843), and the 3rd Wave's own exports. [observed]
 
 ### 3.3 Format tags and layouts
 
@@ -650,8 +650,8 @@ Verified on an 8M (OS 2.0d) unless a note says otherwise.
 
 **Files examined.** Groove Synthesis's factory banks (the 2022 and 2025 banks for the 24-voice
 models and the 2025 8M banks: 1,500 `.pro` and 38 `.pgdata`), its sample library (45 `.pgdata`) and
-sampling examples, its Bank Arranger script, nine third-party program sets (138 `.pgdata`, and the
-rest of the 1,843 `.pro`), and programs exported by a 3rd Wave 8M and a 24M. **Documents:** the
+sampling examples, its Bank Arranger script, nine third-party program sets (843 `.pro` and
+150 `.pgdata`), and programs exported by a 3rd Wave 8M and a 24M. **Documents:** the
 user manual (v1.9) and the *3rd Wave MIDI CC + SysEx Spec* (v2a), whose wavetable and multisample
 messages carry the same data as the files; statements from them are [official]. The library's
 reader is tested by reading files and writing them back: every file checked comes back byte for
