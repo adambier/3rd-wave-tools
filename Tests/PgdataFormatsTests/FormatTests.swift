@@ -115,10 +115,14 @@ final class ProgramTests: XCTestCase {
         XCTAssertNil(plan.conversion)
         let g = try Packer.pack(long, content: [:])
         XCTAssertEqual(g.words.count, declared)
-        // A short file gets a warning and is packed as it is.
+        // A short file is refused when read; one built in memory gets a warning and is packed as it is.
         var short = makeCurrentProgram(); short.values.removeLast(10)
         XCTAssertTrue(PackPlan.make(program: short, files: [], factory: FactoryLibrary()).warnings.contains { $0.contains("header declares") })
         XCTAssertEqual(try Packer.pack(short, content: [:]).words.count, declared - 10)
+        let cut = Data([UInt8](makeCurrentProgram().serialized()).prefix(3000))
+        XCTAssertThrowsError(try ProgramFile(data: cut)) { e in
+            XCTAssertTrue("\(e)".contains("ends early"), "\(e)")
+        }
     }
 }
 

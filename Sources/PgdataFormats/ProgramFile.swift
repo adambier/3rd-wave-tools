@@ -85,6 +85,12 @@ public struct ProgramFile: Equatable {
         guard valuesPerPart > 0, oscillatorIndices.allSatisfy({ $0 < values.count }) else {
             throw FormatError.invalid("Program \"\(name)\" is too short for its declared layout (\(valuesPerPart) values per part).")
         }
+        // Fewer values than the header declares: the file was cut short (every file the 3rd Wave
+        // writes adds up, and a longer one is trimmed at pack time). Refuse rather than pack a
+        // fragment.
+        if let declared = declaredCount, values.count < declared {
+            throw FormatError.invalid("The program file ends early: it holds \(values.count) of the \(declared) values its header declares. It was probably cut short when it was copied or exported.")
+        }
     }
 
     /// The header's S, F, G and E when they are plausible, else nil.

@@ -247,7 +247,9 @@ enum AlertPresenter {
         alert.alertStyle = .informational
         alert.messageText = parts.first ?? ""
         let rest = parts.dropFirst().joined(separator: "\n\n")
-        if !rest.isEmpty { alert.accessoryView = textArea(rest) }
+        // The text, if any, with a Copy button under it that puts the whole report on the
+        // clipboard as plain text and leaves the sheet open.
+        alert.accessoryView = withCopyButton(rest.isEmpty ? nil : textArea(rest), copying: ReportText.plain(text))
         alert.addButton(withTitle: "OK")
         if reveal != nil { alert.addButton(withTitle: "Show in Finder") }
         let finish: (NSApplication.ModalResponse) -> Void = { response in
@@ -298,6 +300,47 @@ enum AlertPresenter {
             }
         }
         return out
+    }
+
+    /// `content` (a text area, or nothing) above a small right-aligned Copy button.
+    private static func withCopyButton(_ content: NSView?, copying text: String) -> NSView {
+        let width = content?.frame.width ?? 520
+        let button = CopyButton(text: text)
+        button.title = "Copied"; button.sizeToFit(); button.title = "Copy"   // room for the wider title
+        let rowHeight = button.frame.height + 4
+        let height = (content?.frame.height ?? 0) + rowHeight
+        let box = NSView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        if let content {
+            content.frame = NSRect(x: 0, y: rowHeight, width: width, height: content.frame.height)
+            box.addSubview(content)
+        }
+        button.frame.origin = NSPoint(x: width - button.frame.width, y: 0)
+        box.addSubview(button)
+        return box
+    }
+
+    /// A small button that copies `text` and says "Copied" for a moment.
+    private final class CopyButton: NSButton {
+        private let text: String
+        init(text: String) {
+            self.text = text
+            super.init(frame: .zero)
+            title = "Copy"
+            bezelStyle = .rounded
+            controlSize = .small
+            font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+            toolTip = "Copy this message to the clipboard"
+            target = self
+            action = #selector(copyText)
+        }
+        required init?(coder: NSCoder) { nil }
+        @objc private func copyText() {
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.setString(text, forType: .string)
+            title = "Copied"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in self?.title = "Copy" }
+        }
     }
 
     static func textArea(_ text: String) -> NSView {
