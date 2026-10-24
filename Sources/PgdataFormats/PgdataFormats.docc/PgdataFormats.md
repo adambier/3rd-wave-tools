@@ -6,9 +6,9 @@ and unified programs.
 ## Overview
 
 PgdataFormats is the library behind pgdata Packer, offered for anyone building their own tools
-for the 3rd Wave: librarians, editors, converters, or scripts. It reads and writes the 3rd Wave's
-four file formats byte for byte, and implements the parts of the 3rd Wave's own behaviour that a
-tool needs to reproduce:
+for the 3rd Wave, such as librarians, converters, or scripts. It reads and writes the 3rd Wave's
+four file formats byte for byte, and implements the parts of the 3rd Wave's own behaviour that
+such a tool needs to reproduce:
 
 - programs (`.pro`), in every layout seen in files saved since 2022, with ``ProgramFile``;
 - wavetables (`.wt`), P and U tables, with ``WavetableFile``;
@@ -22,6 +22,11 @@ tool needs to reproduce:
 - how the 3rd Wave names the files it exports, with ``ExportNames``.
 
 It depends only on Foundation, and its tests run on macOS, Linux, and Windows.
+
+What it does not do is interpret a program's sound settings: what most of a program's roughly
+1,450 values mean is not yet known (fewer than 60 have an identified meaning), so it copies them
+through unchanged. It supports tools that move, pack, unpack, convert, and rename programs, not
+yet ones that create sounds or edit a program's settings.
 
 The package also offers `PgdataPackerCore`, pgdata Packer's own decisions without its user
 interface (pack and unpack plans, file names, Clean Up Names), for a command-line tool or an app

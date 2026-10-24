@@ -9,9 +9,20 @@ This document describes the files the Groove Synthesis 3rd Wave reads and writes
 | `.wt` | one wavetable, as text |
 | `.bin` | one multisample (up to 8 samples with their key ranges and loops) |
 
-It is written for someone implementing these formats. Section [6](#6-converting-older-programs)
-describes how the 3rd Wave converts programs saved by older firmware, which anyone writing a
-`.pgdata` has to do as well.
+It is written for someone implementing these formats.
+
+**What this covers, and what it does not.** The structure of each file is known well enough to
+read and write every file examined byte for byte: where each part of a program is, which values
+are its oscillator sources, how a `.pgdata` carries wavetables and multisamples, and how the 3rd
+Wave converts programs saved by older firmware (section [6](#6-converting-older-programs), which
+anyone writing a `.pgdata` has to do as well). Wavetables and multisamples are understood almost
+completely (section [5](#5-wavetable-wt-and-multisample-bin)). **What most of a program's values
+mean is not known.** A current program holds about 1,450 values; fewer than 60 have an identified
+meaning, most of them only probably (section [3.4](#34-what-the-values-mean)). The rest, nearly
+all of a program's sound settings, can be copied through unchanged but not interpreted. So this
+document supports tools that read, inspect, pack, unpack, convert, move, and rename programs,
+wavetables, and multisamples, but not yet tools that create a program's sound or edit its
+settings.
 
 Groove Synthesis has not published these file formats; its MIDI and SysEx specification defines
 the wavetable and multisample payloads, which the files carry in the same form (section
@@ -189,7 +200,9 @@ Bank Arranger script also accepts `W3_PROG_2`,[^bank-arranger] but no such file 
 
 ### 3.4 What the values mean
 
-Only some values are understood. The rest can be copied through unchanged.
+Only a few values are understood: the oscillator sources and a few dozen others, most of them only
+probably. The rest, nearly all of a program's sound settings, can be copied through unchanged but
+not interpreted.
 
 **Integer part blocks**
 
@@ -707,7 +720,8 @@ are damaged as distributed (empty or cut short).
 | 24M: the 2022 program of section 6.5 that gains a copy of part 1, packed unconverted (`W3_PROG_3` layout) and imported with the `.pgdata` import | part 2 still blank, tempo 120, velocity 5: the fixes are not applied; parts 1 and 2 both shown active (cause not examined) |
 | 24M: two `.pgdata` files carrying the same multisample labelled S20 and S21 | the first stored it in S11 ("Updating sample voice memory"); the second pointed its program at S11 ("Updating Sample Data"): reused by content |
 
-**Implemented from this document alone.** As a check on completeness, a converter was written by
+**Implemented from this document alone.** As a check that section 6 describes the conversion fully
+enough to reproduce it, a converter was written by
 someone given only this document (no access to the library or the files) and run against the 599
 exports above. It matched them to exactly the extent the library does: all but the programs listed
 in section 6.5, plus float 102 on the 24M (section 6.3).

@@ -298,9 +298,12 @@ Checked on an 8M (OS 2.0d), and most points on a 24M as well
 pgdata Packer is one tool; a major aim of this project is to help make it easier to build others,
 in any language. Everything here is open source under the MIT licence.
 
-- **The format reference.** [`docs/FORMATS.md`](docs/FORMATS.md) describes every file the 3rd Wave
-  reads and writes, for someone implementing them for the first time, and how the 3rd Wave behaves
-  when it imports them. Footnotes give the evidence for each statement (a test on a 3rd Wave, or
+- **The format reference.** [`docs/FORMATS.md`](docs/FORMATS.md) describes the structure of the
+  3rd Wave's four file formats, for someone implementing them for the first time, and how the 3rd
+  Wave behaves when it imports them. It is enough to read, write, pack, unpack, convert, and rename
+  programs, wavetables, and multisamples. **What most of a program's values mean is not yet
+  known:** fewer than 60 of a program's roughly 1,450 values have an identified meaning, so it does
+  not yet support tools that create sounds or edit a program's settings. Footnotes give the evidence for each statement (a test on a 3rd Wave, or
   Groove Synthesis's own documents), and what is still unknown is listed at the end.
 - **Test files.** [`fixtures/`](fixtures/) holds a small file of each kind, each with a JSON file
   of what it should parse to, so a new reader or writer can be checked without a 3rd Wave at hand.
