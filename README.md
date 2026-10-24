@@ -13,9 +13,8 @@ checked on an 8M and a 24M, both running OS 2.0d. The Formats and Tests sections
 confirmed on the 3rd Wave and what is inferred.
 
 **Building something for the 3rd Wave?** The file formats are (unofficially) documented as far as
-they're understood, and the library
-behind this app, test files, and a developer tool are free to use under the MIT licence: see
-[For developers](#for-developers).
+they're understood, and the library behind this app, test files, and a developer tool are free to
+use under the MIT licence: see [For developers](#for-developers).
 
 ![The Pack page: the programs added on the left; for the selected program, what each oscillator source will play and whether it is embedded; below, the wavetables and multisamples added and the slots they go to](docs/pack-window.png)
 
