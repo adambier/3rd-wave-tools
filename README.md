@@ -245,13 +245,14 @@ Checked on an 8M (OS 2.0d), and the points about older programs and exporting on
 ([`docs/FORMATS.md`](docs/FORMATS.md#7-what-the-3rd-wave-does-on-import) says which). What the
 3rd Wave does when it imports a file:
 
-- **A table the 3rd Wave already has** (same content, in any slot, whatever its name) is reused. No
-  slot is used, and the 3rd Wave keeps its own name for it.
+- **A table or multisample the 3rd Wave already has** (same content, in any slot, whatever its
+  name) is reused. No slot is used, and the 3rd Wave keeps its own name for it.
 - **A new table or multisample** goes into a free slot, and the program is pointed there. The slot
   number in the file is only a label. With no free slot, the 3rd Wave offers to overwrite its last
   ones; blank placeholder tables count as used. The Pack page shows how many free wavetable slots a
-  program may need; each embedded multisample also takes a free S slot. (For multisamples, the
-  3rd Wave's message says it erases the most recently loaded samples; not tried here.)
+  program may need; each embedded multisample the 3rd Wave does not already have also takes a free
+  S slot. (For multisamples, the 3rd Wave's message says it erases the most recently loaded
+  samples; not tried here.)
 - **A table or multisample listed without its data** plays whatever is in that slot on the 3rd Wave,
   with no warning; an empty sample slot plays silence. That is why multisamples are always
   embedded.
@@ -323,9 +324,8 @@ unpacked and repacked byte for byte with `tw3pg`. The test `.pgdata` files are b
 from files that are not included here (a Groove Synthesis factory program and one of its `.wt`
 files, two third-party programs, and a small `.bin`).
 
-Still unknown: whether the 3rd Wave reuses a multisample it already has (as it does for wavetables);
-how it writes non-ASCII letters in file names; whether a 24K converts older programs exactly as
-the 24M does; and the meaning of most program values.
+Still unknown: how the 3rd Wave writes non-ASCII letters in file names; whether a 24K converts
+older programs exactly as the 24M does; and the meaning of most program values.
 
 ## Layout
 

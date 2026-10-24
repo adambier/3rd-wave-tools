@@ -617,7 +617,9 @@ Verified on an 8M (OS 2.0d) unless a note says otherwise.
   any slot and under any name, the program is pointed at that slot and nothing is stored; the slot
   keeps its own name. (The SysEx spec shows the mechanism: the 3rd Wave keeps a hash id for every
   wavetable and multisample "to lookup whether a wavetable or multisample is already loaded".
-  [official] That it does so for multisamples on import is still untested.)
+  [official]) **Multisamples are reused the same way:** a second `.pgdata` carrying the same
+  multisample under another slot label pointed its program at the slot the first import had
+  filled, with no second copy stored. [verified on the 24M]
 - **A new wavetable or multisample goes into a free slot**, and the program is pointed there: the
   slot in the file is only a label. With no free slot, the 3rd Wave offers to overwrite its last
   table(s). Blank placeholder tables count as used.
@@ -691,6 +693,7 @@ are damaged as distributed (empty or cut short).
 | 24M: a `.pgdata` carrying factory U08 with its mipmap chain zeroed | matched to U08: the hash covers the table only |
 | 24M: a `.pgdata` carrying a new U table (U08 at half level) with its chain zeroed, then **Export Wavetable** | stored in U56, played the same from C2 to C7, exported with the zeros intact: the chain is not used |
 | 24M: the 2022 program of section 6.5 that gains a copy of part 1, packed unconverted (`W3_PROG_3` layout) and imported with the `.pgdata` import | part 2 still blank, tempo 120, velocity 5: the fixes are not applied; parts 1 and 2 both shown active [observed, cause not examined] |
+| 24M: two `.pgdata` files carrying the same multisample labelled S20 and S21 | the first stored it in S11 ("Updating sample voice memory"); the second pointed its program at S11 ("Updating Sample Data"): reused by content |
 
 **Implemented from this document alone.** As a check on completeness, a converter was written by
 someone given only this document (no access to the library or the files) and run against the 599
@@ -701,7 +704,6 @@ in section 6.5, plus float 102 on the 24M (section 6.3).
 
 - Whether a 24K converts exactly as the 24M does.
 - Whether **Import program** accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
-- Whether multisamples are reused by content, as wavetables are.
 - The meaning of most part, float and global values, and of event fields *a* and *time*.
 
 ## Appendix: values for new positions

@@ -386,8 +386,8 @@ public struct PackPlan {
                 warnings += f.problems.map { "\(f.url.lastPathComponent): \($0)." }
                 if case let .multisample(m) = f.body {
                     bytes = multisampleBytes(m)
-                    status = .ok("Embeds \"\(name)\" (\(f.url.lastPathComponent)); stored in a free S slot on import")
-                    brief = "Embedded; needs a free S slot"
+                    status = .ok("Embeds \"\(name)\" (\(f.url.lastPathComponent)); a 3rd Wave that already has it reuses it, otherwise it goes into a free S slot")
+                    brief = "Embedded; reused or stored in a free S slot"
                 } else {
                     bytes = tableBytes
                     if let same = factory.slot(withFingerprint: f.fingerprint) {
