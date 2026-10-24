@@ -3,8 +3,10 @@ import Foundation
 import PgdataFormats   // SwiftPM build; absent in the app's single-module swiftc build
 #endif
 
-// Decision logic behind the app, kept free of UI code so it can be unit-tested. Not part of the
-// public library (PgdataFormats): these are the app's own policies.
+// Decision logic behind pgdata Packer, kept free of UI code so it can be unit-tested and reused by
+// other front ends (a command-line tool, or a GUI on another platform). These are the app's own
+// policies; the file formats and the 3rd Wave's behaviour are in PgdataFormats. The API here may
+// change between versions more than PgdataFormats's does.
 //
 //   ContentFile     a .wt or .bin the user added, with the slot it is assigned to
 //   PackPlan        for one program: what each source will be, and whether a .pgdata is needed
@@ -365,22 +367,16 @@ public struct PackPlan {
 
     /// U48–U55: user slots until Groove Synthesis added them to the factory set in 2025 (files dated
     /// April 2025, shipped with OS 1.9).
-    public static func is2025FactorySlot(_ ref: SourceRef) -> Bool {
-        if case let .u(n) = ref { return (48...55).contains(n) }
-        return false
-    }
+    /// U48–U55, the slots that became factory slots in 2025 (see `SourceRef.is2025FactorySlot`).
+    public static func is2025FactorySlot(_ ref: SourceRef) -> Bool { ref.is2025FactorySlot }
+    /// See `ProgramFile.floatBlockCountSince2025`.
+    public static let currentFloatBlockCount = ProgramFile.floatBlockCountSince2025
 
-    /// Float-block length of programs saved since OS 1.9 (2025).
-    public static let currentFloatBlockCount = 544
-
-    /// A program saved before OS 1.9, and so before U48–U55 held factory tables: an older format
-    /// (W3_PROG_1 to _4) or fewer than 544 values in its float block.
+    /// A program saved before OS 1.9 (see `ProgramFile.predates2025FactoryTables`).
     /// [inferred from the sets seen: every 544-float set dates from 2025 on (8M factory, Matt Johnson,
     /// Miles Away Vol. 3) and every set with fewer predates it (Dynamica, Frank Pels, Euphonic Wave,
     /// Analog Core, Miles Away Vol. 2, Sam Gutman's v5). The 2025 tables shipped with OS 1.9.]
-    public static func predates2025FactoryTables(_ p: ProgramFile) -> Bool {
-        (1...4).contains(p.versionNumber) || p.floatBlockCount < currentFloatBlockCount
-    }
+    public static func predates2025FactoryTables(_ p: ProgramFile) -> Bool { p.predates2025FactoryTables }
 
     /// Why a program counts as saved before OS 1.9, for the note.
     static func layoutReason(_ p: ProgramFile) -> String {
@@ -487,39 +483,17 @@ public enum OutputNames {
         (prefix.map { $0 + "_" } ?? "") + exportName(p.name) + ".pgdata"
     }
 
-    /// The name part of an exported .pgdata file name (see `unified`). Non-ASCII letters are dropped
-    /// too: how the 3rd Wave writes them is not known.
-    public static func exportName(_ name: String) -> String {
-        let words = name.split(separator: " ", omittingEmptySubsequences: true).map { w in
-            String(w.unicodeScalars.filter { $0.isASCII && (CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "_") })
-        }.filter { !$0.isEmpty }
-        return words.isEmpty ? "Untitled" : words.joined(separator: "_")
-    }
+    /// The name part of an exported .pgdata file name (see `unified` and
+    /// `ExportNames.unifiedProgramName`).
+    public static func exportName(_ name: String) -> String { ExportNames.unifiedProgramName(name) }
 
-    private static let locationPattern = try! NSRegularExpression(
-        pattern: #"(?<![A-Za-z0-9])[Bb]0?([1-5])-?[Pp](\d{1,3})(?!\d)"#)
-
-    /// Program location named in a file name ("B05P003.pro", "B5-P003 Name.pro", "B05P18_Name.pgdata").
+    /// See `ExportNames.programLocation(inFileName:)`.
     public static func programLocation(inFileName name: String) -> (bank: Int, program: Int)? {
-        guard let m = locationPattern.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
-              let b = Range(m.range(at: 1), in: name), let p = Range(m.range(at: 2), in: name),
-              let bank = Int(name[b]), let prog = Int(name[p]), (1...100).contains(prog) else { return nil }
-        return (bank, prog)
+        ExportNames.programLocation(inFileName: name)
     }
 
-    private static let bankFolderPattern = try! NSRegularExpression(pattern: #"^[Bb]ank\s*0?([1-5])$"#)
-
-    /// Program location of a file: from its name, or from Groove Synthesis's older layout of a
-    /// "Bank 1" folder holding "001.PRO" … "100.PRO" (the 24-voice Factory Banks v1).
-    public static func programLocation(of url: URL) -> (bank: Int, program: Int)? {
-        if let l = programLocation(inFileName: url.lastPathComponent) { return l }
-        let base = url.deletingPathExtension().lastPathComponent
-        let folder = url.deletingLastPathComponent().lastPathComponent
-        guard base.count <= 3, base.allSatisfy(\.isNumber), let prog = Int(base), (1...100).contains(prog),
-              let m = bankFolderPattern.firstMatch(in: folder, range: NSRange(folder.startIndex..., in: folder)),
-              let b = Range(m.range(at: 1), in: folder), let bank = Int(folder[b]) else { return nil }
-        return (bank, prog)
-    }
+    /// See `ExportNames.programLocation(of:)`.
+    public static func programLocation(of url: URL) -> (bank: Int, program: Int)? { ExportNames.programLocation(of: url) }
 
     /// File-name prefixes for programs written together, in list order. When every file carries a
     /// location: Groove Synthesis's "B05P18" form, two-digit program, or three digits for the whole batch if

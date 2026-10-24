@@ -307,12 +307,17 @@ in any language. Everything here is open source under the MIT licence.
   They are synthetic, so they can be used freely.
 - **A Swift library.** `PgdataFormats` reads and writes every format byte for byte, packs and
   unpacks `.pgdata` files, converts older programs as the 3rd Wave does, and recognises Groove
-  Synthesis's factory wavetables. It depends only on Foundation and builds on macOS and Linux. Add
-  it to a Swift package with
+  Synthesis's factory wavetables. It depends only on Foundation, and its tests run on macOS, Linux,
+  and Windows. Add it to a Swift package with
   `.package(url: "https://github.com/adambier/3rd-wave-tools", from: "1.0.5")` and the product
   `PgdataFormats`. Its documentation, with a getting-started guide, is at
   [adambier.github.io/3rd-wave-tools](https://adambier.github.io/3rd-wave-tools/documentation/pgdataformats/).
   The library is versioned with the app (tags `v1.0.5` and on).
+- **The app's logic, for other platforms.** `PgdataPackerCore`, the package's second library,
+  holds pgdata Packer's own decisions without its user interface: pack and unpack plans, factory
+  table handling, file names, and Clean Up Names. A command-line tool, or an app for Windows or
+  Linux, can use it to behave exactly like pgdata Packer. Its API may change between versions more
+  than `PgdataFormats`'s.
 - **A command-line tool.** `tw3pg` (in `Sources/tw3pg`) inspects files, checks that they round
   trip, unpacks and repacks `.pgdata` files, and converts older programs:
   `swift run tw3pg inspect <file>`.
@@ -389,8 +394,8 @@ Sources/PgdataFormats/      the library (the package's PgdataFormats product): f
   FactoryCatalog.swift        factory table names and fingerprints (generated)
   ByteIO.swift                byte reading and writing, 32-byte name fields
   PgdataFormats.docc/         the library's documentation pages
-Sources/PgdataPackerCore/   the app's own decision logic, no UI: pack and unpack plans, output file
-                            names, Clean Up Names
+Sources/PgdataPackerCore/   the app's own decision logic, no UI (the package's PgdataPackerCore
+                            product): pack and unpack plans, output file names, Clean Up Names
 Sources/PgdataPacker/       the app (SwiftUI)
 Sources/tw3pg/              developer tool: inspect, roundtrip, unpack, repack, compare, wtcheck,
                             factory-catalog, pack, convert, convertcheck, and the 3rd Wave-test builders
@@ -399,7 +404,7 @@ fixtures/                   test files with what each parses to, for other imple
 Resources/                  app icon, drawn by tools/make-icon.py (needs cairosvg and Pillow)
 docs/                       FORMATS.md (format reference) and the screenshots used in this README
 make-app.sh                 builds, signs, and notarizes the app; embeds Sparkle; writes the appcast
-.github/workflows/          publishes the library's documentation to GitHub Pages
+.github/workflows/          tests on Linux, macOS, and Windows; publishes the library's documentation
 ```
 
 ## License

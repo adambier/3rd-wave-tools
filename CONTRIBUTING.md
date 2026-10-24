@@ -49,10 +49,11 @@ bank 3"), or share only your own programs and exports.
 ## Code
 
 - **`PgdataFormats`** is the library other projects use. It depends only on Foundation and has no
-  UI, and it must build on Linux. Every reader writes an unmodified file back byte for byte; keep it
+  UI, and it must build on Linux, macOS, and Windows (the tests run on all three for every push). Every reader writes an unmodified file back byte for byte; keep it
   that way, and add a test for anything new.
 - **`PgdataPackerCore`** holds the app's own decisions (pack and unpack plans, file names, Clean
-  Up Names). **`PgdataPacker`** is the SwiftUI app. **`tw3pg`** is the developer tool.
+  Up Names), also without UI, so that other front ends can share them. **`PgdataPacker`** is the
+  SwiftUI app. **`tw3pg`** is the developer tool.
 - Changes to what the 3rd Wave is said to do belong in FORMATS.md as well as in the code.
 
 ## Writing

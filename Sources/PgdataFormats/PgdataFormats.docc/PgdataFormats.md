@@ -18,9 +18,15 @@ tool needs to reproduce:
 - the conversion the 3rd Wave applies to programs saved by older firmware, with
   ``ProgramConverter``;
 - which slot an oscillator plays, with ``SourceRef``, and which wavetables are Groove
-  Synthesis's factory tables, with ``FactoryLibrary``.
+  Synthesis's factory tables, with ``FactoryLibrary``;
+- how the 3rd Wave names the files it exports, with ``ExportNames``.
 
-It depends only on Foundation and builds on macOS and Linux.
+It depends only on Foundation, and its tests run on macOS, Linux, and Windows.
+
+The package also offers `PgdataPackerCore`, pgdata Packer's own decisions without its user
+interface (pack and unpack plans, file names, Clean Up Names), for a command-line tool or an app
+on another platform that should behave like pgdata Packer. Its API may change between versions
+more than this library's.
 
 The formats themselves, and how each fact about them was established, are described in
 [FORMATS.md](https://github.com/adambier/3rd-wave-tools/blob/main/docs/FORMATS.md), which is
@@ -58,6 +64,10 @@ This project is not affiliated with or endorsed by Groove Synthesis.
 ### Multisamples
 
 - ``Multisample``
+
+### The 3rd Wave's conventions
+
+- ``ExportNames``
 
 ### Supporting types
 

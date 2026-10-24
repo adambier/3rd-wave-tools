@@ -9,8 +9,10 @@ import Foundation
 //   PgdataFormats      the library for other projects: the 3rd Wave's file formats, packing and
 //                      unpacking, program conversion, factory table fingerprints; Foundation only,
 //                      builds on Linux too
-//   PgdataPackerCore   the app's own decision logic (pack and unpack plans, file names, Clean Up
-//                      Names); UI-free and tested, but not offered as a product
+//   PgdataPackerCore   pgdata Packer's own decisions (pack and unpack plans, file names, Clean Up
+//                      Names), without UI, for other front ends (a command-line tool, or a GUI on
+//                      another platform) that should behave like the app; its API may change more
+//                      between versions than PgdataFormats's
 //   PgdataPacker       the macOS app ("pgdata Packer") (SwiftUI); declared only when building on macOS
 //   tw3pg              developer harness used to verify the library against real files
 //
@@ -38,6 +40,7 @@ var targets: [Target] = [
 ]
 var products: [Product] = [
     .library(name: "PgdataFormats", targets: ["PgdataFormats"]),
+    .library(name: "PgdataPackerCore", targets: ["PgdataPackerCore"]),
     .executable(name: "tw3pg", targets: ["tw3pg"]),
 ]
 
