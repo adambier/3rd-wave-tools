@@ -124,6 +124,26 @@ final class ProgramTests: XCTestCase {
             XCTAssertTrue("\(e)".contains("ends early"), "\(e)")
         }
     }
+
+    func testLeftoverTailReadsWhateverItHolds() throws {
+        // The tail left by an export over a longer file can start mid-number and reach into the old
+        // file's float block: it is kept as text, written back as it was, and dropped when packing.
+        let base = String(decoding: makeCurrentProgram().serialized(), as: UTF8.self)
+        let text = base + "-\n0.500000\n12\n3\n"
+        let p = try ProgramFile(data: Data(text.utf8))
+        XCTAssertEqual(p.excessValues, 4)
+        XCTAssertEqual(p.serialized(), Data(text.utf8))
+        XCTAssertEqual(try Packer.pack(p, content: [:]).words.count, p.declaredCount)
+        // A stray carriage return after the last line is not a value.
+        XCTAssertEqual(try ProgramFile(data: Data((base + "\r").utf8)).excessValues, 0)
+        // Six lines (tag, name, and the four sizes) pass the line-count guard and fail the layout one.
+        XCTAssertThrowsError(try ProgramFile(data: Data("W3_PROG_5\nX\n181\n137\n182\n0\n".utf8))) { e in
+            XCTAssertTrue("\(e)".contains("too short for its declared layout"), "\(e)")
+        }
+        XCTAssertThrowsError(try ProgramFile(data: Data("W3_PROG_5\nX\n181\n137\n182\n".utf8))) { e in
+            XCTAssertTrue("\(e)".contains("only 5 lines"), "\(e)")
+        }
+    }
 }
 
 /// A program in the current layout (181/137/182, no events) whose header adds up.

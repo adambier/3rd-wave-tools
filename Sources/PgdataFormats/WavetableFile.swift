@@ -62,9 +62,16 @@ public struct WavetableFile: Equatable {
     /// Identity of the table's content, independent of its name and text formatting.
     public var fingerprint: UInt64 { fnv1a64(dataBytes) }
 
-    /// The largest absolute value. The 3rd Wave's own tables stay within ±1 [observed: every
+    /// The largest absolute sample. The 3rd Wave's own tables stay within ±1 [observed: every
     /// factory table, and SysEx dumps from an 8M], so more suggests a damaged or unnormalised file.
-    public var peak: Float { values.reduce(0) { max($0, abs($1)) } }
+    /// A P table stores each point as a sample and the difference to the next (FORMATS.md 5.1),
+    /// and a difference can reach ±2, so only the samples (the even positions) count.
+    public var peak: Float {
+        switch kind {
+        case .u: return values.reduce(0) { max($0, abs($1)) }
+        case .p: return stride(from: 0, to: values.count, by: 2).reduce(0) { max($0, abs(values[$1])) }
+        }
+    }
 
     public func serialized() -> Data {
         if let o = originalBytes { return Data(o) }

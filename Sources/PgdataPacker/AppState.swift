@@ -244,7 +244,7 @@ final class AppState: ObservableObject {
             // Nothing happened; say why, so a drop that does nothing is not a mystery.
             var why: [String] = []
             if repeated > 0 { why.append("\(repeated) already in the lists") }
-            if skipped.dropped > 0 { why.append("\(skipped.dropped) not .pro, .wt, .bin or .pgdata files") }
+            if skipped.dropped > 0 { why.append("\(skipped.dropped) not .pro, .wt, .bin, or .pgdata files") }
             note("Nothing added" + (why.isEmpty ? "." : ": " + why.joined(separator: "; ") + "."))
         }
         // Show the page the dropped files belong to.
@@ -464,7 +464,7 @@ final class AppState: ObservableObject {
         if !failed.isEmpty { msg += "\n\nNot packed:\n" + failed.joined(separator: "\n") }
         if !converted.isEmpty { msg += "\n\nConverted from an older format, in the same way the 3rd Wave's \u{201C}Import program\u{201D} function handles older programs:\n" + converted.joined(separator: "\n") }
         if !replaced.isEmpty { msg += "\n\nFactory tables replaced by added files (check these are meant):\n" + replaced.joined(separator: "\n") }
-        if !unfamiliar.isEmpty { msg += "\n\nPacked, but check these on the 3rd Wave (unfamiliar layout or a cut name; see each program's notes):\n" + unfamiliar.joined(separator: "\n") }
+        if !unfamiliar.isEmpty { msg += "\n\nPacked, but check these on the 3rd Wave (see each program's notes):\n" + unfamiliar.joined(separator: "\n") }
         // Files none of the packed programs use (other added programs may use them).
         let unused = PackPlan.unusedFiles(contentFiles, plans: packedPlans, factory: factory, programs: "packed")
         if !unused.isEmpty {

@@ -178,7 +178,13 @@ final class RobustnessTests: XCTestCase {
         let f = ContentFile(url: URL(fileURLWithPath: "/x/U56_Loud.wt"), body: .wavetable(loud), slot: .u(56))
         XCTAssertEqual(f.problems.count, 1)
         let plan = PackPlan.make(program: makeCurrentProgram(sources: [2049] + Array(repeating: 42, count: 11)), files: [f], factory: FactoryLibrary())
-        XCTAssertTrue(plan.warnings.contains { $0.contains("U56_Loud.wt: its values reach ±3.50") }, "\(plan.warnings)")
+        XCTAssertTrue(plan.warnings.contains { $0.contains("U56_Loud.wt: its samples reach ±3.50") }, "\(plan.warnings)")
+        // A P table's differences may reach ±2 (a square wave's edges): only its samples count.
+        var pv = [Float](repeating: 0, count: 16_384)
+        for i in stride(from: 0, to: 256, by: 2) { pv[i] = i < 128 ? 1 : -1; pv[i + 1] = i == 126 ? -2 : (i == 254 ? 2 : 0) }
+        let square = WavetableFile(kind: .p, name: "Square", values: pv)
+        XCTAssertEqual(square.peak, 1)
+        XCTAssertTrue(ContentFile(url: URL(fileURLWithPath: "/x/P40_Square.wt"), body: .wavetable(square), slot: .p(40)).problems.isEmpty)
         // Not-a-number lines are refused outright.
         XCTAssertThrowsError(try WavetableFile(data: Data(("UNAME\nBad\n" + String(repeating: "0.5f\n", count: 131_071) + "inf\n").utf8)))
         // A multisample out of key order, with codes outside the specification's ranges.
@@ -194,7 +200,7 @@ final class RobustnessTests: XCTestCase {
         let g = try Packer.pack(makeCurrentProgram(sources: [2049, 4000, 42] + Array(repeating: 42, count: 9)),
                                 content: [.u(56): .wavetable(loud), .s(0): .multisample(m)])
         let up = UnpackPlan.make(g, factory: FactoryLibrary(), skipFactoryDuplicates: true)
-        XCTAssertTrue(up.items[1].description.contains("values reach ±3.50"), up.items[1].description)
+        XCTAssertTrue(up.items[1].description.contains("samples reach ±3.50"), up.items[1].description)
         XCTAssertTrue(up.items[2].description.contains("not in increasing order"), up.items[2].description)
     }
 

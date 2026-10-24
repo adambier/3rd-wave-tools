@@ -101,7 +101,7 @@ struct LogBar: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Label("Drop .pro, .wt, .bin or .pgdata files onto the page above to add them", systemImage: "arrow.down.doc")
+                Label("Drop .pro, .wt, .bin, or .pgdata files onto the page above to add them", systemImage: "arrow.down.doc")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
@@ -352,7 +352,7 @@ enum AlertPresenter {
         let size = button.frame.size
         button.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(button)
-        let vertical = titleField(in: contentView, text: alert.messageText)
+        let vertical = (alert.messageText.isEmpty ? nil : titleField(in: contentView, text: alert.messageText))
             .map { button.centerYAnchor.constraint(equalTo: $0.centerYAnchor) }
             ?? button.topAnchor.constraint(equalTo: content.topAnchor, constant: 1)
         NSLayoutConstraint.activate([

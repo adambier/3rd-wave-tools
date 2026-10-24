@@ -12,7 +12,8 @@
 #                              lists the identities in your keychain
 #   ./make-app.sh --notarize   after signing, submit the app to Apple's notary service, wait for
 #                              the result, and staple the ticket; needs --sign and a notarytool
-#                              keychain profile named "pgdata-packer" (see docs/RELEASING.md)
+#                              keychain profile named "pgdata-packer", made once with
+#                              xcrun notarytool store-credentials "pgdata-packer" --apple-id … --team-id …
 #
 # A release build for distribution: ./make-app.sh --universal --sign "…" --notarize --zip
 #
@@ -34,7 +35,10 @@ NOTARIZE=0
 NOTARY_PROFILE="pgdata-packer"   # xcrun notarytool store-credentials "pgdata-packer" …
 EXPECT_IDENTITY=0
 for arg in "$@"; do
-    if [ "$EXPECT_IDENTITY" -eq 1 ]; then SIGN_IDENTITY="$arg"; EXPECT_IDENTITY=0; continue; fi
+    if [ "$EXPECT_IDENTITY" -eq 1 ]; then
+        case "$arg" in --*) echo "--sign needs an identity, not \"$arg\"." >&2; exit 2 ;; esac
+        SIGN_IDENTITY="$arg"; EXPECT_IDENTITY=0; continue
+    fi
     case "$arg" in
         debug|release) CONFIG="$arg" ;;
         --spm) USE_SPM=1 ;;

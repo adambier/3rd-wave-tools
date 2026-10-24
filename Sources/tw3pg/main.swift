@@ -13,7 +13,7 @@ import PgdataFormats
 //   tw3pg convert <in.pro> <out.pro> [8m|24]         convert an older program to the OS 2.0d layout
 //   tw3pg convertcheck <in dir> <3rd Wave export dir> [8m|24]   convert each input (sorted) and compare with
 //                                        what the 3rd Wave's bulk import made of it (B05P001… in order)
-//   tw3pg wtcheck <dir>...               check every .wt reads and rewrites exactly
+//   tw3pg wtcheck <wt dirs>... -- <pgdata dirs>...   match .wt files against the tables embedded in .pgdata files
 //   tw3pg maketests | maketest5 | maketest6 ...   build the hardware-test files (see each command's usage line)
 
 func files(under paths: [String], ext: Set<String>) -> [URL] {
@@ -84,7 +84,7 @@ let rest = Array(args.dropFirst())
 // For the commands whose arguments are all existing files or folders, a path that does not exist
 // is a typo, not an empty result.
 if ["inspect", "roundtrip", "repack", "compare", "wtcheck", "convertcheck"].contains(cmd) {
-    for a in rest where a != "8m" && a != "24" && !FileManager.default.fileExists(atPath: a) {
+    for a in rest where a != "8m" && a != "24" && a != "--" && !FileManager.default.fileExists(atPath: a) {
         print("error: no such file or folder: \(a)"); exit(1)
     }
 }

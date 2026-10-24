@@ -29,7 +29,7 @@ public struct ContentFile: Identifiable, Equatable {
         case let .wavetable(w):
             fingerprint = w.fingerprint
             let peak = w.peak
-            problems = peak > 1.0001 ? ["its values reach ±\(String(format: "%.2f", peak)); the 3rd Wave's own tables stay within ±1, so the file may be damaged or not normalised"] : []
+            problems = peak > 1.0001 ? ["its samples reach ±\(String(format: "%.2f", peak)); the 3rd Wave's own tables stay within ±1, so the file may be damaged or not normalised"] : []
         case let .multisample(m):
             fingerprint = m.fingerprint
             problems = m.problems
@@ -669,7 +669,7 @@ public struct UnpackPlan {
             let peak = w.peak
             items.append(Item(ref: ref, fileName: name, data: w.serialized(), description: "",
                               isFactoryDuplicate: false, write: true, defaultFileName: name, fingerprint: fp, contentName: w.name,
-                              problem: peak > 1.0001 ? "values reach ±\(String(format: "%.2f", peak)), beyond the ±1 of the 3rd Wave's own tables" : nil))
+                              problem: peak > 1.0001 ? "samples reach ±\(String(format: "%.2f", peak)), beyond the ±1 of the 3rd Wave's own tables" : nil))
         }
         for (ref, m) in up.multisamples {
             let secs = m.samples.reduce(0.0) { $0 + Double($1.length) / Double(max($1.sampleRate, 1)) }

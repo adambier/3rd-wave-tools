@@ -56,11 +56,11 @@ public struct ProgramFile: Equatable {
         var lines = text.components(separatedBy: "\n")
         if trailingNewline { lines.removeLast() }
         // Stray blank lines at the end (a file ending "\n\n", or a lone "\r") are not values.
-        while lines.count > 3, let last = lines.last, last.trimmingCharacters(in: .whitespaces).isEmpty { lines.removeLast() }
+        while lines.count > 3, let last = lines.last, last.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { lines.removeLast() }
         guard let first = lines.first, first.hasPrefix("W3_PROG_") else {
             throw FormatError.badMagic(expected: "3rd Wave program (.pro)", found: String(lines.first?.prefix(16) ?? ""))
         }
-        guard lines.count >= 7 else {
+        guard lines.count >= 6 else {
             throw FormatError.invalid("The program file has only \(lines.count) line\(lines.count == 1 ? "" : "s"); a program has its tag, its name, and at least the four header values.")
         }
         version = lines[0]
@@ -70,8 +70,18 @@ public struct ProgramFile: Equatable {
         // it adds up. Deciding by the text ("has a '.'") is right for every file the 3rd Wave writes,
         // but a float written "1" by another tool would be packed as the integer 1's bit pattern.
         let floatRange = Self.floatRange(declaredBy: body)
+        let declared = Self.header(body.prefix(4).map { Int($0.trimmingCharacters(in: .whitespaces)) ?? -1 })
+            .map { 4 + 4 * $0.s + 4 * $0.f + $0.g + 6 * $0.e }
         values = try body.enumerated().map { i, raw in
             let s = raw.trimmingCharacters(in: .whitespaces)
+            if let declared, i >= declared {
+                // Beyond the declared length: the tail of a longer file this one was exported over
+                // (FORMATS.md 7). Not part of the program, dropped at pack time; it only has to be
+                // written back as it is, so a partial line is kept as text.
+                if let v = Int32(s) { return .int(v, text: s) }
+                if let f = Float(s), f.isFinite { return .float(f, text: s) }
+                return .int(0, text: raw)
+            }
             let isFloat = floatRange?.contains(i) ?? (s.contains(".") || s.contains("e") || s.contains("n"))
             if isFloat {
                 guard let f = Float(s), f.isFinite else { throw FormatError.invalid("Line \(i + 3) of the program is not a number: \"\(s)\".") }

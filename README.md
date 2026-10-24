@@ -109,7 +109,7 @@ number of values per part) gets a warning: the app finds the oscillator sources 
 check them, and check the program on the 3rd Wave after importing. A source number outside every
 known range shows as an unknown source, and the program is not written until those oscillators are
 pointed elsewhere. Content that does not look like the 3rd Wave's own is flagged too: a wavetable
-whose values go beyond ±1, or a multisample whose samples are out of key order or carry values
+whose samples go beyond ±1, or a multisample whose samples are out of key order or carry values
 outside the ranges Groove Synthesis specifies. A file that cannot be read at all (empty, cut
 short, or not the kind its extension says) is reported once, with the reason, and left out.
 
