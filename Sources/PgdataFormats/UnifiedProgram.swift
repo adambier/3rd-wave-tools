@@ -9,10 +9,11 @@ import Foundation
 ///                  P/U: char[32] name, float32 × 16,384 (P) or 131,072 (U)
 ///                  S:   u8 count, char[32] slot name, samples (multisample v5 layout)
 ///     char[32]   program name
-///     u32 ×      one word per .pro value from line 3 on (int32 or float32), to end of file;
+///     u32 ×      one word per .pro value from line 3 on (int32 or float32), to the declared length;
 ///                the 12 oscillator source ids are replaced by indices into the source table.
 ///
-/// Verified on Groove Synthesis's 8M factory banks (19), Groove Synthesis's sample library (45), and 138 third-party files.
+/// Read and rewritten byte for byte: Groove Synthesis's factory banks (38), its sample library
+/// (45), and 138 third-party files.
 public struct UnifiedProgram: Equatable {
     public enum Payload: Equatable {
         case none

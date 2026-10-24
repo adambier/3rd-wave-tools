@@ -9,16 +9,16 @@ This document describes the files the Groove Synthesis 3rd Wave reads and writes
 | `.wt` | one wavetable, as text |
 | `.bin` | one multisample (up to 8 samples with their key ranges and loops) |
 
-It is written for someone implementing these formats. Each section gives the layout first, then
-what the values mean, then how the facts were established. Section [6](#6-converting-older-programs)
+It is written for someone implementing these formats. Section [6](#6-converting-older-programs)
 describes how the 3rd Wave converts programs saved by older firmware, which anyone writing a
 `.pgdata` has to do as well.
 
 Groove Synthesis has not published these file formats; its MIDI and SysEx specification defines
 the wavetable and multisample payloads, which the files carry in the same form (section
 [5](#5-wavetable-wt-and-multisample-bin)). Everything else here comes from reading real files and
-from tests on a 3rd Wave 8M and a 24M, both running OS 2.0d. pgdata Packer's library
-(`Sources/PgdataFormats`) implements it, and its tests cover much of it.
+from tests on a 3rd Wave 8M and a 24M, both running OS 2.0d. The PgdataFormats library in
+3rd-wave-tools (`Sources/PgdataFormats`), which the pgdata Packer app uses, implements it, and its
+tests cover much of it; "the library" below means this library.
 
 ## Contents
 
@@ -47,9 +47,8 @@ Untagged statements describe structure that every file examined follows, so they
 least. The test is that every file reads and writes back byte for byte (section
 [9](#9-how-this-was-established)).
 
-**Counting and naming.** Positions inside a block count from 0. "Integer 34" means the 35th value
-of a part's integer block, "float 113" the 114th of its float block, and "global 24" the 25th global
-value. Lines of a `.pro` count from 1, as a text editor shows them.
+**Counting and naming.** Positions inside a block count from 0: integer 34 is the 35th value of a
+part's integer block, and likewise for floats and globals. Lines of a `.pro` count from 1.
 
 **Binary files** (`.pgdata`, `.bin`) are little-endian. `u8`, `u16`, `u32` are unsigned integers of
 1, 2, and 4 bytes; `f32` is an IEEE 754 single-precision float; `char[n]` is a text field of *n*
@@ -75,7 +74,7 @@ id*. The same ids appear in a `.pgdata`'s source table.
 | 41–47 | analog waves (order below) | A00 … A06 |
 | 1000 + *k* | wavetable slot P(34 + *k*) | P34 … P47 (ids 1000–1013) |
 | 2000 + *k* | wavetable slot U(7 + *k*) | U07 … U63 (ids 2000–2056) |
-| 4000 + *n* | multisample slot S*n* | S0 … |
+| 4000 + *n* | multisample slot S*n* | S00 … (the library accepts S00–S127, ids 4000–4127 [inferred]) |
 
 The ranges look as if later slots were added without renumbering the earlier ones. [inferred]
 
@@ -148,8 +147,8 @@ To find a value:
 For the current layout (*S* = 181, *F* = 137, *G* = 182), the float blocks start at v[728] (line
 731), the globals at v[1276] (line 1279), and the event records at v[1458] (line 1461).
 
-*How this was established:* the sizes add up exactly in every `.pro` examined (over 1,800 files:
-Groove Synthesis's factory banks, nine third-party sets, and the 3rd Wave's own exports). [observed]
+*How this was established:* the sizes add up exactly in every `.pro` examined: 2,348 files from
+Groove Synthesis (1,505) and nine third-party sets (843), and the 3rd Wave's own exports. [observed]
 
 ### 3.3 Format tags and layouts
 
@@ -179,24 +178,24 @@ Only some values are understood. The rest can be copied through unchanged.
 | Value | Meaning |
 |---|---|
 | 0, 1, 2 | Source ids of oscillators 1, 2, and 3 (section [2](#2-oscillator-sources)). [verified] |
-| 34 | Amp envelope amount; 100 = +100. [observed: 3rd Wave Terminal labels it Amp Env Amount; a program with 0 here and float 113 at 0 has been observed to play silently] |
+| 34 | Amp envelope amount; 100 = +100. [inferred: 3rd Wave Terminal labels it Amp Env Amount] A `W3_PROG_3` program packed unconverted, with 0 here, plays silently (section 6.1). [verified] |
 
 **Float part blocks**
 
 | Value | Meaning |
 |---|---|
-| 53 | Tempo in BPM. [observed: 3rd Wave Terminal shows 102.000000 as 102.0 BPM] |
-| 113 | `W3_PROG_3` only: a second amp envelope amount, 0 = full, 1 = none. OS 2.0 folds it into integer 34 when converting. [inferred from 100 conversions] |
-| 124 | Pan: 0 = left, 0.5 = centre, 1 = right. [observed: 3rd Wave Terminal's Pan knob] |
+| 53 | Tempo in BPM. [inferred: 3rd Wave Terminal shows 102.000000 as 102.0 BPM] |
+| 113 | `W3_PROG_3` only: a second amp envelope amount, 0 = full, 1 = none. OS 2.0 folds it into integer 34 when converting. [verified in 100 conversions; the meaning inferred] |
+| 124 | Pan: 0 = left, 0.5 = centre, 1 = right. [inferred: 3rd Wave Terminal's Pan knob] |
 
-**Global values.** These apply to the whole program. Apart from value 1, the meanings below are
+**Global values.** These apply to the whole program. Apart from values 0 and 1, the meanings below are
 inferred from how the values change when the 3rd Wave converts or fits a program to an 8M, and from
 how they line up with the event records.
 
 | Value | Meaning |
 |---|---|
 | 0 | Set by the importing model: 3 on an 8M, 2 on a 24M (section 6.3); 1, 2, or 4 in older files. [verified] |
-| 1 | Velocity curve: 3rd Wave Terminal shows 5 as "Piano", 2 as "Medium", and 3 as "Heavy". [observed] |
+| 1 | Velocity curve: 3rd Wave Terminal shows 5 as "Piano", 2 as "Medium", and 3 as "Heavy". [inferred] |
 | 11 | The selected part, 0–3. [inferred] |
 | 18 | Number of keyboard split points, 0–3; 0 = no split. [inferred] |
 | 21, 22, 23 | The split points, as note numbers: notes above value 21 belong to zone 2, above 22 to zone 3, above 23 to zone 4. [inferred] |
@@ -226,13 +225,7 @@ program has a sequence". [official]
 of a keyboard split the 3rd Wave sends a note to when it converts an old program, and the high byte
 stays between 1 and 128. The type-1 reading is [inferred] from its regular pattern.
 
-### 3.5 Parts 3 and 4 on the 8M
-
-Programs saved on an 8M hold filler in parts 3 and 4: oscillators P02, U01, and A01 Square (ids 2,
-35, and 42), and the same other values every time. [observed in every 8M factory program] An 8M puts
-exactly this filler into parts 3–4 of every program it imports (section 6.4). [verified]
-
-### 3.6 Reading and writing a `.pro`
+### 3.5 Reading and writing a `.pro`
 
 To read: split into lines; line 1 is the tag, line 2 the name; take *S*, *F*, *G*, *E* from the
 next four lines and check that the count adds up; then parse the lines in the float blocks (section
@@ -243,7 +236,7 @@ count does not add up: a file with more values than the header declares carries 
 longer file it was exported over (section [7](#7-what-the-3rd-wave-does-on-import)), and the extra
 values can be dropped; one with fewer is cut short and should be refused. To write: the same in
 reverse, floats with `%f`. Keeping each line's original text lets an unmodified file be written
-back byte for byte, which is how pgdata Packer's reader is tested.
+back byte for byte, which is how the library's reader is tested.
 
 ## 4. Unified program (.pgdata)
 
@@ -271,8 +264,9 @@ then    N records     one per source, in the same order:
                         if has_data and type 4 (multisample):
                           the body of a v5 .bin (section 5.2, from the sample count on)
 then    char[32]      program name
-then    u32 × …       the program values v[0], v[1], … (section 3.2), one word each, to the end
-                      of the file: int32 for integers, f32 for floats
+then    u32 × …       the program values v[0], v[1], … (section 3.2), one word each, to the
+                      length the header declares: int32 for integers, f32 for floats; anything
+                      after it is left over from an export onto a longer file (section 7)
 ```
 
 **Oscillator sources point into the source table.** In the program words, the twelve oscillator
@@ -285,7 +279,7 @@ multisample; 3 unused) are the slot-kind codes of the 3rd Wave's SysEx protocol.
 source id from the table; write the tag `W3_PROG_5` and the name. Each embedded wavetable becomes a
 `.wt` and each multisample a `.bin`.
 
-If the program is in an older layout (section 3.3), convert it (section 6). The conversion needs
+To unpack a program in an older layout (section 3.3), convert it (section 6); the conversion needs
 the format number, which a `.pgdata` does not carry, so it has to be read from the layout:
 *S* = 173 or 174 means `W3_PROG_3` and 179 or 180 means `W3_PROG_4` [observed in every file seen];
 *S* = 181 with *F* below 136 was written by both `W3_PROG_4` and `W3_PROG_5`, which differ only in
@@ -293,13 +287,13 @@ how event records name parts (section 3.4), so look at the note and automation r
 and 2): a target above 3 means `W3_PROG_5`; otherwise a target 0 means `W3_PROG_4`; with neither,
 assume `W3_PROG_5`. [inferred] The same rule serves a `.pro` whose tag disagrees with its layout
 (a `W3_PROG_5` tag on a 173-value layout, as an unpacker that does not convert would write): go by
-the layout.
+the layout, except that a 181-integer layout with fewer than 136 floats keeps a tag of 4 or 5.
 
 **To pack** a `.pro`: list each source the program uses, in order of first use (part 1 oscillator 1
 first), replace the oscillator values with their indices, and embed or just list each source.
 Analog waves are always listed without data. A wavetable or multisample can be embedded, or listed
 without data when the receiving 3rd Wave is expected to have it in that slot (for example, factory
-tables). The program must be converted to the current layout first (section 6).
+tables).
 
 ### 4.2 What real files contain
 
@@ -312,7 +306,7 @@ tables). The program must be converted to the current layout first (section 6).
 - The 3rd Wave's exports are always in the current program layout. [observed]
 
 *How this was established:* the layout reads and rewrites byte for byte 221 files from Groove
-Synthesis, third parties, and a 3rd Wave's own exports. [observed] Files that pgdata Packer builds
+Synthesis, third parties, and a 3rd Wave's own exports. [observed] Files that the library builds
 import correctly. [verified]
 
 ## 5. Wavetable (.wt) and multisample (.bin)
@@ -327,12 +321,10 @@ Plain text, LF or CRLF line ends. [observed: 92 factory files and others]
 | 2 | the table's display name |
 | 3 … | one float per line, as a C literal with an `f` suffix (`0.963237f`, `1.38777878078e-17f`); lines starting with `//` are comments |
 
-- A **P table** has 16,384 values: 64 waves × 128 points, each point stored as a pair (sample, then
-  the difference to the next sample, wrapping within the wave). See below.
-- A **U table** has 131,072 values: 64 waves × 1,024 samples, followed by smaller copies of them (below).
+- A **P table** has 16,384 values and a **U table** 131,072 (below).
 - The file has no slot number; the slot is chosen when it is imported. [verified]
 - Number formatting varies between files: Groove Synthesis's factory P tables use 12–14 digits and
-  exponents. pgdata Packer writes six decimals when that gives back the exact float, and the
+  exponents. The library writes six decimals when that gives back the exact float, and the
   shortest exact form otherwise.
 
 **P tables (PPG-style).** The P set is the 3rd Wave's form of the PPG Wave's wavetables. P00–P31
@@ -350,7 +342,7 @@ the user's own. [official: the user manual] The format:
   from the samples; what the 3rd Wave does when a file's differences disagree with its samples has
   not been tested.
 - **The samples are floats within ±1**, not quantised to the PPG's 8-bit levels, although the
-  manual calls the P set "8-bit" and says the Wave Maker converts imported audio "to the correct
+  manual calls the P set "8-bit" and says the **Wave Maker** converts imported audio "to the correct
   sample rate and bit depth" for it. So whatever reduction the 3rd Wave applies, it is not recorded
   in the file. [observed; the rest inferred]
 - **Positions 60–63 hold the PPG's four standard waveforms** (60 a triangle, 61 a narrow pulse, 62 a
@@ -359,24 +351,22 @@ the user's own. [official: the user manual] The format:
   P27] It is a property of the content, not of the format: P33 and the Prophet VS table P34 use
   all 64 positions for their own waves. [observed]
 
-How a P table *plays* is not in the file but in the program, through three settings in the
-oscillator's Wave Flow menu, all meant to reproduce the PPG [official]: **wavetable smoothing**
-(interpolation between neighbouring waves; off, the sound steps from wave to wave as on the PPG),
-**waveform smoothing** (interpolation within the 128-point wave and of pitch; off, the 3rd Wave
-plays the nearest point and notes are slightly off pitch, as on the PPG), and **use upper
-wavetable**: with it on, a sweep past position 63 of a P table continues into P30, the PPG's upper
-wavetable; with it off, the 3rd Wave sweeps positions 0–59 only, and 60–63 are reached by setting
-the wave offset there with the wave envelope off, which gives the PPG's version of an analog
-waveform. U tables have no such boundary. The manual also says the 3rd Wave runs at the PPG's
-sample rate when a P table is selected. None of this is needed to read or write a `.wt`, but it is
-why a P table's last four waves look unrelated to the rest.
+How a P table *plays* is set in the program, not the file, by three settings in the oscillator's
+Wave Flow menu meant to reproduce the PPG [official]: **wavetable smoothing** (interpolation
+between neighbouring waves), **waveform smoothing** (interpolation within the wave and of pitch),
+and **use upper wavetable**. With **use upper wavetable** on, a sweep past position 63 continues
+into P30, the PPG's upper wavetable; with it off, the 3rd Wave sweeps positions 0–59 only, and
+60–63 are reached by setting the wave offset there with the wave envelope off. That is why a P
+table's last four waves look unrelated to the rest. The user manual's "About Wave Flow and the
+Upper Wavetables", "Importing Wavetables into the P Set", and "How to Sound Like a Vintage PPG"
+have more.
 
 **U tables: the table and its mipmaps.** A U table is 64 waves of 1,024 samples: the manual's
-Wave Maker chapter says "the period length that the 3rd Wave uses is 1024 samples" and takes a
+**Wave Maker** chapter says "the period length that the 3rd Wave uses is 1024 samples" and takes a
 64 × 1,024-sample `.wav` as a ready-made table, and the SysEx spec defines the U payload as
 65,536 floats, "64 different waveforms ... each with a length of 1024 samples". [official] The
 131,072 values of a U `.wt` are that table followed by progressively band-limited, smaller copies
-of the same 64 waves, in the order the 3rd Wave plays them at higher pitches (a mipmap chain):
+of the same 64 waves (a mipmap chain, of the kind usually played at higher pitches):
 
 | Values | Content |
 |---|---|
@@ -391,7 +381,7 @@ of the same 64 waves, in the order the 3rd Wave plays them at higher pitches (a 
 65,536 values exactly, and the 8M's own `.pgdata` exports carry all 131,072] Wave *f* of each level
 corresponds to wave *f* of the table, with the harmonic amplitudes of the base wave up to each
 level's cutoff and a small gain change; in tables made from recorded audio the smaller copies are
-also shifted in phase by a constant, so they were made with a real filter, not an ideal resample.
+also shifted in phase by a constant, so they were made with a real filter, not an ideal resample [inferred].
 
 **The 3rd Wave does not use the chain.** A `.wt` carrying a known table with its second half zeroed
 is matched to the loaded table by its first 65,536 values alone (so the content hash covers only
@@ -400,12 +390,6 @@ C7, and exports again with the zeros intact. [verified on a 24M, OS 2.0d] So the
 passed through but neither hashed nor played; a writer should still fill it with band-limited
 resamples of its waves, as the factory files do, in case a later firmware reads it. The P set has
 no such chain: PPG-style playback is meant to alias.
-
-*Background.* The PPG's own tables were mostly defined by a few stored key waves with the rest
-interpolated between them, and its wavetable 31 was a sample table (piano and saxophone) that the
-3rd Wave does not carry; see Hermann Seib's PPG wavetable listing and the user manual's "About Wave
-Flow and the Upper Wavetables", "Importing Wavetables into the P Set", and "How to Sound Like a
-Vintage PPG".
 
 ### 5.2 Multisample (.bin)
 
@@ -441,7 +425,7 @@ The field meanings and ranges come from Groove Synthesis's *3rd Wave MIDI CC + S
 whose "set multisample" message carries the same fields in a different order, without the name
 and the second rate. [official] It also requires a multisample's samples to be in increasing order
 of assigned note; all 278 multisamples seen (1,270 samples, in `.bin` files and `.pgdata`
-records) are, their volumes lie within 0.6–2.0 and their pitches within ±1. [observed]
+records) are. Their volumes lie within 0.6–2.0, and their pitches within ±1. [observed]
 
 Version 4 lacks the volume. Version 1 also lacks the sample rate and bit depth (after the length),
 and the pitch and second rate. To upgrade an older file, fill in what the 3rd Wave itself uses:
@@ -471,14 +455,11 @@ sets on every import (section 6.3). [verified, section 9]
 
 ### 6.2 The conversion
 
-These are the steps **Import program** applies, in the form pgdata Packer's converter
-(`ProgramConverter`) implements them. They produce the **4-part result**: what a 24M makes of the
-program, with parts 3 and 4 kept. An 8M additionally fits the program to two parts (section 6.4),
-and does so by itself when it imports the converted `.pgdata`. [verified]
-
-In order: steps 1–5 below, then the model's own values (section 6.3), then, for an 8M only, the
-two-part fit (section 6.4). "Old global *n*" means the value before conversion. The steps are
-written for the layouts in section 3.3; pgdata Packer applies them to any `W3_PROG_3`, `_4`, or `_5`
+These are the steps **Import program** applies, as the library's `ProgramConverter` implements
+them: steps 1–5, then the model's own values (section 6.3). They produce the **4-part result**,
+what a 24M makes of the program; an 8M fits it to two parts (section 6.4), and does so by itself on
+importing the `.pgdata`. [verified] "Old global *n*" means the value before conversion. The steps
+are written for the layouts in section 3.3; the library applies them to any `W3_PROG_3`, `_4`, or `_5`
 program with 173–181 integers, 126–137 floats, and 73–182 globals per the header, and packs anything
 else as it is, with a warning.
 
@@ -495,7 +476,7 @@ global 15 (128–131 still come from the appendix).
 **Step 2. Values set in every layout.** In each of the four parts:
 
 - floats 85 and 116 become 0.0 (written `0.000000` even where the old value was `-0.000000`), and
-  float 102 becomes 1.0;
+  float 102 becomes 1.0 (0.446233 for a `W3_PROG_3` program on a 24M: section 6.3);
 - float 115 becomes 1.0 where it was 0.0 [observed in 12 parts, all parts 3–4 on the 24M];
 - floats 91 and 95 become 1.0 where they were above 1.0 [observed in a few `W3_PROG_3` programs,
   the only files seen with such values];
@@ -553,8 +534,9 @@ with the 24M's]
 | Float 102 of a `W3_PROG_3` program, by **Import program** | 1.0 | 0.446233 |
 | Float 102, by the `.pgdata` import | 1.0 | 1.0 |
 
-Since each model overwrites them, what a file carries for these does not matter; pgdata Packer
-writes the 24M's **Import program** values. Float 102 is the one value a `.pgdata` cannot carry
+Since each model overwrites them, what a file carries for these does not matter. When it converts a
+program, the library writes the 24M's **Import program** values; a program already in the current
+layout keeps what it carries. Float 102 is the one value a `.pgdata` cannot carry
 into a 24K/24M as **Import program** would set it, since the `.pgdata` import makes it 1.0 whatever
 the file says. The difference is not audible: the same `W3_PROG_3` program imported both ways on a
 24M sounds the same and shows identical parameters in an editor; only the sequencer piano roll's
@@ -565,8 +547,9 @@ scroll position differs, which may be what the value stores. [verified; the mean
 On an 8M, every import (**Import program**, **Bulk program import**, and the `.pgdata` import) also fits the
 program to two parts: [verified]
 
-- parts 3 and 4 are replaced with the 8M's filler, the same 181 integers and 137 floats every time
-  (listed in the [appendix](#appendix-values-for-new-positions));
+- parts 3 and 4 are replaced with the 8M's filler (oscillators P02, U01, and A01 Square; full list
+  in the [appendix](#appendix-values-for-new-positions)), the same filler found in every program
+  saved on an 8M [observed];
 - globals 24 and 25 keep only parts 1 and 2 (mask & 3); globals 18 and 19 are limited to 1, and
   globals 124, 125, and 127 to 8 (126 is left alone);
 - the selection flags for parts 3 and 4 (globals 39 and 40) are cleared; if part 3 or 4 was selected
@@ -586,9 +569,8 @@ differently by the two imports:
 - **`.pgdata` import** applies step 4 as written, then the mask rule above: a note whose mask names
   only parts 3–4 is dropped, and one that also names part 1 or 2 keeps those.
 
-So one converted file (the 4-part result) serves every model: a 24K or 24M keeps all four parts,
-and an 8M keeps parts 1 and 2. pgdata Packer's converter can also produce **Import program**'s 8M result
-directly (`Model.eightM`); that is used only to check the rules against the 8M's exports.
+The library's converter can also produce **Import program**'s 8M result directly (`Model.eightM`);
+that is used only to check the rules against the 8M's exports.
 
 ### 6.5 Accuracy, and the 3rd Wave's fixes to its 2022 programs
 
@@ -608,7 +590,7 @@ The fixes are not the 2025 factory versions of these programs (several of those 
 of values), and nothing in the files predicts them. That they go by name was shown by importing the
 second program above twice: byte for byte as distributed but with one letter of its name changed,
 it received the ordinary conversion only; under its own name with one value of its unused part 3
-changed, it received the whole fix. So no other program will ever trigger them, and pgdata Packer
+changed, it received the whole fix. So no other program will ever trigger them, and the library
 does not reproduce them: one of these eight programs packed from its 2022 file plays as that file
 describes. The `.pgdata` import does not apply them at all: neither to one of these programs
 already converted to the current layout nor to the unconverted 2022 file, which comes through with
@@ -641,11 +623,11 @@ Verified on an 8M (OS 2.0d) unless a note says otherwise.
   character order, so `B05P100` comes between `B05P10` and `B05P11`; a batch that includes a program
   100 therefore needs three-digit numbers throughout. [verified on the 24M]
 - **An export onto an existing file does not shorten it.** A bulk export over a longer file of the
-  same name has been observed to leave the end of the old file after the new program. [observed once, on the
-  24M] Empty `PROGRAMS` before exporting.
-- **Exporting while the USB drive is mounted on a computer** has been observed to write empty
-  (0-byte) files for the first programs of a bulk export; with the USB cable unplugged during the
-  export, every file is complete.
+  same name leaves the end of the old file after the new program. [observed once, on the 24M] Empty
+  `PROGRAMS` before exporting.
+- **Exporting while the USB drive is mounted on a computer** writes empty (0-byte) files for the
+  first programs of a bulk export; with the USB cable unplugged during the export, every file is
+  complete.
   [observed in one session]
 
 ## 8. Names, file names, and the USB drive
@@ -661,19 +643,19 @@ Verified on an 8M (OS 2.0d) unless a note says otherwise.
   by emptying the folder), not by slot. [verified on the 24M] The 3rd Wave ignores
   file names when importing. [official]
 - **The USB drive** (volume `THIRDWAVE`) shows the folders `PROGRAMS` (`.pro` and `.pgdata`), `WAVES`
-  (`.wt`), `AUDIO` (`.bin` and exported `.wav`) and `FIRMWARE` when mounted on a Mac. [verified]
+  (`.wt`), `AUDIO` (`.bin` and exported `.wav`), and `FIRMWARE` when mounted on a Mac. [verified]
   Groove Synthesis's READMEs write them as `program/`, `waves/`, and `audio/`.
 
 ## 9. How this was established
 
 **Files examined.** Groove Synthesis's factory banks (the 2022 and 2025 banks for the 24-voice
 models and the 2025 8M banks: 1,500 `.pro` and 38 `.pgdata`), its sample library (45 `.pgdata`) and
-sampling examples, its Bank Arranger script, nine third-party program sets (about 850 `.pro` and
-138 `.pgdata`), and programs exported by a 3rd Wave 8M. **Documents:** the user manual (v1.9) and the
-*3rd Wave MIDI CC + SysEx Spec* (v2a), whose wavetable and multisample messages carry the same
-data as the files; statements from them are [official]. pgdata Packer's reader is tested by reading
-files and writing them back: every file checked comes back byte for byte (`.wt` files value for
-value), most recently 703 files in one run. The exceptions are 12 third-party `.pgdata` files that
+sampling examples, its Bank Arranger script, nine third-party program sets (843 `.pro` and
+150 `.pgdata`), and programs exported by a 3rd Wave 8M and a 24M. **Documents:** the
+user manual (v1.9) and the *3rd Wave MIDI CC + SysEx Spec* (v2a), whose wavetable and multisample
+messages carry the same data as the files; statements from them are [official]. The library's
+reader is tested by reading files and writing them back: every file checked comes back byte for
+byte (`.wt` files value for value), most recently 703 files in one run. The exceptions are 12 third-party `.pgdata` files that
 are damaged as distributed (empty or cut short).
 
 **Tests on a 3rd Wave 8M and 24M (OS 2.0d), October 2026** (8M unless marked):
@@ -690,11 +672,11 @@ are damaged as distributed (empty or cut short).
 | A `W3_PROG_3` program packed unconverted, against **Import program** | silent; the differences in section 6.1 |
 | 299 programs (100 `W3_PROG_3`, 76 `W3_PROG_4`, 123 `W3_PROG_5`) bulk-imported and exported | the conversion rules in section 6 |
 | The same program through **Import program** and **Bulk program import** | byte-identical |
-| 5 programs converted by pgdata Packer for the 8M, packed, imported | exported exactly as converted; 4 identical to **Import program**'s result, the fifth differing only in its velocity fix (section 6.5), which the `.pgdata` import did not apply |
+| 5 programs converted by the library for the 8M, packed, imported | exported exactly as converted; 4 identical to **Import program**'s result, the fifth differing only in its velocity fix (section 6.5), which the `.pgdata` import did not apply |
 | 2 programs converted with parts 3–4 kept, packed, imported into the 8M | parts, globals, and all values identical to **Import program**'s result; sequence notes for parts 3–4 as in section 6.4 |
 | 24M: 300 programs (the same 100 `W3_PROG_3` and 100 third-party programs, and Groove Synthesis's 2025 factory bank 1) bulk-imported and exported | the 4-part conversion in section 6.2 |
 | 24M: 3 programs converted for 24 voices, packed, imported, two of them carrying the 8M's values | the 24M's values restored on import; otherwise identical to **Import program**'s result except float 102 (section 6.3) |
-| 24M: the 2022 program of section 6.5 that gains a copy of part 1, bulk-imported renamed and, separately, under its own name with one unused value changed | renamed: ordinary conversion only; own name: every correction — the corrections are keyed by name |
+| 24M: the 2022 program of section 6.5 that gains a copy of part 1, bulk-imported renamed and, separately, under its own name with one unused value changed | renamed: ordinary conversion only; own name: every fix; the fixes are keyed by name |
 | 24M: three `.pro` files named `B05P10`, `B05P100`, `B05P11`, bulk-imported | landed in that order: plain character order |
 | 24M: a `.pgdata` carrying factory U08 with its mipmap chain zeroed | matched to U08: the hash covers the table only |
 | 24M: a `.pgdata` carrying a new U table (U08 at half level) with its chain zeroed, then **Export Wavetable** | stored in U56, played the same from C2 to C7, exported with the zeros intact: the chain is not used |
@@ -710,7 +692,8 @@ in section 6.5, plus float 102 on the 24M (section 6.3).
 
 - Whether a 24K converts exactly as the 24M does.
 - Whether **Import program** accepts a `.pro` tagged `W3_PROG_5` that has an older layout, as an
-  unpacker that does not convert would write it (pgdata Packer's always converts).
+  unpacker that does not convert would write it (the library converts every layout it knows, and
+  writes others as they are, with a warning).
 - The meaning of most part, float, and global values, and of event fields *a* and *time*.
 
 ## Appendix: values for new positions

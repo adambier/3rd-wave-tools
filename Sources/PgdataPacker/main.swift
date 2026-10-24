@@ -1,5 +1,10 @@
 import AppKit
 import SwiftUI
+// Sparkle (in-app updates) is linked by make-app.sh. Package.swift does not declare it, so a build
+// through Xcode or a plain `swift build` compiles without it and has no "Check for Updates…" item.
+#if canImport(Sparkle)
+import Sparkle
+#endif
 
 // Built as a plain swiftc target (see make-app.sh), so the app is assembled here by hand
 // rather than through the `App` protocol. Same structure as ThirdWaveWT.
@@ -7,6 +12,12 @@ import SwiftUI
 let appName = "pgdata Packer"
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    #if canImport(Sparkle)
+    // Starts the updater (scheduled checks follow the user's choice, which Sparkle asks for on the
+    // second launch) and validates the "Check for Updates…" menu item.
+    let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    #endif
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     @objc func showAbout(_ sender: Any?) {
@@ -14,24 +25,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let para = NSMutableParagraphStyle()
         para.alignment = .center
         para.paragraphSpacing = NSFont.smallSystemFontSize
-        let credits = NSAttributedString(
+        let source = "github.com/adambier/3rd-wave-tools"
+        let credits = NSMutableAttributedString(
             string: "Packs and unpacks unified program data (.pgdata) files for the Groove Synthesis 3rd Wave.\n"
                 + "Not affiliated with or endorsed by Groove Synthesis.\n"
-                + "MIT licence. Source: github.com/adambier/pgdata-packer",
+                + "Source: \(source)",   // the licence is the panel's copyright line (NSHumanReadableCopyright)
             attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
                          .foregroundColor: NSColor.secondaryLabelColor,
                          .paragraphStyle: para])
+        // The address is a link; the About panel's credits view opens it when clicked.
+        if let url = URL(string: "https://\(source)") {
+            credits.addAttribute(.link, value: url, range: (credits.string as NSString).range(of: source))
+        }
         NSApplication.shared.orderFrontStandardAboutPanel(options: [.applicationName: appName, .credits: credits])
+    }
+
+    /// Opens the GitHub release page for the running version. Falls back to the list of all
+    /// releases when that page does not exist (a build of a version not yet released), when the
+    /// version is unknown (a build without make-app.sh's Info.plist), or when GitHub cannot be
+    /// reached to check.
+    @objc func showReleaseNotes(_ sender: Any?) {
+        guard let allReleases = URL(string: "https://github.com/adambier/3rd-wave-tools/releases") else { return }
+        guard let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String else {
+            NSWorkspace.shared.open(allReleases)
+            return
+        }
+        let releasePage = allReleases.appendingPathComponent("tag").appendingPathComponent("v\(version)")
+        Task {
+            var request = URLRequest(url: releasePage, timeoutInterval: 5)
+            request.httpMethod = "HEAD"
+            let exists = ((try? await URLSession.shared.data(for: request))?.1 as? HTTPURLResponse)?.statusCode == 200
+            NSWorkspace.shared.open(exists ? releasePage : allReleases)
+        }
     }
 }
 
-private func buildMainMenu() -> NSMenu {
+private func buildMainMenu(appDelegate: AppDelegate) -> NSMenu {
     let mainMenu = NSMenu()
 
     let appMenuItem = NSMenuItem()
     let appMenu = NSMenu()
     let name = appName
     appMenu.addItem(withTitle: "About \(name)", action: #selector(AppDelegate.showAbout(_:)), keyEquivalent: "")
+    #if canImport(Sparkle)
+    let updateItem = appMenu.addItem(withTitle: "Check for Updates…",
+                                     action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
+                                     keyEquivalent: "")
+    updateItem.target = appDelegate.updaterController
+    #endif
     appMenu.addItem(.separator())
     appMenu.addItem(withTitle: "Hide \(name)", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
     appMenu.addItem(.separator())
@@ -61,15 +102,22 @@ private func buildMainMenu() -> NSMenu {
     mainMenu.addItem(windowMenuItem)
     NSApplication.shared.windowsMenu = windowMenu
 
+    let helpMenuItem = NSMenuItem()
+    let helpMenu = NSMenu(title: "Help")
+    helpMenu.addItem(withTitle: "Release Notes", action: #selector(AppDelegate.showReleaseNotes(_:)), keyEquivalent: "")
+    helpMenuItem.submenu = helpMenu
+    mainMenu.addItem(helpMenuItem)
+    NSApplication.shared.helpMenu = helpMenu
+
     return mainMenu
 }
 
 let application = NSApplication.shared
 application.setActivationPolicy(.regular)
-application.mainMenu = buildMainMenu()
 
 let appDelegate = AppDelegate()
 application.delegate = appDelegate
+application.mainMenu = buildMainMenu(appDelegate: appDelegate)
 
 let appState = AppState()
 

@@ -2,8 +2,9 @@ import Foundation
 
 /// What an oscillator plays: a wavetable slot, an analog shape, or a multisample slot.
 ///
-/// Programs store each oscillator's source as one integer ("source id"). The id space
-/// grew in stages and was never renumbered, so it is irregular (verified on an 8M, OS 2.0d):
+/// Programs store each oscillator's source as one integer ("source id"). The id space is
+/// irregular, as if it grew in stages without renumbering [inferred]; ids 34, 1000, 2000, and
+/// 41–47 were verified on an 8M (OS 2.0d), the rest follow from those and from real files:
 ///
 ///     0–33      P00–P33          (PPG tables)
 ///     34–40     U00–U06

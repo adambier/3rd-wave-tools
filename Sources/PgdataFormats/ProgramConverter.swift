@@ -7,9 +7,9 @@ import Foundation
 /// the same way) did to programs on two models running OS 2.0d: 299 on an 8M (100 W3_PROG_3, 76
 /// W3_PROG_4, 123 older W3_PROG_5, ten layouts) and 300 on a 24M (the same 2022 factory bank and
 /// third-party programs, plus Groove Synthesis's 2025 factory bank 1). 292 of the 299 and 292 of
-/// the 300 come out identical, value for value. The rest are all W3_PROG_3 and differ in one to
-/// six values that no rule found so far explains, apart from one program whose part 2 both models
-/// replaced with a copy of part 1. See docs/FORMATS.md.
+/// the 300 come out identical, value for value. The rest are 2022 W3_PROG_3 factory programs that
+/// the firmware fixes individually on import, keyed by the program's name [verified on the 24M];
+/// these fixes are not reproduced. See docs/FORMATS.md section 6.5.
 ///
 /// A .pgdata import converts an old layout's structure but skips several of these value changes:
 /// a W3_PROG_3 program packed unconverted plays silently [verified on hardware].
@@ -242,7 +242,8 @@ public enum ProgramConverter {
     ]
 
     /// Values OS 2.0d gives the global positions older layouts lack (73...181), from 299 bulk imports.
-    /// 120...135 are filled from the old file instead (see `convert`).
+    /// 120...127 and 132...135 are filled from the old file instead when it had 120 globals or
+    /// fewer (see `convert`).
     static let globalDefaults: [Int32] = [
         0, 1, 1, 2, 2, 0, 0, 1, 1, 1, 0, 15, 15, 15, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 2, 3, 0,

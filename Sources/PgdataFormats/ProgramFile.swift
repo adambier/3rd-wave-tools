@@ -2,9 +2,10 @@ import Foundation
 
 /// A .PRO program file: text, one value per line.
 ///
-///     W3_PROG_5            version tag (2, 3, 4, 5 seen)
+///     W3_PROG_5            version tag (3, 4, 5 seen; Groove Synthesis's Bank Arranger also accepts 2)
 ///     <program name>
-///     S                    values per part (173, 174, 179, 180, 181 seen)
+///     S                    integers per part (173, 174, 179, 180, 181 seen)
+///     F, G, E              floats per part, global values, event records (FORMATS.md section 3.2)
 ///     ...                  integers, then a block of floats ("%f"), then an integer tail
 ///
 /// Part k's block starts at line index 3 + S·k; its three oscillator source ids sit at
@@ -155,7 +156,7 @@ public struct ProgramFile: Equatable {
         return values[start...].prefix { $0.isFloat }.count
     }
 
-    /// Layouts seen in real files (1,843 programs: Groove Synthesis factory banks and nine
+    /// Layouts seen in real files (2,348 programs: Groove Synthesis factory banks and nine
     /// third-party sets). The reader finds the oscillator sources from the values-per-part count,
     /// which is verified only for these.
     public static let knownVersions = 3...5
