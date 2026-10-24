@@ -10,16 +10,22 @@ import Foundation
 ///
 /// Part k's block starts at line index 3 + S·k; its three oscillator source ids sit at
 /// offsets 3, 4, 5 within the block. The original text of every line is kept so an
-/// unmodified file is rewritten byte for byte.
+/// unmodified file is rewritten byte for byte. See section 3 of FORMATS.md.
 public struct ProgramFile: Equatable {
+    /// One program value: an integer or a float, with the text of its line.
     public enum Value: Equatable {
+        /// An integer value and the text it was read from or will be written as.
         case int(Int32, text: String)
+        /// A float value and the text it was read from or will be written as.
         case float(Float, text: String)
 
+        /// The value's line as written in the `.pro`.
         public var text: String {
             switch self { case let .int(_, t), let .float(_, t): return t }
         }
 
+        /// The value as the 32-bit word a `.pgdata` stores: an integer's two's-complement bits, or a
+        /// float's IEEE 754 bit pattern.
         public var word: UInt32 {
             switch self {
             case let .int(v, _): return UInt32(bitPattern: v)
@@ -27,26 +33,45 @@ public struct ProgramFile: Equatable {
             }
         }
 
+        /// Whether the value is a float.
         public var isFloat: Bool { if case .float = self { return true }; return false }
 
+        /// An integer value, written in decimal.
         public static func int(_ v: Int32) -> Value { .int(v, text: String(v)) }
+        /// A float value, written with six decimals as C's `%f` writes it (e.g., "0.385000").
         public static func float(_ f: Float) -> Value { .float(f, text: String(format: "%f", Double(f))) }
     }
 
+    /// The format tag on line 1, for example "W3_PROG_5".
     public var version: String
+    /// The program name, line 2.
     public var name: String
     /// Every line after the name (index 0 here = line 3 of the file).
     public var values: [Value]
+    /// The line ending the file uses, "\n" or "\r\n"; written files use the same.
     public var lineEnding: String = "\n"
+    /// Whether the file ends with a line ending after its last value.
     public var trailingNewline: Bool = true
 
+    /// The number of parts (layers) in a program: 4. The 8M plays parts 1 and 2 only.
     public static let partCount = 4
+    /// The number of oscillators in each part: 3.
     public static let oscillatorsPerPart = 3
 
+    /// Creates a program from its format tag, name, and values (every line from line 3 on).
     public init(version: String, name: String, values: [Value]) {
         self.version = version; self.name = name; self.values = values
     }
 
+    /// Reads a `.pro` file, with LF or CRLF line endings.
+    ///
+    /// Lines in the float blocks, as the header places them, are read as floats and the rest as
+    /// integers; when the header does not add up, a line is read as a float by its text. Values
+    /// beyond the header's declared count are kept (see ``excessValues``). See section 3.5 of
+    /// FORMATS.md.
+    ///
+    /// - Throws: ``FormatError`` when the data is not a program, a value is not a number, or the
+    ///   file holds fewer values than its header declares.
     public init(data: Data) throws {
         let bytes = [UInt8](data)
         var text = bytes.latin1
@@ -126,7 +151,7 @@ public struct ProgramFile: Equatable {
         return 4 + 4 * h.s + 4 * h.f + h.g + 6 * h.e
     }
 
-    /// Values beyond what the header declares. The 3rd Wave leaves the end of an old file in place
+    /// The number of values beyond what the header declares. The 3rd Wave leaves the end of an old file in place
     /// when it exports onto a longer one, so such files exist; the extra values are not part of the
     /// program.
     public var excessValues: Int { max(0, values.count - (declaredCount ?? values.count)) }
@@ -138,6 +163,7 @@ public struct ProgramFile: Equatable {
         return p
     }
 
+    /// The program as `.pro` file data, each value written as its ``Value/text``.
     public func serialized() -> Data {
         var lines = [version, name] + values.map(\.text)
         if trailingNewline { lines.append("") }
@@ -156,10 +182,15 @@ public struct ProgramFile: Equatable {
         return values[start...].prefix { $0.isFloat }.count
     }
 
-    /// Layouts seen in real files (2,348 programs: Groove Synthesis factory banks and nine
-    /// third-party sets). The reader finds the oscillator sources from the values-per-part count,
-    /// which is verified only for these.
+    /// Format numbers seen in real files: 3, 4, and 5.
+    ///
+    /// The real files are 2,348 programs: Groove Synthesis factory banks and nine third-party sets.
+    /// See also ``knownValuesPerPart``.
     public static let knownVersions = 3...5
+    /// Values-per-part counts (integers per part, *S*) seen in real files (see ``knownVersions``).
+    ///
+    /// The reader finds the oscillator sources from the values-per-part count, which is verified
+    /// only for these.
     public static let knownValuesPerPart: Set<Int> = [173, 174, 179, 180, 181]
 
     /// Why this program's layout is unfamiliar, or nil when it is one seen before.
@@ -173,6 +204,7 @@ public struct ProgramFile: Equatable {
         return "Unfamiliar program layout (\(what.joined(separator: ", "))): the oscillator sources may be misread. Check them here and on the 3rd Wave after importing."
     }
 
+    /// Integers per part (*S*), the first value; 0 when the program has no values.
     public var valuesPerPart: Int {
         if case let .int(v, _)? = values.first { return Int(v) }
         return 0
@@ -185,10 +217,13 @@ public struct ProgramFile: Equatable {
         return (0..<Self.partCount).flatMap { k in (3...5).map { 1 + s * k + $0 } }
     }
 
+    /// The source ids of the 12 oscillators, part-major (part 1 oscillator 1 first), or −1 where
+    /// the value is not an integer. See section 2 of FORMATS.md.
     public var sourceIDs: [Int32] {
         oscillatorIndices.map { i in if case let .int(v, _) = values[i] { return v } else { return -1 } }
     }
 
+    /// The sources of the 12 oscillators, part-major (part 1 oscillator 1 first).
     public var sources: [SourceRef] { sourceIDs.map(SourceRef.init(id:)) }
 
     /// Distinct sources in order of first appearance (part 1 osc 1 … part 4 osc 3).
@@ -198,6 +233,10 @@ public struct ProgramFile: Equatable {
         return seen
     }
 
+    /// Sets the source id of one oscillator.
+    ///
+    /// `slot` counts the 12 oscillators part-major from 0: part *k* (0–3), oscillator *j* (0–2) is
+    /// slot 3*k* + *j*.
     public mutating func setSourceID(_ id: Int32, at slot: Int) {
         values[oscillatorIndices[slot]] = .int(id)
     }

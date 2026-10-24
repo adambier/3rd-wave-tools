@@ -11,21 +11,37 @@ import Foundation
 /// of the same waves at 512, 256, 128, 64, and 64 samples (see docs/FORMATS.md 5.1). The same
 /// values, as little-endian float32, are what a .pgdata embeds.
 public struct WavetableFile: Equatable {
-    public enum Kind: String { case p = "PNAME", u = "UNAME"
+    /// The kind of wavetable, P or U; the raw value is the file's first line.
+    public enum Kind: String {
+        /// A P table (PPG-style, 16,384 values; header line `PNAME`) or a U table (131,072 values;
+        /// header line `UNAME`). See section 5.1 of FORMATS.md.
+        case p = "PNAME", u = "UNAME"
+        /// The number of values a table of this kind holds: 16,384 for P, 131,072 for U.
         public var valueCount: Int { self == .p ? 16_384 : 131_072 }
+        /// The slot letter: "P" or "U".
         public var letter: String { self == .p ? "P" : "U" }
     }
 
+    /// Whether this is a P or a U table.
     public var kind: Kind
+    /// The table's display name, line 2. Changing it discards ``originalBytes``.
     public var name: String { didSet { originalBytes = nil } }
+    /// The table's values, ``Kind/valueCount`` of them. Changing them discards ``originalBytes``.
     public var values: [Float] { didSet { originalBytes = nil } }
     /// Original file bytes, kept so an unmodified file is written back unchanged.
     public var originalBytes: [UInt8]?
 
+    /// Creates a wavetable from its kind, name, and values.
+    ///
+    /// The values should number ``Kind/valueCount``; this initializer does not check.
     public init(kind: Kind, name: String, values: [Float]) {
         self.kind = kind; self.name = name; self.values = values; originalBytes = nil
     }
 
+    /// Reads a `.wt` file, with LF or CRLF line endings.
+    ///
+    /// - Throws: ``FormatError`` when the data is not a wavetable, a value is not a finite number,
+    ///   or the number of values is wrong for the kind.
     public init(data: Data) throws {
         let bytes = [UInt8](data)
         let text = bytes.latin1.replacingOccurrences(of: "\r\n", with: "\n")
@@ -60,10 +76,14 @@ public struct WavetableFile: Equatable {
     }
 
     /// Identity of the table's content, independent of its name and text formatting.
+    ///
+    /// A 64-bit FNV-1a hash of ``dataBytes``, covering every value. The 3rd Wave's own matching
+    /// of U tables looks at the first 65,536 values only (section 5.1 of FORMATS.md), so two U
+    /// tables that differ only in their mipmap chains have different fingerprints here.
     public var fingerprint: UInt64 { fnv1a64(dataBytes) }
 
-    /// The largest absolute sample. The 3rd Wave's own tables stay within ±1 [observed: every
-    /// factory table, and SysEx dumps from an 8M], so more suggests a damaged or unnormalised file.
+    /// The largest absolute sample. The 3rd Wave's own tables stay within ±1 (seen in every
+    /// factory table, and in SysEx dumps from an 8M), so more suggests a damaged or unnormalised file.
     /// A P table stores each point as a sample and the difference to the next (FORMATS.md 5.1),
     /// and a difference can reach ±2, so only the samples (the even positions) count.
     public var peak: Float {
@@ -73,6 +93,11 @@ public struct WavetableFile: Equatable {
         }
     }
 
+    /// The wavetable as `.wt` file data.
+    ///
+    /// An unmodified file read with ``init(data:)`` is written back unchanged. Otherwise each value
+    /// is written with six decimals when that reproduces it exactly, and in the shortest exact form
+    /// otherwise, with LF line endings.
     public func serialized() -> Data {
         if let o = originalBytes { return Data(o) }
         var s = kind.rawValue + "\n" + name + "\n"

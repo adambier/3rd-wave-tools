@@ -7,3 +7,6 @@ build/
 *.bundle
 *.zip
 *.dSYM
+site/
+# Appears only when the documentation plugin is resolved (PGDATA_DOCS=1).
+Package.resolved

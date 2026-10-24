@@ -13,36 +13,60 @@ import Foundation
 ///                the 12 oscillator source ids are replaced by indices into the source table.
 ///
 /// Read and rewritten byte for byte: Groove Synthesis's factory banks (38), its sample library
-/// (45), and 138 third-party files.
+/// (45), and 138 third-party files. See section 4 of FORMATS.md.
 public struct UnifiedProgram: Equatable {
+    /// The data a source record carries.
     public enum Payload: Equatable {
+        /// No data: the source is listed only, and the 3rd Wave plays whatever is in that slot (or,
+        /// for an analog wave, the built-in wave).
         case none
+        /// An embedded wavetable: its name and its values as little-endian 32-bit floats, 16,384
+        /// for a P table or 131,072 for a U table (the bytes of ``WavetableFile/dataBytes``).
         case wavetable(name: NameField, data: [UInt8])
+        /// An embedded multisample.
         case multisample(Multisample)
     }
 
+    /// One entry of the source table, with its record.
     public struct Source: Equatable {
+        /// The slot the entry names.
         public var ref: SourceRef
+        /// The data the entry carries, if any.
         public var payload: Payload
+        /// Whether the entry carries data.
         public var hasData: Bool { payload != .none }
     }
 
+    /// The file's first 16 bytes, "W3_UNIPROG_1" padded with NUL bytes, kept as read.
     public var magic: [UInt8]
+    /// The source table, in order: the oscillator values in ``words`` are indices into it.
     public var sources: [Source]
+    /// The program name.
     public var programName: NameField
     /// Program words with oscillator ids already replaced by source-table indices.
     public var words: [UInt32]
-    /// Bytes after the program's declared end when the file was read (left over when the 3rd Wave
-    /// exported onto a longer file). Not written back.
+    /// The number of bytes after the program's declared end when the file was read (left over
+    /// when the 3rd Wave exported onto a longer file). Not written back.
     public var trailingBytes = 0
 
+    /// The tag a `.pgdata` begins with: "W3_UNIPROG_1".
     public static let magicText = "W3_UNIPROG_1"
 
+    /// Creates a unified program from its source table, program name, and program words.
+    ///
+    /// The oscillator words must already hold indices into `sources`. ``Packer/pack(_:content:)``
+    /// builds one from a program.
     public init(sources: [Source], programName: NameField, words: [UInt32]) {
         magic = NameField(Self.magicText, width: 16).raw
         self.sources = sources; self.programName = programName; self.words = words
     }
 
+    /// Reads a `.pgdata` file.
+    ///
+    /// Bytes after the program's declared length are dropped and counted in ``trailingBytes``.
+    ///
+    /// - Throws: ``FormatError`` when the data is not a unified program, ends early, or does not
+    ///   agree with itself (for example, a source record that does not match the source table).
     public init(data: Data) throws {
         let bytes = [UInt8](data)
         guard bytes.count >= 17 else {
@@ -112,6 +136,7 @@ public struct UnifiedProgram: Equatable {
         }
     }
 
+    /// The unified program as `.pgdata` file data.
     public func serialized() -> Data {
         var w = ByteWriter()
         w.put(magic)
@@ -149,5 +174,6 @@ public struct UnifiedProgram: Equatable {
 }
 
 extension SourceRef {
+    /// Whether the source is a P wavetable slot.
     public var isP: Bool { if case .p = self { return true }; return false }
 }

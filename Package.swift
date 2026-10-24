@@ -26,6 +26,10 @@ let onLinux: Bool = {
     #endif
 }()
 let includeTests = onLinux || ProcessInfo.processInfo.environment["PGDATA_TESTS"] != nil
+// The documentation plugin is needed only to build the PgdataFormats documentation site
+// (PGDATA_DOCS=1 swift package generate-documentation …); projects that depend on this package
+// don't fetch it.
+let includeDocsPlugin = ProcessInfo.processInfo.environment["PGDATA_DOCS"] != nil
 
 var targets: [Target] = [
     .target(name: "PgdataFormats"),
@@ -50,5 +54,7 @@ let package = Package(
     name: "3rd-wave-tools",
     platforms: [.macOS(.v13)],
     products: products,
+    dependencies: includeDocsPlugin
+        ? [.package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.0")] : [],
     targets: targets
 )

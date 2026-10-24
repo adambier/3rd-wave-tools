@@ -2,24 +2,37 @@ import Foundation
 
 // MARK: - Factory library
 
-/// The factory wavetables, as names and content fingerprints by slot. The app uses the built-in
-/// list (`FactoryLibrary.builtIn`, generated from Groove Synthesis's factory .wt files by
-/// `tw3pg factory-catalog`); it never embeds factory tables, so it does not need their data.
-/// `init(folders:)` reads the .wt files themselves, for that generator and for tests.
+/// Groove Synthesis's factory wavetables, as names and content fingerprints by slot.
+///
+/// pgdata Packer uses the built-in list (``builtIn``, generated from Groove Synthesis's factory
+/// `.wt` files by `tw3pg factory-catalog`); it never embeds factory tables, so it does not need
+/// their data. ``init(folders:)`` reads the `.wt` files themselves, for that generator and for
+/// tests.
+///
+/// Factory slots are P00–P35 and U00–U55 (section 2 of FORMATS.md). A program can list a factory
+/// table without its data, since every 3rd Wave is expected to have it loaded.
 public struct FactoryLibrary {
+    /// One factory wavetable: its display name and the fingerprint of its content.
     public struct Table: Equatable {
+        /// The table's display name, as its `.wt` file gives it.
         public var name: String
+        /// The table's content fingerprint, as ``WavetableFile/fingerprint`` computes it.
         public var fingerprint: UInt64
+        /// Creates a table entry from a name and a content fingerprint.
         public init(name: String, fingerprint: UInt64) { self.name = name; self.fingerprint = fingerprint }
     }
+    /// The factory tables known to this library, by slot.
     public private(set) var tables: [SourceRef: Table] = [:]
+    /// Files that ``init(folders:)`` could not use, each as a sentence; empty for other initializers.
     public private(set) var problems: [String] = []
 
+    /// Creates an empty library.
     public init() {}
 
+    /// Creates a library from tables keyed by slot.
     public init(_ tables: [SourceRef: Table]) { self.tables = tables }
 
-    /// The factory set built into the app (U00–U55, P00–P35; U48–U55 added in 2025).
+    /// The factory set built into the library (U00–U55, P00–P35; U48–U55 added in 2025).
     public static let builtIn: FactoryLibrary = {
         var t: [SourceRef: Table] = [:]
         for e in FactoryCatalog.entries {
@@ -28,7 +41,7 @@ public struct FactoryLibrary {
         return FactoryLibrary(t)
     }()
 
-    /// All 56 factory U tables and 36 factory P tables present.
+    /// Whether all 56 factory U tables and all 36 factory P tables are present.
     public var isComplete: Bool {
         tables.keys.filter { if case .u = $0 { return true }; return false }.count >= 56 && tables.keys.filter(\.isP).count >= 36
     }
@@ -63,14 +76,18 @@ public struct FactoryLibrary {
         }
     }
 
+    /// The display name of the factory table in `ref`, or nil when the library has none for that slot.
     public func name(_ ref: SourceRef) -> String? { tables[ref]?.name }
 
-    /// Factory slot whose table has this content, if any.
+    /// The factory slot whose table has this content fingerprint, or nil when there is none.
     public func slot(withFingerprint f: UInt64) -> SourceRef? {
         tables.first { $0.value.fingerprint == f }?.key
     }
 
-    /// Swift source for `FactoryCatalog`, listing these tables in slot order.
+    /// Swift source for the library's built-in catalog, listing these tables in slot order.
+    ///
+    /// `note` becomes the second comment line of the generated file. This is how the catalog behind
+    /// ``builtIn`` is generated.
     public func catalogSource(note: String) -> String {
         let refs = tables.keys.sorted()
         var s = """

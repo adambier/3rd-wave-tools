@@ -1,10 +1,24 @@
 import Foundation
 
+/// An error reading a 3rd Wave file: the data is not the expected kind of file, ends early, or
+/// is malformed.
+///
+/// Each case's ``description`` is a complete sentence suitable for showing to a user.
 public enum FormatError: Error, CustomStringConvertible, Equatable {
+    /// The data does not begin with the tag of the expected file type.
+    ///
+    /// `expected` names the file type (for example, "3rd Wave program (.pro)"), and `found` is the
+    /// text the data begins with, empty when the data is empty.
     case badMagic(expected: String, found: String)
+    /// The data ends before a field it should contain.
+    ///
+    /// `at` is the byte offset of the field, `need` the number of bytes the field takes, and `have`
+    /// the total length of the data in bytes.
     case truncated(at: Int, need: Int, have: Int)
+    /// The data is malformed in some other way; the string says how.
     case invalid(String)
 
+    /// A sentence describing the error, for display.
     public var description: String {
         switch self {
         case let .badMagic(e, f):
@@ -69,25 +83,37 @@ struct ByteWriter {
 
 /// A fixed-width, NUL-padded name field. The raw bytes are kept so a file can be rewritten
 /// byte for byte even when the padding after the terminator is not all zeros.
+///
+/// The 3rd Wave's name fields (`char[32]` in `.pgdata` and `.bin` files) hold up to 31
+/// single-byte (Latin-1) characters followed by a NUL. See section 8 of FORMATS.md.
 public struct NameField: Equatable, Hashable {
+    /// The field's bytes exactly as stored, terminator and padding included.
     public private(set) var raw: [UInt8]
 
+    /// Creates a field from its stored bytes, kept as they are.
     public init(raw: [UInt8]) { self.raw = raw }
 
+    /// Creates a field of `width` bytes holding `text`.
+    ///
+    /// The text is stored one byte per Unicode scalar, with any scalar above 255 stored as "?". It is
+    /// cut to `width` − 1 bytes, so that at least one NUL follows it, and padded with NUL bytes.
     public init(_ text: String, width: Int = 32) {
         var b = Array(text.unicodeScalars.map { $0.value < 256 ? UInt8($0.value) : UInt8(ascii: "?") }.prefix(width - 1))
         b += [UInt8](repeating: 0, count: width - b.count)
         raw = b
     }
 
+    /// The name: the bytes up to the first NUL, read as Latin-1.
     public var text: String {
         let end = raw.firstIndex(of: 0) ?? raw.count
         return Array(raw[..<end]).latin1
     }
 
-    /// How a name fits a field: the 3rd Wave's name fields hold single-byte (Latin-1) characters,
-    /// so a name takes one byte per Unicode scalar, and any scalar above 255 (an en dash, a curly
-    /// quote, an emoji) is stored as "?".
+    /// The number of bytes `s` takes in a name field.
+    ///
+    /// The 3rd Wave's name fields hold single-byte (Latin-1) characters, so a name takes one byte
+    /// per Unicode scalar, and any scalar above 255 (an en dash, a curly quote, an emoji) is stored
+    /// as "?".
     public static func storedLength(_ s: String) -> Int { s.unicodeScalars.count }
     /// The characters of `s` that cannot be stored, each once, in order.
     public static func unstorable(in s: String) -> String {
@@ -105,7 +131,8 @@ extension String {
     var latin1Bytes: [UInt8] { unicodeScalars.map { $0.value < 256 ? UInt8($0.value) : UInt8(ascii: "?") } }
 }
 
-/// 64-bit FNV-1a, used to fingerprint wavetable and sample content.
+/// Returns the 64-bit FNV-1a hash of `bytes`, used to fingerprint wavetable and multisample
+/// content.
 public func fnv1a64(_ bytes: [UInt8]) -> UInt64 {
     var h: UInt64 = 0xcbf2_9ce4_8422_2325
     for b in bytes { h ^= UInt64(b); h = h &* 0x0000_0100_0000_01b3 }

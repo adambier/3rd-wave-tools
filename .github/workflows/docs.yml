@@ -1,0 +1,54 @@
+# Builds the PgdataFormats documentation with DocC and publishes it to GitHub Pages:
+# https://adambier.github.io/3rd-wave-tools/documentation/pgdataformats/
+#
+# Runs on every push to main that touches the library or its documentation, and on demand
+# (Actions tab → Documentation → Run workflow). The repository's Pages setting must be
+# "Source: GitHub Actions".
+
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Sources/PgdataFormats/**"
+      - "Package.swift"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: swift:6.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the documentation site
+        run: |
+          PGDATA_DOCS=1 swift package --allow-writing-to-directory ./site \
+            generate-documentation --target PgdataFormats --disable-indexing \
+            --transform-for-static-hosting --hosting-base-path 3rd-wave-tools \
+            --output-path ./site
+          # The site's root forwards to the library's page.
+          echo '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=documentation/pgdataformats/"><title>PgdataFormats</title><a href="documentation/pgdataformats/">PgdataFormats documentation</a>' > ./site/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -8,24 +8,36 @@ import Foundation
 /// W3_PROG_4, 123 older W3_PROG_5, ten layouts) and 300 on a 24M (the same 2022 factory bank and
 /// third-party programs, plus Groove Synthesis's 2025 factory bank 1). 292 of the 299 and 292 of
 /// the 300 come out identical, value for value. The rest are 2022 W3_PROG_3 factory programs that
-/// the firmware fixes individually on import, keyed by the program's name [verified on the 24M];
+/// the firmware fixes individually on import, keyed by the program's name (shown on the 24M);
 /// these fixes are not reproduced. See docs/FORMATS.md section 6.5.
 ///
 /// A .pgdata import converts an old layout's structure but skips several of these value changes:
-/// a W3_PROG_3 program packed unconverted plays silently [verified on hardware].
+/// a W3_PROG_3 program packed unconverted has been observed to play silently on a 3rd Wave.
+/// See section 6 of FORMATS.md for the conversion step by step.
 public enum ProgramConverter {
     /// The 3rd Wave whose Import program the result reproduces. `.twentyFour` (24K or 24M) keeps
-    /// all four parts and is what pgdata Packer writes: an 8M fits such a program to its two parts
-    /// when it imports the .pgdata [verified]. `.eightM` adds the 8M's own two-part steps; it is
-    /// used to check the rules against the 8M's exports.
+    /// all four parts and is what pgdata Packer writes: an 8M has been observed to fit such a
+    /// program to its two parts when it imports the .pgdata. `.eightM` adds the 8M's own two-part
+    /// steps; it is used to check the rules against the 8M's exports.
     public enum Model: String, CaseIterable, Sendable {
+        /// The 3rd Wave 8M, which plays parts 1 and 2 only: the result also has the 8M's two-part
+        /// steps (section 6.4 of FORMATS.md).
         case eightM = "8M"
+        /// The 24-voice models, 24K and 24M, which play all four parts. The rules come from a 24M;
+        /// that a 24K converts the same way has not been checked.
         case twentyFour = "24K / 24M"
     }
 
+    /// The sizes a program's header declares: integers per part, floats per part, and global values.
+    ///
+    /// The event record count is not part of the layout. See section 3.3 of FORMATS.md for the
+    /// layouts seen.
     public struct Layout: Equatable, CustomStringConvertible, Sendable {
+        /// Integers per part (*S*), floats per part (*F*), and global values (*G*), in that order.
         public var ints: Int, floats: Int, globals: Int
+        /// Creates a layout from its three sizes.
         public init(ints: Int, floats: Int, globals: Int) { self.ints = ints; self.floats = floats; self.globals = globals }
+        /// The sizes as "S/F/G", for example "181/137/182".
         public var description: String { "\(ints)/\(floats)/\(globals)" }
     }
 
@@ -62,7 +74,10 @@ public enum ProgramConverter {
 
     /// The converted program. A program already in the current layout comes back unchanged.
     /// `format` overrides the format number in the tag (3, 4, or 5), for a program unpacked from a
-    /// .pgdata, which has no tag (see `inferredFormat`).
+    /// .pgdata, which has no tag (see ``inferredFormat(_:)``).
+    ///
+    /// - Throws: ``FormatError/invalid(_:)`` when the program cannot be converted (see
+    ///   ``unsupportedReason(_:)``).
     public static func convert(_ p: ProgramFile, for model: Model = .twentyFour, format: Int? = nil) throws -> ProgramFile {
         guard needsConversion(p) else { return p }
         if let why = unsupportedReason(p) { throw FormatError.invalid("\(p.name): \(why)") }
@@ -193,11 +208,11 @@ public enum ProgramConverter {
 
     /// The format a program unpacked from a .pgdata was probably saved in. A .pgdata has no format
     /// tag, so it is read from the layout: 173 or 174 integers per part = W3_PROG_3, 179 or 180 =
-    /// W3_PROG_4 [observed in every file seen]. 181 with fewer than 136 floats was written as both
+    /// W3_PROG_4 (true of every file seen). 181 with fewer than 136 floats was written as both
     /// W3_PROG_4 and W3_PROG_5; the two differ only in how event records name parts, so (looking at
     /// note and automation records only) a part mask above 3 means W3_PROG_5, else a part index 0
-    /// means W3_PROG_4 [inferred]. Without either, W3_PROG_5 is assumed. Nil when the layout is
-    /// current or unknown.
+    /// means W3_PROG_4 (an inference from the files, not checked on a 3rd Wave). Without either,
+    /// W3_PROG_5 is assumed. Nil when the layout is current or unknown.
     public static func inferredFormat(_ p: ProgramFile) -> Int? {
         guard let l = layout(of: p), l != current else { return nil }
         switch l.ints {
@@ -234,7 +249,7 @@ public enum ProgramConverter {
         }
     }
 
-    /// Globals every converted program had with these values [observed in all 599 conversions].
+    /// Globals every converted program had with these values (seen in all 599 conversions).
     /// (0, 80, and 174 differ by model: see `convert`.)
     static let globalsSet: [(Int, Int32)] = [
         (2, 0), (36, 0), (75, 1), (76, 2), (77, 2), (78, 0), (79, 0), (81, 1), (82, 1),

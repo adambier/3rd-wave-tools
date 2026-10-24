@@ -6,15 +6,23 @@ import Foundation
 public enum SourceContent: Equatable {
     /// List the source but carry no data: the 3rd Wave uses whatever is in that slot.
     case reference
+    /// Embed this wavetable. It must be of the slot's kind: a P table for a P slot, a U table for a
+    /// U slot.
     case wavetable(WavetableFile)
+    /// Embed this multisample. Only a multisample (S) slot can take one.
     case multisample(Multisample)
 }
 
+/// An error building a `.pgdata` with ``Packer/pack(_:content:)``.
 public enum PackError: Error, CustomStringConvertible {
+    /// No content was given for these sources, which the program uses.
     case unresolved([SourceRef])
+    /// The content given for this source does not suit its slot; the string says why.
     case wrongKind(SourceRef, String)
+    /// The program uses this source id, which names no known slot.
     case unknownSource(Int32)
 
+    /// A sentence describing the error, for display.
     public var description: String {
         switch self {
         case let .unresolved(r):
@@ -25,6 +33,9 @@ public enum PackError: Error, CustomStringConvertible {
     }
 }
 
+/// Builds unified programs (`.pgdata`) from programs and the content of the sources they use.
+///
+/// See section 4 of FORMATS.md for the format, and ``Unpacker`` for the reverse.
 public enum Packer {
     /// Builds a .pgdata from a program and the content chosen for each of its sources.
     ///
@@ -32,12 +43,20 @@ public enum Packer {
     /// source included, as Groove Synthesis's sample library does. Analog shapes never carry data.
     /// Multisamples are normally carried. Listing an S slot without its samples is allowed only when
     /// asked for explicitly: no such file from Groove Synthesis has been seen, and the 3rd Wave plays
-    /// whatever is in that slot, or silence if it is empty [verified: FORMATS.md section 7].
+    /// whatever is in that slot, or silence if it is empty (FORMATS.md section 7).
     ///
     /// Values beyond the program's declared length (left over when the 3rd Wave exported onto a
     /// longer file) are dropped. A program saved in an older layout is converted to the current one
-    /// (see `ProgramConverter`), because the 3rd Wave's .pgdata import does not convert it fully.
+    /// (see ``ProgramConverter``), because the 3rd Wave's .pgdata import does not convert it fully.
     /// One in a layout the converter does not know is packed as it is.
+    ///
+    /// - Parameters:
+    ///   - program: The program to pack.
+    ///   - content: The content for each source the program uses, by slot. Analog waves need no
+    ///     entry; every other source does.
+    /// - Returns: The unified program, ready for ``UnifiedProgram/serialized()``.
+    /// - Throws: ``PackError`` when a source has no content or content of the wrong kind, or the
+    ///   program uses an unknown source id.
     public static func pack(_ program: ProgramFile, content: [SourceRef: SourceContent]) throws -> UnifiedProgram {
         var program = program.trimmedToHeader()
         if ProgramConverter.needsConversion(program), ProgramConverter.unsupportedReason(program) == nil {
@@ -82,9 +101,11 @@ public enum Packer {
         return UnifiedProgram(sources: sources, programName: NameField(program.name), words: words)
     }
 
-    /// True when the program cannot be expressed as a plain .pro for a 3rd Wave whose slots
-    /// hold factory content in `factoryContent` slots: it uses a sample, or a wavetable slot
-    /// for which `isFactoryContent` returns false.
+    /// Whether the program needs a `.pgdata`, rather than a plain `.pro`, to play as intended.
+    ///
+    /// True when it uses a multisample slot, or a wavetable slot for which `isFactoryContent`
+    /// returns false: content that a 3rd Wave holding only factory content in its slots does not
+    /// have.
     public static func needsUnifiedFile(_ program: ProgramFile, isFactoryContent: (SourceRef) -> Bool) -> Bool {
         program.distinctSources.contains { ref in
             ref.isSample || (ref.isWavetable && !isFactoryContent(ref))
@@ -94,23 +115,45 @@ public enum Packer {
 
 // MARK: - Unpacking
 
+/// The contents of a unified program, as ``Unpacker/unpack(_:)`` returns them: the program and
+/// the wavetables and multisamples it embeds.
 public struct UnpackedProgram {
+    /// The program, with source ids in place of source-table indices, tagged `W3_PROG_5`.
+    ///
+    /// A program in an older layout is converted to the current one, as the 3rd Wave's
+    /// **Import program** would convert it; ``notes`` says so.
     public var program: ProgramFile
     /// Embedded content, keyed by the slot the program refers to.
     public var wavetables: [(ref: SourceRef, file: WavetableFile)]
+    /// The embedded multisamples, each with the slot the program refers to.
     public var multisamples: [(ref: SourceRef, sample: Multisample)]
     /// Sources listed without data (expected to be present on the 3rd Wave already).
+    ///
+    /// Analog waves, which never carry data, are not included.
     public var referenced: [SourceRef]
+    /// Sentences describing anything unusual found while unpacking, for display: for example, a
+    /// conversion, an unfamiliar layout, an oscillator pointing past the source table, or bytes
+    /// left over at the end of the file. Empty for an ordinary file.
     public var notes: [String]
 }
 
+/// Takes a unified program (`.pgdata`) apart into a program, wavetables, and multisamples.
+///
+/// See section 4.1 of FORMATS.md, and ``Packer`` for the reverse.
 public enum Unpacker {
     /// Float-block length by values-per-part, from 1,800+ program files.
-    /// 181 has three layouts that share the "W3_PROG_5" tag: 520 (older; Sam Gutman's, Feb 2025),
+    /// 181 has three layouts that share the "W3_PROG_5" tag: 520 (older third-party programs, Feb 2025),
     /// 544 (from OS 1.9; Groove Synthesis's 8M factory banks, Aug 2025), and 548 (written by OS 2.0d,
     /// whose exports all have 548; the last 4 were 0 in every file seen).
     static let floatCounts: [Int: [Int]] = [173: [504], 174: [508], 179: [508], 180: [520], 181: [548, 544, 520]]
 
+    /// Splits a unified program into its program and the content it embeds.
+    ///
+    /// Each oscillator's source-table index is replaced with the source id from the table. An
+    /// index past the end of the table is kept as it is, and noted. Values after the program's
+    /// declared end are ignored. A program in an older layout is converted when its format can be
+    /// inferred (see ``ProgramConverter/inferredFormat(_:)``), and written as it is otherwise.
+    /// Every such case is described in ``UnpackedProgram/notes``. Unpacking does not fail.
     public static func unpack(_ u: UnifiedProgram) -> UnpackedProgram {
         var notes: [String] = []
         let s = u.valuesPerPart
