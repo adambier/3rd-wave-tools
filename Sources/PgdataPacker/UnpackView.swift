@@ -4,6 +4,9 @@ import UniformTypeIdentifiers
 #if canImport(PgdataFormats)
 import PgdataFormats
 #endif
+#if canImport(PgdataPackerCore)
+import PgdataPackerCore
+#endif
 
 struct UnpackView: View {
     @EnvironmentObject var state: AppState

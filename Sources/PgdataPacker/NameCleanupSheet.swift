@@ -2,6 +2,9 @@ import SwiftUI
 #if canImport(PgdataFormats)
 import PgdataFormats
 #endif
+#if canImport(PgdataPackerCore)
+import PgdataPackerCore
+#endif
 
 /// "Clean Up Names…": proposes tidier names for the programs and the added wavetables and
 /// multisamples (never factory wavetables). Every change is shown and can be edited or unticked.

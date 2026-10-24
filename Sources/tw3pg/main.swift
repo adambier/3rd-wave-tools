@@ -1,5 +1,6 @@
 import Foundation
 import PgdataFormats
+import PgdataPackerCore
 
 // Developer harness for the format library. Not the user-facing tool (that is the app).
 //

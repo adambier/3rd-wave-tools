@@ -2,6 +2,9 @@ import SwiftUI
 #if canImport(PgdataFormats)
 import PgdataFormats
 #endif
+#if canImport(PgdataPackerCore)
+import PgdataPackerCore
+#endif
 
 /// "Point to another slot…": choose oscillators of one program and the slot they should use.
 /// Opened from a source row (oscillators using that source pre-ticked) or from an unused content

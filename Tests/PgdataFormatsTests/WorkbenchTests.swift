@@ -1,5 +1,6 @@
 import XCTest
 @testable import PgdataFormats
+@testable import PgdataPackerCore
 
 final class WorkbenchTests: XCTestCase {
     var dir: URL!

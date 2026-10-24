@@ -6,7 +6,11 @@ import Foundation
 // file formats (.pro, .wt, .bin, .pgdata).
 // Not affiliated with or endorsed by Groove Synthesis.
 //
-//   PgdataFormats      file formats and packing logic; Foundation only, builds on Linux too
+//   PgdataFormats      the library for other projects: the 3rd Wave's file formats, packing and
+//                      unpacking, program conversion, factory table fingerprints; Foundation only,
+//                      builds on Linux too
+//   PgdataPackerCore   the app's own decision logic (pack and unpack plans, file names, Clean Up
+//                      Names); UI-free and tested, but not offered as a product
 //   PgdataPacker       the macOS app ("pgdata Packer") (SwiftUI); declared only when building on macOS
 //   tw3pg              developer harness used to verify the library against real files
 //
@@ -25,7 +29,8 @@ let includeTests = onLinux || ProcessInfo.processInfo.environment["PGDATA_TESTS"
 
 var targets: [Target] = [
     .target(name: "PgdataFormats"),
-    .executableTarget(name: "tw3pg", dependencies: ["PgdataFormats"]),
+    .target(name: "PgdataPackerCore", dependencies: ["PgdataFormats"]),
+    .executableTarget(name: "tw3pg", dependencies: ["PgdataFormats", "PgdataPackerCore"]),
 ]
 var products: [Product] = [
     .library(name: "PgdataFormats", targets: ["PgdataFormats"]),
@@ -33,12 +38,12 @@ var products: [Product] = [
 ]
 
 #if os(macOS)
-targets.append(.executableTarget(name: "PgdataPacker", dependencies: ["PgdataFormats"]))
+targets.append(.executableTarget(name: "PgdataPacker", dependencies: ["PgdataFormats", "PgdataPackerCore"]))
 products.append(.executable(name: "PgdataPacker", targets: ["PgdataPacker"]))
 #endif
 
 if includeTests {
-    targets.append(.testTarget(name: "PgdataFormatsTests", dependencies: ["PgdataFormats"]))
+    targets.append(.testTarget(name: "PgdataFormatsTests", dependencies: ["PgdataFormats", "PgdataPackerCore"]))
 }
 
 let package = Package(

@@ -1,5 +1,6 @@
 import XCTest
 @testable import PgdataFormats
+@testable import PgdataPackerCore
 
 /// Synthetic programs exercising each conversion rule. The rules themselves were checked against
 /// 299 bulk imports on an 8M with `tw3pg convertcheck` (the files are not in the repository).

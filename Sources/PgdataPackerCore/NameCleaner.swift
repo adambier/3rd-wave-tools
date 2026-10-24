@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(PgdataFormats)
+import PgdataFormats   // SwiftPM build; absent in the app's single-module swiftc build
+#endif
 
 /// Proposes tidier names for programs, wavetables, and multisamples. Only a proposal: the app
 /// shows every change for approval. Factory wavetables are never offered for renaming.

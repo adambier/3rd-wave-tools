@@ -4,6 +4,9 @@ import Foundation
 #if canImport(PgdataFormats)
 import PgdataFormats   // SwiftPM build; absent in the single-module swiftc build
 #endif
+#if canImport(PgdataPackerCore)
+import PgdataPackerCore
+#endif
 
 /// All app state. Plain ObservableObject, used only from the main thread (as in ThirdWaveWT).
 final class AppState: ObservableObject {

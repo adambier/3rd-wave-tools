@@ -1,5 +1,6 @@
 import XCTest
 @testable import PgdataFormats
+@testable import PgdataPackerCore
 
 /// How the readers behave on damaged, truncated, empty, mistyped and hand-edited files: every
 /// such file must produce a FormatError with a plain reason, never a crash or silently wrong output.
