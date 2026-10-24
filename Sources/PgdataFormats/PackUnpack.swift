@@ -33,11 +33,12 @@ public enum Packer {
     /// Multisamples are normally carried. Listing an S slot without its samples is allowed only when
     /// asked for explicitly: no such file has been seen, and the 3rd Wave's handling is untested.
     ///
-    /// A program saved in an older layout is converted to the current one first (see
-    /// `ProgramConverter`), because the 3rd Wave's .pgdata import does not convert it fully. One in
-    /// a layout the converter does not know is packed as it is.
+    /// Values beyond the program's declared length (left over when the 3rd Wave exported onto a
+    /// longer file) are dropped. A program saved in an older layout is converted to the current one
+    /// (see `ProgramConverter`), because the 3rd Wave's .pgdata import does not convert it fully.
+    /// One in a layout the converter does not know is packed as it is.
     public static func pack(_ program: ProgramFile, content: [SourceRef: SourceContent]) throws -> UnifiedProgram {
-        var program = program
+        var program = program.trimmedToHeader()
         if ProgramConverter.needsConversion(program), ProgramConverter.unsupportedReason(program) == nil {
             program = try ProgramConverter.convert(program)
         }
@@ -124,20 +125,37 @@ public enum Unpacker {
                 values[i] = .int(u.sources[k].ref.id)
             } else {
                 // Kept as it is, so nothing is invented; the 3rd Wave will read it as source id k.
+                let asID = Int32(bitPattern: u.words[i])
                 notes.append("Oscillator \(slot % 3 + 1) of part \(slot / 3 + 1) points at source \(k), which the file does not list. "
-                             + "The .pro keeps the value \(k), which the 3rd Wave reads as \(SourceRef(id: Int32(k)).description).")
+                             + "The .pro keeps the value \(asID), which the 3rd Wave reads as \(SourceRef(id: asID).description).")
             }
+        }
+        if u.trailingBytes > 0 {
+            notes.append("The file has \(u.trailingBytes) bytes after the end of the program, probably left over from a longer "
+                         + "file it was exported onto; they are ignored.")
         }
         var program = ProgramFile(version: "W3_PROG_5", name: u.programName.text, values: values)
         // A .pgdata built from an older program by another tool: write the .pro in the current layout,
         // as Import program would have made it.
-        if let format = ProgramConverter.inferredFormat(program), let l = ProgramConverter.layout(of: program),
-           let converted = try? ProgramConverter.convert(program, format: format) {
-            program = converted
-            notes.append("This file holds a program originally saved in an older format (probably W3_PROG_\(format), layout \(l)). "
-                         + "The .pro will be written in the current format, converted in the same way the 3rd Wave's \u{201C}Import program\u{201D} "
-                         + "function handles older programs"
-                         + (format == 3 ? "; the 3rd Wave's \u{201C}Import unified program data file\u{201D} function leaves such a program silent." : "."))
+        let olderFormat = "in the same way the 3rd Wave's \u{201C}Import program\u{201D} function handles older programs"
+        if let l = ProgramConverter.layout(of: program), l != ProgramConverter.current {
+            if let format = ProgramConverter.inferredFormat(program) {
+                do {
+                    program = try ProgramConverter.convert(program, format: format)
+                    notes.append("This file holds a program originally saved in an older format (probably W3_PROG_\(format), layout \(l)). "
+                                 + "The .pro will be written in the current format, converted \(olderFormat)"
+                                 + (format == 3 ? "; the 3rd Wave's \u{201C}Import unified program data file\u{201D} function leaves such a program silent." : "."))
+                } catch {
+                    notes.append("This file holds a program in an older layout (\(l)) that could not be converted: \(error) "
+                                 + "The .pro is written as it is, so the 3rd Wave may not play it \(olderFormat).")
+                }
+            } else {
+                notes.append("This file holds a program in a layout (\(l)) this app has not seen before. The .pro is written as it is, "
+                             + "tagged W3_PROG_5, so the 3rd Wave may not play it \(olderFormat).")
+            }
+        } else if ProgramConverter.layout(of: program) == nil {
+            notes.append("The program's header (\(s) integers and \(floatCount / 4) floats per part) does not match its length "
+                         + "(\(u.words.count) values). The .pro is written as it is; the 3rd Wave may not read it.")
         }
 
         var wts: [(SourceRef, WavetableFile)] = []

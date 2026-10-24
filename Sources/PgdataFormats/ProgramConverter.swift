@@ -67,7 +67,7 @@ public enum ProgramConverter {
         guard needsConversion(p) else { return p }
         if let why = unsupportedReason(p) { throw FormatError.invalid("\(p.name): \(why)") }
         let l = layout(of: p)!
-        let v = format ?? p.versionNumber
+        let v = format ?? resolvedFormat(p)
         let eightM = model == .eightM
         let parts = 0..<ProgramFile.partCount
 
@@ -94,8 +94,8 @@ public enum ProgramConverter {
             // 0.446233 [observed: 100 on each model].
             floats[k][102] = (v == 3 && !eightM) ? "0.446233" : "1.000000"
             // 0 became 1.0 [observed in 12 parts 3–4 on the 24M; 1.0 in every other part seen].
-            if floats[k][115] == "0.000000" { floats[k][115] = "1.000000" }
-            // 2.0 became 1.0 [observed twice, W3_PROG_3].
+            if Double(floats[k][115]) == 0 { floats[k][115] = "1.000000" }
+            // 2.0 became 1.0 [observed in a few W3_PROG_3 programs, the only files seen with values above 1 here].
             for j in [91, 95] where (Double(floats[k][j]) ?? 0) > 1 { floats[k][j] = "1.000000" }
             // 0 became 1 [observed in all 53 parts that had 0].
             for j in 63...65 where ints[k][j] == 0 { ints[k][j] = 1 }
@@ -106,8 +106,9 @@ public enum ProgramConverter {
                 // W3_PROG_3 kept part of the amp envelope amount in float 113 (0 = full, 1 = none);
                 // OS 2.0 adds it to integer 34 [observed in all 100 W3_PROG_3 programs]. This is what made an
                 // unconverted W3_PROG_3 program silent.
-                let extra = ((1 - (Double(floats[k][113]) ?? 0)) * 100).rounded()
-                ints[k][34] = min(127, ints[k][34] + Int32(extra))
+                let f113 = Double(floats[k][113]) ?? 0
+                let extra = f113.isFinite ? Int64(max(-1e9, min(1e9, ((1 - f113) * 100).rounded()))) : 0
+                ints[k][34] = Int32(clamping: min(127, Int64(ints[k][34]) + extra))
             }
         }
 
@@ -115,8 +116,8 @@ public enum ProgramConverter {
         // Values each model sets its own way on every import [observed: 299 on the 8M, 300 on the 24M].
         let stamp: [(Int, Int32)] = eightM ? [(0, 3), (80, 1), (174, 1)] : [(0, 2), (80, 0), (174, 0)]
         for (j, x) in stamp { g[j] = x }
-        // Velocity: W3_PROG_3's 5 became 2 in 89 programs and 3 in 4 others, which no rule found
-        // so far separates [observed].
+        // Velocity: W3_PROG_3's 5 became 2 [observed in 89 programs]. The 4 others that got 3 are
+        // among the 2022 factory programs the firmware fixes by name (FORMATS.md section 6.5).
         if v == 3, g[1] == 5 { g[1] = 2 }
         // Layouts with 120 globals or fewer had one value where OS 2.0 has one per part [observed in all 100].
         if l.globals <= 120 {
@@ -182,7 +183,10 @@ public enum ProgramConverter {
     /// One line saying what converting this program means, for the app; nil when it needs nothing.
     public static func summary(_ p: ProgramFile) -> String? {
         guard needsConversion(p), unsupportedReason(p) == nil, let l = layout(of: p) else { return nil }
-        return "Originally saved in an older format (\(p.version), layout \(l)). The program will be converted to the "
+        let f = resolvedFormat(p)
+        let saved = f == p.versionNumber ? "(\(p.version), layout \(l))"
+                                         : "(layout \(l), that of W3_PROG_\(f), though tagged \(p.version))"
+        return "Originally saved in an older format \(saved). The program will be converted to the "
             + "current format (W3_PROG_5, \(current)) as part of packing, in the same way the 3rd Wave's \u{201C}Import program\u{201D} "
             + "function handles older programs."
     }
@@ -190,9 +194,10 @@ public enum ProgramConverter {
     /// The format a program unpacked from a .pgdata was probably saved in. A .pgdata has no format
     /// tag, so it is read from the layout: 173 or 174 integers per part = W3_PROG_3, 179 or 180 =
     /// W3_PROG_4 [observed in every file seen]. 181 with fewer than 136 floats was written as both
-    /// W3_PROG_4 and W3_PROG_5; the two differ only in how event records name parts, so a record
-    /// for part index 0 means W3_PROG_4 and a part mask above 3 means W3_PROG_5 [inferred]. Without
-    /// either, W3_PROG_5 is assumed. Nil when the layout is current or unknown.
+    /// W3_PROG_4 and W3_PROG_5; the two differ only in how event records name parts, so (looking at
+    /// note and automation records only) a part mask above 3 means W3_PROG_5, else a part index 0
+    /// means W3_PROG_4 [inferred]. Without either, W3_PROG_5 is assumed. Nil when the layout is
+    /// current or unknown.
     public static func inferredFormat(_ p: ProgramFile) -> Int? {
         guard let l = layout(of: p), l != current else { return nil }
         switch l.ints {
@@ -212,10 +217,20 @@ public enum ProgramConverter {
         }
     }
 
+    /// The format to convert a tagged .pro from: its tag, unless the layout contradicts it (a
+    /// `W3_PROG_5` tag on a 173-value layout, as an unpacker that does not convert writes); then the
+    /// layout decides, except that 181 integers with fewer than 136 floats fits both W3_PROG_4 and
+    /// W3_PROG_5, where a tag of 4 or 5 is kept.
+    static func resolvedFormat(_ p: ProgramFile) -> Int {
+        guard let l = layout(of: p), let inferred = inferredFormat(p) else { return p.versionNumber }
+        if l.ints == 181, l.floats < 136, (4...5).contains(p.versionNumber) { return p.versionNumber }
+        return inferred
+    }
+
     private static func intOf(_ v: ProgramFile.Value) -> Int32 {
         switch v {
         case let .int(x, _): return x
-        case let .float(f, _): return Int32(f)
+        case let .float(f, _): return f.isFinite ? Int32(clamping: Int64(max(-1e12, min(1e12, Double(f))))) : 0
         }
     }
 

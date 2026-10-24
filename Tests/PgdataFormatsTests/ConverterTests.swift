@@ -138,6 +138,43 @@ final class ConverterTests: XCTestCase {
         XCTAssertTrue(up.notes.contains { $0.contains("older format") && $0.contains("W3_PROG_3") })
     }
 
+    func testTagContradictedByLayoutGoesByLayout() throws {
+        // An unpacker that does not convert writes W3_PROG_5 on a 173-value layout: it is still a
+        // W3_PROG_3 program, so the float 113 fold applies.
+        var p = makeV3 { i, f, _ in i[0][34] = 0; f[0][113] = "0.000000" }
+        p.version = "W3_PROG_5"
+        XCTAssertEqual(ProgramConverter.resolvedFormat(p), 3)
+        let c = try ProgramConverter.convert(p)
+        XCTAssertEqual(ints(c, part: 0)[34], 100)
+        XCTAssertEqual(floats(c, part: 0)[102], "0.446233")
+        XCTAssertTrue(ProgramConverter.summary(p)!.contains("though tagged W3_PROG_5"))
+        // 181 integers with fewer than 136 floats fits both W3_PROG_4 and W3_PROG_5: the tag is kept.
+        func prog(_ tag: String) -> ProgramFile {
+            var v: [ProgramFile.Value] = [.int(181), .int(130), .int(177), .int(0)]
+            v += Array(repeating: .int(0), count: 4 * 181)
+            v += Array(repeating: .float(0, text: "0.000000"), count: 4 * 130)
+            v += Array(repeating: .int(0), count: 177)
+            return ProgramFile(version: tag, name: "x", values: v)
+        }
+        XCTAssertEqual(ProgramConverter.resolvedFormat(prog("W3_PROG_4")), 4)
+        XCTAssertEqual(ProgramConverter.resolvedFormat(prog("W3_PROG_5")), 5)
+    }
+
+    func testHostileValuesDoNotCrash() throws {
+        // Non-finite or huge values where the conversion does arithmetic.
+        for text in ["nan", "inf", "-30000000.000000", "30000000.000000"] {
+            let p = makeV3 { i, f, _ in f[0][113] = text; i[0][34] = 2147483647 }
+            let c = try ProgramConverter.convert(p)
+            XCTAssertLessThanOrEqual(ints(c, part: 0)[34], 127)
+        }
+        // A float in an integer position (a hand-made file) is read as a whole number, not trapped on.
+        var p = makeV3()
+        p.values[4 + 10] = .float(1e10, text: "10000000000.000000")
+        p.values[4 + 11] = .float(.nan, text: "nan")
+        XCTAssertNoThrow(try ProgramConverter.convert(p))
+        XCTAssertEqual(ints(try ProgramConverter.convert(p), part: 0)[10], Int32.max)
+    }
+
     func testFormatInferredFromLayout() {
         func prog(_ s: Int, _ f: Int, _ g: Int, events: [[Int32]]) -> ProgramFile {
             var v: [ProgramFile.Value] = [.int(Int32(s)), .int(Int32(f)), .int(Int32(g)), .int(Int32(events.count))]

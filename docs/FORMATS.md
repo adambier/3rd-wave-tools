@@ -148,8 +148,6 @@ For the current layout (*S* = 181, *F* = 137, *G* = 182), the float blocks start
 
 *How this was established:* the sizes add up exactly in every `.pro` examined (over 1,800 files:
 Groove Synthesis's factory banks, nine third-party sets and the 3rd Wave's own exports). [observed]
-Earlier versions of pgdata Packer did not use lines 4–6; they guessed the float block's length from
-*S*, which works for every layout seen.
 
 ### 3.3 Format tags and layouts
 
@@ -234,10 +232,13 @@ exactly this filler into parts 3–4 of every program it imports (section 6.4). 
 
 ### 3.6 Reading and writing a `.pro`
 
-To read: split into lines; line 1 is the tag, line 2 the name; parse the rest as numbers (a line
-containing `.` is a float); take *S*, *F*, *G*, *E* from the first four and check that the count adds
-up. To write: the same in reverse, floats with `%f`. Keeping each line's original text lets an
-unmodified file be written back byte for byte, which is how pgdata Packer's reader is tested.
+To read: split into lines; line 1 is the tag, line 2 the name; take *S*, *F*, *G*, *E* from the
+next four lines and check that the count adds up; then parse the lines in the float blocks (section
+3.2) as floats and every other line as an integer. (Deciding by the text instead, "a line with a `.`
+is a float", works for every file the 3rd Wave writes, but a float block line written `1` by some
+other tool would then be read as the integer 1 and packed as the wrong 32-bit pattern.) To write:
+the same in reverse, floats with `%f`. Keeping each line's original text lets an unmodified file be
+written back byte for byte, which is how pgdata Packer's reader is tested.
 
 ## 4. Unified program (.pgdata)
 
@@ -282,8 +283,11 @@ If the program is in an older layout (section 3.3), convert it (section 6). The 
 the format number, which a `.pgdata` does not carry, so it has to be read from the layout:
 *S* = 173 or 174 means `W3_PROG_3` and 179 or 180 means `W3_PROG_4` [observed in every file seen];
 *S* = 181 with *F* below 136 was written by both `W3_PROG_4` and `W3_PROG_5`, which differ only in
-how event records name parts (section 3.4), so a record with target 0 means `W3_PROG_4` and a
-target above 3 means `W3_PROG_5`; with neither, assume `W3_PROG_5`. [inferred]
+how event records name parts (section 3.4), so look at the note and automation records (types 1
+and 2): a target above 3 means `W3_PROG_5`; otherwise a target 0 means `W3_PROG_4`; with neither,
+assume `W3_PROG_5`. [inferred] The same rule serves a `.pro` whose tag disagrees with its layout
+(a `W3_PROG_5` tag on a 173-value layout, as an unpacker that does not convert would write): go by
+the layout.
 
 **To pack** a `.pro`: list each source the program uses, in order of first use (part 1 oscillator 1
 first), replace the oscillator values with their indices, and embed or just list each source.
@@ -389,7 +393,10 @@ program, with parts 3 and 4 kept. An 8M additionally fits the program to two par
 and does so by itself when it imports the converted `.pgdata`. [verified]
 
 In order: steps 1–5 below, then the model's own values (section 6.3), then, for an 8M only, the
-two-part fit (section 6.4). "Old global *n*" means the value before conversion.
+two-part fit (section 6.4). "Old global *n*" means the value before conversion. The steps are
+written for the layouts in section 3.3; pgdata Packer applies them to any `W3_PROG_3`, `_4` or `_5`
+program with 173–181 integers, 126–137 floats and 73–182 globals per the header, and packs anything
+else as it is, with a warning.
 
 **Step 1. Extend each section.** Keep every old value in its position and append new ones:
 
@@ -406,6 +413,8 @@ global 15 (128–131 still come from the appendix).
 - floats 85 and 116 become 0.0 (written `0.000000` even where the old value was `-0.000000`), and
   float 102 becomes 1.0;
 - float 115 becomes 1.0 where it was 0.0 [observed in 12 parts, all parts 3–4 on the 24M];
+- floats 91 and 95 become 1.0 where they were above 1.0 [observed in a few `W3_PROG_3` programs,
+  the only files seen with such values];
 - integers 63, 64 and 65 become 1 where they were 0;
 - if all three oscillators are A04 Supersaw (id 43), oscillator 3 becomes A00 Sawtooth (id 41)
   [inferred: OS 2.0 allows two supersaws per part].
@@ -419,8 +428,7 @@ non-zero 177 was seen only on the 24M). Globals 0, 80 and 174 are set too, by mo
 - amp envelope: integer 34 of each part increases by 100 × (1 − float 113), computed in double
   precision and rounded to the nearest whole number (halves away from zero), with the result capped
   at 127;
-- velocity: global 1 becomes 2 where it was 5;
-- floats 91 and 95 become 1.0 where they were above 1.0.
+- velocity: global 1 becomes 2 where it was 5.
 
 **Step 4. Event records (`W3_PROG_3` and `W3_PROG_4`):** replace each record's *target*, a part
 number *n*, with a part mask. Keep every record, in order. The mask is 2<sup>*n*</sup> (0 when *n*
@@ -461,13 +469,12 @@ with the 24M's]
 | Float 102 of a `W3_PROG_3` program, by **Import program** | 1.0 | 0.446233 |
 | Float 102, by the `.pgdata` import | 1.0 | 1.0 |
 
-Since each model overwrites them, what a file carries for these does not matter. pgdata Packer
-writes the 24M's **Import program** values (so 0.446233 in float 102 of a converted `W3_PROG_3`
-program), but that one value no file can control: on a 24K/24M the `.pgdata` import sets it to 1.0
-whatever the file says. The difference is not audible: the same program imported both ways on a
-24M sounded the same, and every parameter shown by an editor was identical; only the sequencer
-piano roll's scroll position differed, which may be what the value stores. [verified; the meaning
-inferred]
+Since each model overwrites them, what a file carries for these does not matter; pgdata Packer
+writes the 24M's **Import program** values. Float 102 is the one value a `.pgdata` cannot carry
+into a 24K/24M as **Import program** would set it, since the `.pgdata` import makes it 1.0 whatever
+the file says. The difference is not audible: the same `W3_PROG_3` program imported both ways on a
+24M sounded the same and showed identical parameters in an editor; only the sequencer piano roll's
+scroll position differed, which may be what the value stores. [verified; the meaning inferred]
 
 ### 6.4 What an 8M does on top
 
@@ -499,39 +506,29 @@ So one converted file (the 4-part result) serves every model: a 24K or 24M keeps
 and an 8M keeps parts 1 and 2. pgdata Packer's converter can also produce **Import program**'s 8M result
 directly (`Model.eightM`); that is used only to check the rules against the 8M's exports.
 
-### 6.5 Accuracy
+### 6.5 Accuracy, and the 3rd Wave's fixes to its 2022 programs
 
 The converter matches the 3rd Wave's own export byte for byte for 292 of the 299 programs on the 8M
 and 292 of the 300 on the 24M, including every `W3_PROG_4` and `W3_PROG_5` program. The rest are
-`W3_PROG_3` factory programs from 2022, the same seven on both models plus one on the 24M:
+eight `W3_PROG_3` factory programs from 2022 (seven of them on both models) that the firmware
+**fixes individually on import, keyed by the program's name**: [verified on the 24M]
 
-- in 3, global 1 (velocity) became 3, not 2, with nothing in the file to separate them from the 89
-  where it became 2;
-- in 1, the 3rd Wave replaced part 2 with a copy of part 1 panned the other way (float 124: 1 in
-  part 1, 0 in part 2), set the layer to parts 1–2, the tempo (float 53) to 102 in every part and
-  velocity to 3;
-- in 2, a few values in parts 1–2 changed (integers 30 and 33, floats 17, 44 and 103);
-- in 1, the tempo went from 120 to 122 in parts 1–2 (all four on the 24M);
-- in 1, on the 24M only, integer 143 went from 8 to 0 in parts 1 and 2.
+- in 3, global 1 (velocity) is 3 rather than 2;
+- in 1, part 2 becomes a copy of part 1 panned the other way (float 124: 1 in part 1, 0 in part
+  2), the layer becomes parts 1–2, the tempo (float 53) 102 in every part and velocity 3;
+- in 2, a few values in parts 1–2 change (integers 30 and 33, floats 17, 44 and 103);
+- in 1, the tempo goes from 120 to 122 in parts 1–2 (all four on the 24M);
+- in 1, on the 24M only, integer 143 goes from 8 to 0 in parts 1 and 2.
 
-These are not conversion rules but **corrections to particular programs, keyed by the program's
-name**. [verified on the 24M, one program] The evidence: every changed value started inside the
-range hundreds of untouched programs use, so they are not range checks; the new values cannot be
-derived from the file (the same starting value becomes 0.013 in one part and 0.019 in the other;
-a tempo goes from 120 to 122); both models make exactly the same changes; and a direct test
-settled it. The program that gains a copy of part 1 was put through **Bulk program import** twice:
-once byte for byte as distributed except for one letter of its name, and once under its own name
-with one value of its unused part 3 changed. The renamed one received the ordinary conversion only
-(tempo 120, velocity 2, part 2 off); the one with its own name received every correction (tempo
-102, velocity 3, part 2 a copy of part 1, layered). The corrections are not the 2025 factory
-versions of these programs either: several of those differ from the corrected result in hundreds
-of values.
-
-So the firmware carries a short list of fixes to its own 2022 programs, and no other program will
-ever trigger them. pgdata Packer does not reproduce them: one of these eight programs packed from
-its 2022 file plays as that file describes. The `.pgdata` import did not apply the velocity fix to
-one of them that had already been converted to the current layout (section 9); whether it applies
-the fixes to an unconverted 2022 file has not been tested.
+The fixes are not the 2025 factory versions of these programs (several of those differ in hundreds
+of values), and nothing in the files predicts them. That they go by name was shown by importing the
+second program above twice: byte for byte as distributed but with one letter of its name changed,
+it received the ordinary conversion only; under its own name with one value of its unused part 3
+changed, it received the whole fix. So no other program will ever trigger them, and pgdata Packer
+does not reproduce them: one of these eight programs packed from its 2022 file plays as that file
+describes. The `.pgdata` import did not apply the velocity fix to one of them that had already been
+converted to the current layout (section 9); whether it applies the fixes to an unconverted 2022
+file has not been tested.
 
 ## 7. What the 3rd Wave does on import
 
@@ -599,7 +596,7 @@ are damaged as distributed (empty or cut short).
 | A `W3_PROG_3` program packed unconverted, against **Import program** | silent; the differences in section 6.1 |
 | 299 programs (100 `W3_PROG_3`, 76 `W3_PROG_4`, 123 `W3_PROG_5`) bulk-imported and exported | the conversion rules in section 6 |
 | The same program through **Import program** and **Bulk program import** | byte-identical |
-| 5 programs converted by pgdata Packer for the 8M, packed, imported | exported exactly as converted; 4 identical to **Import program**'s result, the fifth differing only in the velocity value of section 6.5 |
+| 5 programs converted by pgdata Packer for the 8M, packed, imported | exported exactly as converted; 4 identical to **Import program**'s result, the fifth differing only in its velocity fix (section 6.5), which the `.pgdata` import did not apply |
 | 2 programs converted with parts 3–4 kept, packed, imported into the 8M | parts, globals and all values identical to **Import program**'s result; sequence notes for parts 3–4 as in section 6.4 |
 | 24M: 300 programs (the same 100 `W3_PROG_3` and 100 third-party programs, and Groove Synthesis's 2025 factory bank 1) bulk-imported and exported | the 4-part conversion in section 6.2 |
 | 24M: 3 programs converted for 24 voices, packed, imported, two of them carrying the 8M's values | the 24M's values restored on import; otherwise identical to **Import program**'s result except float 102 (section 6.3) |
@@ -608,8 +605,7 @@ are damaged as distributed (empty or cut short).
 **Implemented from this document alone.** As a check on completeness, a converter was written by
 someone given only this document (no access to the library or the files) and run against the 599
 exports above. It matched them to exactly the extent the library does: all but the programs listed
-in section 6.5, plus float 102 on the 24M (section 6.3). Two gaps it found, the 8M's filler and the
-selection-flag exception in section 6.4, were filled in; the appendix now carries the filler.
+in section 6.5, plus float 102 on the 24M (section 6.3).
 
 ## 10. Open questions
 

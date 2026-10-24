@@ -78,6 +78,59 @@ final class ProgramTests: XCTestCase {
         let parsed = try ProgramFile(data: Data(crlf.utf8))
         XCTAssertEqual(parsed.serialized(), Data(crlf.utf8))
     }
+
+    func testFloatsFollowTheHeaderNotTheText() throws {
+        // A float block line written "1" by another tool is the float 1.0, not the integer 1.
+        var lines = String(decoding: makeCurrentProgram().serialized(), as: UTF8.self).components(separatedBy: "\n")
+        let firstFloat = 2 + 4 + 4 * 181                   // line index of part 1 float 0
+        lines[firstFloat] = "1"
+        lines[firstFloat + 1] = "0"
+        lines[2 + 4 + 7] = "3.000000"                      // a whole number written as a float, in an integer position
+        let p = try ProgramFile(data: Data(lines.joined(separator: "\n").utf8))
+        XCTAssertEqual(p.values[4 + 4 * 181], .float(1, text: "1"))
+        XCTAssertEqual(p.values[4 + 4 * 181].word, Float(1).bitPattern)
+        XCTAssertEqual(p.values[4 + 4 * 181 + 1].word, Float(0).bitPattern)
+        XCTAssertEqual(p.values[4 + 7], .int(3, text: "3.000000"))
+        XCTAssertEqual(p.floatBlockCount, 4 * 137)
+        // Trailing blank lines and trailing spaces are tolerated; non-numbers and fractions in integer positions are not.
+        XCTAssertNoThrow(try ProgramFile(data: Data((lines.joined(separator: "\n") + "\n\n").utf8)))
+        lines[2 + 4 + 8] = "5 "
+        XCTAssertEqual(try ProgramFile(data: Data(lines.joined(separator: "\n").utf8)).values[4 + 8], .int(5, text: "5"))
+        lines[2 + 4 + 8] = "5.5"
+        XCTAssertThrowsError(try ProgramFile(data: Data(lines.joined(separator: "\n").utf8)))
+        lines[firstFloat] = "nan"
+        XCTAssertThrowsError(try ProgramFile(data: Data(lines.joined(separator: "\n").utf8)))
+    }
+
+    func testValuesBeyondTheHeaderAreDropped() throws {
+        // The 3rd Wave leaves the end of an old file in place when it exports onto a longer one.
+        var long = makeCurrentProgram()
+        let declared = long.values.count
+        long.values += (0..<50).map { .int(Int32($0)) }
+        XCTAssertEqual(long.declaredCount, declared)
+        XCTAssertEqual(long.excessValues, 50)
+        XCTAssertNil(ProgramConverter.layout(of: long))
+        let plan = PackPlan.make(program: long, files: [], factory: FactoryLibrary())
+        XCTAssertTrue(plan.warnings.contains { $0.contains("50 values beyond") })
+        XCTAssertNil(plan.conversion)
+        let g = try Packer.pack(long, content: [:])
+        XCTAssertEqual(g.words.count, declared)
+        // A short file gets a warning and is packed as it is.
+        var short = makeCurrentProgram(); short.values.removeLast(10)
+        XCTAssertTrue(PackPlan.make(program: short, files: [], factory: FactoryLibrary()).warnings.contains { $0.contains("header declares") })
+        XCTAssertEqual(try Packer.pack(short, content: [:]).words.count, declared - 10)
+    }
+}
+
+/// A program in the current layout (181/137/182, no events) whose header adds up.
+func makeCurrentProgram(sources: [Int32] = Array(repeating: 42, count: 12)) -> ProgramFile {
+    var v: [ProgramFile.Value] = [.int(181), .int(137), .int(182), .int(0)]
+    v += Array(repeating: .int(0), count: 4 * 181)
+    v += (0..<(4 * 137)).map { .float(Float($0 % 7) * 0.125) }
+    v += Array(repeating: .int(0), count: 182)
+    var p = ProgramFile(version: "W3_PROG_5", name: "Current", values: v)
+    for (k, id) in sources.enumerated() { p.setSourceID(id, at: k) }
+    return p
 }
 
 final class PackTests: XCTestCase {
@@ -129,6 +182,29 @@ final class PackTests: XCTestCase {
         for i in tail..<(tail + 4) { pro.values[i] = .int(0) }
         pro.values[1] = .int(136); pro.values[2] = .int(40); pro.values[3] = .int(0)
         XCTAssertEqual(Unpacker.unpack(try Packer.pack(pro, content: [:])).program.serialized(), pro.serialized())
+    }
+
+    func testTrailingBytesAfterTheProgramAreIgnored() throws {
+        let g = try Packer.pack(makeCurrentProgram(), content: [:])
+        var bytes = [UInt8](g.serialized())
+        let clean = bytes.count
+        bytes += [UInt8](repeating: 0xAB, count: 1_001)           // not even a whole number of words
+        let parsed = try UnifiedProgram(data: Data(bytes))
+        XCTAssertEqual(parsed.words, g.words)
+        XCTAssertEqual(parsed.trailingBytes, 1_001)
+        XCTAssertEqual(parsed.serialized().count, clean)
+        XCTAssertTrue(Unpacker.unpack(parsed).notes.contains { $0.contains("1001 bytes after the end of the program") })
+        // Without a plausible header, an odd length is still an error.
+        XCTAssertThrowsError(try UnifiedProgram(data: Data([UInt8](g.serialized()).dropLast(3))))
+    }
+
+    func testOscillatorWordOutOfRangeDoesNotCrash() throws {
+        var g = try Packer.pack(makeCurrentProgram(), content: [:])
+        g.words[g.oscillatorWordIndices[0]] = 0xFFFF_FFFF
+        g.words[g.oscillatorWordIndices[1]] = 0x8000_0000
+        let up = Unpacker.unpack(try UnifiedProgram(data: g.serialized()))
+        XCTAssertEqual(up.notes.filter { $0.contains("does not list") }.count, 2)
+        XCTAssertEqual(up.program.sourceIDs[0], -1)
     }
 
     func testSampleIsNeverLeftOut() throws {

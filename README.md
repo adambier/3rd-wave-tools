@@ -256,7 +256,9 @@ Checked on an 8M and a 24M (OS 2.0d). What the 3rd Wave does when it imports a f
 > finished.
 >
 > **Empty the `PROGRAMS` folder before exporting.** An export onto an existing file of the same name
-> does not shorten it, so a longer old file leaves its tail behind the new program.
+> does not shorten it, so a longer old file leaves its tail behind the new program. (The app
+> recognises such a file by its header, drops the leftover values when packing or unpacking it,
+> and says so.)
 >
 > **Leave only one `.pgdata` in `PROGRAMS` when using Import unified program data file.** It takes
 > the first file in alphabetical order without asking.

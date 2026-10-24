@@ -31,6 +31,9 @@ public struct UnifiedProgram: Equatable {
     public var programName: NameField
     /// Program words with oscillator ids already replaced by source-table indices.
     public var words: [UInt32]
+    /// Bytes after the program's declared end when the file was read (left over when the 3rd Wave
+    /// exported onto a longer file). Not written back.
+    public var trailingBytes = 0
 
     public static let magicText = "W3_UNIPROG_1"
 
@@ -83,12 +86,24 @@ public struct UnifiedProgram: Equatable {
         }
         sources = out
         programName = NameField(raw: try r.take(32))
-        guard r.remaining % 4 == 0 else {
+        // The first four words (S, F, G, E) say how long the program is. When they are plausible and
+        // the file runs on past that, the rest is left over from a longer file it was exported onto
+        // (FORMATS.md section 7) and is not part of the program.
+        var count = r.remaining / 4
+        if r.remaining >= 16 {
+            var peek = r
+            let h = try (0..<4).map { _ in Int(Int32(bitPattern: try peek.u32())) }
+            if let h = ProgramFile.header(h) {
+                let declared = 4 + 4 * h.s + 4 * h.f + h.g + 6 * h.e
+                if declared < count { count = declared; trailingBytes = r.remaining - 4 * declared }
+            }
+        }
+        guard trailingBytes > 0 || r.remaining % 4 == 0 else {
             throw FormatError.invalid("Program data is \(r.remaining) bytes, not a whole number of values; the file may be truncated.")
         }
         var ws: [UInt32] = []
-        ws.reserveCapacity(r.remaining / 4)
-        while r.remaining > 0 { ws.append(try r.u32()) }
+        ws.reserveCapacity(count)
+        for _ in 0..<count { ws.append(try r.u32()) }
         words = ws
         // The program block must at least hold the 12 oscillator words its first word implies.
         guard valuesPerPart > 0, oscillatorWordIndices.allSatisfy({ $0 < words.count }) else {

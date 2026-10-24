@@ -283,23 +283,39 @@ public struct PackPlan {
     public static func make(program: ProgramFile, files: [ContentFile], factory: FactoryLibrary,
                             overrides: [SourceRef: Choice] = [:], original: ProgramFile? = nil,
                             names: [UUID: String] = [:]) -> PackPlan {
-        let srcs = program.sources
         /// The name a file will be packed under (renamed in Clean Up Names, or its own).
         func packedName(_ f: ContentFile) -> String { names[f.id] ?? f.name }
         var warnings: [String] = [program.layoutWarning].compactMap { $0 }
-        // (A program whose header does not add up is left to `layoutWarning`.)
-        if ProgramConverter.needsConversion(program), ProgramConverter.layout(of: program) != nil,
-           let why = ProgramConverter.unsupportedReason(program) {
-            warnings.append("This program is not in the current format and cannot be converted: \(why) It is packed as it is, "
-                            + "and the 3rd Wave may not play it as it would after its \u{201C}Import program\u{201D} function.")
+        // What `Packer.pack` will write: the program cut to its declared length and, when it is in
+        // an older layout the converter knows, converted. Rows and the size estimate come from that.
+        let trimmed = program.trimmedToHeader()
+        if program.excessValues > 0 {
+            warnings.append("The file has \(program.excessValues) values beyond the \(trimmed.values.count) its header declares, probably left "
+                            + "over from a longer file it was exported onto. Only the declared values are packed.")
+        } else if program.layoutWarning == nil, ProgramConverter.layout(of: program) == nil, let declared = program.declaredCount {
+            warnings.append("The program's header declares \(declared) values but the file has \(program.values.count). It is packed as it "
+                            + "is; the 3rd Wave may not read it.")
         }
+        let packed: ProgramFile
+        if ProgramConverter.needsConversion(trimmed), ProgramConverter.layout(of: trimmed) != nil {
+            if let why = ProgramConverter.unsupportedReason(trimmed) {
+                warnings.append("This program is not in the current format and cannot be converted: \(why) It is packed as it is, "
+                                + "and the 3rd Wave may not play it as it would after its \u{201C}Import program\u{201D} function.")
+                packed = trimmed
+            } else {
+                packed = (try? ProgramConverter.convert(trimmed)) ?? trimmed
+            }
+        } else {
+            packed = trimmed
+        }
+        let srcs = packed.sources
         if program.name.count > NameCleaner.fieldLimit {
             warnings.append("The program name is \(program.name.count) characters; the 3rd Wave keeps \(NameCleaner.fieldLimit), so it is cut to \"\(String(program.name.prefix(NameCleaner.fieldLimit)))\".")
         }
         let originalSrcs = original?.sources ?? srcs
         let predates = predates2025FactoryTables(program)
         var rows: [Row] = []
-        for ref in program.distinctSources {
+        for ref in packed.distinctSources {
             let positions = srcs.indices.filter { srcs[$0] == ref }
             let users = positions.map(Oscillator.label)
             var from: [SourceRef] = []
@@ -407,9 +423,9 @@ public struct PackPlan {
         if !missing.isEmpty { verdict = .blocked(missing) }
         else if rows.contains(where: \.embeds) { verdict = .embedsContent }
         else { verdict = .factoryOnly }
-        let total = 17 + 4 * rows.count + rows.reduce(0) { $0 + $1.bytes } + 32 + 4 * program.values.count
+        let total = 17 + 4 * rows.count + rows.reduce(0) { $0 + $1.bytes } + 32 + 4 * packed.values.count
         let userSlots = rows.filter(\.wasUserSlot).map(\.ref)
-        return PackPlan(rows: rows, verdict: verdict, warnings: warnings, conversion: ProgramConverter.summary(program),
+        return PackPlan(rows: rows, verdict: verdict, warnings: warnings, conversion: ProgramConverter.summary(trimmed),
                         userSlotNote: userSlots.isEmpty ? nil : userSlotNote(program: program, slots: userSlots, factory: factory),
                         estimatedBytes: total)
     }
