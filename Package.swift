@@ -2,10 +2,11 @@
 import PackageDescription
 import Foundation
 
-// pgdata Packer — pack and unpack unified program data (.pgdata) for the Groove Synthesis 3rd Wave.
+// 3rd-wave-tools — the pgdata Packer app and a Swift library for the Groove Synthesis 3rd Wave's
+// file formats (.pro, .wt, .bin, .pgdata).
 // Not affiliated with or endorsed by Groove Synthesis.
 //
-//   PgdataFormats   file formats and packing logic; Foundation only, builds on Linux too
+//   PgdataFormats      file formats and packing logic; Foundation only, builds on Linux too
 //   PgdataPacker       the macOS app ("pgdata Packer") (SwiftUI); declared only when building on macOS
 //   tw3pg              developer harness used to verify the library against real files
 //
@@ -41,7 +42,7 @@ if includeTests {
 }
 
 let package = Package(
-    name: "PgdataPacker",
+    name: "3rd-wave-tools",
     platforms: [.macOS(.v13)],
     products: products,
     targets: targets

@@ -17,7 +17,7 @@ confirmed on the 3rd Wave and what is inferred.
 ## Download
 
 Download `pgdata-Packer-<version>.zip` from the
-[latest release](https://github.com/adambier/pgdata-packer/releases/latest), unzip it, and move
+[latest release](https://github.com/adambier/3rd-wave-tools/releases/latest), unzip it, and move
 the app wherever you like, for example to your Applications folder. The app is signed with a
 Developer ID and notarized by Apple, so it opens like any other app, on Apple Silicon and Intel
 Macs. Requires macOS 13 or later.
@@ -29,8 +29,8 @@ tools (`xcode-select --install`; Xcode 14.1 or later, for the macOS 13 SDK). The
 project.
 
 ```
-git clone https://github.com/adambier/pgdata-packer.git
-cd pgdata-packer
+git clone https://github.com/adambier/3rd-wave-tools.git
+cd 3rd-wave-tools
 ./make-app.sh          # builds "pgdata Packer.app" in this folder
 open "pgdata Packer.app"
 ```
