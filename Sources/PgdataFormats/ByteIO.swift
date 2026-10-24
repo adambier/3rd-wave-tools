@@ -7,9 +7,11 @@ public enum FormatError: Error, CustomStringConvertible, Equatable {
 
     public var description: String {
         switch self {
-        case let .badMagic(e, f): return "Not a \(e) file (header reads \"\(f)\")."
+        case let .badMagic(e, f):
+            return f.isEmpty ? "Not a \(e) file: it is empty." : "Not a \(e) file: it begins with \"\(f)\"."
         case let .truncated(at, need, have):
-            return "File is truncated: needed \(need) bytes at offset \(at), but it is only \(have) bytes long."
+            if have == 0 { return "The file is empty." }
+            return "The file ends early: it is \(have) bytes, but at least \(at + need) were expected. It was probably cut short when it was copied or exported."
         case let .invalid(s): return s
         }
     }
@@ -81,6 +83,16 @@ public struct NameField: Equatable, Hashable {
     public var text: String {
         let end = raw.firstIndex(of: 0) ?? raw.count
         return Array(raw[..<end]).latin1
+    }
+
+    /// How a name fits a field: the 3rd Wave's name fields hold single-byte (Latin-1) characters,
+    /// so a name takes one byte per Unicode scalar, and any scalar above 255 (an en dash, a curly
+    /// quote, an emoji) is stored as "?".
+    public static func storedLength(_ s: String) -> Int { s.unicodeScalars.count }
+    /// The characters of `s` that cannot be stored, each once, in order.
+    public static func unstorable(in s: String) -> String {
+        var seen = Set<UInt32>()
+        return String(s.unicodeScalars.filter { $0.value > 255 && seen.insert($0.value).inserted }.map(Character.init))
     }
 }
 

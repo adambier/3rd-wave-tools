@@ -57,8 +57,11 @@ public struct ProgramFile: Equatable {
         if trailingNewline { lines.removeLast() }
         // Stray blank lines at the end (a file ending "\n\n", or a lone "\r") are not values.
         while lines.count > 3, let last = lines.last, last.trimmingCharacters(in: .whitespaces).isEmpty { lines.removeLast() }
-        guard lines.count >= 3, lines[0].hasPrefix("W3_PROG_") else {
+        guard let first = lines.first, first.hasPrefix("W3_PROG_") else {
             throw FormatError.badMagic(expected: "3rd Wave program (.pro)", found: String(lines.first?.prefix(16) ?? ""))
+        }
+        guard lines.count >= 7 else {
+            throw FormatError.invalid("The program file has only \(lines.count) line\(lines.count == 1 ? "" : "s"); a program has its tag, its name and at least the four header values.")
         }
         version = lines[0]
         name = lines[1]

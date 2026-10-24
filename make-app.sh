@@ -39,12 +39,13 @@ DEPLOYMENT_TARGET="13.0"
 mkdir -p build
 
 if [ "$USE_SPM" -eq 1 ]; then
+    if [ "$UNIVERSAL" -eq 1 ]; then echo "--universal is ignored with --spm (SwiftPM builds for this Mac's architecture)." >&2; fi
     echo "Building through SwiftPM ($CONFIG)…"
     swift build -c "$CONFIG" --product PgdataPacker
     BIN="$(swift build -c "$CONFIG" --show-bin-path)/PgdataPacker"
 else
-    SDK="$(xcrun --sdk macosx --show-sdk-path)"
-    if [ ! -d "$SDK" ]; then
+    SDK="$(xcrun --sdk macosx --show-sdk-path 2>/dev/null || true)"
+    if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then
         echo "Could not locate the macOS SDK. Run: xcode-select --install" >&2
         exit 1
     fi
@@ -117,14 +118,14 @@ PLIST
 
 # An unsigned arm64 app is killed at launch, so the ad-hoc signature is required for any build
 # that includes an Apple Silicon slice (every release build, and debug builds on Apple Silicon).
-if ! codesign --force --sign - "$APP" 2>/dev/null; then
+if ! codesign --force --sign - "$APP"; then
     echo "codesign failed: the app will not launch on Apple Silicon without an ad-hoc signature." >&2
     exit 1
 fi
 
 echo
 echo "Built $APP ($(lipo -archs "$APP/Contents/MacOS/PgdataPacker" 2>/dev/null || echo "$ARCH"))"
-echo "Run it with:  open $APP"
+echo "Run it with:  open \"$APP\""
 
 if [ "$MAKE_ZIP" -eq 1 ]; then
     ZIP="pgdata-Packer-$VERSION.zip"

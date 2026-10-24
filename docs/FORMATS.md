@@ -106,10 +106,10 @@ id 15, for example) [observed]. P36–P47 = ids 1002–1013 is [inferred]; no fi
 ### 3.1 Text format
 
 A `.pro` is plain text with one value per line, LF line ends and a final newline. [observed] (A
-reader should accept CRLF as well.) Integers are written in decimal (`-12`, `2018`). Floats are
-written with exactly six decimals, as C's `%f` does (`0.385000`, `120.000000`, `-0.002000`), so a
-float in a `.pro` is rounded to about 1e-6. The 3rd Wave's own export writes them the same way.
-[observed]
+reader should accept CRLF as well.) Integers are written in decimal (e.g., `-12`, `2018`). Floats
+are written with exactly six decimals, as C's `%f` does (e.g., `0.385000`, `120.000000`,
+`-0.002000`), so a float in a `.pro` is rounded to about 1e-6. The 3rd Wave's own export writes
+them the same way. [observed]
 
 ### 3.2 Layout
 
@@ -322,12 +322,27 @@ Plain text, LF or CRLF line ends. [observed: 92 factory files and others]
 | 3 … | one float per line, as a C literal with an `f` suffix (`0.963237f`, `1.38777878078e-17f`); lines starting with `//` are comments |
 
 - A **P table** has 16,384 values: 64 waves × 128 points, each point stored as a pair (sample, then
-  the difference to the next sample, wrapping within the wave).
+  the difference to the next sample, wrapping within the wave). See below.
 - A **U table** has 131,072 values: 64 waves × 2,048 samples.
 - The file has no slot number; the slot is chosen when it is imported. [verified]
 - Number formatting varies between files: Groove Synthesis's factory P tables use 12–14 digits and
   exponents. pgdata Packer writes six decimals when that gives back the exact float, and the
   shortest exact form otherwise.
+
+**P tables (PPG-style).** A P table is the 3rd Wave's form of the PPG Wave's wavetables: 64
+waves of 128 points, a wave being one cycle. The file stores each point as a pair, the sample and
+then the difference to the next sample of the same wave (the last point's difference leads back to
+the first), so a wave takes 256 values and the table 16,384. The difference is derived data: in
+every factory P table examined it equals the next sample minus this one to float precision, and
+the 3rd Wave itself holds a P table as 64 × 128 plain samples. [observed: six tables embedded in
+Groove Synthesis's `.pgdata` files, five exactly and the Prophet VS table within 1e-6; the internal
+form over SysEx] A writer should therefore compute the differences from the samples; what the
+3rd Wave does when a file's differences disagree with its samples has not been tested. The samples
+are floats within ±1, not quantised to the PPG's 8-bit levels. [observed] The PPG convention of
+standard waveforms in the last four positions (60 a triangle, 61 a narrow pulse, 62 a square, 63 a
+sawtooth) holds in the classic tables (P00, P01, P23 and P27 of those examined) but not in all
+(P33 and the Prophet VS table P34 use all 64 positions for their own waves), so it is a property
+of the content, not of the format. [observed]
 
 ### 5.2 Multisample (.bin)
 

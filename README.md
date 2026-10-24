@@ -20,8 +20,8 @@ There is no download: the app is not notarised with Apple (that needs a paid dev
 and an app that isn't makes macOS show a security warning that has to be bypassed. Building it
 yourself takes a minute and avoids that; an app built on your own Mac opens normally.
 
-Requires macOS 13 or later and the Xcode command-line tools (`xcode-select --install`). There is no
-Xcode project.
+Requires macOS 13 or later and the Xcode command-line tools (`xcode-select --install`; Xcode 14.1
+or later, for the macOS 13 SDK). There is no Xcode project.
 
 ```
 git clone https://github.com/adambier/pgdata-packer.git
@@ -32,8 +32,10 @@ open "pgdata Packer.app"
 
 Move the app wherever you like afterwards, for example to your Applications folder.
 
-The tests (`./run-tests.sh`) need a full Xcode installation on a Mac; on Linux, `swift test` runs
-them directly.
+The tests (`./run-tests.sh`) need a full Xcode installation (15 or later) on a Mac; on Linux,
+`swift test` runs them directly. (`Package.swift` includes the test target only when
+`PGDATA_TESTS=1` is set, which the script does, so that a plain `swift build` works with the
+command-line tools alone.)
 
 ## Using it
 
@@ -69,9 +71,9 @@ ways to fix it: add the author's table, point the oscillators elsewhere, or choo
 table anyway from the Plays menu.
 
 A program counts as saved before OS 1.9 when its format is older than `W3_PROG_5` or its float
-block has fewer than 544 values. Every program saved since OS 1.9 that has been seen has 544
-(Groove Synthesis's factory banks from August 2025 onwards); every older set has fewer. The file
-carries no date, so this is an inference from the layout.
+block has fewer than 544 values. Every program saved since OS 1.9 that has been seen has 544 or
+more (544 from OS 1.9, as in Groove Synthesis's factory banks from August 2025; 548 from OS 2.0);
+every older set has fewer. The file carries no date, so this is an inference from the layout.
 
 A table from a user slot (U56–U63, P36–P47) or a multisample that a program uses is always
 embedded from a file you add, because whoever loads the file will not have the same user slots or
@@ -148,11 +150,11 @@ The program name at the top of the detail area can be edited. **Clean Up Names�
 names for the programs and for the wavetables and multisamples you added (never factory
 wavetables):
 
-- slot numbers removed from the start or end ("U48 Warm Pad" → "Warm Pad", "S010_Strings_" →
-  "Strings", "B5-P003 Name" → "Name");
+- slot numbers removed from the start or end (e.g., "U48 Warm Pad" → "Warm Pad", "S010_Strings_"
+  → "Strings", "B5-P003 Name" → "Name");
 - underscores to spaces;
-- title case for names written entirely in capitals or entirely in lower case ("GLASS BELLS" →
-  "Glass Bells"). Names that already mix cases keep their capitals.
+- title case for names written entirely in capitals or entirely in lower case (e.g., "GLASS
+  BELLS" → "Glass Bells"). Names that already mix cases keep their capitals.
 
 Within title case:
 
@@ -160,8 +162,9 @@ Within title case:
 - words with no vowels count as acronyms (e.g., PWM, PPG, FM); Y counts as a vowel, so "SYNTH"
   becomes "Synth";
 - words on an editable list keep a fixed spelling (e.g., LFO, MIDI, LoFi);
-- short joining words are lower case except at the start ("DRUMS AND AMPS" → "Drums and Amps"),
-  and the parts of a hyphenated word are cased separately ("LO-FI PAD" → "Lo-Fi Pad").
+- short joining words are lower case except at the start (e.g., "DRUMS AND AMPS" → "Drums and
+  Amps"), and the parts of a hyphenated word are cased separately (e.g., "LO-FI PAD" → "Lo-Fi
+  Pad").
 
 Every proposal is shown, can be edited, and can be unticked. New names go into the `.pgdata` and
 its file name. Source files are not changed, and unpacking keeps names as they are.
@@ -233,7 +236,9 @@ the layout, so the unpacked `.pro` is always in the current format, `W3_PROG_5`.
 
 ## On the 3rd Wave
 
-Checked on an 8M and a 24M (OS 2.0d). What the 3rd Wave does when it imports a file:
+Checked on an 8M (OS 2.0d), and the points about older programs and exporting on a 24M as well
+([`docs/FORMATS.md`](docs/FORMATS.md#7-what-the-3rd-wave-does-on-import) says which). What the
+3rd Wave does when it imports a file:
 
 - **A table the 3rd Wave already has** (same content, in any slot, whatever its name) is reused. No
   slot is used, and the 3rd Wave keeps its own name for it.
@@ -286,7 +291,7 @@ or inferred. In brief:
 ## Verification
 
 Run against about 2,700 real files: Groove Synthesis's factory banks (8M, and 24-voice versions 1
-and 2b), sample library and OS 1.8 example files, plus ten third-party sound sets. These checks
+and 2b), sample library and OS 1.8 example files, plus nine third-party program sets. These checks
 use the `tw3pg` developer tool, which keeps each table as it was; the app's own repack lists
 factory tables instead of embedding them, so its output differs there by design.
 
@@ -294,7 +299,7 @@ factory tables instead of embedding them, so its output differs there by design.
   files are upgraded to v5).
 - All 221 `.pgdata` files unpack and repack identically, up to the `.pro` format's six-decimal
   float precision (the 3rd Wave's own `.pro` export has the same limit).
-- All 314 embedded wavetables are bit-identical to the `.wt` files they came from.
+- All 325 embedded wavetables compared are bit-identical to the `.wt` files they came from.
 - Packing Groove Synthesis's factory `.pro` files reproduces the structure of their `.pgdata` (19
   for the 8M, 19 for the 24-voice models): the same sources, in the same order, with the same
   samples. What differs: Groove Synthesis's files embed the factory tables and this app lists them
@@ -305,8 +310,8 @@ factory tables instead of embedding them, so its output differs there by design.
 
 ## Tests on the 3rd Wave
 
-The behaviour under "On the 3rd Wave" was checked on an 8M and a 24M (both
-OS 2.0d), along with name lengths and the 3rd Wave's own export file names. The conversion of older
+The behaviour under "On the 3rd Wave" was checked on an 8M (OS 2.0d), parts of it on a 24M as
+well, along with name lengths and the 3rd Wave's own export file names. The conversion of older
 programs was worked out from 599 programs bulk-imported and exported again on the two, and
 programs converted and packed by this app were imported on both. The 3rd Wave's exports were also
 unpacked and repacked byte for byte with `tw3pg`. The test `.pgdata` files are built with `tw3pg`
@@ -315,8 +320,9 @@ files, two third-party programs, and a small `.bin`).
 
 Still unknown: whether the 3rd Wave reuses a multisample it already has (as it does for wavetables);
 whether its bulk import sorts file names plainly or by number; how it writes non-ASCII letters in
-file names; whether a 24K converts older programs exactly as the 24M does; and the meaning of most
-program values.
+file names; whether a 24K converts older programs exactly as the 24M does; whether **Import unified
+program data file** applies the 3rd Wave's fixes to its 2022 factory programs; and the meaning of
+most program values.
 
 ## Layout
 
@@ -328,6 +334,7 @@ Sources/PgdataFormats/   formats and packing logic, no UI (tested on Linux and m
   Multisample.swift         .bin and the shared sample record
   UnifiedProgram.swift      .pgdata
   PackUnpack.swift          Packer / Unpacker
+  ProgramConverter.swift    older programs to the current layout, as Import program converts them
   Workbench.swift           factory library, pack and unpack plans, output file names
   NameCleaner.swift         Clean Up Names
   FactoryCatalog.swift      factory table names and fingerprints (generated)
@@ -336,7 +343,7 @@ Sources/PgdataPacker/       the app (SwiftUI)
 Resources/                  app icon, drawn by tools/make-icon.py (needs cairosvg and Pillow)
 docs/                       FORMATS.md (format reference) and the screenshots used in this README
 Sources/tw3pg/              developer harness: inspect, roundtrip, unpack, repack, compare, wtcheck,
-                            factory-catalog, pack, and the 3rd Wave-test builders
+                            factory-catalog, pack, convert, convertcheck, and the 3rd Wave-test builders
 Tests/PgdataFormatsTests/
 ```
 

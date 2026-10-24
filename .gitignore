@@ -5,3 +5,5 @@
 hw-tests/
 build/
 *.bundle
+*.zip
+*.dSYM

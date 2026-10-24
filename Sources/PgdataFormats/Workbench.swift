@@ -309,9 +309,7 @@ public struct PackPlan {
             packed = trimmed
         }
         let srcs = packed.sources
-        if program.name.count > NameCleaner.fieldLimit {
-            warnings.append("The program name is \(program.name.count) characters; the 3rd Wave keeps \(NameCleaner.fieldLimit), so it is cut to \"\(String(program.name.prefix(NameCleaner.fieldLimit)))\".")
-        }
+        warnings += nameWarnings(program.name, what: "The program name")
         let originalSrcs = original?.sources ?? srcs
         let predates = predates2025FactoryTables(program)
         var rows: [Row] = []
@@ -373,9 +371,7 @@ public struct PackPlan {
                 let f = files.first { $0.id == id }!
                 embeds = true
                 let name = packedName(f)
-                if name.count > NameCleaner.fieldLimit {
-                    warnings.append("\(f.url.lastPathComponent): the name \"\(name)\" is \(name.count) characters; the 3rd Wave keeps \(NameCleaner.fieldLimit), so it is cut to \"\(String(name.prefix(NameCleaner.fieldLimit)))\".")
-                }
+                warnings += nameWarnings(name, what: "\(f.url.lastPathComponent): the name \"\(name)\"")
                 if case let .multisample(m) = f.body {
                     bytes = multisampleBytes(m)
                     status = .ok("Embeds \"\(name)\" (\(f.url.lastPathComponent)); stored in a free S slot on import")
@@ -430,6 +426,22 @@ public struct PackPlan {
                         estimatedBytes: total)
     }
 
+    /// Why a name will not be stored as written: too long for the 3rd Wave's 31-byte fields, or
+    /// holding characters outside the single-byte range they use (stored as "?").
+    static func nameWarnings(_ name: String, what: String) -> [String] {
+        var out: [String] = []
+        let n = NameField.storedLength(name)
+        if n > NameCleaner.fieldLimit {
+            let cut = String(String.UnicodeScalarView(name.unicodeScalars.prefix(NameCleaner.fieldLimit)))
+            out.append("\(what) is \(n) characters; the 3rd Wave keeps \(NameCleaner.fieldLimit), so it is cut to \"\(cut)\".")
+        }
+        let lost = NameField.unstorable(in: name)
+        if !lost.isEmpty {
+            out.append("\(what) has \(lost.count == 1 ? "a character" : "characters") the 3rd Wave's name fields cannot hold (\(lost.map { "\u{201C}\($0)\u{201D}" }.joined(separator: ", "))); \(lost.count == 1 ? "it is" : "they are") written as \"?\".")
+        }
+        return out
+    }
+
     /// U48–U55: user slots until Groove Synthesis added them to the factory set in 2025 (files dated
     /// April 2025, shipped with OS 1.9).
     public static func is2025FactorySlot(_ ref: SourceRef) -> Bool {
@@ -475,9 +487,9 @@ public struct PackPlan {
         Until 2025, U48–U55 were user slots, where people loaded their own wavetables. Groove Synthesis then made them factory slots. Loaded as it is, this program would play the factory \(one ? "table" : "tables") \(factoryList) instead of the \(one ? "one" : "ones") the author used.
 
         To fix it, do one of these:
-        • Add the author's wavetable \(one ? "file" : "files") for \(list). Program sets that use these slots usually include them, often named with the slot (for example "\(first.label) Name.wt"). A file whose name starts with the slot is assigned to it automatically; otherwise, choose Choose what to play… in the slot's Plays menu and pick the file. \(one ? "The table is" : "The tables are") then included in the .pgdata, and the 3rd Wave stores \(one ? "it in a free slot" : "them in free slots") when it imports the file.
+        • Add the author's wavetable \(one ? "file" : "files") for \(list). Program sets that use these slots usually include them, often named with the slot (for example "\(first.label) Name.wt"). A file whose name starts with the slot is assigned to it automatically; otherwise, use Choose what to play… in the slot's Plays menu and pick the file. \(one ? "The table is" : "The tables are") then included in the .pgdata, and the 3rd Wave stores \(one ? "it in a free slot" : "them in free slots") when it imports the file.
         • Point the oscillators to a different wavetable you have: Choose what to play… in the slot's Plays menu.
-        • Use the factory \(one ? "table" : "tables") anyway: \(one ? "in the slot's Plays menu, choose Factory \(fname(first))" : "in each slot's Plays menu, choose its factory table (Factory \(fname(first)) for \(first.label), and so on)"). Choose this if you know the program was made for \(one ? "it" : "them"), or you accept a different sound.
+        • Use the factory \(one ? "table" : "tables") anyway: \(one ? "in the slot's Plays menu, choose Factory table — \(factory.name(first) ?? "")" : "in each slot's Plays menu, choose its factory table (Factory table — \(factory.name(first) ?? "") for \(first.label), and so on)"). Choose this if you know the program was made for \(one ? "it" : "them"), or you accept a different sound.
         """
         return Note(title: title, body: body)
     }
@@ -522,11 +534,13 @@ public struct PackPlan {
 // MARK: - File names
 
 public enum OutputNames {
-    /// Removes characters that are awkward in file names on macOS and on the 3rd Wave's drive.
+    /// Removes characters that are not allowed in file names on macOS or on the 3rd Wave's USB
+    /// drive (a FAT volume, where `* ? " < > |` and a trailing dot are also illegal). [inferred: the
+    /// drive's file system has not been checked]
     public static func sanitize(_ s: String) -> String {
-        let bad = CharacterSet(charactersIn: "/:\\\0").union(.controlCharacters)
+        let bad = CharacterSet(charactersIn: "/:\\\0*?\"<>|").union(.controlCharacters)
         let t = s.unicodeScalars.map { bad.contains($0) ? "_" : String($0) }.joined()
-        let trimmed = t.trimmingCharacters(in: .whitespaces)
+        let trimmed = t.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: ".")))
         return trimmed.isEmpty ? "Untitled" : trimmed
     }
 
@@ -609,6 +623,12 @@ public struct UnpackPlan {
         /// Content identical to the factory table in the same slot (writing it is optional).
         public var isFactoryDuplicate: Bool
         public var write: Bool
+        /// The name generated for the file, which an emptied name field falls back to.
+        public var defaultFileName: String = ""
+        /// For a wavetable: the content's fingerprint and name, so the plan can be refreshed
+        /// without re-serialising the table.
+        public var fingerprint: UInt64? = nil
+        public var contentName: String? = nil
     }
 
     public var programName: String
@@ -619,25 +639,44 @@ public struct UnpackPlan {
 
     public static func make(_ u: UnifiedProgram, factory: FactoryLibrary, skipFactoryDuplicates: Bool) -> UnpackPlan {
         let up = Unpacker.unpack(u)
-        var items: [Item] = [Item(ref: nil, fileName: OutputNames.program(up.program), data: up.program.serialized(),
+        let programName = OutputNames.program(up.program)
+        var items: [Item] = [Item(ref: nil, fileName: programName, data: up.program.serialized(),
                                   description: "Program (\(up.program.values.count + 2) lines)",
-                                  isFactoryDuplicate: false, write: true)]
+                                  isFactoryDuplicate: false, write: true, defaultFileName: programName)]
         for (ref, w) in up.wavetables {
-            let dup = factory.tables[ref]?.fingerprint == w.fingerprint
-            var desc = "\(ref.label) wavetable \"\(w.name)\""
-            if dup { desc += " — identical to the factory table" }
-            else if let f = factory.slot(withFingerprint: w.fingerprint) { desc += " — identical to factory \(f.label)" }
-            items.append(Item(ref: ref, fileName: OutputNames.wavetable(ref, w), data: w.serialized(), description: desc,
-                              isFactoryDuplicate: dup, write: !(dup && skipFactoryDuplicates)))
+            let fp = w.fingerprint
+            let name = OutputNames.wavetable(ref, w)
+            items.append(Item(ref: ref, fileName: name, data: w.serialized(), description: "",
+                              isFactoryDuplicate: false, write: true, defaultFileName: name, fingerprint: fp, contentName: w.name))
         }
         for (ref, m) in up.multisamples {
             let secs = m.samples.reduce(0.0) { $0 + Double($1.length) / Double(max($1.sampleRate, 1)) }
-            items.append(Item(ref: ref, fileName: OutputNames.multisample(ref, m), data: m.binData(),
+            let name = OutputNames.multisample(ref, m)
+            items.append(Item(ref: ref, fileName: name, data: m.binData(),
                               description: "\(ref.label) multisample \"\(m.name)\", \(m.samples.count) sample\(m.samples.count == 1 ? "" : "s"), "
                                 + String(format: "%.1f s", secs),
-                              isFactoryDuplicate: false, write: true))
+                              isFactoryDuplicate: false, write: true, defaultFileName: name))
         }
         return UnpackPlan(programName: up.program.name, items: items, referenced: up.referenced, notes: up.notes)
+            .refreshed(factory: factory, skipFactoryDuplicates: skipFactoryDuplicates, resetWrite: true)
+    }
+
+    /// The plan with its wavetable descriptions and factory-duplicate flags recomputed, without
+    /// re-serialising anything. File names and Write choices are kept, except that a factory
+    /// duplicate's Write follows `skipFactoryDuplicates` (every item's does with `resetWrite`).
+    public func refreshed(factory: FactoryLibrary, skipFactoryDuplicates: Bool, resetWrite: Bool = false) -> UnpackPlan {
+        var plan = self
+        for j in plan.items.indices {
+            guard let ref = plan.items[j].ref, let fp = plan.items[j].fingerprint, let name = plan.items[j].contentName else { continue }
+            let dup = factory.tables[ref]?.fingerprint == fp
+            var desc = "\(ref.label) wavetable \"\(name)\""
+            if dup { desc += " — identical to the factory table" }
+            else if let f = factory.slot(withFingerprint: fp) { desc += " — identical to factory \(f.label)" }
+            plan.items[j].description = desc
+            plan.items[j].isFactoryDuplicate = dup
+            if dup || resetWrite { plan.items[j].write = !(dup && skipFactoryDuplicates) }
+        }
+        return plan
     }
 }
 

@@ -14,16 +14,6 @@ enum Panels {
         return p.runModal() == .OK ? p.url : nil
     }
 
-    static func chooseFile(types: [String], message: String) -> URL? {
-        let p = NSOpenPanel()
-        p.canChooseFiles = true
-        p.canChooseDirectories = false
-        p.allowsMultipleSelection = false
-        p.allowedContentTypes = types.compactMap { UTType(filenameExtension: $0) }
-        p.message = message
-        return p.runModal() == .OK ? p.url : nil
-    }
-
     static func chooseFiles(message: String) -> [URL] {
         let p = NSOpenPanel()
         p.canChooseFiles = true
@@ -33,18 +23,8 @@ enum Panels {
         return p.runModal() == .OK ? p.urls : []
     }
 
-    /// `details`, when given, goes in a scrolling text area below the message (one item per line).
-    /// An alert with several buttons (first one is the default). Returns the index of the button
-    /// pressed. `details`, when given, goes in a scrolling text area.
-    static func choose(title: String, message: String, details: String? = nil, buttons: [String]) -> Int {
-        let a = NSAlert()
-        a.messageText = title
-        a.informativeText = message
-        if let d = details, !d.isEmpty { a.accessoryView = AlertPresenter.textArea(d) }
-        for b in buttons { a.addButton(withTitle: b) }
-        return a.runModal().rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
-    }
-
+    /// A confirmation with one action button and Cancel. `details`, when given, goes in a scrolling
+    /// text area below the message (one item per line).
     static func confirm(title: String, message: String, details: String? = nil, ok: String) -> Bool {
         let a = NSAlert()
         a.messageText = title
@@ -55,9 +35,11 @@ enum Panels {
         return a.runModal() == .alertFirstButtonReturn
     }
 
-    /// What `write` did: how many files it wrote and what went wrong, or nil when cancelled.
+    /// What `write` did: how many files it wrote (and which, as indices into the list given), and
+    /// what went wrong; nil when cancelled.
     struct WriteResult {
         var written: Int
+        var writtenIndices: Set<Int> = []
         var failed: [String]
     }
 
@@ -112,10 +94,10 @@ enum Panels {
             }
         }
         var result = WriteResult(written: 0, failed: [])
-        for p in planned {
+        for (i, p) in planned.enumerated() {
             do {
                 try fm.createDirectory(at: p.url.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try p.data.write(to: p.url, options: .atomic); result.written += 1
+                try p.data.write(to: p.url, options: .atomic); result.written += 1; result.writtenIndices.insert(i)
             } catch {
                 result.failed.append("\(shown(p.url)): \(error.localizedDescription)")
                 if result.failed.count >= 3 && result.written == 0 {

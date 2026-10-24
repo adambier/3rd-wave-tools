@@ -100,7 +100,7 @@ struct LogBar: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Label("Drop .pro, .wt, .bin or .pgdata files anywhere in the window to add them", systemImage: "arrow.down.doc")
+                Label("Drop .pro, .wt, .bin or .pgdata files onto the page above to add them", systemImage: "arrow.down.doc")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             .padding(.horizontal, 10).padding(.vertical, 6)

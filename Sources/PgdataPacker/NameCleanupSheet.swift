@@ -114,7 +114,7 @@ struct NameCleanupSheet: View {
     private func apply() {
         var n = 0
         for r in toApply {
-            let new = String(proposed(r).prefix(NameCleaner.fieldLimit))
+            let new = String(String.UnicodeScalarView(proposed(r).unicodeScalars.prefix(NameCleaner.fieldLimit)))
             if r.isProgram { state.setProgramName(r.id, new) } else { state.contentNames[r.id] = new }
             n += 1
         }
@@ -126,12 +126,21 @@ struct NameCleanupSheet: View {
 
 /// Warns when a name is longer than a name field holds (31 characters). The 3rd Wave displays all 31
 /// for programs, wavetables and multisamples [verified, T6].
+/// Flags a name the 3rd Wave will not store as written: too long for its 31-character fields, or
+/// holding characters outside the single-byte range they use (an en dash, curly quotes, accents
+/// typed as separate marks), which are stored as "?".
 struct NameLengthNote: View {
     let name: String
     var body: some View {
-        if name.count > NameCleaner.fieldLimit {
+        let n = NameField.storedLength(name)
+        let lost = NameField.unstorable(in: name)
+        if n > NameCleaner.fieldLimit {
             Label("Too long: cut to \(NameCleaner.fieldLimit)", systemImage: "xmark.octagon").foregroundStyle(.red)
-                .help("Name fields on the 3rd Wave hold \(NameCleaner.fieldLimit) characters. This name is \(name.count); it will be cut to \"\(String(name.prefix(NameCleaner.fieldLimit)))\".")
+                .help("Name fields on the 3rd Wave hold \(NameCleaner.fieldLimit) characters. This name is \(n); it will be cut to \"\(String(String.UnicodeScalarView(name.unicodeScalars.prefix(NameCleaner.fieldLimit))))\".")
+        }
+        if !lost.isEmpty {
+            Label("\(lost.map { "\u{201C}\($0)\u{201D}" }.joined(separator: " ")) → ?", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                .help("Name fields on the 3rd Wave hold single-byte characters only. \(lost.count == 1 ? "This character is" : "These characters are") written as \"?\": \(lost.map { "\u{201C}\($0)\u{201D}" }.joined(separator: ", ")). Replace \(lost.count == 1 ? "it" : "them") with plain equivalents (e.g., a hyphen for a dash, straight quotes) to keep the name as you typed it.")
         }
     }
 }

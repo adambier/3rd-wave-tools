@@ -13,6 +13,8 @@ import PgdataFormats
 //   tw3pg convert <in.pro> <out.pro> [8m|24]         convert an older program to the OS 2.0d layout
 //   tw3pg convertcheck <in dir> <3rd Wave export dir> [8m|24]   convert each input (sorted) and compare with
 //                                        what the 3rd Wave's bulk import made of it (B05P001… in order)
+//   tw3pg wtcheck <dir>...               check every .wt reads and rewrites exactly
+//   tw3pg maketests | maketest5 | maketest6 ...   build the hardware-test files (see each command's usage line)
 
 func files(under paths: [String], ext: Set<String>) -> [URL] {
     var out: [URL] = []
@@ -74,9 +76,20 @@ let args = Array(CommandLine.arguments.dropFirst())
 func need(_ n: Int, _ rest: [String], _ usage: String) {
     if rest.count < n { print("usage: tw3pg " + usage); exit(2) }
 }
-guard let cmd = args.first else { print("usage: tw3pg inspect|roundtrip|unpack|repack|compare|factory-catalog|pack ..."); exit(2) }
+guard let cmd = args.first else {
+    print("usage: tw3pg inspect|roundtrip|unpack|repack|compare|factory-catalog|pack|convert|convertcheck|wtcheck|maketests|maketest5|maketest6 ...")
+    exit(2)
+}
 let rest = Array(args.dropFirst())
+// For the commands whose arguments are all existing files or folders, a path that does not exist
+// is a typo, not an empty result.
+if ["inspect", "roundtrip", "repack", "compare", "wtcheck", "convertcheck"].contains(cmd) {
+    for a in rest where a != "8m" && a != "24" && !FileManager.default.fileExists(atPath: a) {
+        print("error: no such file or folder: \(a)"); exit(1)
+    }
+}
 
+do {
 switch cmd {
 case "convert":
     need(2, rest, "convert <in.pro> <out.pro> [8m|24]")
@@ -255,8 +268,7 @@ case "wtcheck":
 
 case "maketests":
     need(4, rest, "maketests <factory .pro using U07> <a .wt already on the 3rd Wave> <a W3_PROG_4 .pro> <outdir>")
-    // tw3pg maketests <factory .pro using U07> <a .wt already on the 3rd Wave> <a W3_PROG_4 .pro> <outdir>
-    // Builds the hardware-test .pgdata files described in the README's "synth tests" section.
+    // Builds the hardware-test .pgdata files for tests T1–T4 and T6 (hw-tests/TESTS.md, not in the repository).
     let base = try ProgramFile(data: try load(URL(fileURLWithPath: rest[0])))
     let existing = try WavetableFile(data: try load(URL(fileURLWithPath: rest[1])))
     let v4 = try ProgramFile(data: try load(URL(fileURLWithPath: rest[2])))
@@ -355,4 +367,7 @@ case "maketest5":
 
 default:
     print("unknown command \(cmd)"); exit(2)
+}
+} catch {
+    print("error: \((error as? FormatError)?.description ?? (error as? PackError)?.description ?? error.localizedDescription)"); exit(1)
 }

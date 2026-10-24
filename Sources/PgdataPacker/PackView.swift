@@ -44,18 +44,21 @@ struct PackView: View {
                 .help("Propose tidier names for the programs and the files you added (e.g., slot numbers removed, title case). Factory wavetables keep their names.")
                 .sheet(isPresented: $state.showNameCleanup) { NameCleanupSheet(state: state) }
             Spacer()
-            Button("Remove Selected") { state.removePrograms(selection); selection = [] }.disabled(selection.isEmpty)
+            Button("Remove Selected") { state.removePrograms(visibleSelection); selection = [] }.disabled(visibleSelection.isEmpty)
                 .help("Remove the selected programs from this list (the files are not touched)")
             Button("Remove All…") { state.removeAllPack(); if state.programs.isEmpty { selection = [] } }
                 .disabled(state.programs.isEmpty && state.contentFiles.isEmpty)
                 .help("Remove every program and added file from this page (the files are not touched)")
-            Button("Pack Selected…") { state.writeUnified(Array(selection)) }.disabled(selection.isEmpty)
+            Button("Pack Selected…") { state.writeUnified(Array(visibleSelection)) }.disabled(visibleSelection.isEmpty)
             Button("Pack All…") { state.writeUnified(state.programs.map(\.id)) }.disabled(state.programs.isEmpty)
                 .keyboardShortcut("s", modifiers: [.command, .shift])
                 .buttonStyle(.borderedProminent)
         }
         .padding(10)
     }
+
+    /// The selection without rows the filter hides (the list keeps those selected out of sight).
+    private var visibleSelection: Set<UUID> { selection.intersection(shownPrograms.map(\.id)) }
 
     /// Programs matching the filter field and, when asked, only those needing attention.
     private var shownPrograms: [AppState.PackItem] {
@@ -98,10 +101,10 @@ struct PackView: View {
                 }
             }
             .visibleScrollers()
-            .onDeleteCommand { state.removePrograms(selection); selection = [] }
+            .onDeleteCommand { state.removePrograms(visibleSelection); selection = [] }
             .overlay {
                 if state.programs.isEmpty {
-                    ListPlaceholder(text: "No programs yet. Drop .pro files anywhere in the window, or click Add Files or Folders…")
+                    ListPlaceholder(text: "No programs yet. Drop .pro files onto this page, or click Add Files or Folders…")
                 } else if shownPrograms.isEmpty {
                     ListPlaceholder(text: "No programs match the filter.")
                 }
@@ -177,7 +180,7 @@ struct ProgramDetail: View {
                 Label(c, systemImage: "arrow.triangle.2.circlepath").foregroundStyle(.secondary)
             }
             if let note = plan.userSlotNote { UserSlotNoteBox(note: note) }
-            ForEach(plan.warnings, id: \.self) { w in
+            ForEach(Array(plan.warnings.enumerated()), id: \.offset) { _, w in
                 Label(w, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
             }
             Table(plan.rows) {
@@ -374,7 +377,7 @@ struct ContentFilesTable: View {
             .visibleScrollers()
             .overlay {
                 if st.contentFiles.isEmpty {
-                    ListPlaceholder(text: "No wavetables or samples yet. Drop .wt and .bin files anywhere in the window, or click Add Files or Folders…")
+                    ListPlaceholder(text: "No wavetables or samples yet. Drop .wt and .bin files onto this page, or click Add Files or Folders…")
                 }
             }
         }
@@ -439,7 +442,7 @@ struct UsageCell: View {
         if let note {
             HStack(spacing: 6) {
                 Label(short(note), systemImage: "exclamationmark.triangle").foregroundStyle(.orange).lineLimit(1).help(note)
-                if !file.isSample, !state.programs.isEmpty {
+                if !file.isSample, !state.programs.isEmpty, !state.isFactoryCopy(file) {
                     Button("Point a program here…") { state.repointRequest = .init(fileID: file.id) }
                         .buttonStyle(.link)
                         .help("Choose a program and the oscillators that should play this file")

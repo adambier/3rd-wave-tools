@@ -252,12 +252,24 @@ struct WriteToggleCell: View {
     }
 }
 
+/// The file name, edited freely and cleaned when editing ends (Return or leaving the field), so
+/// typing a space does not have it trimmed away under the cursor.
 struct FileNameCell: View {
     @ObservedObject var state: AppState
     let unpackID: UUID
     let file: UnpackPlan.Item
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
     var body: some View {
-        TextField("", text: Binding(get: { file.fileName }, set: { state.setUnpackItem(unpackID, file.id, fileName: $0) }))
+        TextField("", text: $text)
             .textFieldStyle(.roundedBorder)
+            .focused($focused)
+            .onAppear { text = file.fileName }
+            .onChange(of: file.fileName) { text = $0 }
+            .onSubmit { commit() }
+            .onChange(of: focused) { if !$0 { commit() } }
     }
+
+    private func commit() { text = state.commitUnpackFileName(unpackID, file.id, text) }
 }
