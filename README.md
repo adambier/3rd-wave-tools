@@ -20,8 +20,11 @@ Download `pgdata-Packer-<version>.zip` from the
 [latest release](https://github.com/adambier/3rd-wave-tools/releases/latest), unzip it, and move
 the app wherever you like, for example to your Applications folder. The app is signed with a
 Developer ID and notarized by Apple, so it opens like any other app, on Apple Silicon and Intel
-Macs. Requires macOS 13 or later. From 1.0.4, the app checks for updates itself (**Check for
-Updates…** in the app menu), using [Sparkle](https://sparkle-project.org).
+Macs. Requires macOS 13 or later.
+
+From 1.0.4, the app updates itself, using [Sparkle](https://sparkle-project.org): on its second
+launch it asks whether to check automatically, and **Check for Updates…** in the app menu checks
+at any time. **Release Notes** in the Help menu opens the notes for the version you have.
 
 ## Build
 
@@ -36,13 +39,15 @@ cd 3rd-wave-tools
 open "pgdata Packer.app"
 ```
 
-An app built on your own Mac is signed only for that Mac (an "ad-hoc" signature); it opens
-normally there, and macOS warns about it elsewhere.
+The first build downloads Sparkle from GitHub (checked against its SHA-256 and kept in `build/`),
+so it needs a network connection; later builds work offline. An app built on your own Mac is
+signed only for that Mac (an "ad-hoc" signature); it opens normally there, and macOS warns about
+it elsewhere.
 
 The tests (`./run-tests.sh`) need a full Xcode installation (15 or later) on a Mac; on Linux,
 `swift test` runs them directly. (`Package.swift` includes the test target only when
 `PGDATA_TESTS=1` is set, which the script does, so that a plain `swift build` works with the
-command-line tools alone.)
+command-line tools alone. Such a build has no Sparkle, so no **Check for Updates…**.)
 
 ## Using it
 
@@ -96,7 +101,7 @@ the app lists its oscillator sources and what each will be:
   A file named with its slot (e.g., `U48 Warm Pad.wt`, `S010_Strings.bin`) is assigned to it
   automatically; assign others in the Slot column. One assignment serves every loaded program that
   uses the slot, with two safeguards for factory slots: a file in U48–U55 is used only by programs
-  from before 2025 (later programs keep the factory table, and can still choose the file in the
+  saved before OS 1.9 (later programs keep the factory table, and can still choose the file in the
   Plays menu), and a file in any other factory slot is used but flagged, in the program's status and
   in the report after packing, as replacing the factory table;
 - **for a factory slot: the factory table,** listed but not embedded. An added file identical to it
@@ -138,8 +143,8 @@ wavetable is missing) opens a sheet. Tick the oscillators to change, then pick w
 play:
 
 - a file you added (listed first). When the program needs a slot that has nothing yet (e.g., U57),
-  the sheet preselects an unused file and assigns it to that slot, so the oscillators stay as they
-  are;
+  the sheet preselects an added file that has no slot yet and assigns it to that slot, so the
+  oscillators stay as they are;
 - any factory U or P slot (searchable by slot or name);
 - an analog wave (A00–A06).
 
@@ -151,8 +156,8 @@ The Source column then shows, for example, **U01 → U56**, with a button to und
 Parts 3 and 4 play only on the 4-part models (24K, 24M). In every program saved on an 8M seen so
 far, they hold filler (P02, U01, and an analog wave).
 
-Added files that no program uses are flagged in the files table ("Not used by any added program", or
-"another choice is made for U57" when the slot is filled some other way). **Point a program
+Added files that no program uses are flagged in the files table ("Not used", or "Not used: the
+slot plays something else" when the slot is filled some other way; the tooltip gives the reason). **Point a program
 here…** opens the same sheet for the file. Unused files are listed again after packing.
 
 #### Names
@@ -226,7 +231,7 @@ wavetable named with its slot (e.g., `U57_Warm Pad.wt`), and a `.bin` per multis
 Groove Synthesis's sample library names them (e.g., `S010_Strings.bin`).
 
 When a batch writes any wavetables or multisamples, the files go into the folders your 3rd Wave's
-USB drive uses: `PROGRAMS` for `.pro`, `WAVES` for `.wt` and `AUDIO` for `.bin`, so you can copy
+USB drive uses: `PROGRAMS` for `.pro`, `WAVES` for `.wt`, and `AUDIO` for `.bin`, so you can copy
 them onto the drive as they are. A batch of programs alone is written straight into the folder
 you choose.
 
@@ -238,7 +243,8 @@ files to see everything they will produce in one list, with the program each fil
 ![The Unpack page with five .pgdata files selected: the multisamples to import first, the factory slots their programs play from your 3rd Wave, and each file they will produce with its program, file name, and contents](docs/unpack-window.png)
 
 Untick anything you don't want, or rename it, before **Unpack Selected…** or **Unpack All…**.
-Wavetables identical to the factory table in their slot are skipped by default: the 3rd Wave's own
+Wavetables identical to the factory table in their slot are skipped by default (**Skip factory
+wavetables**): the 3rd Wave's own
 export embeds factory tables too, and a repack lists them anyway. Unpacked names are kept as they
 are.
 
@@ -285,7 +291,7 @@ Checked on an 8M (OS 2.0d), and most points on a 24M as well
 ## Formats
 
 [`docs/FORMATS.md`](docs/FORMATS.md) is the full reference: what is known about `.pro`, `.pgdata`,
-`.wt` and `.bin` files and the oscillator source ids, how the 3rd Wave converts older programs, and
+`.wt`, and `.bin` files and the oscillator source ids, how the 3rd Wave converts older programs, and
 what is still open. Each statement there says whether it was checked on a 3rd Wave, seen in files,
 or inferred. In brief:
 
@@ -309,7 +315,7 @@ and 2b), sample library, and OS 1.8 example files, plus nine third-party program
 use the `tw3pg` developer tool, which keeps each table as it was; the app's own repack lists
 factory tables instead of embedding them, so its output differs there by design.
 
-- Every `.pro`, `.wt`, `.pgdata` and v5 `.bin` reads and rewrites byte for byte (v1 and v4 `.bin`
+- Every `.pro`, `.wt`, `.pgdata`, and v5 `.bin` reads and rewrites byte for byte (v1 and v4 `.bin`
   files are upgraded to v5).
 - All 221 `.pgdata` files unpack and repack identically, up to the `.pro` format's six-decimal
   float precision (the 3rd Wave's own `.pro` export has the same limit).
@@ -324,10 +330,10 @@ factory tables instead of embedding them, so its output differs there by design.
 
 ## Tests on the 3rd Wave
 
-The behaviour under "On the 3rd Wave" was checked on an 8M (OS 2.0d), parts of it on a 24M as
-well, along with name lengths and the 3rd Wave's own export file names. The conversion of older
-programs was worked out from 599 programs bulk-imported and exported again on the two, and
-programs converted and packed by this app were imported on both. The 3rd Wave's exports were also
+Besides the import behaviour above, name lengths and the 3rd Wave's own export file names were
+checked on the 3rd Wave. The conversion of older programs was worked out from 599 programs
+bulk-imported and exported again on an 8M and a 24M, and programs converted and packed by this
+app were imported on both. The 3rd Wave's exports were also
 unpacked and repacked byte for byte with `tw3pg`. The test `.pgdata` files are built with `tw3pg`
 from files that are not included here (a Groove Synthesis factory program and one of its `.wt`
 files, two third-party programs, and a small `.bin`).
@@ -351,11 +357,12 @@ Sources/PgdataFormats/   formats and packing logic, no UI (tested on Linux and m
   FactoryCatalog.swift      factory table names and fingerprints (generated)
   ByteIO.swift              byte reading and writing, 32-byte name fields
 Sources/PgdataPacker/       the app (SwiftUI)
-Resources/                  app icon, drawn by tools/make-icon.py (needs cairosvg and Pillow)
-docs/                       FORMATS.md (format reference) and the screenshots used in this README
 Sources/tw3pg/              developer harness: inspect, roundtrip, unpack, repack, compare, wtcheck,
                             factory-catalog, pack, convert, convertcheck, and the 3rd Wave-test builders
-Tests/PgdataFormatsTests/
+Tests/PgdataFormatsTests/   unit tests (./run-tests.sh)
+Resources/                  app icon, drawn by tools/make-icon.py (needs cairosvg and Pillow)
+docs/                       FORMATS.md (format reference) and the screenshots used in this README
+make-app.sh                 builds, signs, and notarizes the app; embeds Sparkle; writes the appcast
 ```
 
 ## License
