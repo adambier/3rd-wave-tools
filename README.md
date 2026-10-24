@@ -204,8 +204,9 @@ Files are named in Groove Synthesis's own pattern, with the program location fir
   digits, hyphens and underscores is dropped (e.g., "Big Bass (MW)" → `Big_Bass_MW`). This affects
   the file name only, not the program name inside it.
 - A batch that includes a program 100 uses three digits throughout (e.g., `B05P087_…`,
-  `B05P100_…`). The 3rd Wave itself writes `B05P09_…` and `B05P100_…`, but in plain alphabetical order
-  `B05P100` sorts between `B05P10` and `B05P11`, which could put it out of order in a bulk import.
+  `B05P100_…`). The 3rd Wave itself writes `B05P09_…` and `B05P100_…`, but its bulk import takes
+  files in plain character order, where `B05P100` sorts between `B05P10` and `B05P11` (checked on a
+  24M), which would put it out of order.
 - If any program being written has no location in its file name (for example, a renamed file, or a
   `.pro` written by Unpack), all of them are numbered by their place in the batch instead (e.g.,
   `001_…`, `002_…`).
@@ -323,10 +324,9 @@ from files that are not included here (a Groove Synthesis factory program and on
 files, two third-party programs, and a small `.bin`).
 
 Still unknown: whether the 3rd Wave reuses a multisample it already has (as it does for wavetables);
-whether its bulk import sorts file names plainly or by number; how it writes non-ASCII letters in
-file names; whether a 24K converts older programs exactly as the 24M does; whether **Import unified
-program data file** applies the 3rd Wave's fixes to its 2022 factory programs; and the meaning of
-most program values.
+how it writes non-ASCII letters in file names; whether a 24K converts older programs exactly as
+the 24M does; whether **Import unified program data file** applies the 3rd Wave's fixes to its 2022
+factory programs; and the meaning of most program values.
 
 ## Layout
 

@@ -626,8 +626,9 @@ Verified on an 8M (OS 2.0d) unless a note says otherwise.
 - **An 8M fits every imported program to two parts** (section 6.4), and each model sets a few
   values of its own on every import (section 6.3). [verified on both]
 - **The `.pgdata` import takes the first `.pgdata` file in `PROGRAMS`**, in alphabetical order; it
-  does not offer a choice. [verified on the 24M] **Bulk program import** takes the files in
-  alphabetical order. [verified]
+  does not offer a choice. [verified on the 24M] **Bulk program import** takes the files in plain
+  character order, so `B05P100` comes between `B05P10` and `B05P11`; a batch that includes a program
+  100 therefore needs three-digit numbers throughout. [verified on the 24M]
 - **An export onto an existing file does not shorten it.** When a bulk export replaced a longer file
   of the same name, the end of the old file remained after the new program. [observed once, on the
   24M] Empty `PROGRAMS` before exporting.
@@ -693,7 +694,6 @@ in section 6.5, plus float 102 on the 24M (section 6.3).
 - Whether the 3rd Wave plays the mipmap chain in the second half of a U `.wt` as given, or rebuilds it from the table on import (section 5.1).
 - Whether **Import program** accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
 - Whether multisamples are reused by content, as wavetables are.
-- Whether **Bulk program import** sorts file names plainly or by number (`B05P100` before or after `B05P10`).
 - The meaning of most part, float and global values, and of event fields *a* and *time*.
 
 ## Appendix: values for new positions
