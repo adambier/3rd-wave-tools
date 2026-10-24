@@ -198,7 +198,7 @@ section can come out a little larger. Each embedded U table adds about 0.5 MB, e
 the app asks first whether to pack the others. Existing files are never replaced without asking,
 and the report at the end can open the folder in the Finder.
 
-![The report after packing, listing the input files no packed program uses and, where it is not obvious, why](docs/pack-report.png)
+![The report after packing: every program was converted from an older format, and seven added files were left out because no packed program uses them](docs/pack-report.png)
 
 Files are named in Groove Synthesis's own pattern, with the program location first:
 `B05P87_Glass_Bells.pgdata`, as in Groove Synthesis's `B05P06_Glass_Cow_Bell_Transients.pgdata`.
