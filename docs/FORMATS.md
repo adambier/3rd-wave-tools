@@ -324,7 +324,7 @@ Plain text, LF or CRLF line ends. [observed: 92 factory files and others]
 
 - A **P table** has 16,384 values: 64 waves × 128 points, each point stored as a pair (sample, then
   the difference to the next sample, wrapping within the wave). See below.
-- A **U table** has 131,072 values: 64 waves × 2,048 samples.
+- A **U table** has 131,072 values: 64 waves × 1,024 samples, followed by smaller copies of them (below).
 - The file has no slot number; the slot is chosen when it is imported. [verified]
 - Number formatting varies between files: Groove Synthesis's factory P tables use 12–14 digits and
   exponents. pgdata Packer writes six decimals when that gives back the exact float, and the
@@ -366,14 +366,31 @@ waveform. U tables have no such boundary. The manual also says the 3rd Wave runs
 sample rate when a P table is selected. None of this is needed to read or write a `.wt`, but it is
 why a P table's last four waves look unrelated to the rest.
 
-**U tables** hold 64 waves of 2,048 plain samples (no differences), floats within ±1. [observed]
-Inside the 3rd Wave, however, a U table is 64 waves of 1,024 samples: its SysEx spec defines the
-U payload as 65,536 floats, "64 different waveforms ... each with a length of 1024 samples" (and
-the P payload as 8,192: 64 × 128), and the dumps agree. [official; observed on an 8M, OS 2.0] How
-the file's 2,048 become the 3rd Wave's 1,024 (every other sample, a resample, or something else)
-has not been checked (section 10). It matters for one thing: the 3rd Wave identifies a table by a
-hash of the samples as it holds them, so a `.wt` is matched against loaded tables only after that
-reduction.
+**U tables: the table and its mipmaps.** A U table is 64 waves of 1,024 samples: the manual's
+Wave Maker chapter says "the period length that the 3rd Wave uses is 1024 samples" and takes a
+64 × 1,024-sample `.wav` as a ready-made table, and the SysEx spec defines the U payload as
+65,536 floats, "64 different waveforms ... each with a length of 1024 samples". [official] The
+131,072 values of a U `.wt` are that table followed by progressively band-limited, smaller copies
+of the same 64 waves, in the order the 3rd Wave plays them at higher pitches (a mipmap chain):
+
+| Values | Content |
+|---|---|
+| 0 – 65,535 | the table: 64 waves × 1,024 samples |
+| 65,536 – 98,303 | the same 64 waves at 512 samples each |
+| 98,304 – 114,687 | at 256 samples each |
+| 114,688 – 122,879 | at 128 samples each, band-limited |
+| 122,880 – 126,975 | at 64 samples each, band-limited further |
+| 126,976 – 131,071 | at 64 samples each again, band-limited further still (only the lowest few harmonics) |
+
+[observed in all 56 factory U tables; verified on a 24M: a SysEx dump of U08 equals the file's first
+65,536 values exactly, and the 8M's own `.pgdata` exports carry all 131,072] Wave *f* of each level
+corresponds to wave *f* of the table, with the harmonic amplitudes of the base wave up to each
+level's cutoff and a small gain change; in tables made from recorded audio the smaller copies are
+also shifted in phase by a constant, so they were made with a real filter, not an ideal resample,
+and a writer cannot expect to reproduce them exactly. What the 3rd Wave does with a `.wt` whose
+second half is missing or wrong (ignore it and rebuild the chain, or play it as given) has not been
+tested; a converter should generate a plausible chain (band-limited resamples of its waves) until
+that is known. The P set has no such chain: PPG-style playback is meant to alias.
 
 *Background.* The PPG's own tables were mostly defined by a few stored key waves with the rest
 interpolated between them, and its wavetable 31 was a sample table (piano and saxophone) that the
@@ -673,7 +690,7 @@ in section 6.5, plus float 102 on the 24M (section 6.3).
 
 - Whether a 24K converts exactly as the 24M does.
 - Whether the `.pgdata` import applies the corrections of section 6.5 to an unconverted 2022 file.
-- How a U table's 2,048 samples per wave in a `.wt` relate to the 1,024 the 3rd Wave sends over SysEx (section 5.1).
+- Whether the 3rd Wave plays the mipmap chain in the second half of a U `.wt` as given, or rebuilds it from the table on import (section 5.1).
 - Whether **Import program** accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
 - Whether multisamples are reused by content, as wavetables are.
 - Whether **Bulk program import** sorts file names plainly or by number (`B05P100` before or after `B05P10`).
