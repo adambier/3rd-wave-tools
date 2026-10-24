@@ -14,14 +14,19 @@ confirmed on the 3rd Wave and what is inferred.
 
 ![The Pack page: the programs added on the left; for the selected program, what each oscillator source will play and whether it is embedded; below, the wavetables and multisamples added and the slots they go to](docs/pack-window.png)
 
+## Download
+
+Download `pgdata-Packer-<version>.zip` from the
+[latest release](https://github.com/adambier/pgdata-packer/releases/latest), unzip it, and move
+the app wherever you like, for example to your Applications folder. The app is signed with a
+Developer ID and notarized by Apple, so it opens like any other app, on Apple Silicon and Intel
+Macs. Requires macOS 13 or later.
+
 ## Build
 
-There is no download: the app is not notarised with Apple (that needs a paid developer account),
-and an app that isn't makes macOS show a security warning that has to be bypassed. Building it
-yourself takes a minute and avoids that; an app built on your own Mac opens normally.
-
-Requires macOS 13 or later and the Xcode command-line tools (`xcode-select --install`; Xcode 14.1
-or later, for the macOS 13 SDK). There is no Xcode project.
+Or build it yourself; it takes a minute. Requires macOS 13 or later and the Xcode command-line
+tools (`xcode-select --install`; Xcode 14.1 or later, for the macOS 13 SDK). There is no Xcode
+project.
 
 ```
 git clone https://github.com/adambier/pgdata-packer.git
@@ -30,7 +35,8 @@ cd pgdata-packer
 open "pgdata Packer.app"
 ```
 
-Move the app wherever you like afterwards, for example to your Applications folder.
+An app built on your own Mac is signed only for that Mac (an "ad-hoc" signature); it opens
+normally there, and macOS warns about it elsewhere.
 
 The tests (`./run-tests.sh`) need a full Xcode installation (15 or later) on a Mac; on Linux,
 `swift test` runs them directly. (`Package.swift` includes the test target only when
