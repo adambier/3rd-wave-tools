@@ -17,25 +17,27 @@ jobs:
     runs-on: ubuntu-24.04
     container: swift:6.0-noble
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Test
         run: swift test
 
   macos:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Test
         run: PGDATA_TESTS=1 swift test
 
   windows:
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      # Swift 6.0.3 cannot build any package manifest against the runner's current Windows SDK
+      # (a module cycle in the C runtime headers); a newer toolchain can.
       - uses: compnerd/gha-setup-swift@main
         with:
-          branch: swift-6.0.3-release
-          tag: 6.0.3-RELEASE
+          swift-version: swift-6.2-release
+          swift-build: 6.2-RELEASE
       - name: Test
         env:
           PGDATA_TESTS: "1"
