@@ -20,7 +20,8 @@ Download `pgdata-Packer-<version>.zip` from the
 [latest release](https://github.com/adambier/3rd-wave-tools/releases/latest), unzip it, and move
 the app wherever you like, for example to your Applications folder. The app is signed with a
 Developer ID and notarized by Apple, so it opens like any other app, on Apple Silicon and Intel
-Macs. Requires macOS 13 or later.
+Macs. Requires macOS 13 or later. From 1.0.4, the app checks for updates itself (**Check for
+Updates…** in the app menu), using [Sparkle](https://sparkle-project.org).
 
 ## Build
 

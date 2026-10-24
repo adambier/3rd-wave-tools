@@ -14,8 +14,18 @@
 #                              the result, and staple the ticket; needs --sign and a notarytool
 #                              keychain profile named "pgdata-packer", made once with
 #                              xcrun notarytool store-credentials "pgdata-packer" --apple-id … --team-id …
+#   ./make-app.sh --appcast    after --zip, add the zip to ./appcast.xml with Sparkle's generate_appcast
+#                              (signs it with the EdDSA key in your keychain; the download URL is
+#                              the GitHub release for tag v<version>); commit appcast.xml to main
+#                              once the release is published
+#   ./make-app.sh --feed-url=URL
+#                              use this update feed instead of the public one (to test updates
+#                              against a local appcast)
 #
-# A release build for distribution: ./make-app.sh --universal --sign "…" --notarize --zip
+# A release build for distribution: ./make-app.sh --universal --sign "…" --notarize --zip --appcast
+#
+# In-app updates use Sparkle 2. The script downloads the pinned Sparkle release into build/ (once,
+# checked against its SHA-256), links against it, and embeds Sparkle.framework in the app.
 #
 # The result is "./pgdata Packer.app" — double-clickable, no Xcode needed; the Command Line
 # Tools are enough (xcode-select --install). Same approach as ThirdWaveWT: SwiftPM looks
@@ -33,6 +43,9 @@ UNIVERSAL=0
 SIGN_IDENTITY=""
 NOTARIZE=0
 NOTARY_PROFILE="pgdata-packer"   # xcrun notarytool store-credentials "pgdata-packer" …
+MAKE_APPCAST=0
+# Sparkle reads the update feed from here. Permanent once a release with it has shipped.
+FEED_URL="https://raw.githubusercontent.com/adambier/3rd-wave-tools/main/appcast.xml"
 EXPECT_IDENTITY=0
 for arg in "$@"; do
     if [ "$EXPECT_IDENTITY" -eq 1 ]; then
@@ -47,11 +60,19 @@ for arg in "$@"; do
         --sign) EXPECT_IDENTITY=1 ;;
         --sign=*) SIGN_IDENTITY="${arg#--sign=}" ;;
         --notarize) NOTARIZE=1 ;;
+        --appcast) MAKE_APPCAST=1 ;;
+        --feed-url=*) FEED_URL="${arg#--feed-url=}" ;;
         *) echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
 if [ "$EXPECT_IDENTITY" -eq 1 ] || { [ "$NOTARIZE" -eq 1 ] && [ -z "$SIGN_IDENTITY" ]; }; then
     echo "--sign needs an identity, and --notarize needs --sign." >&2
+    exit 2
+fi
+if [ "$MAKE_APPCAST" -eq 1 ] && { [ "$MAKE_ZIP" -eq 0 ] || [ "$UNIVERSAL" -eq 0 ]; }; then
+    # generate_appcast reads the architectures from the app: a one-architecture build would hide
+    # the update from the other kind of Mac.
+    echo "--appcast needs --zip and --universal." >&2
     exit 2
 fi
 
@@ -63,13 +84,43 @@ VERSION="1.0.3"
 BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 DEPLOYMENT_TARGET="13.0"
 
+# Sparkle 2, for in-app updates. The public half of the EdDSA key that signs each update (the
+# private half is in the release signer's keychain; Sparkle's generate_keys made it).
+SPARKLE_VERSION="2.10.0"
+SPARKLE_SHA256="c2bf58aa8387266ac179357b1415d6f2635f044da8be41042af32425dae6da0c"
+SPARKLE_PUBLIC_ED_KEY="ShzzIZMfB/yPf9gMeqIb2FEgIJ/L/ACcNrYrVLsfS4U="
+SPARKLE_DIR="build/Sparkle-$SPARKLE_VERSION"   # the distribution archive, extracted
+
 mkdir -p build
+
+if [ ! -d "$SPARKLE_DIR/Sparkle.framework" ]; then
+    SPARKLE_ARCHIVE="build/Sparkle-$SPARKLE_VERSION.tar.xz"
+    echo "Downloading Sparkle $SPARKLE_VERSION…"
+    curl -fsSL -o "$SPARKLE_ARCHIVE" \
+        "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz"
+    if [ "$(shasum -a 256 "$SPARKLE_ARCHIVE" | cut -d ' ' -f 1)" != "$SPARKLE_SHA256" ]; then
+        echo "The Sparkle download does not match its expected SHA-256; not using it." >&2
+        rm -f "$SPARKLE_ARCHIVE"
+        exit 1
+    fi
+    rm -rf "$SPARKLE_DIR.partial"
+    mkdir -p "$SPARKLE_DIR.partial"
+    tar -xf "$SPARKLE_ARCHIVE" -C "$SPARKLE_DIR.partial"
+    mv "$SPARKLE_DIR.partial" "$SPARKLE_DIR"
+    rm -f "$SPARKLE_ARCHIVE"
+fi
 
 if [ "$USE_SPM" -eq 1 ]; then
     if [ "$UNIVERSAL" -eq 1 ]; then echo "--universal is ignored with --spm (SwiftPM builds for this Mac's architecture)." >&2; fi
     echo "Building through SwiftPM ($CONFIG)…"
-    swift build -c "$CONFIG" --product PgdataPacker
-    BIN="$(swift build -c "$CONFIG" --show-bin-path)/PgdataPacker"
+    # Package.swift does not declare Sparkle (the app compiles without it); point the compiler and
+    # linker at the downloaded framework instead.
+    SPM_SPARKLE_FLAGS=(-Xswiftc -F -Xswiftc "$PWD/$SPARKLE_DIR"
+                       -Xlinker -F -Xlinker "$PWD/$SPARKLE_DIR"
+                       -Xlinker -framework -Xlinker Sparkle
+                       -Xlinker -rpath -Xlinker @executable_path/../Frameworks)
+    swift build -c "$CONFIG" --product PgdataPacker "${SPM_SPARKLE_FLAGS[@]}"
+    BIN="$(swift build -c "$CONFIG" --show-bin-path "${SPM_SPARKLE_FLAGS[@]}")/PgdataPacker"
 else
     SDK="$(xcrun --sdk macosx --show-sdk-path 2>/dev/null || true)"
     if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then
@@ -100,6 +151,9 @@ else
             -framework AppKit \
             -framework SwiftUI \
             -framework UniformTypeIdentifiers \
+            -F "$SPARKLE_DIR" \
+            -framework Sparkle \
+            -Xlinker -rpath -Xlinker @executable_path/../Frameworks \
             -o "$SLICE" \
             Sources/PgdataFormats/*.swift \
             Sources/PgdataPacker/*.swift
@@ -121,6 +175,15 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/PgdataPacker"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+
+# Sparkle.framework, copied with ditto to keep its symlinks and executable bits. The app is not
+# sandboxed, so Sparkle's XPC services are not used; Sparkle's docs allow removing them.
+SPARKLE_FW="$APP/Contents/Frameworks/Sparkle.framework"
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$SPARKLE_DIR/Sparkle.framework" "$SPARKLE_FW"
+rm -rf "$SPARKLE_FW/XPCServices" "$SPARKLE_FW/Versions/B/XPCServices"
+# Sparkle's MIT licence asks for its notice to go with every copy.
+cp "$SPARKLE_DIR/LICENSE" "$APP/Contents/Resources/Sparkle-LICENSE.txt"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -144,24 +207,33 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>NSHighResolutionCapable</key>  <true/>
     <key>NSHumanReadableCopyright</key> <string>MIT License</string>
     <key>NSPrincipalClass</key>         <string>NSApplication</string>
+    <key>SUFeedURL</key>                <string>$FEED_URL</string>
+    <key>SUPublicEDKey</key>            <string>$SPARKLE_PUBLIC_ED_KEY</string>
 </dict>
 </plist>
 PLIST
 
+# Signed inside-out, never with --deep: Sparkle's helper tool and app, then the framework (removing
+# the XPC services invalidated its signature), then the app.
+SIGN_ORDER=("$SPARKLE_FW/Versions/B/Autoupdate" "$SPARKLE_FW/Versions/B/Updater.app" "$SPARKLE_FW" "$APP")
 if [ -n "$SIGN_IDENTITY" ]; then
     # Developer ID signature with the hardened runtime and a secure timestamp, as notarization
     # requires. The app has no entitlements: nothing it does needs an exception from the runtime.
     echo "Signing with \"$SIGN_IDENTITY\"…"
-    codesign --force --timestamp --options runtime --sign "$SIGN_IDENTITY" "$APP"
+    for ITEM in "${SIGN_ORDER[@]}"; do
+        codesign --force --timestamp --options runtime --sign "$SIGN_IDENTITY" "$ITEM"
+    done
     codesign --verify --deep --strict --verbose=2 "$APP"
 else
     # An unsigned arm64 app is killed at launch, so the ad-hoc signature is required for any
     # build that includes an Apple Silicon slice (every release build, and debug builds on Apple
     # Silicon). An ad-hoc signed app opens on the Mac that built it; elsewhere macOS warns.
-    if ! codesign --force --sign - "$APP"; then
-        echo "codesign failed: the app will not launch on Apple Silicon without an ad-hoc signature." >&2
-        exit 1
-    fi
+    for ITEM in "${SIGN_ORDER[@]}"; do
+        if ! codesign --force --sign - "$ITEM"; then
+            echo "codesign failed on $ITEM: the app will not launch on Apple Silicon without an ad-hoc signature." >&2
+            exit 1
+        fi
+    done
 fi
 
 if [ "$NOTARIZE" -eq 1 ]; then
@@ -189,4 +261,26 @@ if [ "$MAKE_ZIP" -eq 1 ]; then
     rm -f "$ZIP"
     ditto -c -k --keepParent "$APP" "$ZIP"
     echo "Wrote $ZIP"
+fi
+
+if [ "$MAKE_APPCAST" -eq 1 ]; then
+    # generate_appcast works on a folder of archives and updates the appcast.xml in it: a fresh
+    # folder holding the current appcast.xml (if any) and only this release's zip, so the download
+    # URL prefix applies to this release alone and the earlier items keep their URLs. A release
+    # notes file next to the zip, pgdata-Packer-<version>.html or .md, becomes the update's notes.
+    APPCAST_DIR="build/appcast"
+    rm -rf "$APPCAST_DIR"
+    mkdir -p "$APPCAST_DIR"
+    if [ -f appcast.xml ]; then cp appcast.xml "$APPCAST_DIR/appcast.xml"; fi
+    cp "$ZIP" "$APPCAST_DIR/"
+    for NOTES in "pgdata-Packer-$VERSION.html" "pgdata-Packer-$VERSION.md"; do
+        if [ -f "$NOTES" ]; then cp "$NOTES" "$APPCAST_DIR/"; fi
+    done
+    "$SPARKLE_DIR/bin/generate_appcast" \
+        --download-url-prefix "https://github.com/adambier/3rd-wave-tools/releases/download/v$VERSION/" \
+        --maximum-versions 0 \
+        --maximum-deltas 0 \
+        "$APPCAST_DIR"
+    cp "$APPCAST_DIR/appcast.xml" appcast.xml
+    echo "Updated appcast.xml; commit it to main once the v$VERSION release with $ZIP is published."
 fi

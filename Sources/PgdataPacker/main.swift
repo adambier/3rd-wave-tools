@@ -1,5 +1,10 @@
 import AppKit
 import SwiftUI
+// Sparkle (in-app updates) is linked by make-app.sh. Package.swift does not declare it, so a build
+// through Xcode or a plain `swift build` compiles without it and has no "Check for Updates…" item.
+#if canImport(Sparkle)
+import Sparkle
+#endif
 
 // Built as a plain swiftc target (see make-app.sh), so the app is assembled here by hand
 // rather than through the `App` protocol. Same structure as ThirdWaveWT.
@@ -7,6 +12,12 @@ import SwiftUI
 let appName = "pgdata Packer"
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    #if canImport(Sparkle)
+    // Starts the updater (scheduled checks follow the user's choice, which Sparkle asks for on the
+    // second launch) and validates the "Check for Updates…" menu item.
+    let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    #endif
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     @objc func showAbout(_ sender: Any?) {
@@ -17,7 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let credits = NSAttributedString(
             string: "Packs and unpacks unified program data (.pgdata) files for the Groove Synthesis 3rd Wave.\n"
                 + "Not affiliated with or endorsed by Groove Synthesis.\n"
-                + "MIT licence. Source: github.com/adambier/pgdata-packer",
+                + "MIT licence. Source: github.com/adambier/3rd-wave-tools",
             attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
                          .foregroundColor: NSColor.secondaryLabelColor,
                          .paragraphStyle: para])
@@ -25,13 +36,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-private func buildMainMenu() -> NSMenu {
+private func buildMainMenu(appDelegate: AppDelegate) -> NSMenu {
     let mainMenu = NSMenu()
 
     let appMenuItem = NSMenuItem()
     let appMenu = NSMenu()
     let name = appName
     appMenu.addItem(withTitle: "About \(name)", action: #selector(AppDelegate.showAbout(_:)), keyEquivalent: "")
+    #if canImport(Sparkle)
+    let updateItem = appMenu.addItem(withTitle: "Check for Updates…",
+                                     action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
+                                     keyEquivalent: "")
+    updateItem.target = appDelegate.updaterController
+    #endif
     appMenu.addItem(.separator())
     appMenu.addItem(withTitle: "Hide \(name)", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
     appMenu.addItem(.separator())
@@ -66,10 +83,10 @@ private func buildMainMenu() -> NSMenu {
 
 let application = NSApplication.shared
 application.setActivationPolicy(.regular)
-application.mainMenu = buildMainMenu()
 
 let appDelegate = AppDelegate()
 application.delegate = appDelegate
+application.mainMenu = buildMainMenu(appDelegate: appDelegate)
 
 let appState = AppState()
 
