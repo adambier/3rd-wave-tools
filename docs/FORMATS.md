@@ -18,7 +18,9 @@ the wavetable and multisample payloads, which the files carry in the same form (
 [5](#5-wavetable-wt-and-multisample-bin)). Everything else here comes from reading real files and
 from tests on a 3rd Wave 8M and a 24M, both running OS 2.0d. The PgdataFormats library in
 3rd-wave-tools (`Sources/PgdataFormats`), which the pgdata Packer app uses, implements it, and its
-tests cover much of it; "the library" below means this library.
+tests cover much of it; "the library" below means this library. The repository's
+[`fixtures`](../fixtures/) folder holds a small file of each kind with what it should parse to,
+for checking an implementation.
 
 ## Contents
 

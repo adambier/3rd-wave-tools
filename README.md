@@ -12,6 +12,10 @@ Not affiliated with or endorsed by Groove Synthesis. Everything here was worked 
 checked on an 8M and a 24M, both running OS 2.0d. The Formats and Tests sections say what was
 confirmed on the 3rd Wave and what is inferred.
 
+**Building something for the 3rd Wave?** The file formats are documented in full, and the library
+behind this app, test files, and a developer tool are free to use under the MIT licence: see
+[For developers](#for-developers).
+
 ![The Pack page: the programs added on the left; for the selected program, what each oscillator source will play and whether it is embedded; below, the wavetables and multisamples added and the slots they go to](docs/pack-window.png)
 
 ## Download
@@ -288,12 +292,41 @@ Checked on an 8M (OS 2.0d), and most points on a 24M as well
 > **Leave only one `.pgdata` in `PROGRAMS` when using Import unified program data file.** It takes
 > the first file in alphabetical order without asking.
 
+## For developers
+
+pgdata Packer is one tool; the aim of this project is to make it easy to build others, in any
+language: librarians, editors, converters, patch generators, or scripts. When tools by different
+people read and write the 3rd Wave's files the same way the 3rd Wave does, every 3rd Wave owner
+benefits. Everything here is open source under the MIT licence.
+
+- **The format reference.** [`docs/FORMATS.md`](docs/FORMATS.md) describes every file the 3rd Wave
+  reads and writes, for someone implementing them for the first time, and how the 3rd Wave behaves
+  when it imports them. Footnotes give the evidence for each statement (a test on a 3rd Wave, or
+  Groove Synthesis's own documents), and what is still unknown is listed at the end.
+- **Test files.** [`fixtures/`](fixtures/) holds a small file of each kind, each with a JSON file
+  of what it should parse to, so a new reader or writer can be checked without a 3rd Wave at hand.
+  They are synthetic, so they can be used freely.
+- **A Swift library.** `PgdataFormats` reads and writes every format byte for byte, packs and
+  unpacks `.pgdata` files, converts older programs as the 3rd Wave does, and recognises Groove
+  Synthesis's factory wavetables. It depends only on Foundation and builds on macOS and Linux. Add
+  it to a Swift package with
+  `.package(url: "https://github.com/adambier/3rd-wave-tools", from: "1.0.5")` and the product
+  `PgdataFormats`. Its documentation, with a getting-started guide, is at
+  [adambier.github.io/3rd-wave-tools](https://adambier.github.io/3rd-wave-tools/documentation/pgdataformats/).
+  The library is versioned with the app (tags `v1.0.5` and on).
+- **A command-line tool.** `tw3pg` (in `Sources/tw3pg`) inspects files, checks that they round
+  trip, unpacks and repacks `.pgdata` files, and converts older programs:
+  `swift run tw3pg inspect <file>`.
+- **Contributions.** Corrections to the format reference are the most valuable contribution,
+  whether from tests on a 3rd Wave or from knowing better; so are bug reports with the files that
+  show them, and word of tools built on this. [`CONTRIBUTING.md`](CONTRIBUTING.md) explains how.
+
 ## Formats
 
 [`docs/FORMATS.md`](docs/FORMATS.md) is the full reference: what is known about `.pro`, `.pgdata`,
 `.wt`, and `.bin` files and the oscillator source ids, how the 3rd Wave converts older programs, and
-what is still open. Each statement there says whether it was checked on a 3rd Wave, seen in files,
-or inferred. In brief:
+what is still open. Footnotes give the evidence for each statement, and inferences are said to
+be inferences. In brief:
 
 - **.pro**: text, one value per line: the format tag (`W3_PROG_3` to `_5`), the name, four sizes
   (integers and floats per part, global values, sequence events), then four integer part blocks
@@ -344,25 +377,30 @@ older programs exactly as the 24M does; and the meaning of most program values.
 ## Layout
 
 ```
-Sources/PgdataFormats/   formats and packing logic, no UI (tested on Linux and macOS)
-  SourceRef.swift           source-id mapping
-  ProgramFile.swift         .pro
-  WavetableFile.swift       .wt
-  Multisample.swift         .bin and the shared sample record
-  UnifiedProgram.swift      .pgdata
-  PackUnpack.swift          Packer / Unpacker
-  ProgramConverter.swift    older programs to the current layout, as Import program converts them
-  Workbench.swift           factory library, pack and unpack plans, output file names
-  NameCleaner.swift         Clean Up Names
-  FactoryCatalog.swift      factory table names and fingerprints (generated)
-  ByteIO.swift              byte reading and writing, 32-byte name fields
+Sources/PgdataFormats/      the library (the package's PgdataFormats product): formats, packing,
+                            conversion; no UI; Foundation only (tested on Linux and macOS)
+  SourceRef.swift             source-id mapping
+  ProgramFile.swift           .pro
+  WavetableFile.swift         .wt
+  Multisample.swift           .bin and the shared sample record
+  UnifiedProgram.swift        .pgdata
+  PackUnpack.swift            Packer / Unpacker
+  ProgramConverter.swift      older programs to the current layout, as Import program converts them
+  FactoryLibrary.swift        factory wavetables by slot, name, and fingerprint
+  FactoryCatalog.swift        factory table names and fingerprints (generated)
+  ByteIO.swift                byte reading and writing, 32-byte name fields
+  PgdataFormats.docc/         the library's documentation pages
+Sources/PgdataPackerCore/   the app's own decision logic, no UI: pack and unpack plans, output file
+                            names, Clean Up Names
 Sources/PgdataPacker/       the app (SwiftUI)
-Sources/tw3pg/              developer harness: inspect, roundtrip, unpack, repack, compare, wtcheck,
+Sources/tw3pg/              developer tool: inspect, roundtrip, unpack, repack, compare, wtcheck,
                             factory-catalog, pack, convert, convertcheck, and the 3rd Wave-test builders
 Tests/PgdataFormatsTests/   unit tests (./run-tests.sh)
+fixtures/                   test files with what each parses to, for other implementers
 Resources/                  app icon, drawn by tools/make-icon.py (needs cairosvg and Pillow)
 docs/                       FORMATS.md (format reference) and the screenshots used in this README
 make-app.sh                 builds, signs, and notarizes the app; embeds Sparkle; writes the appcast
+.github/workflows/          publishes the library's documentation to GitHub Pages
 ```
 
 ## License
