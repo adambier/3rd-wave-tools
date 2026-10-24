@@ -12,7 +12,8 @@ Not affiliated with or endorsed by Groove Synthesis. Everything here was worked 
 checked on an 8M and a 24M, both running OS 2.0d. The Formats and Tests sections say what was
 confirmed on the 3rd Wave and what is inferred.
 
-**Building something for the 3rd Wave?** The file formats are (unofficially) documented, and the library
+**Building something for the 3rd Wave?** The file formats are (unofficially) documented as far as
+they're understood, and the library
 behind this app, test files, and a developer tool are free to use under the MIT licence: see
 [For developers](#for-developers).
 
