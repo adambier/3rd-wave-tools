@@ -29,7 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let credits = NSMutableAttributedString(
             string: "Packs and unpacks unified program data (.pgdata) files for the Groove Synthesis 3rd Wave.\n"
                 + "Not affiliated with or endorsed by Groove Synthesis.\n"
-                + "MIT licence. Source: \(source)",
+                + "Source: \(source)",   // the licence is the panel's copyright line (NSHumanReadableCopyright)
             attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
                          .foregroundColor: NSColor.secondaryLabelColor,
                          .paragraphStyle: para])
