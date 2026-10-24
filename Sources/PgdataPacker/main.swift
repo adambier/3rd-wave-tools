@@ -35,17 +35,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.orderFrontStandardAboutPanel(options: [.applicationName: appName, .credits: credits])
     }
 
-    /// Opens the GitHub release page for the running version (the latest release when the version
-    /// is unknown, as in a build without make-app.sh's Info.plist).
+    /// Opens the GitHub release page for the running version. Falls back to the list of all
+    /// releases when that page does not exist (a build of a version not yet released), when the
+    /// version is unknown (a build without make-app.sh's Info.plist), or when GitHub cannot be
+    /// reached to check.
     @objc func showReleaseNotes(_ sender: Any?) {
-        let releases = "https://github.com/adambier/3rd-wave-tools/releases"
-        let address: String
-        if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
-            address = "\(releases)/tag/v\(version)"
-        } else {
-            address = "\(releases)/latest"
+        guard let allReleases = URL(string: "https://github.com/adambier/3rd-wave-tools/releases") else { return }
+        guard let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String else {
+            NSWorkspace.shared.open(allReleases)
+            return
         }
-        if let url = URL(string: address) { NSWorkspace.shared.open(url) }
+        let releasePage = allReleases.appendingPathComponent("tag").appendingPathComponent("v\(version)")
+        Task {
+            var request = URLRequest(url: releasePage, timeoutInterval: 5)
+            request.httpMethod = "HEAD"
+            let exists = ((try? await URLSession.shared.data(for: request))?.1 as? HTTPURLResponse)?.statusCode == 200
+            NSWorkspace.shared.open(exists ? releasePage : allReleases)
+        }
     }
 }
 
