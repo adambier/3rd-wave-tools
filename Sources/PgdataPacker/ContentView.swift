@@ -248,13 +248,11 @@ enum AlertPresenter {
         alert.alertStyle = .informational
         alert.messageText = parts.first ?? ""
         let rest = parts.dropFirst().joined(separator: "\n\n")
-        let content = rest.isEmpty ? nil : textArea(rest)
-        alert.accessoryView = content
+        // The text, if any, with a copy icon in its top-right corner that puts the whole report
+        // on the clipboard as plain text and leaves the sheet open.
+        if !rest.isEmpty { alert.accessoryView = textArea(rest, copying: ReportText.plain(text)) }
         alert.addButton(withTitle: "OK")
         if reveal != nil { alert.addButton(withTitle: "Show in Finder") }
-        // A copy icon that puts the whole report on the clipboard as plain text and leaves the
-        // sheet open.
-        addCopyButton(to: alert, content: content, copying: ReportText.plain(text))
         let finish: (NSApplication.ModalResponse) -> Void = { response in
             if response == .alertSecondButtonReturn, let url = reveal { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             done()
@@ -305,78 +303,29 @@ enum AlertPresenter {
         return out
     }
 
-    /// Puts the copy icon in the alert's lower-left corner, level with the response buttons: the
-    /// spot macOS gives an alert's Help button, the one control it places beside the buttons
-    /// without being an answer to the alert. Laying the alert out first is how Apple says to
-    /// position things relative to its views. When the buttons leave no room there (two side by
-    /// side across the whole width), the icon goes under the text instead.
-    private static func addCopyButton(to alert: NSAlert, content: NSView?, copying text: String) {
-        alert.layout()
-        let button = CopyButton(text: text, sizedLike: alert.buttons.first)
-        if let contentView = alert.window.contentView, let ok = alert.buttons.first {
-            let okFrame = contentView.convert(ok.bounds, from: ok)
-            let leading = content.map { contentView.convert($0.bounds, from: $0).minX } ?? leadingEdge(of: contentView)
-            let buttonsLeft = alert.buttons.map { contentView.convert($0.bounds, from: $0).minX }.min() ?? okFrame.minX
-            let frame = NSRect(x: leading, y: okFrame.minY, width: button.frame.width, height: button.frame.height)
-            if frame.maxX + 8 <= buttonsLeft {
-                button.frame = frame
-                button.autoresizingMask = [.maxXMargin, .maxYMargin]   // stays in the corner
-                contentView.addSubview(button)
-                return
-            }
-        }
-        alert.accessoryView = withCopyButton(content, button)
-        alert.layout()
-    }
-
-    /// The left edge of the alert's text, from its text fields.
-    private static func leadingEdge(of view: NSView) -> CGFloat {
-        var edges: [CGFloat] = []
-        func walk(_ v: NSView) {
-            for s in v.subviews {
-                if s is NSTextField { edges.append(view.convert(s.bounds, from: s).minX) }
-                walk(s)
-            }
-        }
-        walk(view)
-        return edges.min() ?? 16
-    }
-
-    /// `content` (a text area, or nothing) above a right-aligned copy icon.
-    private static func withCopyButton(_ content: NSView?, _ button: NSButton) -> NSView {
-        let width = content?.frame.width ?? 520
-        let rowHeight = button.frame.height + 4
-        let height = (content?.frame.height ?? 0) + rowHeight
-        let box = NSView(frame: NSRect(x: 0, y: 0, width: width, height: height))
-        if let content {
-            content.frame = NSRect(x: 0, y: rowHeight, width: width, height: content.frame.height)
-            box.addSubview(content)
-        }
-        button.frame.origin = NSPoint(x: width - button.frame.width, y: 0)
-        box.addSubview(button)
-        return box
-    }
-
-    /// A push button showing the system copy symbol that copies `text` and shows a check mark
-    /// for a moment. Sized like `reference` (the alert's OK button) so the two line up.
+    /// A borderless button showing the system copy symbol (a bezel appears under the pointer)
+    /// that copies `text` and shows a check mark for a moment.
     private final class CopyButton: NSButton {
         private let text: String
         private static let copyIcon = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: "Copy")
         private static let doneIcon = NSImage(systemSymbolName: "checkmark", accessibilityDescription: "Copied")
-        init(text: String, sizedLike reference: NSButton?) {
+        init(text: String) {
             self.text = text
             super.init(frame: .zero)
             title = ""
             image = Self.copyIcon
             imagePosition = .imageOnly
-            bezelStyle = reference?.bezelStyle ?? .rounded
-            controlSize = reference?.controlSize ?? .large
+            symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)
+            contentTintColor = .secondaryLabelColor
+            bezelStyle = .texturedRounded
+            showsBorderOnlyWhileMouseInside = true
+            controlSize = .small
             toolTip = "Copy results to clipboard"
             setAccessibilityLabel("Copy results to clipboard")
             target = self
             action = #selector(copyText)
             sizeToFit()
-            frame.size.width = max(frame.width, frame.height)   // square, not a sliver
+            frame.size = NSSize(width: max(frame.width, 22), height: max(frame.height, 22))
         }
         required init?(coder: NSCoder) { nil }
         @objc private func copyText() {
@@ -388,7 +337,19 @@ enum AlertPresenter {
         }
     }
 
-    static func textArea(_ text: String) -> NSView {
+    /// The top-right corner of a text area kept clear of text, for the copy icon.
+    private static let iconCorner = NSSize(width: 28, height: 22)
+
+    /// Keeps `iconCorner` free of text so the first line wraps before the icon.
+    private static func reserveIconCorner(in tv: NSTextView) {
+        guard let tc = tv.textContainer else { return }
+        let w = tc.containerSize.width
+        tc.exclusionPaths = [NSBezierPath(rect: NSRect(x: w - iconCorner.width, y: 0, width: iconCorner.width, height: iconCorner.height))]
+    }
+
+    /// A read-only text area 520 points wide that scrolls past about 360 points of text. With
+    /// `copying`, a copy icon sits in its top-right corner that puts that text on the clipboard.
+    static func textArea(_ text: String, copying plain: String? = nil) -> NSView {
         let width: CGFloat = 520, maxHeight: CGFloat = 360
         let tv = NSTextView(frame: NSRect(x: 0, y: 0, width: width, height: 10))
         tv.isEditable = false
@@ -403,6 +364,7 @@ enum AlertPresenter {
         tv.autoresizingMask = [.width]
         tv.maxSize = NSSize(width: width, height: .greatestFiniteMagnitude)
         tv.textStorage?.setAttributedString(styled(text))
+        if plain != nil { reserveIconCorner(in: tv) }
         var used: CGFloat = 60
         if let lm = tv.layoutManager, let tc = tv.textContainer {
             lm.ensureLayout(for: tc)
@@ -418,6 +380,22 @@ enum AlertPresenter {
         scroll.drawsBackground = false
         scroll.borderType = scrolls ? .bezelBorder : .noBorder
         scroll.documentView = tv
-        return scroll
+        guard let plain else { return scroll }
+        // The text view is now as wide as the scroll view's content (less the scroll bar, when
+        // there is one): keep the corner clear at that width, and put the icon over it.
+        scroll.tile()
+        tv.frame.size.width = scroll.contentSize.width
+        reserveIconCorner(in: tv)
+        let button = CopyButton(text: plain)
+        let box = NSView(frame: scroll.frame)
+        scroll.autoresizingMask = [.width, .height]
+        box.addSubview(scroll)
+        let scrollBar = scrolls ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 0
+        let inset: CGFloat = scrolls ? 3 : 1
+        button.frame.origin = NSPoint(x: box.frame.width - scrollBar - button.frame.width - inset,
+                                      y: box.frame.height - button.frame.height - inset)
+        button.autoresizingMask = [.minXMargin, .minYMargin]
+        box.addSubview(button)
+        return box
     }
 }
