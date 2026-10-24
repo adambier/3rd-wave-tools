@@ -14,8 +14,10 @@ what the values mean, then how the facts were established. Section [6](#6-conver
 describes how the 3rd Wave converts programs saved by older firmware, which anyone writing a
 `.pgdata` has to do as well.
 
-Groove Synthesis has not published these formats. Everything here comes from reading real files
-and from tests on a 3rd Wave 8M and a 24M, both running OS 2.0d. pgdata Packer's library
+Groove Synthesis has not published these file formats; its MIDI and SysEx specification defines
+the wavetable and multisample payloads, which the files carry in the same form (section
+[5](#5-wavetable-wt-and-multisample-bin)). Everything else here comes from reading real files and
+from tests on a 3rd Wave 8M and a 24M, both running OS 2.0d. pgdata Packer's library
 (`Sources/PgdataFormats`) implements it, and its tests cover much of it.
 
 ## Contents
@@ -236,9 +238,12 @@ To read: split into lines; line 1 is the tag, line 2 the name; take *S*, *F*, *G
 next four lines and check that the count adds up; then parse the lines in the float blocks (section
 3.2) as floats and every other line as an integer. (Deciding by the text instead, "a line with a `.`
 is a float", works for every file the 3rd Wave writes, but a float block line written `1` by some
-other tool would then be read as the integer 1 and packed as the wrong 32-bit pattern.) To write:
-the same in reverse, floats with `%f`. Keeping each line's original text lets an unmodified file be
-written back byte for byte, which is how pgdata Packer's reader is tested.
+other tool would then be read as the integer 1 and packed as the wrong 32-bit pattern.) When the
+count does not add up: a file with more values than the header declares carries the tail of a
+longer file it was exported over (section [7](#7-what-the-3rd-wave-does-on-import)), and the extra
+values can be dropped; one with fewer is cut short and should be refused. To write: the same in
+reverse, floats with `%f`. Keeping each line's original text lets an unmodified file be written
+back byte for byte, which is how pgdata Packer's reader is tested.
 
 ## 4. Unified program (.pgdata)
 
@@ -703,7 +708,8 @@ in section 6.5, plus float 102 on the 24M (section 6.3).
 ## 10. Open questions
 
 - Whether a 24K converts exactly as the 24M does.
-- Whether **Import program** accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
+- Whether **Import program** accepts a `.pro` tagged `W3_PROG_5` that has an older layout, as an
+  unpacker that does not convert would write it (pgdata Packer's always converts).
 - The meaning of most part, float and global values, and of event fields *a* and *time*.
 
 ## Appendix: values for new positions

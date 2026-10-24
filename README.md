@@ -39,7 +39,8 @@ command-line tools alone.)
 
 ## Using it
 
-The window has two pages, **Pack** and **Unpack**. There is nothing to set up.
+The window has two pages, **Pack** and **Unpack**. There is nothing to set up. Every report or
+list of problems the app shows has a copy icon beside its title that puts the text on the clipboard.
 
 ### Factory wavetables
 
@@ -241,7 +242,7 @@ the layout, so the unpacked `.pro` is always in the current format, `W3_PROG_5`.
 
 ## On the 3rd Wave
 
-Checked on an 8M (OS 2.0d), and the points about older programs and exporting on a 24M as well
+Checked on an 8M (OS 2.0d), and most points on a 24M as well
 ([`docs/FORMATS.md`](docs/FORMATS.md#7-what-the-3rd-wave-does-on-import) says which). What the
 3rd Wave does when it imports a file:
 
