@@ -386,11 +386,15 @@ of the same 64 waves, in the order the 3rd Wave plays them at higher pitches (a 
 65,536 values exactly, and the 8M's own `.pgdata` exports carry all 131,072] Wave *f* of each level
 corresponds to wave *f* of the table, with the harmonic amplitudes of the base wave up to each
 level's cutoff and a small gain change; in tables made from recorded audio the smaller copies are
-also shifted in phase by a constant, so they were made with a real filter, not an ideal resample,
-and a writer cannot expect to reproduce them exactly. What the 3rd Wave does with a `.wt` whose
-second half is missing or wrong (ignore it and rebuild the chain, or play it as given) has not been
-tested; a converter should generate a plausible chain (band-limited resamples of its waves) until
-that is known. The P set has no such chain: PPG-style playback is meant to alias.
+also shifted in phase by a constant, so they were made with a real filter, not an ideal resample.
+
+**The 3rd Wave does not use the chain.** A `.wt` carrying a known table with its second half zeroed
+was matched to the loaded table by its first 65,536 values alone (so the content hash covers only
+the table); one carrying a new table with a zeroed chain was stored, played identically from C2 to
+C7, and exported again with the zeros intact. [verified on a 24M, OS 2.0d] So the chain is kept and
+passed through but neither hashed nor played; a writer should still fill it with band-limited
+resamples of its waves, as the factory files do, in case a later firmware reads it. The P set has
+no such chain: PPG-style playback is meant to alias.
 
 *Background.* The PPG's own tables were mostly defined by a few stored key waves with the rest
 interpolated between them, and its wavetable 31 was a sample table (piano and saxophone) that the
@@ -644,8 +648,9 @@ Verified on an 8M (OS 2.0d) unless a note says otherwise.
 - **Program locations** display as `B4-P003`: bank 1–5, program 001–100. [verified]
 - **The 3rd Wave's exports** are named `B05P094.pro` (three-digit program) and
   `B05P09_Name.pgdata` / `B05P100_Name.pgdata` (program number with at least two digits; spaces
-  become underscores; punctuation other than hyphens is dropped). [verified] The 3rd Wave ignores
-  file names when importing. [official]
+  become underscores; punctuation other than hyphens is dropped). [verified] **Export Wavetable**
+  names its files `01.wt`, `02.wt`, … in sequence, not by slot. [verified on the 24M] The 3rd Wave
+  ignores file names when importing. [official]
 - **The USB drive** (volume `THIRDWAVE`) shows the folders `PROGRAMS` (`.pro` and `.pgdata`), `WAVES`
   (`.wt`), `AUDIO` (`.bin` and exported `.wav`) and `FIRMWARE` when mounted on a Mac. [verified]
   Groove Synthesis's READMEs write them as `program/`, `waves/` and `audio/`.
@@ -681,6 +686,9 @@ are damaged as distributed (empty or cut short).
 | 24M: 300 programs (the same 100 `W3_PROG_3` and 100 third-party programs, and Groove Synthesis's 2025 factory bank 1) bulk-imported and exported | the 4-part conversion in section 6.2 |
 | 24M: 3 programs converted for 24 voices, packed, imported, two of them carrying the 8M's values | the 24M's values restored on import; otherwise identical to **Import program**'s result except float 102 (section 6.3) |
 | 24M: the 2022 program of section 6.5 that gains a copy of part 1, bulk-imported renamed and, separately, under its own name with one unused value changed | renamed: ordinary conversion only; own name: every correction — the corrections are keyed by name |
+| 24M: three `.pro` files named `B05P10`, `B05P100`, `B05P11`, bulk-imported | landed in that order: plain character order |
+| 24M: a `.pgdata` carrying factory U08 with its mipmap chain zeroed | matched to U08: the hash covers the table only |
+| 24M: a `.pgdata` carrying a new U table (U08 at half level) with its chain zeroed, then **Export Wavetable** | stored in U56, played the same from C2 to C7, exported with the zeros intact: the chain is not used |
 
 **Implemented from this document alone.** As a check on completeness, a converter was written by
 someone given only this document (no access to the library or the files) and run against the 599
@@ -691,7 +699,6 @@ in section 6.5, plus float 102 on the 24M (section 6.3).
 
 - Whether a 24K converts exactly as the 24M does.
 - Whether the `.pgdata` import applies the corrections of section 6.5 to an unconverted 2022 file.
-- Whether the 3rd Wave plays the mipmap chain in the second half of a U `.wt` as given, or rebuilds it from the table on import (section 5.1).
 - Whether **Import program** accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
 - Whether multisamples are reused by content, as wavetables are.
 - The meaning of most part, float and global values, and of event fields *a* and *time*.
