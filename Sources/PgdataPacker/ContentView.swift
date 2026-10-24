@@ -248,11 +248,13 @@ enum AlertPresenter {
         alert.alertStyle = .informational
         alert.messageText = parts.first ?? ""
         let rest = parts.dropFirst().joined(separator: "\n\n")
-        // The text, if any, with a Copy button under it that puts the whole report on the
-        // clipboard as plain text and leaves the sheet open.
-        alert.accessoryView = withCopyButton(rest.isEmpty ? nil : textArea(rest), copying: ReportText.plain(text))
+        let content = rest.isEmpty ? nil : textArea(rest)
+        alert.accessoryView = content
         alert.addButton(withTitle: "OK")
         if reveal != nil { alert.addButton(withTitle: "Show in Finder") }
+        // A copy icon that puts the whole report on the clipboard as plain text and leaves the
+        // sheet open.
+        addCopyButton(to: alert, content: content, copying: ReportText.plain(text))
         let finish: (NSApplication.ModalResponse) -> Void = { response in
             if response == .alertSecondButtonReturn, let url = reveal { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             done()
@@ -303,11 +305,46 @@ enum AlertPresenter {
         return out
     }
 
-    /// `content` (a text area, or nothing) above a small right-aligned Copy button.
-    private static func withCopyButton(_ content: NSView?, copying text: String) -> NSView {
+    /// Puts the copy icon in the alert's lower-left corner, level with the response buttons: the
+    /// spot macOS gives an alert's Help button, the one control it places beside the buttons
+    /// without being an answer to the alert. Laying the alert out first is how Apple says to
+    /// position things relative to its views. When the buttons leave no room there (two side by
+    /// side across the whole width), the icon goes under the text instead.
+    private static func addCopyButton(to alert: NSAlert, content: NSView?, copying text: String) {
+        alert.layout()
+        let button = CopyButton(text: text, sizedLike: alert.buttons.first)
+        if let contentView = alert.window.contentView, let ok = alert.buttons.first {
+            let okFrame = contentView.convert(ok.bounds, from: ok)
+            let leading = content.map { contentView.convert($0.bounds, from: $0).minX } ?? leadingEdge(of: contentView)
+            let buttonsLeft = alert.buttons.map { contentView.convert($0.bounds, from: $0).minX }.min() ?? okFrame.minX
+            let frame = NSRect(x: leading, y: okFrame.minY, width: button.frame.width, height: button.frame.height)
+            if frame.maxX + 8 <= buttonsLeft {
+                button.frame = frame
+                button.autoresizingMask = [.maxXMargin, .maxYMargin]   // stays in the corner
+                contentView.addSubview(button)
+                return
+            }
+        }
+        alert.accessoryView = withCopyButton(content, button)
+        alert.layout()
+    }
+
+    /// The left edge of the alert's text, from its text fields.
+    private static func leadingEdge(of view: NSView) -> CGFloat {
+        var edges: [CGFloat] = []
+        func walk(_ v: NSView) {
+            for s in v.subviews {
+                if s is NSTextField { edges.append(view.convert(s.bounds, from: s).minX) }
+                walk(s)
+            }
+        }
+        walk(view)
+        return edges.min() ?? 16
+    }
+
+    /// `content` (a text area, or nothing) above a right-aligned copy icon.
+    private static func withCopyButton(_ content: NSView?, _ button: NSButton) -> NSView {
         let width = content?.frame.width ?? 520
-        let button = CopyButton(text: text)
-        button.title = "Copied"; button.sizeToFit(); button.title = "Copy"   // room for the wider title
         let rowHeight = button.frame.height + 4
         let height = (content?.frame.height ?? 0) + rowHeight
         let box = NSView(frame: NSRect(x: 0, y: 0, width: width, height: height))
@@ -320,27 +357,34 @@ enum AlertPresenter {
         return box
     }
 
-    /// A small button that copies `text` and says "Copied" for a moment.
+    /// A push button showing the system copy symbol that copies `text` and shows a check mark
+    /// for a moment. Sized like `reference` (the alert's OK button) so the two line up.
     private final class CopyButton: NSButton {
         private let text: String
-        init(text: String) {
+        private static let copyIcon = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: "Copy")
+        private static let doneIcon = NSImage(systemSymbolName: "checkmark", accessibilityDescription: "Copied")
+        init(text: String, sizedLike reference: NSButton?) {
             self.text = text
             super.init(frame: .zero)
-            title = "Copy"
-            bezelStyle = .rounded
-            controlSize = .small
-            font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-            toolTip = "Copy this message to the clipboard"
+            title = ""
+            image = Self.copyIcon
+            imagePosition = .imageOnly
+            bezelStyle = reference?.bezelStyle ?? .rounded
+            controlSize = reference?.controlSize ?? .large
+            toolTip = "Copy results to clipboard"
+            setAccessibilityLabel("Copy results to clipboard")
             target = self
             action = #selector(copyText)
+            sizeToFit()
+            frame.size.width = max(frame.width, frame.height)   // square, not a sliver
         }
         required init?(coder: NSCoder) { nil }
         @objc private func copyText() {
             let pb = NSPasteboard.general
             pb.clearContents()
             pb.setString(text, forType: .string)
-            title = "Copied"
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in self?.title = "Copy" }
+            image = Self.doneIcon
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in self?.image = Self.copyIcon }
         }
     }
 
