@@ -3,6 +3,31 @@
     <channel>
         <title>pgdata Packer</title>
         <item>
+            <title>1.0.5</title>
+            <pubDate>Sat, 24 Oct 2026 16:45:57 -0700</pubDate>
+            <sparkle:version>162</sparkle:version>
+            <sparkle:shortVersionString>1.0.5</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## Help
+
+- The Help menu has **Read Me** (this version's README) and **File Format Reference** (the current format reference), alongside **Release Notes**.
+
+## For developers
+
+This release is mostly for people who want to build their own tools for the 3rd Wave.
+
+- **The format reference** ([`docs/FORMATS.md`](https://github.com/adambier/3rd-wave-tools/blob/v1.0.5/docs/FORMATS.md)) now gives the evidence for each statement in footnotes (a test on a 3rd Wave, or Groove Synthesis's own documents), says inferences in words, and states plainly what it does not cover: the structure of every file is known, but what most of a program's values mean is not yet known, so it supports tools that read, pack, unpack, convert, and rename programs, not yet tools that edit sounds.
+- **Test files** in [`fixtures/`](https://github.com/adambier/3rd-wave-tools/tree/v1.0.5/fixtures): a small file of each kind, each with a JSON file of what it should parse to, for checking a reader or writer in any language.
+- **Two Swift libraries.** `PgdataFormats` reads and writes the four formats, packs and unpacks `.pgdata` files, and converts older programs; `PgdataPackerCore` holds this app's own decisions without its user interface, for a command-line tool or an app on another platform that should behave like pgdata Packer. Both depend only on Foundation, and their tests run on macOS, Linux, and Windows for every change.
+- **Documentation** for `PgdataFormats`, with a getting-started guide: [adambier.github.io/3rd-wave-tools](https://adambier.github.io/3rd-wave-tools/documentation/pgdataformats/).
+- **[`CONTRIBUTING.md`](https://github.com/adambier/3rd-wave-tools/blob/v1.0.5/CONTRIBUTING.md)** explains how to help, above all with corrections to the format reference.
+
+Nothing changes in how the app packs or unpacks.
+
+]]></description>
+            <enclosure url="https://github.com/adambier/3rd-wave-tools/releases/download/v1.0.5/pgdata-Packer-1.0.5.zip" length="2550352" type="application/octet-stream" sparkle:edSignature="H9nFdvE8FRtGQl9LIYpEeT3HK2tTUDSvLilkgyma3owQUKJTMrvnedcvoOCQoOoJTBa6jNfxwCmE714aN/iiBA=="/>
+        </item>
+        <item>
             <title>1.0.4</title>
             <pubDate>Sat, 24 Oct 2026 13:29:30 -0700</pubDate>
             <sparkle:version>140</sparkle:version>
