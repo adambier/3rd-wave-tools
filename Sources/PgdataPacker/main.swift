@@ -34,6 +34,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                          .paragraphStyle: para])
         NSApplication.shared.orderFrontStandardAboutPanel(options: [.applicationName: appName, .credits: credits])
     }
+
+    /// Opens the GitHub release page for the running version (the latest release when the version
+    /// is unknown, as in a build without make-app.sh's Info.plist).
+    @objc func showReleaseNotes(_ sender: Any?) {
+        let releases = "https://github.com/adambier/3rd-wave-tools/releases"
+        let address: String
+        if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
+            address = "\(releases)/tag/v\(version)"
+        } else {
+            address = "\(releases)/latest"
+        }
+        if let url = URL(string: address) { NSWorkspace.shared.open(url) }
+    }
 }
 
 private func buildMainMenu(appDelegate: AppDelegate) -> NSMenu {
@@ -77,6 +90,13 @@ private func buildMainMenu(appDelegate: AppDelegate) -> NSMenu {
     windowMenuItem.submenu = windowMenu
     mainMenu.addItem(windowMenuItem)
     NSApplication.shared.windowsMenu = windowMenu
+
+    let helpMenuItem = NSMenuItem()
+    let helpMenu = NSMenu(title: "Help")
+    helpMenu.addItem(withTitle: "Release Notes", action: #selector(AppDelegate.showReleaseNotes(_:)), keyEquivalent: "")
+    helpMenuItem.submenu = helpMenu
+    mainMenu.addItem(helpMenuItem)
+    NSApplication.shared.helpMenu = helpMenu
 
     return mainMenu
 }
