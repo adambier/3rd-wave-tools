@@ -31,7 +31,8 @@ public enum Packer {
     /// Sources are listed in order of first use (part 1 osc 1 … part 4 osc 3), every referenced
     /// source included, as Groove Synthesis's sample library does. Analog shapes never carry data.
     /// Multisamples are normally carried. Listing an S slot without its samples is allowed only when
-    /// asked for explicitly: no such file has been seen, and the 3rd Wave's handling is untested.
+    /// asked for explicitly: no such file from Groove Synthesis has been seen, and the 3rd Wave plays
+    /// whatever is in that slot, or silence if it is empty [verified: FORMATS.md section 7].
     ///
     /// Values beyond the program's declared length (left over when the 3rd Wave exported onto a
     /// longer file) are dropped. A program saved in an older layout is converted to the current one
@@ -55,7 +56,7 @@ public enum Packer {
             case (.s, .multisample(let m)):
                 sources.append(.init(ref: ref, payload: .multisample(m)))
             case (.s, .reference):
-                // Listed without its samples. Never seen in Groove Synthesis's files; the 3rd Wave's handling is untested.
+                // Listed without its samples. Never seen in Groove Synthesis's files; the 3rd Wave plays the slot as loaded, or silence.
                 sources.append(.init(ref: ref, payload: .none))
             case (.s, _):
                 throw PackError.wrongKind(ref, "a sample slot needs a multisample (.bin), not a wavetable.")
