@@ -649,8 +649,9 @@ Verified on an 8M (OS 2.0d) unless a note says otherwise.
 - **The 3rd Wave's exports** are named `B05P094.pro` (three-digit program) and
   `B05P09_Name.pgdata` / `B05P100_Name.pgdata` (program number with at least two digits; spaces
   become underscores; punctuation other than hyphens is dropped). [verified] **Export Wavetable**
-  names its files `01.wt`, `02.wt`, … in sequence, not by slot. [verified on the 24M] The 3rd Wave
-  ignores file names when importing. [official]
+  names its files `01.wt`, `02.wt`, … from a counter the 3rd Wave keeps (it went on to `03.wt`
+  after the folder had been emptied), not by slot. [verified on the 24M] The 3rd Wave ignores
+  file names when importing. [official]
 - **The USB drive** (volume `THIRDWAVE`) shows the folders `PROGRAMS` (`.pro` and `.pgdata`), `WAVES`
   (`.wt`), `AUDIO` (`.bin` and exported `.wav`) and `FIRMWARE` when mounted on a Mac. [verified]
   Groove Synthesis's READMEs write them as `program/`, `waves/` and `audio/`.
