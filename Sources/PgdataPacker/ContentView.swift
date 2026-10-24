@@ -259,11 +259,23 @@ enum AlertPresenter {
             if response == .alertSecondButtonReturn, let url = reveal { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             done()
         }
+        // The text area starts at its top, not wherever the alert's layout left it (a long report
+        // opened half scrolled). Once more after the sheet is on screen, when the final layout is in.
+        if let scroll = alert.accessoryView as? NSScrollView {
+            scrollToTop(scroll)
+            DispatchQueue.main.async { scrollToTop(scroll) }
+        }
         if let w = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first(where: \.isVisible) {
             alert.beginSheetModal(for: w, completionHandler: finish)
         } else {
             finish(alert.runModal())
         }
+    }
+
+    /// Scrolls a text area to its top. The text view is flipped, so y = 0 is the top.
+    static func scrollToTop(_ scroll: NSScrollView) {
+        scroll.contentView.scroll(to: .zero)
+        scroll.reflectScrolledClipView(scroll.contentView)
     }
 
     /// Lays out a report (see `ReportText`): paragraphs separated by blank lines, headings (lines
@@ -403,6 +415,8 @@ enum AlertPresenter {
         scroll.drawsBackground = false
         scroll.borderType = scrolls ? .bezelBorder : .noBorder
         scroll.documentView = tv
+        scrollToTop(scroll)
+        DispatchQueue.main.async { scrollToTop(scroll) }
         return scroll
     }
 }
