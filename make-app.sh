@@ -286,7 +286,8 @@ if [ "$MAKE_APPCAST" -eq 1 ]; then
     # URL prefix applies to this release alone and the earlier items keep their URLs. The release
     # notes, hw-tests/release-notes-<version>.md if present, go next to the zip under its base name
     # and are embedded in the item for Sparkle's update window (a linked notes file on GitHub would
-    # be served as a download, not shown).
+    # be served as a download, not shown). Their "## Download" section, which is about the zip on
+    # the GitHub release page, is left out of the update window.
     APPCAST_DIR="build/appcast"
     rm -rf "$APPCAST_DIR"
     mkdir -p "$APPCAST_DIR"
@@ -294,7 +295,9 @@ if [ "$MAKE_APPCAST" -eq 1 ]; then
     cp "$ZIP" "$APPCAST_DIR/"
     NOTES="hw-tests/release-notes-$VERSION.md"
     if [ -f "$NOTES" ]; then
-        cp "$NOTES" "$APPCAST_DIR/pgdata-Packer-$VERSION.md"
+        # Drop from a "## Download" heading to the next "## " heading (or the end).
+        awk '/^## /{ skip = ($0 ~ /^## Download[[:space:]]*$/) } !skip' "$NOTES" \
+            > "$APPCAST_DIR/pgdata-Packer-$VERSION.md"
     else
         echo "No $NOTES: the update will have no release notes." >&2
     fi
