@@ -272,7 +272,8 @@ then    u32 × …       the program values v[0], v[1], … (section 3.2), one w
 
 **Oscillator sources point into the source table.** In the program words, the twelve oscillator
 values (integers 0–2 of each part) hold the index *k* of a source-table entry instead of a source
-id. Everything else is the `.pro`'s values unchanged.
+id. Everything else is the `.pro`'s values unchanged. The type codes (0 P, 1 U, 2 analog, 4
+multisample; 3 unused) are the slot-kind codes of the 3rd Wave's SysEx protocol. [observed]
 
 **To unpack** a `.pgdata` into a `.pro`: read the program words; tell floats from integers using
 *S*, *F*, *G* and *E* in the first four words (section 3.2); replace each oscillator's index with the
@@ -329,20 +330,53 @@ Plain text, LF or CRLF line ends. [observed: 92 factory files and others]
   exponents. pgdata Packer writes six decimals when that gives back the exact float, and the
   shortest exact form otherwise.
 
-**P tables (PPG-style).** A P table is the 3rd Wave's form of the PPG Wave's wavetables: 64
-waves of 128 points, a wave being one cycle. The file stores each point as a pair, the sample and
-then the difference to the next sample of the same wave (the last point's difference leads back to
-the first), so a wave takes 256 values and the table 16,384. The difference is derived data: in
-every factory P table examined it equals the next sample minus this one to float precision, and
-the 3rd Wave itself holds a P table as 64 × 128 plain samples. [observed: six tables embedded in
-Groove Synthesis's `.pgdata` files, five exactly and the Prophet VS table within 1e-6; the internal
-form over SysEx] A writer should therefore compute the differences from the samples; what the
-3rd Wave does when a file's differences disagree with its samples has not been tested. The samples
-are floats within ±1, not quantised to the PPG's 8-bit levels. [observed] The PPG convention of
-standard waveforms in the last four positions (60 a triangle, 61 a narrow pulse, 62 a square, 63 a
-sawtooth) holds in the classic tables (P00, P01, P23 and P27 of those examined) but not in all
-(P33 and the Prophet VS table P34 use all 64 positions for their own waves), so it is a property
-of the content, not of the format. [observed]
+**P tables (PPG-style).** The P set is the 3rd Wave's form of the PPG Wave's wavetables. P00–P31
+are derived from the PPG Wave 2.2/2.3's own tables (P30 is the PPG's *upper wavetable*), P32 and
+P33 are Groove Synthesis's, P34 and P35 hold the Prophet VS waves; 48 slots in all, the rest for
+the user's own. [official: the user manual] The format:
+
+- **64 waves of 128 points**, a wave being one cycle. The file stores each point as a pair, the
+  sample and then the difference to the next sample of the same wave (the last point's difference
+  leads back to the first), so a wave takes 256 values and the table 16,384. The difference is
+  derived data: in every factory P table examined it equals the next sample minus this one to
+  float precision, and over SysEx the 3rd Wave sends a P table as 64 × 128 plain samples.
+  [observed: six tables embedded in Groove Synthesis's `.pgdata` files, five exactly and the
+  Prophet VS table within 1e-6; SysEx dumps from an 8M] A writer should compute the differences
+  from the samples; what the 3rd Wave does when a file's differences disagree with its samples has
+  not been tested.
+- **The samples are floats within ±1**, not quantised to the PPG's 8-bit levels, although the
+  manual calls the P set "8-bit" and says the Wave Maker converts imported audio "to the correct
+  sample rate and bit depth" for it. So whatever reduction the 3rd Wave applies, it is not recorded
+  in the file. [observed; the rest inferred]
+- **Positions 60–63 hold the PPG's four standard waveforms** (60 a triangle, 61 a narrow pulse, 62 a
+  square, 63 a sawtooth) in the tables that came from the PPG: every PPG wavetable had only 60
+  waves of its own, and these four were always the same. [official; observed in P00, P01, P23 and
+  P27] It is a property of the content, not of the format: P33 and the Prophet VS table P34 use
+  all 64 positions for their own waves. [observed]
+
+How a P table *plays* is not in the file but in the program, through three settings in the
+oscillator's Wave Flow menu, all meant to reproduce the PPG [official]: **wavetable smoothing**
+(interpolation between neighbouring waves; off, the sound steps from wave to wave as on the PPG),
+**waveform smoothing** (interpolation within the 128-point wave and of pitch; off, the 3rd Wave
+plays the nearest point and notes are slightly off pitch, as on the PPG), and **use upper
+wavetable**: with it on, a sweep past position 63 of a P table continues into P30, the PPG's upper
+wavetable; with it off, the 3rd Wave sweeps positions 0–59 only, and 60–63 are reached by setting
+the wave offset there with the wave envelope off, which gives the PPG's version of an analog
+waveform. U tables have no such boundary. The manual also says the 3rd Wave runs at the PPG's
+sample rate when a P table is selected. None of this is needed to read or write a `.wt`, but it is
+why a P table's last four waves look unrelated to the rest.
+
+**U tables** hold 64 waves of 2,048 plain samples (no differences), floats within ±1. [observed]
+Over SysEx, however, the 3rd Wave sends a U table as 64 × 1,024 float32 samples, and the manual
+describes the Wave Maker's import of 2,048-sample waves as "96 kHz" tables; how the file's 2,048
+relate to the 1,024 the 3rd Wave holds (every other sample, a resample, or something else) has not
+been checked (section 10). [SysEx: observed on an 8M, OS 2.0]
+
+*Background.* The PPG's own tables were mostly defined by a few stored key waves with the rest
+interpolated between them, and its wavetable 31 was a sample table (piano and saxophone) that the
+3rd Wave does not carry; see Hermann Seib's PPG wavetable listing and the user manual's "About Wave
+Flow and the Upper Wavetables", "Importing Wavetables into the P Set" and "How to Sound Like a
+Vintage PPG".
 
 ### 5.2 Multisample (.bin)
 
@@ -626,6 +660,7 @@ in section 6.5, plus float 102 on the 24M (section 6.3).
 
 - Whether a 24K converts exactly as the 24M does.
 - Whether the `.pgdata` import applies the corrections of section 6.5 to an unconverted 2022 file.
+- How a U table's 2,048 samples per wave in a `.wt` relate to the 1,024 the 3rd Wave sends over SysEx (section 5.1).
 - Whether **Import program** accepts an unpacked `.pro` tagged `W3_PROG_5` that has an older layout.
 - Whether multisamples are reused by content, as wavetables are.
 - Whether **Bulk program import** sorts file names plainly or by number (`B05P100` before or after `B05P10`).
