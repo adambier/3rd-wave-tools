@@ -50,7 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Opens `url` if GitHub answers for it, and `fallback` if it does not or cannot be reached.
     /// Pages for the running version do not exist yet in a build of a version not yet released.
     private func openIfAvailable(_ url: URL, orElse fallback: URL) {
-        Task {
+        Task { @MainActor in
             var request = URLRequest(url: url, timeoutInterval: 5)
             request.httpMethod = "HEAD"
             let exists = ((try? await URLSession.shared.data(for: request))?.1 as? HTTPURLResponse)?.statusCode == 200
