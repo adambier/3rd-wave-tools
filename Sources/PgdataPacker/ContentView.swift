@@ -248,11 +248,12 @@ enum AlertPresenter {
         alert.alertStyle = .informational
         alert.messageText = parts.first ?? ""
         let rest = parts.dropFirst().joined(separator: "\n\n")
-        // The text, if any, with a copy icon in its top-right corner that puts the whole report
-        // on the clipboard as plain text and leaves the sheet open.
-        if !rest.isEmpty { alert.accessoryView = textArea(rest, copying: ReportText.plain(text)) }
+        if !rest.isEmpty { alert.accessoryView = textArea(rest) }
         alert.addButton(withTitle: "OK")
         if reveal != nil { alert.addButton(withTitle: "Show in Finder") }
+        // With a report under the title, a copy icon on the title's line that puts the whole
+        // report on the clipboard as plain text and leaves the sheet open.
+        if let content = alert.accessoryView { placeCopyIcon(in: alert, beside: content, copying: ReportText.plain(text)) }
         let finish: (NSApplication.ModalResponse) -> Void = { response in
             if response == .alertSecondButtonReturn, let url = reveal { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             done()
@@ -337,19 +338,39 @@ enum AlertPresenter {
         }
     }
 
-    /// The top-right corner of a text area kept clear of text, for the copy icon.
-    private static let iconCorner = NSSize(width: 28, height: 22)
-
-    /// Keeps `iconCorner` free of text so the first line wraps before the icon.
-    private static func reserveIconCorner(in tv: NSTextView) {
-        guard let tc = tv.textContainer else { return }
-        let w = tc.containerSize.width
-        tc.exclusionPaths = [NSBezierPath(rect: NSRect(x: w - iconCorner.width, y: 0, width: iconCorner.width, height: iconCorner.height))]
+    /// Puts the copy icon level with the alert's title, at the right edge of the text column (the
+    /// way a chat message carries its copy control). The alert is laid out first, as Apple says
+    /// to do before positioning anything relative to its views, and the icon is added to the
+    /// alert's window over the title's line. If the title can't be found, the icon goes over the
+    /// text area's top-right corner.
+    private static func placeCopyIcon(in alert: NSAlert, beside content: NSView, copying text: String) {
+        alert.layout()
+        guard let contentView = alert.window.contentView else { return }
+        let button = CopyButton(text: text)
+        let column = contentView.convert(content.bounds, from: content)
+        var origin = NSPoint(x: column.maxX - button.frame.width - 1, y: column.maxY - button.frame.height - 1)
+        if let title = titleField(in: contentView, text: alert.messageText) {
+            // Centred on the title's first line.
+            let frame = contentView.convert(title.bounds, from: title)
+            let line = title.font.map { $0.ascender - $0.descender + $0.leading } ?? frame.height
+            origin.y = frame.maxY - min(line, frame.height) / 2 - button.frame.height / 2
+        }
+        button.frame.origin = origin
+        button.autoresizingMask = [.minXMargin, .minYMargin]   // stays at the top right
+        contentView.addSubview(button)
     }
 
-    /// A read-only text area 520 points wide that scrolls past about 360 points of text. With
-    /// `copying`, a copy icon sits in its top-right corner that puts that text on the clipboard.
-    static func textArea(_ text: String, copying plain: String? = nil) -> NSView {
+    /// The text field showing `text` (the alert's title), anywhere under `view`.
+    private static func titleField(in view: NSView, text: String) -> NSTextField? {
+        for sub in view.subviews {
+            if let field = sub as? NSTextField, field.stringValue == text { return field }
+            if let found = titleField(in: sub, text: text) { return found }
+        }
+        return nil
+    }
+
+    /// A read-only text area 520 points wide that scrolls past about 360 points of text.
+    static func textArea(_ text: String) -> NSView {
         let width: CGFloat = 520, maxHeight: CGFloat = 360
         let tv = NSTextView(frame: NSRect(x: 0, y: 0, width: width, height: 10))
         tv.isEditable = false
@@ -364,7 +385,6 @@ enum AlertPresenter {
         tv.autoresizingMask = [.width]
         tv.maxSize = NSSize(width: width, height: .greatestFiniteMagnitude)
         tv.textStorage?.setAttributedString(styled(text))
-        if plain != nil { reserveIconCorner(in: tv) }
         var used: CGFloat = 60
         if let lm = tv.layoutManager, let tc = tv.textContainer {
             lm.ensureLayout(for: tc)
@@ -380,22 +400,6 @@ enum AlertPresenter {
         scroll.drawsBackground = false
         scroll.borderType = scrolls ? .bezelBorder : .noBorder
         scroll.documentView = tv
-        guard let plain else { return scroll }
-        // The text view is now as wide as the scroll view's content (less the scroll bar, when
-        // there is one): keep the corner clear at that width, and put the icon over it.
-        scroll.tile()
-        tv.frame.size.width = scroll.contentSize.width
-        reserveIconCorner(in: tv)
-        let button = CopyButton(text: plain)
-        let box = NSView(frame: scroll.frame)
-        scroll.autoresizingMask = [.width, .height]
-        box.addSubview(scroll)
-        let scrollBar = scrolls ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 0
-        let inset: CGFloat = scrolls ? 3 : 1
-        button.frame.origin = NSPoint(x: box.frame.width - scrollBar - button.frame.width - inset,
-                                      y: box.frame.height - button.frame.height - inset)
-        button.autoresizingMask = [.minXMargin, .minYMargin]
-        box.addSubview(button)
-        return box
+        return scroll
     }
 }
