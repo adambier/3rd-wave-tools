@@ -6,11 +6,11 @@ and unified programs.
 ## Overview
 
 PgdataFormats is the library behind pgdata Packer, offered for anyone building their own tools
-for the 3rd Wave: librarians, editors, converters, or scripts. It reads and writes every file the
-3rd Wave uses, byte for byte, and implements the parts of the 3rd Wave's own behaviour that a
+for the 3rd Wave: librarians, editors, converters, or scripts. It reads and writes the 3rd Wave's
+four file formats byte for byte, and implements the parts of the 3rd Wave's own behaviour that a
 tool needs to reproduce:
 
-- programs (`.pro`), in every layout the 3rd Wave has saved since 2022, with ``ProgramFile``;
+- programs (`.pro`), in every layout seen in files saved since 2022, with ``ProgramFile``;
 - wavetables (`.wt`), P and U tables, with ``WavetableFile``;
 - multisamples (`.bin`), in versions 1, 4, and 5, with ``Multisample``;
 - unified programs (`.pgdata`), a program together with the wavetables and multisamples it

@@ -35,8 +35,8 @@ They list, for each file, the values a reader most often gets wrong:
   and the embedded name), the number of program words, the twelve oscillator words (indices into
   the source table), and the source ids they unpack to.
 
-Floats appear as JSON numbers in their shortest exact form; a `.pro`'s floats appear as the text
-in the file (six decimals, section 3.1).
+Floats appear as JSON numbers, which convert back to the exact 32-bit values; a `.pro`'s floats
+appear as the text in the file (six decimals, section 3.1).
 
 ## Keeping them current
 

@@ -120,8 +120,8 @@ public enum Packer {
 public struct UnpackedProgram {
     /// The program, with source ids in place of source-table indices, tagged `W3_PROG_5`.
     ///
-    /// A program in an older layout is converted to the current one, as the 3rd Wave's
-    /// **Import program** would convert it; ``notes`` says so.
+    /// A program in an older layout is converted to the current one when the converter knows its
+    /// layout, as the 3rd Wave's **Import program** would convert it; ``notes`` says so.
     public var program: ProgramFile
     /// Embedded content, keyed by the slot the program refers to.
     public var wavetables: [(ref: SourceRef, file: WavetableFile)]
@@ -194,7 +194,7 @@ public enum Unpacker {
                                  + "The .pro is written as it is, so the 3rd Wave may not play it \(olderFormat).")
                 }
             } else {
-                notes.append("This file holds a program in a layout (\(l)) this app has not seen before. The .pro is written as it is, "
+                notes.append("This file holds a program in a layout (\(l)) not seen before. The .pro is written as it is, "
                              + "tagged W3_PROG_5, so the 3rd Wave may not play it \(olderFormat).")
             }
         } else if ProgramConverter.layout(of: program) == nil {

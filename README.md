@@ -12,7 +12,7 @@ Not affiliated with or endorsed by Groove Synthesis. Everything here was worked 
 checked on an 8M and a 24M, both running OS 2.0d. The Formats and Tests sections say what was
 confirmed on the 3rd Wave and what is inferred.
 
-**Building something for the 3rd Wave?** The file formats are documented in full, and the library
+**Building something for the 3rd Wave?** The file formats are (unofficially) documented, and the library
 behind this app, test files, and a developer tool are free to use under the MIT licence: see
 [For developers](#for-developers).
 
@@ -28,7 +28,8 @@ Macs. Requires macOS 13 or later.
 
 From 1.0.4, the app updates itself, using [Sparkle](https://sparkle-project.org): on its second
 launch it asks whether to check automatically, and **Check for Updates…** in the app menu checks
-at any time. **Release Notes** in the Help menu opens the notes for the version you have.
+at any time. In the Help menu, **Read Me** opens this page and **File Format Reference** the format
+reference; **Release Notes** opens the notes for the version you have.
 
 ## Build
 
@@ -294,10 +295,8 @@ Checked on an 8M (OS 2.0d), and most points on a 24M as well
 
 ## For developers
 
-pgdata Packer is one tool; the aim of this project is to make it easy to build others, in any
-language: librarians, editors, converters, patch generators, or scripts. When tools by different
-people read and write the 3rd Wave's files the same way the 3rd Wave does, every 3rd Wave owner
-benefits. Everything here is open source under the MIT licence.
+pgdata Packer is one tool; a major aim of this project is to help make it easier to build others,
+in any language. Everything here is open source under the MIT licence.
 
 - **The format reference.** [`docs/FORMATS.md`](docs/FORMATS.md) describes every file the 3rd Wave
   reads and writes, for someone implementing them for the first time, and how the 3rd Wave behaves

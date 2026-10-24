@@ -119,7 +119,7 @@ public struct Multisample: Equatable {
             throw FormatError.badMagic(expected: "3rd Wave multisample (.bin)", found: magic)
         }
         guard [1, 4, 5].contains(v) else {
-            throw FormatError.invalid("Multisample file version \(v) is not one this app knows (1, 4, and 5 are supported).")
+            throw FormatError.invalid("Multisample file version \(v) is not supported (versions 1, 4, and 5 are).")
         }
         var r = ByteReader(bytes, offset: 16)
         let n = Int(try r.u8())

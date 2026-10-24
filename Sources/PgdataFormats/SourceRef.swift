@@ -27,9 +27,13 @@ public enum SourceRef: Hashable, Comparable, CustomStringConvertible {
     /// A source id that names no known slot, kept as it is.
     case unknown(Int32)
 
-    /// The number of P slots (48), the number of U slots (64), and the highest S slot number this
-    /// library accepts (127).
-    public static let pCount = 48, uCount = 64, sMax = 127
+    /// The number of P slots: 48, P00–P47.
+    public static let pCount = 48
+    /// The number of U slots: 64, U00–U63.
+    public static let uCount = 64
+    /// The highest multisample slot number this library accepts: 127. The 3rd Wave's own upper
+    /// limit has not been checked.
+    public static let sMax = 127
     /// The number of factory P tables, in P00–P35: 36.
     public static let factoryPCount = 36   // P00–P35
     /// The number of factory U tables, in U00–U55: 56.
@@ -153,6 +157,7 @@ public enum SourceRef: Hashable, Comparable, CustomStringConvertible {
         return SourceRef(label: String(k) + digits)
     }
 
+    /// Orders sources by type code (P, U, analog, multisample), then by source id.
     public static func < (a: SourceRef, b: SourceRef) -> Bool {
         (a.typeCode, a.id) < (b.typeCode, b.id)
     }

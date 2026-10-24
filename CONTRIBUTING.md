@@ -1,7 +1,6 @@
 # Contributing
 
-Thank you for helping. This project exists so that anyone can build software for the Groove
-Synthesis 3rd Wave, so contributions of every size are welcome: a correction to one sentence of
+Thank you for helping. Contributions of every size are welcome: a correction to one sentence of
 the format reference counts as much as code.
 
 ## What helps most
@@ -37,7 +36,7 @@ bank 3"), or share only your own programs and exports.
 - **The app** (macOS 13 or later, Xcode command-line tools): `./make-app.sh`, then
   `open "pgdata Packer.app"`. The first build downloads Sparkle.
 - **The tests:** `./run-tests.sh` on a Mac with a full Xcode installation (15 or later), or
-  `PGDATA_TESTS=1 swift test` on Linux (Swift 5.9 or later; tested with 6.0).
+  `swift test` on Linux (Swift 5.9 or later; tested with 6.0).
 - **The test files** in [`fixtures/`](fixtures/): after a deliberate change to what the library
   writes, rebuild them with
   `PGDATA_TESTS=1 PGDATA_REGENERATE_FIXTURES=1 swift test --filter FixtureTests` and include the
@@ -62,8 +61,6 @@ The README, FORMATS.md, the documentation, and the app's text follow a few conve
 
 - "3rd Wave", never "Third Wave"; "Groove Synthesis" in full.
 - "the 3rd Wave" or "your 3rd Wave", not "the synth".
-- No names of third-party sound sets, programs, or their authors (code comments and tests may
-  use them where it helps).
 - Standing behaviour in the present tense; single observations as "has been observed to …".
 - Inferences said to be inferences.
 - The serial (Oxford) comma.

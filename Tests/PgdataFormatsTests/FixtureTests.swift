@@ -244,7 +244,8 @@ enum FixtureBuilder {
         return WavetableFile(kind: .u, name: "Fixture U Saw Harmonics", values: out.flatMap { $0 })
     }
 
-    /// A multisample of two short samples, a sine below middle C and a square from it up.
+    /// A multisample of two short samples, a sine below middle C and a square from it up. Note
+    /// names follow `Multisample.noteName`, which calls middle C (note 60) C3.
     static func multisample() -> Multisample {
         func audio(_ frames: Int, _ f: (Int) -> Double) -> [UInt8] {
             (0..<frames).flatMap { i -> [UInt8] in
@@ -252,10 +253,10 @@ enum FixtureBuilder {
                 return [UInt8(v & 0xff), UInt8(v >> 8)]
             }
         }
-        let sine = Multisample.Sample(name: NameField("Fixture Sine C3"), length: 64, start: 0, end: 63, loopStart: 0, loopEnd: 63,
+        let sine = Multisample.Sample(name: NameField("Fixture Sine C2"), length: 64, start: 0, end: 63, loopStart: 0, loopEnd: 63,
                                       rootNote: 48, lowNote: 0, highNote: 59, loopMode: 2, crossfade: 0, crossfadeType: 0,
                                       audio: audio(64) { sin(2 * .pi * Double($0) / 32) })
-        let square = Multisample.Sample(name: NameField("Fixture Square C5"), length: 64, start: 0, end: 63, loopStart: 16, loopEnd: 63,
+        let square = Multisample.Sample(name: NameField("Fixture Square C4"), length: 64, start: 0, end: 63, loopStart: 16, loopEnd: 63,
                                         rootNote: 72, lowNote: 60, highNote: 127, loopMode: 1, crossfade: 4, crossfadeType: 2,
                                         audio: audio(64) { ($0 % 16) < 8 ? 1 : -1 })
         return Multisample(slotName: NameField("Fixture Multisample"), samples: [sine, square])

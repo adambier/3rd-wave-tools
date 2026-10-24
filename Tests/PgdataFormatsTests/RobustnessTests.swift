@@ -109,7 +109,7 @@ final class RobustnessTests: XCTestCase {
         XCTAssertEqual(try Multisample(binData: v4.binData()).sourceVersion, 5)   // upgraded on write
         // Unknown version, trailing bytes.
         var v7 = [UInt8](m.binData()); v7[11] = UInt8(ascii: "7")
-        XCTAssertTrue(error { try Multisample(binData: Data(v7)) }.contains("version 7 is not one this app knows"))
+        XCTAssertTrue(error { try Multisample(binData: Data(v7)) }.contains("version 7 is not supported"))
         XCTAssertTrue(error { try Multisample(binData: m.binData() + Data([1, 2, 3])) }.contains("3 unexpected bytes at the end"))
     }
 
@@ -147,7 +147,7 @@ final class RobustnessTests: XCTestCase {
         let g = UnifiedProgram(sources: [.init(ref: .analog(1), payload: .none)], programName: NameField("x"),
                                words: odd.words.enumerated().map { i, w in odd.oscillatorIndices.contains(i) ? 0 : w })
         let up = Unpacker.unpack(g)
-        XCTAssertTrue(up.notes.contains { $0.contains("layout (177/128/100) this app has not seen before") }, "\(up.notes)")
+        XCTAssertTrue(up.notes.contains { $0.contains("layout (177/128/100) not seen before") }, "\(up.notes)")
         XCTAssertEqual(up.program.values.count, odd.values.count)
         // A known old layout with a global count the converter refuses.
         let refused = prog(173, 126, 40)

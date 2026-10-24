@@ -27,6 +27,8 @@ concurrency:
 
 jobs:
   build:
+    # Only in this repository: a fork has no Pages site to publish to.
+    if: github.repository == 'adambier/3rd-wave-tools'
     runs-on: ubuntu-24.04
     container: swift:6.0-noble
     steps:

@@ -16,8 +16,8 @@ import Foundation
 /// See section 6 of FORMATS.md for the conversion step by step.
 public enum ProgramConverter {
     /// The 3rd Wave whose Import program the result reproduces. `.twentyFour` (24K or 24M) keeps
-    /// all four parts and is what pgdata Packer writes: an 8M has been observed to fit such a
-    /// program to its two parts when it imports the .pgdata. `.eightM` adds the 8M's own two-part
+    /// all four parts and is what pgdata Packer writes: an 8M fits such a program to its two
+    /// parts when it imports the .pgdata. `.eightM` adds the 8M's own two-part
     /// steps; it is used to check the rules against the 8M's exports.
     public enum Model: String, CaseIterable, Sendable {
         /// The 3rd Wave 8M, which plays parts 1 and 2 only: the result also has the 8M's two-part
@@ -33,8 +33,12 @@ public enum ProgramConverter {
     /// The event record count is not part of the layout. See section 3.3 of FORMATS.md for the
     /// layouts seen.
     public struct Layout: Equatable, CustomStringConvertible, Sendable {
-        /// Integers per part (*S*), floats per part (*F*), and global values (*G*), in that order.
-        public var ints: Int, floats: Int, globals: Int
+        /// Integers per part (*S*).
+        public var ints: Int
+        /// Floats per part (*F*).
+        public var floats: Int
+        /// Global values (*G*).
+        public var globals: Int
         /// Creates a layout from its three sizes.
         public init(ints: Int, floats: Int, globals: Int) { self.ints = ints; self.floats = floats; self.globals = globals }
         /// The sizes as "S/F/G", for example "181/137/182".

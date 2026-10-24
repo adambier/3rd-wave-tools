@@ -104,7 +104,7 @@ public struct UnifiedProgram: Equatable {
                 case .s:
                     payload = .multisample(try Multisample.readBody(&r))
                 default:
-                    throw FormatError.invalid("Source \(refs[k].label) claims to carry data, which this app does not understand.")
+                    throw FormatError.invalid("Source \(refs[k].label) claims to carry data, which this kind of source cannot.")
                 }
             }
             out.append(Source(ref: refs[k], payload: payload))

@@ -201,7 +201,7 @@ public struct ProgramFile: Equatable {
         var what: [String] = []
         if !v { what.append("format \(version)") }
         if !s { what.append("\(valuesPerPart) values per part") }
-        return "Unfamiliar program layout (\(what.joined(separator: ", "))): the oscillator sources may be misread. Check them here and on the 3rd Wave after importing."
+        return "Unfamiliar program layout (\(what.joined(separator: ", "))): the oscillator sources may be misread. Check them, and check the program on the 3rd Wave after importing."
     }
 
     /// Integers per part (*S*), the first value; 0 when the program has no values.

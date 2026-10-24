@@ -13,9 +13,11 @@ import Foundation
 public struct WavetableFile: Equatable {
     /// The kind of wavetable, P or U; the raw value is the file's first line.
     public enum Kind: String {
-        /// A P table (PPG-style, 16,384 values; header line `PNAME`) or a U table (131,072 values;
-        /// header line `UNAME`). See section 5.1 of FORMATS.md.
-        case p = "PNAME", u = "UNAME"
+        /// A P table: PPG-style, 16,384 values, header line `PNAME`. See section 5.1 of FORMATS.md.
+        case p = "PNAME"
+        /// A U table: 131,072 values (the table and its mipmap chain), header line `UNAME`. See
+        /// section 5.1 of FORMATS.md.
+        case u = "UNAME"
         /// The number of values a table of this kind holds: 16,384 for P, 131,072 for U.
         public var valueCount: Int { self == .p ? 16_384 : 131_072 }
         /// The slot letter: "P" or "U".

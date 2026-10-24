@@ -51,8 +51,8 @@ Where something is reasoning that has not been checked, the text says so in word
     [9](#9-how-this-was-established) lists the tests.
 [^both]: Tested on a 3rd Wave 8M and a 24M (OS 2.0d), October 2026; section
     [9](#9-how-this-was-established) lists the tests.
-[^bulk]: Seen in every one of the 599 programs bulk-imported and exported again on an 8M (299) and
-    a 24M (300), OS 2.0d, October 2026 (section [9](#9-how-this-was-established)).
+[^bulk]: Seen in the programs bulk-imported and exported again on an 8M (299 programs) and a 24M
+    (300), OS 2.0d, October 2026 (section [9](#9-how-this-was-established)).
 [^manual]: Groove Synthesis's user manual (v1.9).
 [^spec]: Groove Synthesis's *3rd Wave MIDI CC + SysEx Spec* (v2a).
 [^bank-arranger]: Groove Synthesis's Bank Arranger script.
@@ -71,7 +71,8 @@ file** (called "the `.pgdata` import" here).
 **Parts.** A program has four parts (layers), numbered 1–4 on the 3rd Wave and 0–3 in the files.
 The 24K and 24M play all four; the 8M plays parts 1 and 2 only.[^parts]
 
-[^parts]: Stated by Groove Synthesis.
+[^parts]: Stated by Groove Synthesis. An 8M also fits every program it imports to two parts
+    (section [6.4](#64-what-an-8m-does-on-top)).
 
 ## 2. Oscillator sources
 
@@ -114,8 +115,9 @@ from the 3rd Wave's OSC screen for programs that use them.[^osc-ids] The rest of
 from those and from the names of tables embedded in `.pgdata` files ("Wavetable P15" under id 15,
 for example). P36–P47 as ids 1002–1013 is an assumption: no file using them has been seen.
 
-[^factory-slots]: Groove Synthesis's support page lists U00–U55 as the factory U tables and
-    offers U48–U55 as a separate download. The user manual (v1.9) still gives U00–U47.
+[^factory-slots]: Groove Synthesis's user manual (v1.9) gives P00–P35 as the factory P tables.
+    For the U tables, Groove Synthesis's support page lists U00–U55 and offers U48–U55 as a
+    separate download; the manual still gives U00–U47.
 [^osc-ids]: Read on an 8M's OSC screen (OS 2.0d), 21–23 October 2026.
 
 ## 3. Program (.pro)
@@ -288,7 +290,7 @@ then    u32 × …       the program values v[0], v[1], … (section 3.2), one w
 **Oscillator sources point into the source table.** In the program words, the twelve oscillator
 values (integers 0–2 of each part) hold the index *k* of a source-table entry instead of a source
 id. Everything else is the `.pro`'s values unchanged. The type codes (0 P, 1 U, 2 analog, 4
-multisample; 3 unused) are the slot-kind codes of the 3rd Wave's SysEx protocol.[^spec]
+multisample; 3 unused) match the slot-kind codes of the 3rd Wave's SysEx protocol.
 
 **To unpack** a `.pgdata` into a `.pro`: read the program words; tell floats from integers using
 *S*, *F*, *G*, and *E* in the first four words (section 3.2); replace each oscillator's index with the
@@ -379,7 +381,7 @@ have more.
 **U tables: the table and its mipmaps.** A U table is 64 waves of 1,024 samples: the manual's
 **Wave Maker** chapter says "the period length that the 3rd Wave uses is 1024 samples" and takes a
 64 × 1,024-sample `.wav` as a ready-made table, and the SysEx spec defines the U payload as
-65,536 floats, "64 different waveforms ... each with a length of 1024 samples".[^manual] [^spec] The
+65,536 floats, "64 different waveforms ... each with a length of 1024 samples".[^manual][^spec] The
 131,072 values of a U `.wt` are that table followed by progressively band-limited, smaller copies
 of the same 64 waves (a mipmap chain, of the kind usually played at higher pitches):
 
@@ -660,10 +662,13 @@ Tested on an 8M (OS 2.0d) unless a footnote says otherwise; section
   become underscores; punctuation other than hyphens is dropped).[^8m] **Export Wavetable**
   names its files `01.wt`, `02.wt`, … from a counter the 3rd Wave keeps (the counter is not reset
   by emptying the folder), not by slot.[^24m] The 3rd Wave ignores
-  file names when importing.[^both]
+  file names when importing.[^file-names]
 - **The USB drive** (volume `THIRDWAVE`) shows the folders `PROGRAMS` (`.pro` and `.pgdata`), `WAVES`
   (`.wt`), `AUDIO` (`.bin` and exported `.wav`), and `FIRMWARE` when mounted on a Mac.[^8m]
   Groove Synthesis's READMEs write them as `program/`, `waves/`, and `audio/`.
+
+[^file-names]: Stated by Groove Synthesis. The hardware tests in section
+    [9](#9-how-this-was-established) also imported files under names of their own.
 
 ## 9. How this was established
 
