@@ -261,8 +261,8 @@ the layout, so the unpacked `.pro` is always in the current format, `W3_PROG_5`.
 
 ### Convert
 
-Drop wavetable files or folders: WAV wavetables (the kind Serum, Vital, and many other synths
-use), the 3rd Wave's `.wt` and `.pgdata` files, and Surge `.wt` files. Folders are searched, and
+Drop wavetable files or folders: WAV and FLAC wavetables (the kinds Serum, Vital, Phase Plant,
+and many other synths use), the 3rd Wave's `.wt` and `.pgdata` files, and Surge `.wt` files. Folders are searched, and
 files without wavetables are passed over. Each table is listed once, with any identical copies
 noted beside it, and with its frames, its frame size, and how the frame size was decided: from
 metadata in the file, a `_wt<N>` tag in its name, a Serum `.txt` file beside it, or its length.

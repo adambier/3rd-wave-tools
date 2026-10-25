@@ -132,8 +132,37 @@ These rules were checked against about 20,000 files from the libraries of Hive, 
 Tonverk, and several Serum packs: every table those libraries hold was listed with the size its
 maker gives it (or, for two Tonverk files of 8,192 and 16,384 samples, with the choice left
 open), and the samples beside them (multisampled notes, single cycles, looped notes, drums) were
-not. Phase Plant's factory tables are FLAC files and DUNE 3's `.wt` files are in a format of
-their own; Convert reads neither.
+not. DUNE 3's `.wt` files are in a format of their own; Convert does not read them.
+
+### FLAC files
+
+Convert reads FLAC files with its own decoder (RFC 9639 [^flac]: CONSTANT, VERBATIM, FIXED, and
+LPC subframes, Rice and Rice2 residuals, wasted bits, the three stereo modes, 4- to 32-bit
+samples, fixed or variable block sizes). It checks each frame's checksums and, when the file
+carries one, the MD5 signature of its audio, and reports a file that fails any of them as
+damaged. Only the first channel is kept, as for a WAV.
+
+A FLAC file has no RIFF chunks, so rules 1–3, 6, and 7 look at its APPLICATION blocks instead:
+a block whose id is one of those chunk ids, forwards or byte-reversed, is read as that chunk. The
+reversed form is what Phase Plant's factory library has: of its 402 files (all mono, 24-bit, and
+256 × 2,048 samples), 29 carry a 48-byte " mlc" block holding `<!>2048 10000000 Kilohearts
+(www.kilohearts.com)`, and 8 carry a 60-byte "lpms" block (a `smpl` chunk with no loops). Every one
+also carries an 8-byte "MsHk" block: a little-endian 32-bit 1, then a 32-bit float between 0.89
+and 3.55 (1.0 in 272 files), with no evident relation to the file's peak (all peak at exactly full
+scale) or RMS level; it states neither a frame size nor a frame count, so it is read past, and
+what the float means is not documented. A Vorbis comment whose value is a Serum tag (`<!>2048 …`)
+is read as a `clm ` chunk, with a note saying where it was found (no writer is known to do this;
+the tag's form is unmistakable). Other comments that mention frames, cycles, or wavetables are
+noted, not acted on. Rules 4, 5, and 8 apply as for a WAV, so Phase Plant's 373 untagged files are
+listed by their length.
+
+Checked: the 402 files of Phase Plant's library decode sample for sample as ffmpeg decodes them
+(as 32-bit floats; all 402 also pass their MD5 signatures), every one is listed as 256 × 2,048,
+and every one round-trips through each of Convert's writers. The decoder's tests use synthetic
+files from ffmpeg and from a small test-only encoder, covering 8-, 12-, 16-, 20-, 24-, and 32-bit
+samples, every subframe kind and stereo mode, wasted bits, variable block sizes, escaped
+partitions, and missing or wrong MD5 signatures, with ffmpeg's decoding as the reference. A
+256 × 2,048 24-bit file decodes in under 20 ms in a release build.
 
 ## 4. Changing frame size and frame count
 
@@ -175,6 +204,7 @@ Results from any of these are welcome:
 [^tonverk]: *Tonverk User Manual*, OS 1.4.1, section 5.2.5, "Wavetables".
     <https://www.elektron.se/wp-content/uploads/2026/09/Tonverk-User-Manual_ENG_OS1.4.1_260923.pdf>
 [^phaseplant]: Kilohearts, Phase Plant manual and "Wavetables".
+[^flac]: RFC 9639, "Free Lossless Audio Codec" (IETF, 2024).
     <https://kilohearts.com/docs/wavetables>
 [^surge-code]: Surge XT's source code: `resources/data/wavetables/WT fileformat.txt`,
     `src/common/WAVFileSupport.cpp`, and `src/common/dsp/Wavetable.h`.
