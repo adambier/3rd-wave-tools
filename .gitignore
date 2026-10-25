@@ -10,3 +10,4 @@ build/
 site/
 # Appears only when the documentation plugin is resolved (PGDATA_DOCS=1).
 Package.resolved
+__pycache__/
