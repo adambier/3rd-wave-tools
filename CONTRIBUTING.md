@@ -1,7 +1,7 @@
 # Contributing
 
 Thank you for helping. Contributions of every size are welcome: a correction to one sentence of
-the format reference counts as much as code.
+the format reference is as appreciated as code.
 
 ## What helps most
 
@@ -40,8 +40,8 @@ bank 3"), or share only your own programs and exports.
 - **The tests:** `./run-tests.sh` on a Mac with a full Xcode installation (15 or later), or
   `swift test` on Linux or Windows (Swift 5.9 or later; tested with 6.0 on Linux and macOS and 6.2
   on Windows, where 6.0 cannot build against the current Windows SDK).
-- **The test files** in [`fixtures/`](fixtures/): after a deliberate change to what the library
-  writes, rebuild them with
+- **The test files** in [`fixtures/`](fixtures/): after a deliberate change to what the libraries
+  write, rebuild them with
   `PGDATA_TESTS=1 PGDATA_REGENERATE_FIXTURES=1 swift test --filter FixtureTests` and include the
   new files in the change.
 - **The libraries' documentation:**
@@ -58,8 +58,8 @@ bank 3"), or share only your own programs and exports.
   anything new.
 - **`WavetableFormats`** reads, resizes, and writes wavetables in other synths' formats. It
   depends only on Foundation and `PgdataFormats`, has no UI, and must build on the same three
-  platforms. Each preset's `basis` names what its behaviour rests on, and its `testedIn` lists
-  only the destinations it has been tested in.
+  platforms. Each destination's `basis` names what its behaviour rests on, and its `testedIn`
+  lists only the synths it has been tested in.
 - **`PgdataPackerCore`** holds the app's own decisions (pack, unpack, and convert plans, file
   names, Clean Up Names), also without UI, so that other front ends can share them. **`PgdataPacker`** is the
   SwiftUI app. **`tw3pg`** is the developer tool.
