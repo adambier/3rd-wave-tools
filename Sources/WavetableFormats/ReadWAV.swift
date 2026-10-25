@@ -19,6 +19,8 @@ extension WavetableReader {
         var basis: String
         /// The source as the subject of a sentence ("the clm chunk").
         var subject: String
+        /// What kind of source it is.
+        var evidence: FrameSizeEvidence
     }
 
     /// An interpolation claim from one of the file's sources of metadata.
@@ -72,9 +74,10 @@ extension WavetableReader {
         // trusted even when the samples run a little past the last whole frame, as in files from
         // some editors; the extra samples are then left out. Cue points and loops must divide
         // the file exactly, since ordinary samples have them too.
-        func offer(_ size: Int, basis: String, subject: String, explicit: Bool = true) {
+        func offer(_ size: Int, basis: String, subject: String, explicit: Bool = true,
+                   evidence: FrameSizeEvidence = .statedInFile) {
             if size >= 2, count % size == 0 || (explicit && count >= size) {
-                sizes.append(SizeClaim(size: size, basis: basis, subject: subject))
+                sizes.append(SizeClaim(size: size, basis: basis, subject: subject, evidence: evidence))
             } else {
                 notes.append("\(capitalized(subject)) gives \(grouped(size)) samples per frame, which does not divide "
                              + "the file's \(grouped(count)) samples, so it is not used.")
@@ -101,7 +104,7 @@ extension WavetableReader {
         // 4. Tonverk file-name tag.
         if let t = tag {
             let subject = "the Tonverk tag in the file name (\(t.text))"
-            offer(t.size, basis: "Tonverk file name (\(t.text))", subject: subject)
+            offer(t.size, basis: "Tonverk file name (\(t.text))", subject: subject, evidence: .fileName)
             if t.stepped { interps.append(InterpolationClaim(value: .none, subject: subject)) }
         }
         // 5. Serum sidecar text.
@@ -109,7 +112,7 @@ extension WavetableReader {
             let s = parseSidecar(text)
             if let n = s.size {
                 if (32...9999).contains(n) {
-                    offer(n, basis: "Serum .txt sidecar ([\(n)])", subject: "the Serum .txt sidecar ([\(n)])")
+                    offer(n, basis: "Serum .txt sidecar ([\(n)])", subject: "the Serum .txt sidecar ([\(n)])", evidence: .sidecar)
                 } else {
                     notes.append("The Serum .txt sidecar gives [\(n)], outside the 32–9,999 Serum accepts, so it is not used.")
                 }
@@ -119,21 +122,23 @@ extension WavetableReader {
         // 6. cue points, evenly spaced. Cue points and loops also mark ordinary samples, so these
         // two count only for frame sizes a wavetable can have (at most 4,096, Surge's limit).
         if let cue = wav.chunks["cue "], let d = cueSpacing(cue), d <= 4096 {
-            offer(d, basis: "cue points", subject: "the cue points", explicit: false)
+            offer(d, basis: "cue points", subject: "the cue points", explicit: false, evidence: .markers)
         }
         // 7. A single smpl loop.
         if let smpl = wav.chunks["smpl"], let loop = singleLoop(smpl) {
             let inclusive = loop.end - loop.start + 1, exclusive = loop.end - loop.start
             let n = count % inclusive != 0 && exclusive >= 2 && count % exclusive == 0 ? exclusive : inclusive
-            if n <= 4096 { offer(n, basis: "smpl loop", subject: "the smpl loop", explicit: false) }
+            if n <= 4096 { offer(n, basis: "smpl loop", subject: "the smpl loop", explicit: false, evidence: .markers) }
         }
 
         var frameSize: Int?
         var basis: String
         var candidates: [Int] = []
+        var evidence = FrameSizeEvidence.none
         if let chosen = sizes.first {
             frameSize = chosen.size
             basis = chosen.basis
+            evidence = chosen.evidence
             for other in sizes.dropFirst() where other.size != chosen.size {
                 notes.append("\(capitalized(other.subject)) gives \(grouped(other.size)) samples per frame, but "
                              + "\(chosen.subject) gives \(grouped(chosen.size)); \(chosen.subject) is used.")
@@ -157,6 +162,7 @@ extension WavetableReader {
             // ordinary audio (a 16-second sample at 48 kHz is 375 × 2,048).
             guard count / 2048 <= 256 else { return [] }
             frameSize = 2048
+            evidence = .length
             basis = "file length (multiples of 2,048, the Serum convention)"
             candidates = fittingFrameSizes(count).filter { $0 != 2048 }
         } else {
@@ -184,7 +190,7 @@ extension WavetableReader {
         if let t = tag, !t.nameBeforeTag.isEmpty { name = t.nameBeforeTag }
         return [FoundTable(name: name, fileName: fileName, source: .wav, samples: samples, frameSize: frameSize,
                            frameSizeBasis: basis, candidateFrameSizes: candidates, interpolation: interpolation,
-                           notes: notes)]
+                           notes: notes, frameSizeEvidence: evidence)]
     }
 
     // MARK: Parsing the RIFF structure

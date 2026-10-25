@@ -51,6 +51,24 @@ public enum SourceFormat: Equatable, Sendable {
     case surgeWavetable
 }
 
+/// What a found table's frame size rests on, from the most certain to the least.
+public enum FrameSizeEvidence: String, Equatable, Sendable {
+    /// Stated in the file's contents: a WAV's `clm `, `srge`, or `uhWT` chunk, a Surge `.wt`
+    /// header, or the fixed layout of a 3rd Wave table.
+    case statedInFile
+    /// A Tonverk-style `_wt<N>` tag in the file name.
+    case fileName
+    /// A Serum `.txt` file beside the WAV.
+    case sidecar
+    /// Evenly spaced `cue ` points or a single `smpl` loop: markers that ordinary samples have
+    /// too, so less certain.
+    case markers
+    /// The file's length only: an assumption (2,048 per frame) the user may need to change.
+    case length
+    /// Nothing settles it: the user must choose from `candidateFrameSizes`.
+    case none
+}
+
 /// A wavetable found in a file, before or after its frame size is settled.
 public struct FoundTable: Equatable, Sendable {
     /// The table's name.
@@ -68,8 +86,11 @@ public struct FoundTable: Equatable, Sendable {
     /// How the frame size was decided, as a short phrase for display (e.g., "clm chunk",
     /// "Tonverk file name (_wt1024)", "3rd Wave U table", "file length").
     public var frameSizeBasis: String
-    /// Frame sizes the file's length allows, when `frameSize` is nil.
+    /// Frame sizes the file's length allows: when `frameSize` is nil, the sizes to choose from;
+    /// when it rests on the length only, the other sizes that fit.
     public var candidateFrameSizes: [Int]
+    /// What `frameSize` rests on.
+    public var frameSizeEvidence: FrameSizeEvidence
     /// How the file asks to move between frames, when it says.
     public var interpolation: Interpolation?
     /// For a table from a 3rd Wave `.wt` or `.pgdata`: the content fingerprint pgdata Packer's
@@ -82,12 +103,17 @@ public struct FoundTable: Equatable, Sendable {
     /// Creates a found table; see the properties for what each value means.
     public init(name: String, fileName: String, source: SourceFormat, samples: [Float], frameSize: Int?,
                 frameSizeBasis: String, candidateFrameSizes: [Int] = [], interpolation: Interpolation? = nil,
-                thirdWaveFingerprint: UInt64? = nil, notes: [String] = []) {
+                thirdWaveFingerprint: UInt64? = nil, notes: [String] = [],
+                frameSizeEvidence: FrameSizeEvidence? = nil) {
         self.name = name; self.fileName = fileName; self.source = source; self.samples = samples
         self.frameSize = frameSize; self.frameSizeBasis = frameSizeBasis
         self.candidateFrameSizes = candidateFrameSizes; self.interpolation = interpolation
         self.thirdWaveFingerprint = thirdWaveFingerprint; self.notes = notes
+        self.frameSizeEvidence = frameSizeEvidence ?? (frameSize == nil ? .none : .statedInFile)
     }
+
+    /// The largest absolute sample (computed each time; cache it when it is needed often).
+    public var peak: Float { samples.reduce(0) { max($0, abs($1)) } }
 
     /// The table cut into frames of `size` samples (default: `frameSize`); nil when no size is
     /// known or the samples do not divide evenly.

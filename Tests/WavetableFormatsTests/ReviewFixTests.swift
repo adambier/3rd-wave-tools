@@ -45,6 +45,17 @@ final class ReviewFixTests: XCTestCase {
         XCTAssertNil(plan.items[0].chosenFrameSize)
     }
 
+    func testFrameSizeEvidence() throws {
+        XCTAssertEqual(try WavetableReader.read(wav16(65_536), fileName: "a.wav").first?.frameSizeEvidence, .length)
+        XCTAssertEqual(try WavetableReader.read(wav16(16_384), fileName: "b.wav").first?.frameSizeEvidence, FrameSizeEvidence.none)
+        XCTAssertEqual(try WavetableReader.read(wav16(65_536), fileName: "c_wt1024.wav").first?.frameSizeEvidence, .fileName)
+        XCTAssertEqual(try WavetableReader.read(wav16(8192, loop: (0, 2047)), fileName: "d.wav").first?.frameSizeEvidence, .markers)
+        let p = try XCTUnwrap(WavetableReader.read(Data(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("fixtures/wavetable-p.wt")), fileName: "p.wt").first)
+        XCTAssertEqual(p.frameSizeEvidence, .statedInFile)
+    }
+
     func testEightThousandSamplesOfferOtherSizes() throws {
         let found = try XCTUnwrap(WavetableReader.read(wav16(8192), fileName: "Four.wav").first)
         XCTAssertNil(found.frameSize)
