@@ -15,6 +15,7 @@ public struct Wavetable: Equatable, Sendable {
     /// How the source asks to move between frames, when it says.
     public var interpolation: Interpolation?
 
+    /// Creates a wavetable from its name, frames, and interpolation, if known.
     public init(name: String, frames: [[Float]], interpolation: Interpolation? = nil) {
         self.name = name; self.frames = frames; self.interpolation = interpolation
     }
@@ -78,6 +79,7 @@ public struct FoundTable: Equatable, Sendable {
     /// Things worth telling the user about this table (e.g., samples beyond ±1).
     public var notes: [String]
 
+    /// Creates a found table; see the properties for what each value means.
     public init(name: String, fileName: String, source: SourceFormat, samples: [Float], frameSize: Int?,
                 frameSizeBasis: String, candidateFrameSizes: [Int] = [], interpolation: Interpolation? = nil,
                 thirdWaveFingerprint: UInt64? = nil, notes: [String] = []) {
@@ -141,6 +143,7 @@ public struct OutputOptions: Equatable, Sendable {
     /// (triangle, narrow pulse, square, sawtooth), as the 3rd Wave's PPG-derived tables have.
     public var appendPPGStandardWaves: Bool
 
+    /// Creates options; the defaults pick frames evenly and keep the source's interpolation.
     public init(frameCountPolicy: FrameCountPolicy = .pickEvenly, interpolation: Interpolation? = nil,
                 tonverkFrameSize: Int? = nil, appendPPGStandardWaves: Bool = false) {
         self.frameCountPolicy = frameCountPolicy; self.interpolation = interpolation
@@ -160,6 +163,7 @@ public struct OutputFile: Equatable, Sendable {
     /// What the conversion did that the user should know (e.g., frame count changed, scaled to fit).
     public var notes: [String]
 
+    /// Creates an output file.
     public init(fileName: String, folder: String? = nil, data: Data, notes: [String] = []) {
         self.fileName = fileName; self.folder = folder; self.data = data; self.notes = notes
     }
@@ -167,6 +171,8 @@ public struct OutputFile: Equatable, Sendable {
 
 /// Why a file could not be read or a table could not be converted, as a sentence for the user.
 public struct WavetableError: Error, Equatable, CustomStringConvertible, Sendable {
+    /// The reason, as a sentence.
     public var description: String
+    /// Creates an error with its reason.
     public init(_ description: String) { self.description = description }
 }

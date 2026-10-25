@@ -5,9 +5,11 @@ the format reference counts as much as code.
 
 ## What helps most
 
-- **Corrections and additions to [`docs/FORMATS.md`](docs/FORMATS.md).** If something there is
+- **Corrections and additions to [`docs/FORMATS.md`](docs/FORMATS.md)** and, for other synths'
+  wavetables, [`docs/WAVETABLES.md`](docs/WAVETABLES.md), including a test of a Convert
+  destination in the synth it is for. If something there is
   wrong, incomplete, or still listed as unknown, and you know better, please say so, whether you
-  found out on a 3rd Wave, from Groove Synthesis's documents, or from files.
+  found out on a 3rd Wave or another synth, from its maker's documents, or from files.
 - **Bug reports** for the app, the library, or `tw3pg`, with the files that show the problem if
   you can share them.
 - **Word of what you build.** If you write a tool that reads or writes the 3rd Wave's files, open
@@ -42,10 +44,11 @@ bank 3"), or share only your own programs and exports.
   writes, rebuild them with
   `PGDATA_TESTS=1 PGDATA_REGENERATE_FIXTURES=1 swift test --filter FixtureTests` and include the
   new files in the change.
-- **The library's documentation:**
+- **The libraries' documentation:**
   `PGDATA_DOCS=1 swift package --disable-sandbox preview-documentation --target PgdataFormats`
-  builds it and serves it locally. Every public declaration in `PgdataFormats` should have a doc
-  comment. Pushes to `main` that change the library publish it to GitHub Pages.
+  (or `--target WavetableFormats`) builds it and serves it locally. Every public declaration in
+  both libraries should have a doc comment. Pushes to `main` that change a library publish its
+  documentation to GitHub Pages.
 
 ## Code
 
@@ -53,8 +56,12 @@ bank 3"), or share only your own programs and exports.
   UI, and it must build on Linux, macOS, and Windows (the tests run on all three for every push).
   Every reader writes an unmodified file back byte for byte; keep it that way, and add a test for
   anything new.
-- **`PgdataPackerCore`** holds the app's own decisions (pack and unpack plans, file names, Clean
-  Up Names), also without UI, so that other front ends can share them. **`PgdataPacker`** is the
+- **`WavetableFormats`** reads, resizes, and writes wavetables in other synths' formats. It
+  depends only on Foundation and `PgdataFormats`, has no UI, and must build on the same three
+  platforms. Each preset's `basis` names what its behaviour rests on, and its `testedIn` lists
+  only the destinations it has been tested in.
+- **`PgdataPackerCore`** holds the app's own decisions (pack, unpack, and convert plans, file
+  names, Clean Up Names), also without UI, so that other front ends can share them. **`PgdataPacker`** is the
   SwiftUI app. **`tw3pg`** is the developer tool.
 - Changes to what the 3rd Wave is said to do belong in FORMATS.md as well as in the code.
 

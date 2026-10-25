@@ -1,7 +1,9 @@
-# Builds the PgdataFormats documentation with DocC and publishes it to GitHub Pages:
+# Builds the documentation of the PgdataFormats and WavetableFormats libraries with DocC and
+# publishes it to GitHub Pages:
 # https://adambier.github.io/3rd-wave-tools/documentation/pgdataformats/
+# https://adambier.github.io/3rd-wave-tools/documentation/wavetableformats/
 #
-# Runs on every push to main that touches the library or its documentation, and on demand
+# Runs on every push to main that touches the libraries or their documentation, and on demand
 # (Actions tab → Documentation → Run workflow). The repository's Pages setting must be
 # "Source: GitHub Actions".
 
@@ -12,6 +14,7 @@ on:
     branches: [main]
     paths:
       - "Sources/PgdataFormats/**"
+      - "Sources/WavetableFormats/**"
       - "Package.swift"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
@@ -36,11 +39,20 @@ jobs:
       - name: Build the documentation site
         run: |
           PGDATA_DOCS=1 swift package --allow-writing-to-directory ./site \
-            generate-documentation --target PgdataFormats --disable-indexing \
+            generate-documentation --target PgdataFormats --target WavetableFormats \
+            --enable-experimental-combined-documentation --disable-indexing \
             --transform-for-static-hosting --hosting-base-path 3rd-wave-tools \
             --output-path ./site
-          # The site's root forwards to the library's page.
-          echo '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=documentation/pgdataformats/"><title>PgdataFormats</title><a href="documentation/pgdataformats/">PgdataFormats documentation</a>' > ./site/index.html
+          # The site's root links to each library's pages.
+          cat > ./site/index.html <<'HTML'
+          <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>3rd Wave Tools: library documentation</title>
+          <body style="font: 16px/1.5 -apple-system, system-ui, sans-serif; max-width: 40em; margin: 3em auto; padding: 0 1em">
+          <h1>3rd Wave Tools: library documentation</h1>
+          <p><a href="documentation/pgdataformats/">PgdataFormats</a>: the Groove Synthesis 3rd Wave's file formats.</p>
+          <p><a href="documentation/wavetableformats/">WavetableFormats</a>: other synths' wavetable formats, and converting tables to and from the 3rd Wave's.</p>
+          <p>Source, format reference, and the pgdata Packer app: <a href="https://github.com/adambier/3rd-wave-tools">github.com/adambier/3rd-wave-tools</a>. Not affiliated with or endorsed by Groove Synthesis.</p>
+          HTML
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./site

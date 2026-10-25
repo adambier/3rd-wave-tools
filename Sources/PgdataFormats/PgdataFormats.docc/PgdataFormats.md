@@ -19,7 +19,8 @@ such a tool needs to reproduce:
   ``ProgramConverter``;
 - which slot an oscillator plays, with ``SourceRef``, and which wavetables are Groove
   Synthesis's factory tables, with ``FactoryLibrary``;
-- how the 3rd Wave names the files it exports, with ``ExportNames``.
+- how the 3rd Wave names the files it exports, with ``ExportNames``, and file names that are safe
+  on its USB drive and elsewhere, with ``SafeFileName``.
 
 It depends only on Foundation, and its tests run on macOS, Linux, and Windows.
 
@@ -28,10 +29,11 @@ What it does not do is interpret a program's sound settings: what most of a prog
 through unchanged. It supports tools that move, pack, unpack, convert, and rename programs, not
 yet ones that create sounds or edit a program's settings.
 
-The package also offers `PgdataPackerCore`, pgdata Packer's own decisions without its user
-interface (pack and unpack plans, file names, Clean Up Names), for a command-line tool or an app
-on another platform that should behave like pgdata Packer. Its API may change between versions
-more than this library's.
+The package also offers two more libraries. `WavetableFormats` reads and writes other synths'
+wavetable formats and converts tables to and from the 3rd Wave's. `PgdataPackerCore` holds
+pgdata Packer's own decisions without its user interface (pack, unpack, and convert plans, file
+names, Clean Up Names), for a command-line tool or an app on another platform that should behave
+like pgdata Packer; its API may change between versions more than this library's.
 
 The formats themselves, and how each fact about them was established, are described in
 [FORMATS.md](https://github.com/adambier/3rd-wave-tools/blob/main/docs/FORMATS.md), which is
@@ -73,6 +75,7 @@ This project is not affiliated with or endorsed by Groove Synthesis.
 ### The 3rd Wave's conventions
 
 - ``ExportNames``
+- ``SafeFileName``
 
 ### Supporting types
 
