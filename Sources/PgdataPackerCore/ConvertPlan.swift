@@ -557,16 +557,57 @@ public struct ConvertPlan: Equatable {
     }
 
     /// The line under the destination list: that nothing has been tested yet, or which
-    /// destinations have been, from each preset's `testedIn`.
+    /// destinations have been, from each preset's `testedIn`. (The "Sources" heading over the
+    /// book icons says where to look for more.)
     public static var testingFootnote: String {
         let tested = OutputPreset.allCases.filter { !$0.testedIn.isEmpty }
-        if tested.isEmpty {
-            return "Not yet tested in these synths. Click a row’s book icon for its sources."
+        if tested.isEmpty { return "Converting to these outputs has not yet been tested." }
+        if tested.count == OutputPreset.allCases.count { return "Converting to every output has been tested." }
+        return "Tested so far: " + listPhrase(tested.map(\.shortTitle)) + "."
+    }
+
+    /// The sources popover's line on a destination: "Converting to this output has not yet been
+    /// tested." or "Tested in Pigments and Serum."
+    public static func testingStatus(_ preset: OutputPreset) -> String {
+        preset.testedIn.isEmpty ? "Converting to this output has not yet been tested."
+                                : "Tested in " + listPhrase(preset.testedIn) + "."
+    }
+
+    /// The orange note under the chosen destination, or nil: one of the things its sources leave
+    /// open (`OutputPreset.caveat` has the general statement, shown with the sources), said
+    /// only when the tables to convert, or a choice made, bring it about:
+    /// - Serum, Vital, Pigments: an interpolation other than crossfade is saved for some table,
+    ///   which Pigments does not read.
+    /// - MiniFreak V: some table has fewer than 64 frames, which it is not documented to handle.
+    /// - Phase Plant: some table has fewer than the 256 frames its documentation asks for, so
+    ///   frames are added.
+    public func caveat(for preset: OutputPreset) -> String? {
+        let tables = selectedItems.filter(canConvert)
+        switch preset {
+        case .wav2048:
+            let notCrossfade = tables.contains { (item: Item) -> Bool in
+                let saved = WavetableWriter.interpolationRecorded(for: preset, source: item.table.interpolation, options: options)
+                return saved != nil && saved != .crossfade
+            }
+            return notCrossfade ? "Pigments does not read the interpolation saved in the file (Serum and Vital do)." : nil
+        case .miniFreak:
+            let short = tables.filter { ($0.frameCount ?? 64) < 64 }.count
+            guard short > 0 else { return nil }
+            return "\(Self.tablesHave(short, of: tables.count)) fewer than 64 frames; what MiniFreak V does with \(short == 1 ? "it" : "them") is not documented."
+        case .phasePlant:
+            let short = tables.filter { ($0.frameCount ?? 256) < 256 }.count
+            guard short > 0 else { return nil }
+            return "\(Self.tablesHave(short, of: tables.count)) fewer than 256 frames; whether Phase Plant loads shorter tables is untested, so frames are added to reach 256."
+        case .thirdWaveU, .thirdWaveP, .tonverk, .surge, .waveEdit:
+            return nil
         }
-        if tested.count == OutputPreset.allCases.count {
-            return "Every destination has been tested in its synth. Click a row’s icon for its sources."
-        }
-        return "Tested: " + listPhrase(tested.map(\.shortTitle)) + ". Click a row’s book icon for its sources."
+    }
+
+    /// "1 table has", "12 tables have"; "Both tables have" or "All 12 tables have" when every
+    /// table to convert is meant (`CountWords.all`).
+    static func tablesHave(_ n: Int, of total: Int) -> String {
+        if n == 1 { return "1 table has" }
+        return (n == total ? CountWords.all(n, "tables") : "\(n) tables") + " have"
     }
 
     /// The report's first line: "Converted 74 tables for Phase Plant into “output”." (the
@@ -603,10 +644,26 @@ public struct ConvertPlan: Equatable {
     // MARK: Existing choices (the Options pickers)
 
     // The Interpolation and Tonverk frame size pickers list every value the destination can take
-    // and mark the one the tables to convert already have: "Crossfade (existing)" when they all
+    // and mark the one the tables to convert already have: "Crossfade — existing" when they all
     // agree (that item stands for no override, `options.interpolation == nil`), or a first item
-    // "Each table's own (existing: 3 stepped, 2 crossfade)" when they differ. Tables that
-    // cannot convert yet are left out of the counts.
+    // "Each table's own — existing: 3 stepped, 2 crossfade" when they differ. Tables that cannot
+    // convert yet are left out of the counts.
+
+    /// A picker item's words in two parts: the value ("Crossfade", "Each table's own") and, set
+    /// apart after a dash and in a second style, what the tables already have ("existing",
+    /// "existing: 3 stepped, 2 crossfade").
+    public struct ChoiceLabel: Equatable {
+        /// The value the item chooses.
+        public var value: String
+        /// What the tables to convert already have, or nil when the item is not marked.
+        public var existing: String?
+
+        /// Creates a label from its two parts.
+        public init(value: String, existing: String? = nil) { self.value = value; self.existing = existing }
+
+        /// The parts as one string: "Crossfade — existing".
+        public var text: String { existing.map { value + " — " + $0 } ?? value }
+    }
 
     /// The interpolation each table to convert would be saved with when none is chosen
     /// (`options.interpolation` nil): the table's own, or crossfade when its file doesn't say
@@ -631,16 +688,16 @@ public struct ConvertPlan: Equatable {
     public var sharedExistingInterpolation: Interpolation? { Self.shared(existingInterpolations()) }
 
     /// The Interpolation picker's first item when the tables to convert differ, or there are
-    /// none: "Each table's own (existing: 3 stepped, 2 crossfade)" (for Tonverk, "smooth" for
+    /// none: "Each table's own — existing: 3 stepped, 2 crossfade" (for Tonverk, "smooth" for
     /// crossfade). Nil when they all agree: that value's own item is then marked existing.
-    public var eachTablesOwnInterpolationLabel: String? {
+    public var eachTablesOwnInterpolationLabel: ChoiceLabel? {
         let counts = existingInterpolations()
         if counts.count == 1 { return nil }
-        if counts.isEmpty { return "Each table's own" }
+        if counts.isEmpty { return ChoiceLabel(value: "Each table's own") }
         let parts = [Interpolation.none, .crossfade, .spectral].compactMap { (i: Interpolation) -> String? in
             counts[i].map { "\($0) \(existingWord(i))" }
         }
-        return "Each table's own (existing: " + parts.joined(separator: ", ") + ")"
+        return ChoiceLabel(value: "Each table's own", existing: "existing: " + parts.joined(separator: ", "))
     }
 
     /// The word for an interpolation in the existing counts: "stepped", "crossfade", or
@@ -671,14 +728,14 @@ public struct ConvertPlan: Equatable {
     }
 
     /// The Tonverk frame size picker's first item when the tables to convert differ in frame
-    /// size, have one Tonverk doesn't take, or there are none: "Each table's own (existing:
-    /// 1,024 and 2,048)", and for sizes Tonverk doesn't take, what the writer does with them
+    /// size, have one Tonverk doesn't take, or there are none: "Each table's own — existing:
+    /// 1,024 and 2,048", and for sizes Tonverk doesn't take, what the writer does with them
     /// ("2,048 for 3 tables of 600, which Tonverk doesn't take"). Nil when every table has one
     /// size Tonverk takes: that size's own item is then marked existing.
-    public var eachTablesOwnFrameSizeLabel: String? {
+    public var eachTablesOwnFrameSizeLabel: ChoiceLabel? {
         let counts = existingFrameSizes()
         if sharedTonverkFrameSize != nil { return nil }
-        if counts.isEmpty { return "Each table's own" }
+        if counts.isEmpty { return ChoiceLabel(value: "Each table's own") }
         let sizes = counts.keys.sorted()
         let taken = sizes.filter { WavetableWriter.tonverkFrameSizes.contains($0) }
         let notTaken = sizes.filter { !WavetableWriter.tonverkFrameSizes.contains($0) }
@@ -688,7 +745,7 @@ public struct ConvertPlan: Equatable {
             let n = notTaken.reduce(0) { $0 + (counts[$1] ?? 0) }
             parts.append("2,048 for \(n) table\(n == 1 ? "" : "s") of \(Self.listPhrase(notTaken.map(Self.formatCount))), which Tonverk doesn't take")
         }
-        return "Each table's own (existing: " + parts.joined(separator: "; ") + ")"
+        return ChoiceLabel(value: "Each table's own", existing: "existing: " + parts.joined(separator: "; "))
     }
 
     /// The one key of a count, when there is exactly one.
@@ -746,16 +803,21 @@ public struct ConvertPlan: Equatable {
         return (gain, lose)
     }
 
-    /// The Options caption for the frame-count choice: "Affects 12 tables: 9 gain frames
-    /// (repeated), 3 lose frames (picked evenly)." or "Every table already fits."
+    /// The Options caption for the frame-count choice: "148 tables lose frames (picked
+    /// evenly)." or, when some gain and some lose, "Affects 12 tables: 9 gain frames (repeated),
+    /// 3 lose frames (picked evenly)."; "Every table already fits." when none changes.
     public var frameCountCaption: String {
         let c = frameCountChanges
         let total = c.gain + c.lose
         guard total > 0 else { return "Every table already fits." }
-        var parts: [String] = []
-        if c.gain > 0 { parts.append("\(c.gain) gain\(c.gain == 1 ? "s" : "") frames (\(Self.methodWord(options.frameCountPolicy, grows: true)))") }
-        if c.lose > 0 { parts.append("\(c.lose) lose\(c.lose == 1 ? "s" : "") frames (\(Self.methodWord(options.frameCountPolicy, grows: false)))") }
-        return "Affects \(total) table\(total == 1 ? "" : "s"): " + parts.joined(separator: ", ") + "."
+        func part(_ n: Int, _ verb: String, grows: Bool, noun: Bool) -> String {
+            let subject = noun ? (n == 1 ? "1 table " : "\(n) tables ") : "\(n) "
+            let method = Self.methodWord(options.frameCountPolicy, grows: grows)
+            return subject + verb + (n == 1 ? "s" : "") + " frames (" + method + ")"
+        }
+        if c.lose == 0 { return part(c.gain, "gain", grows: true, noun: true) + "." }
+        if c.gain == 0 { return part(c.lose, "lose", grows: false, noun: true) + "." }
+        return "Affects \(total) tables: " + part(c.gain, "gain", grows: true, noun: false) + ", " + part(c.lose, "lose", grows: false, noun: false) + "."
     }
 
     /// For a 3rd Wave destination: a warning when more of the user's own tables are to be

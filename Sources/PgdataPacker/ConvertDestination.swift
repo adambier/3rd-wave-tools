@@ -22,26 +22,34 @@ struct ConvertDestinationPane: View {
             // page's top out of view.
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Convert to").font(.headline)
-                        Text(ConvertDestinationPane.scope(plan.selectedItems.count))
-                            .font(.caption).foregroundStyle(.secondary)
-                        if let capacity = plan.thirdWaveCapacityNote {
-                            Label {
-                                Text(capacity).fixedSize(horizontal: false, vertical: true)
-                            } icon: {
-                                Image(systemName: "exclamationmark.triangle")
-                            }
-                            .font(.caption).foregroundStyle(.orange)
-                            .padding(.top, 2)
+                    HStack(alignment: .top, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Convert to").font(.headline)
+                            Text(ConvertDestinationPane.scope(plan.selectedItems.count))
+                                .font(.caption).foregroundStyle(.secondary)
                         }
+                        Spacer(minLength: 0)
+                        // Heads the column of book icons; aligned with them (the rows have the
+                        // same 6-point inset).
+                        ConvertSourcesHeader().padding(.trailing, 6)
                     }
-                    // The chosen destination goes down as a value, so the groups and rows are
-                    // laid out again whenever it changes. (With the rows reading it from the
-                    // state object themselves, the radio and highlight stayed on the destination
-                    // chosen at launch while the rest of the pane followed the new one.)
+                    if let capacity = plan.thirdWaveCapacityNote {
+                        Label {
+                            Text(capacity).fixedSize(horizontal: false, vertical: true)
+                        } icon: {
+                            Image(systemName: "exclamationmark.triangle")
+                        }
+                        .font(.caption).foregroundStyle(.orange)
+                    }
+                    // The chosen destination and its note go down as values, so the groups and
+                    // rows are laid out again whenever they change. (With the rows reading the
+                    // choice from the state object themselves, the radio and highlight stayed on
+                    // the destination chosen at launch while the rest of the pane followed the
+                    // new one.)
                     ForEach(OutputPreset.Group.allCases, id: \.self) { (group: OutputPreset.Group) in
-                        ConvertPresetGroup(group: group, chosen: plan.preset) { state.convertPlan.preset = $0 }
+                        ConvertPresetGroup(group: group, chosen: plan.preset, caveat: plan.caveat(for: plan.preset)) {
+                            state.convertPlan.preset = $0
+                        }
                     }
                     Text(ConvertPlan.testingFootnote)
                         .font(.caption).foregroundStyle(.secondary)
@@ -49,6 +57,8 @@ struct ConvertDestinationPane: View {
                     ConvertOptionsBox(state: state)
                 }
                 .padding(12)
+                // Room for the scroll bar, which lies over the content when it is shown.
+                .padding(.trailing, ConvertDestinationPane.scrollerInset)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .visibleScrollers()
@@ -65,6 +75,11 @@ struct ConvertDestinationPane: View {
             }
         }
     }
+
+    /// The width a classic scroll bar covers at the trailing edge of a SwiftUI ScrollView's
+    /// content (`visibleScrollers()` makes the bars classic; SwiftUI lays the content out at the
+    /// full width regardless, so the bar lay over the right edge of the text).
+    static let scrollerInset: CGFloat = NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
 
     /// "For all 75 tables to convert": the destination and its options apply to every table
     /// marked to convert, unlike the preview below the table.
@@ -83,26 +98,31 @@ struct ConvertDestinationPane: View {
 struct ConvertPresetGroup: View {
     let group: OutputPreset.Group
     let chosen: OutputPreset
+    /// The orange note for the chosen destination, when the tables bring one about
+    /// (`ConvertPlan.caveat(for:)`); shown on that row only.
+    let caveat: String?
     let choose: (OutputPreset) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(group.title).font(.caption).foregroundStyle(.secondary).padding(.top, 2)
             ForEach(group.presets, id: \.self) { (p: OutputPreset) in
-                ConvertPresetRow(preset: p, chosen: p == chosen) { choose(p) }
+                ConvertPresetRow(preset: p, chosen: p == chosen, caveat: p == chosen ? caveat : nil) { choose(p) }
                     // A new identity when the row's state changes, so the radio, the highlight,
-                    // and the line that only the chosen row shows are all drawn afresh.
+                    // and the lines that only the chosen row shows are all drawn afresh.
                     .id("\(p.rawValue)-\(p == chosen)")
             }
         }
     }
 }
 
-/// One destination: a radio, its short title and size, and whether it has been tested; the
-/// chosen one also says why it is a destination of its own.
+/// One destination: a radio, its short title and size, and the icon that opens its sources; the
+/// chosen one also says why it is a destination of its own, and warns when the tables to
+/// convert bring about something its sources leave open.
 struct ConvertPresetRow: View {
     let preset: OutputPreset
     let chosen: Bool
+    let caveat: String?
     let choose: () -> Void
 
     var body: some View {
@@ -110,7 +130,7 @@ struct ConvertPresetRow: View {
         // clicking it opens the sources rather than choosing the row. A tap gesture rather than
         // a Button: a plain Button's label did not redraw its radio when the choice changed.
         HStack(alignment: .top, spacing: 4) {
-            ConvertPresetRowLabel(preset: preset, chosen: chosen)
+            ConvertPresetRowLabel(preset: preset, chosen: chosen, caveat: caveat)
                 .onTapGesture { choose() }
                 .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : [.isButton])
             ConvertSourcesButton(preset: preset)
@@ -120,10 +140,12 @@ struct ConvertPresetRow: View {
     }
 }
 
-/// The radio, title, spec line, and (when chosen) why this destination is separate, plus any caveat.
+/// The radio, title, spec line, and (when chosen) why this destination is separate and the
+/// note, if any, on what its sources leave open for these tables.
 struct ConvertPresetRowLabel: View {
     let preset: OutputPreset
     let chosen: Bool
+    let caveat: String?
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -142,8 +164,7 @@ struct ConvertPresetRowLabel: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 2)
                 }
-                if let caveat = preset.caveat {
-                    // What the sources leave open, in the open rather than on hover.
+                if let caveat {
                     Label {
                         Text(caveat).fixedSize(horizontal: false, vertical: true)
                     } icon: {
@@ -160,32 +181,24 @@ struct ConvertPresetRowLabel: View {
     }
 }
 
-/// A book when the destination rests on its sources alone, a green seal when it has been tested.
-/// Clicking it shows the sources (publisher and document) and the tested status.
-struct ConvertSourcesButton: View {
-    let preset: OutputPreset
+/// Heads the column of book icons: "Sources", which opens a note on what the icons show and
+/// why to look.
+struct ConvertSourcesHeader: View {
     @State private var showing = false
-
-    private var tested: [String] { preset.testedIn }
-    private var status: String {
-        tested.isEmpty ? "Not yet tested in its synth." : "Tested in " + ConvertPlan.listPhrase(tested) + "."
-    }
 
     var body: some View {
         Button { showing.toggle() } label: {
-            Image(systemName: tested.isEmpty ? "book.closed" : "checkmark.seal.fill")
-                .foregroundStyle(tested.isEmpty ? Color.secondary : Color.green)
+            Text("Sources").font(.caption).foregroundStyle(.secondary)
         }
         .buttonStyle(.borderless)
-        .help("Sources for this destination")
-        .popover(isPresented: $showing, arrowEdge: .leading) {
+        .help("What each destination rests on, and whether converting to it has been tested")
+        .popover(isPresented: $showing, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(preset.shortTitle).font(.headline)
-                Text(status)
-                Text("Sources").font(.subheadline).bold().padding(.top, 4)
-                Text(preset.basis + ".")
-                    .textSelection(.enabled)
+                Text("Sources").font(.headline)
+                Text("Each destination follows the documents or source code published for that synth. Click a destination's book to see them, what they leave open, and whether a converted file has been tested in the synth.")
                     .fixedSize(horizontal: false, vertical: true)
+                Label("A green seal marks a destination that has been tested.", systemImage: "checkmark.seal.fill")
+                    .foregroundStyle(.secondary)
             }
             .padding(12)
             .frame(width: 320, alignment: .leading)
@@ -193,32 +206,84 @@ struct ConvertSourcesButton: View {
     }
 }
 
-/// The options that apply to the chosen destination, always open.
-struct ConvertOptionsBox: View {
-    @ObservedObject var state: AppState
+/// A book when the destination rests on its sources alone, a green seal when it has been tested.
+/// Clicking it shows the sources (publisher and document), what they leave open, and whether
+/// converting to the destination has been tested.
+struct ConvertSourcesButton: View {
+    let preset: OutputPreset
+    @State private var showing = false
+
+    private var tested: Bool { !preset.testedIn.isEmpty }
 
     var body: some View {
-        let preset = state.convertPlan.preset
-        GroupBox("Options") {
-            VStack(alignment: .leading, spacing: 12) {
-                ConvertFrameCountOption(state: state)
-                if preset.recordsInterpolation { ConvertInterpolationOption(state: state) }
-                if preset == .tonverk { ConvertTonverkSizeOption(state: state) }
-                if preset == .thirdWaveP { ConvertPPGOption(state: state) }
+        Button { showing.toggle() } label: {
+            Image(systemName: tested ? "checkmark.seal.fill" : "book.closed")
+                .foregroundStyle(tested ? Color.green : Color.secondary)
+        }
+        .buttonStyle(.borderless)
+        .help("Sources for this destination, and whether converting to it has been tested")
+        .popover(isPresented: $showing, arrowEdge: .leading) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(preset.shortTitle).font(.headline)
+                Text(ConvertPlan.testingStatus(preset))
+                Text("Sources").font(.subheadline).bold().padding(.top, 4)
+                Text(preset.basis + ".")
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let open = preset.caveat {
+                    Text("What they leave open").font(.subheadline).bold().padding(.top, 4)
+                    Text(open)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .padding(4)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .frame(width: 320, alignment: .leading)
         }
     }
 }
 
-/// Keep original frames or crossfade new ones, when the destination needs a different count.
+/// The options that apply to the chosen destination and these tables, always open; nothing
+/// when none applies (the frame-count choice only when some table to convert gains or loses
+/// frames for the destination).
+struct ConvertOptionsBox: View {
+    @ObservedObject var state: AppState
+
+    var body: some View {
+        let plan = state.convertPlan
+        let preset = plan.preset
+        let changes = plan.frameCountChanges
+        let frameCount = changes.gain + changes.lose > 0
+        if frameCount || preset.recordsInterpolation || preset == .tonverk || preset == .thirdWaveP {
+            GroupBox("Options") {
+                VStack(alignment: .leading, spacing: 12) {
+                    if frameCount { ConvertFrameCountOption(state: state) }
+                    if preset.recordsInterpolation { ConvertInterpolationOption(state: state) }
+                    if preset == .tonverk { ConvertTonverkSizeOption(state: state) }
+                    if preset == .thirdWaveP { ConvertPPGOption(state: state) }
+                }
+                .padding(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
+/// A picker item's two parts (`ConvertPlan.ChoiceLabel`): the value, then what the tables
+/// already have after a dash and in italics ("Crossfade — *existing*").
+private func choiceText(_ label: ConvertPlan.ChoiceLabel) -> Text {
+    guard let existing = label.existing else { return Text(label.value) }
+    return Text(label.value) + Text(" — " + existing).italic()
+}
+
+/// Keep original frames or crossfade new ones; shown when some table to convert gains or loses
+/// frames for the destination.
 struct ConvertFrameCountOption: View {
     @ObservedObject var state: AppState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("If the destination needs more or fewer frames")
+            Text("The destination needs more or fewer frames")
             Picker("", selection: $state.convertPlan.options.frameCountPolicy) {
                 Text("Keep Original Frames").tag(FrameCountPolicy.pickEvenly)
                 Text("Crossfade New Frames").tag(FrameCountPolicy.interpolate)
@@ -235,8 +300,8 @@ struct ConvertFrameCountOption: View {
 
 /// The interpolation the file records, for destinations whose files can. The menu lists the
 /// values the destination can record and marks the one the tables to convert already have
-/// ("Crossfade (existing)"), which stands for no override; when they differ, a first item
-/// keeps each table's own ("Each table's own (existing: 3 stepped, 2 crossfade)"). The counts
+/// ("Crossfade — existing"), which stands for no override; when they differ, a first item
+/// keeps each table's own ("Each table's own — existing: 3 stepped, 2 crossfade"). The counts
 /// come from `ConvertPlan.existingInterpolations()`.
 struct ConvertInterpolationOption: View {
     @ObservedObject var state: AppState
@@ -254,13 +319,10 @@ struct ConvertInterpolationOption: View {
         tonverk ? [Interpolation.none, .crossfade] : [Interpolation.none, .crossfade, .spectral]
     }
 
-    /// The menu's words for a value.
+    /// The menu's words for a value: its `displayName`, except Tonverk's "Smooth" for crossfade
+    /// (what its file name says).
     private func label(_ value: Interpolation) -> String {
-        switch value {
-        case Interpolation.none: return "None (Stepped)"
-        case .crossfade: return tonverk ? "Smooth" : "Crossfade"
-        case .spectral: return "Spectral"
-        }
+        value == .crossfade && tonverk ? "Smooth" : value.displayName
     }
 
     var body: some View {
@@ -270,19 +332,19 @@ struct ConvertInterpolationOption: View {
             Text("Interpolation saved in the file")
             Picker("", selection: selection) {
                 if let own = plan.eachTablesOwnInterpolationLabel {
-                    Text(own).tag(Optional<Interpolation>.none)
+                    choiceText(own).tag(Optional<Interpolation>.none)
                 }
                 ForEach(choices, id: \.self) { (value: Interpolation) in
                     // The value the tables already have stands for no override (nil).
-                    Text(label(value) + (value == shared ? " (existing)" : ""))
+                    choiceText(ConvertPlan.ChoiceLabel(value: label(value), existing: value == shared ? "existing" : nil))
                         .tag(value == shared ? Optional<Interpolation>.none : Optional<Interpolation>.some(value))
                 }
             }
             .labelsHidden()
             .frame(maxWidth: 260)
             .help(tip)
-            Text(tonverk ? "\u{201C}Existing\u{201D} is the interpolation the tables to convert already have; a file that doesn't say counts as smooth. None (Stepped) adds r to the file name."
-                         : "\u{201C}Existing\u{201D} is the interpolation the tables to convert already have; a file that doesn't say counts as crossfade.")
+            Text(tonverk ? "\u{201C}Existing\u{201D} is the interpolation the tables already have; a file that doesn't say counts as smooth. None (stepped) adds r to the file name."
+                         : "\u{201C}Existing\u{201D} is the interpolation the tables already have; a file that doesn't say counts as crossfade.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -306,9 +368,9 @@ struct ConvertInterpolationOption: View {
 }
 
 /// Tonverk's frame size, written into the file name. The menu lists the sizes Tonverk takes and
-/// marks the one every table to convert has ("2,048 (existing)"), which stands for no override;
+/// marks the one every table to convert has ("2,048 — existing"), which stands for no override;
 /// when they differ, or a table has a size Tonverk doesn't take, a first item keeps each table's
-/// own ("Each table's own (existing: 1,024 and 2,048)"). From `ConvertPlan.existingFrameSizes()`.
+/// own ("Each table's own — existing: 1,024 and 2,048"). From `ConvertPlan.existingFrameSizes()`.
 struct ConvertTonverkSizeOption: View {
     @ObservedObject var state: AppState
 
@@ -319,16 +381,16 @@ struct ConvertTonverkSizeOption: View {
             Text("Tonverk frame size")
             Picker("", selection: selection) {
                 if let own = plan.eachTablesOwnFrameSizeLabel {
-                    Text(own).tag(Optional<Int>.none)
+                    choiceText(own).tag(Optional<Int>.none)
                 }
                 ForEach(WavetableWriter.tonverkFrameSizes, id: \.self) { (n: Int) in
-                    Text(ConvertPlan.formatCount(n) + (n == shared ? " (existing)" : ""))
+                    choiceText(ConvertPlan.ChoiceLabel(value: ConvertPlan.formatCount(n), existing: n == shared ? "existing" : nil))
                         .tag(n == shared ? Optional<Int>.none : Optional<Int>.some(n))
                 }
             }
             .labelsHidden()
             .frame(maxWidth: 260)
-            .help("\u{201C}Existing\u{201D} is the frame size the tables to convert already have; Tonverk takes 64 to 4,096 (powers of two), and a table of another size is written at 2,048. Any other choice resamples every table to that size.")
+            .help("\u{201C}Existing\u{201D} is the frame size the tables already have; Tonverk takes 64 to 4,096 (powers of two), and a table of another size is written at 2,048. Any other choice resamples every table to that size.")
             Text(exampleLine)
                 .font(.caption).foregroundStyle(.secondary)
                 .lineLimit(1).truncationMode(.middle)

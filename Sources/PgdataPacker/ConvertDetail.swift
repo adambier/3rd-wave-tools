@@ -39,6 +39,8 @@ struct ConvertDetailPane: View {
                 ScrollView {
                     ConvertItemPreview(state: state, item: chosen[0])
                         .padding(12)
+                        // Room for the scroll bar, which lies over the content when it is shown.
+                        .padding(.trailing, ConvertDestinationPane.scrollerInset)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
                 .visibleScrollers()

@@ -30,12 +30,22 @@ struct ConvertView: View {
                           detail: "Add WAV and FLAC wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table is then listed with its size (frames × samples per frame) and what converting changes, and previewed below. This page converts existing wavetables between formats; it does not make wavetables from other audio.")
             } else {
                 HSplitView {
-                    VSplitView {
-                        ConvertTablesPane(selection: $selection)
-                            .frame(minWidth: 520, maxWidth: .infinity, minHeight: 200, maxHeight: .infinity)
-                        ConvertDetailPane(selection: selection)
-                            .frame(maxWidth: .infinity, minHeight: 170, idealHeight: 320, maxHeight: .infinity)
+                    // The preview's height is the page's own (dragged at the divider, kept
+                    // between sessions): a VSplitView gave the preview back its smallest height
+                    // whenever the selection changed its content.
+                    GeometryReader { (geo: GeometryProxy) in
+                        let tallest = max(ConvertPaneDivider.minimumHeight, geo.size.height - ConvertPaneDivider.tableMinimumHeight)
+                        let height = min(max(state.convertPreviewHeight, ConvertPaneDivider.minimumHeight), tallest)
+                        VStack(spacing: 0) {
+                            ConvertTablesPane(selection: $selection)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            ConvertPaneDivider(height: $state.convertPreviewHeight, tallest: tallest)
+                            ConvertDetailPane(selection: selection)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: height)
+                        }
                     }
+                    .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
                     ConvertDestinationPane()
                         .frame(minWidth: 260, idealWidth: 300, maxWidth: 380, maxHeight: .infinity)
                 }
@@ -79,6 +89,52 @@ struct ConvertView: View {
                 .help("Convert the tables marked to convert into a folder you choose")
         }
         .padding(10)
+    }
+}
+
+/// The divider between the table and the preview: dragging it changes the preview's height
+/// (`AppState.convertPreviewHeight`), between `minimumHeight` and `tallest`, as a split view's
+/// divider would, with the up-down cursor. A thin line in a strip wide enough to grab.
+struct ConvertPaneDivider: View {
+    @Binding var height: CGFloat
+    /// The most the preview may take: the pane's height less what the table keeps.
+    let tallest: CGFloat
+    @State private var heightAtStart: CGFloat?
+
+    /// The least the preview is given.
+    static let minimumHeight: CGFloat = 170
+    /// What the table above keeps when the preview is dragged up (its header, a few rows, and
+    /// the divider).
+    static let tableMinimumHeight: CGFloat = 220
+    /// The strip the pointer grabs.
+    private static let grabHeight: CGFloat = 9
+
+    var body: some View {
+        ZStack {
+            Color.clear
+            Divider()
+        }
+        .frame(height: Self.grabHeight)
+        .contentShape(Rectangle())
+        .onHover { (inside: Bool) in
+            if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
+        }
+        .gesture(
+            DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                .onChanged { (drag: DragGesture.Value) in
+                    let start = heightAtStart ?? height
+                    heightAtStart = start
+                    NSCursor.resizeUpDown.set()   // kept while the pointer runs ahead of the strip
+                    // Dragging down makes the preview shorter.
+                    height = min(max(start - drag.translation.height, Self.minimumHeight), tallest)
+                }
+                .onEnded { _ in heightAtStart = nil }
+        )
+        .accessibilityLabel("Preview height")
+        .accessibilityAdjustableAction { (direction: AccessibilityAdjustmentDirection) in
+            let step: CGFloat = 20
+            height = min(max(height + (direction == .increment ? step : -step), Self.minimumHeight), tallest)
+        }
     }
 }
 

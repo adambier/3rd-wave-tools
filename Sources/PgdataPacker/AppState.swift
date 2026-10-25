@@ -102,6 +102,9 @@ final class AppState: ObservableObject {
     @Published var convertPlan = ConvertPlan() { didSet { saveSettings() } }
     /// Show only the Wavetables page's tables that can't be converted yet (`ConvertPlan.needsAttention`).
     @Published var convertOnlyAttention = false
+    /// The height of the Wavetables page's preview pane, which the user drags; remembered between
+    /// sessions (see `ConvertPaneDivider`).
+    @Published var convertPreviewHeight: CGFloat = 320 { didSet { saveSettings() } }
     /// The writer's results for the tables the Wavetables page previews, kept between passes.
     let convertPreviews = ConvertPreviewCache()
 
@@ -135,6 +138,8 @@ final class AppState: ObservableObject {
         if let raw = defaults.string(forKey: "convertFrameCountPolicy"), let p = FrameCountPolicy(rawValue: raw) {
             convertPlan.options.frameCountPolicy = p
         }
+        let height = defaults.double(forKey: "convertPreviewHeight")
+        if height >= 170 { convertPreviewHeight = CGFloat(height) }
         // Settings from versions that asked for the factory .wt files and tracked the 3rd Wave's slots.
         for key in ["factoryFolders", "embedFactory", "synthHasAllFactory"] { defaults.removeObject(forKey: key) }
         loading = false
@@ -154,6 +159,7 @@ final class AppState: ObservableObject {
         defaults.set(nameCleaner.fixedSpellings, forKey: "cleanFixedSpellings")
         defaults.set(convertPlan.preset.rawValue, forKey: "convertPreset")
         defaults.set(convertPlan.options.frameCountPolicy.rawValue, forKey: "convertFrameCountPolicy")
+        defaults.set(Double(convertPreviewHeight), forKey: "convertPreviewHeight")
     }
 
     // MARK: Messages

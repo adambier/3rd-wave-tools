@@ -489,7 +489,12 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(Interpolation.none.displayName, "None (stepped)")
         XCTAssertEqual(Interpolation.displayName(nil), "Not stated")
         XCTAssertEqual(Interpolation.displayName(.spectral), "Spectral")
-        XCTAssertTrue(ConvertPlan.testingFootnote.hasPrefix("Not yet tested"))
+        XCTAssertEqual(ConvertPlan.testingFootnote, "Converting to these outputs has not yet been tested.")
+        XCTAssertEqual(ConvertPlan.testingStatus(.tonverk), "Converting to this output has not yet been tested.")
+        XCTAssertEqual(ConvertPlan.tablesHave(1, of: 5), "1 table has")
+        XCTAssertEqual(ConvertPlan.tablesHave(2, of: 2), "Both tables have")
+        XCTAssertEqual(ConvertPlan.tablesHave(2, of: 5), "2 tables have")
+        XCTAssertEqual(ConvertPlan.tablesHave(5, of: 5), "All 5 tables have")
         XCTAssertEqual(ConvertPlan.methodWord(.pickEvenly, grows: true), "repeated")
         XCTAssertEqual(ConvertPlan.methodWord(.pickEvenly, grows: false), "picked evenly")
         XCTAssertEqual(ConvertPlan.methodWord(.interpolate, grows: true), "crossfaded")
@@ -792,7 +797,7 @@ final class ConvertOptionsTextTests: XCTestCase {
         p.preset = .wav2048
         XCTAssertEqual(p.frameCountCaption, "Every table already fits.")
         p.preset = .phasePlant   // 256 already fits; the other two gain frames
-        XCTAssertEqual(p.frameCountCaption, "Affects 2 tables: 2 gain frames (crossfaded).")
+        XCTAssertEqual(p.frameCountCaption, "2 tables gain frames (crossfaded).")
     }
 
     func testThirdWaveCapacityNote() throws {
@@ -854,12 +859,45 @@ final class ConvertExistingChoicesTests: XCTestCase {
         return plan
     }
 
+    /// The orange note under the chosen destination appears only when the tables bring about
+    /// what the destination's sources leave open.
+    func testCaveatOnlyWhenTheTablesBringItAbout() {
+        // Pigments: only when an interpolation other than crossfade would be saved.
+        var serum = pickerPlan(.wav2048, [(nil, 2048), (.crossfade, 2048)])
+        XCTAssertNil(serum.caveat(for: .wav2048))
+        serum.options.interpolation = .spectral
+        XCTAssertEqual(serum.caveat(for: .wav2048), "Pigments does not read the interpolation saved in the file (Serum and Vital do).")
+        var stepped = pickerPlan(.wav2048, [(Interpolation.none, 2048), (nil, 2048)])
+        XCTAssertNotNil(stepped.caveat(for: .wav2048))
+        stepped.options.interpolation = .crossfade   // the override makes every file crossfade
+        XCTAssertNil(stepped.caveat(for: .wav2048))
+        // MiniFreak V and Phase Plant: only for tables with fewer frames than they expect.
+        let two = pickerPlan(.miniFreak, [(nil, 2048), (nil, 2048)])
+        XCTAssertEqual(two.caveat(for: .miniFreak), "Both tables have fewer than 64 frames; what MiniFreak V does with them is not documented.")
+        XCTAssertEqual(two.caveat(for: .phasePlant), "Both tables have fewer than 256 frames; whether Phase Plant loads shorter tables is untested, so frames are added to reach 256.")
+        let one = pickerPlan(.miniFreak, [(nil, 2048)])
+        XCTAssertEqual(one.caveat(for: .miniFreak), "1 table has fewer than 64 frames; what MiniFreak V does with it is not documented.")
+        var tall = ConvertPlan(preset: .miniFreak)
+        let wave = (0..<2048).map { Float(sin(Double($0) * 2 * .pi / 2048)) * 0.5 }
+        let table = FoundTable(name: "Tall", fileName: "Tall.wav", source: .wav, samples: Array(Array(repeating: wave, count: 64).joined()),
+                               frameSize: 2048, frameSizeBasis: "clm chunk")
+        tall.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Tall.wav"), table: table)], factory: FactoryLibrary())
+        XCTAssertNil(tall.caveat(for: .miniFreak))
+        XCTAssertNotNil(tall.caveat(for: .phasePlant))
+        // Destinations whose sources settle their behaviour never warn.
+        for preset in [OutputPreset.thirdWaveU, .thirdWaveP, .tonverk, .surge, .waveEdit] {
+            XCTAssertNil(two.caveat(for: preset), "\(preset)")
+        }
+        // A table that cannot convert yet does not count.
+        XCTAssertNil(ConvertPlan(preset: .miniFreak).caveat(for: .miniFreak))
+    }
+
     func testExistingInterpolationsCountWhatTheFileWouldRecord() {
         // A file that doesn't say counts as crossfade, the writer's default.
         var plan = pickerPlan(.wav2048, [(.crossfade, 2048), (nil, 2048), (Interpolation.none, 2048), (.spectral, 2048), (Interpolation.none, 2048)])
         XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 2, Interpolation.none: 2, .spectral: 1])
         XCTAssertNil(plan.sharedExistingInterpolation)
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel, "Each table's own (existing: 2 stepped, 2 crossfade, 1 spectral)")
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table's own — existing: 2 stepped, 2 crossfade, 1 spectral")
         // An override does not change what the tables have.
         plan.options.interpolation = .spectral
         XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 2, Interpolation.none: 2, .spectral: 1])
@@ -873,16 +911,16 @@ final class ConvertExistingChoicesTests: XCTestCase {
         for item in plan.items { plan.setSelected(item.id, false) }
         XCTAssertEqual(plan.existingInterpolations(), [:])
         XCTAssertNil(plan.sharedExistingInterpolation)
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel, "Each table's own")
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel, ConvertPlan.ChoiceLabel(value: "Each table's own"))
         // A destination whose files record no interpolation has nothing to count.
         for item in plan.items { plan.setSelected(item.id, true) }
         plan.preset = .thirdWaveU
         XCTAssertEqual(plan.existingInterpolations(), [:])
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel, "Each table's own")
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel, ConvertPlan.ChoiceLabel(value: "Each table's own"))
         // Tonverk: spectral counts as smooth, and the words are Tonverk's.
         plan.preset = .tonverk
         XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 3, Interpolation.none: 2])
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel, "Each table's own (existing: 2 stepped, 3 smooth)")
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table's own — existing: 2 stepped, 3 smooth")
         let smooth = pickerPlan(.tonverk, [(.spectral, 2048), (nil, 1024)])
         XCTAssertEqual(smooth.sharedExistingInterpolation, .crossfade)
         XCTAssertNil(smooth.eachTablesOwnInterpolationLabel)
@@ -909,19 +947,19 @@ final class ConvertExistingChoicesTests: XCTestCase {
         // Two sizes Tonverk takes.
         plan = pickerPlan(.tonverk, [(nil, 2048), (nil, 1024), (nil, 2048)])
         XCTAssertNil(plan.sharedTonverkFrameSize)
-        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel, "Each table's own (existing: 1,024 and 2,048)")
+        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel?.text, "Each table's own — existing: 1,024 and 2,048")
         // A size Tonverk doesn't take is written at 2,048 (the writer's rule), and the label says so.
         plan = pickerPlan(.tonverk, [(nil, 2048), (nil, 600), (nil, 600), (nil, 1024)])
-        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel, "Each table's own (existing: 1,024 and 2,048; 2,048 for 2 tables of 600, which Tonverk doesn't take)")
+        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel?.text, "Each table's own — existing: 1,024 and 2,048; 2,048 for 2 tables of 600, which Tonverk doesn't take")
         plan = pickerPlan(.tonverk, [(nil, 600)])
         XCTAssertNil(plan.sharedTonverkFrameSize, "one size, but not one Tonverk takes")
-        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel, "Each table's own (existing: 2,048 for 1 table of 600, which Tonverk doesn't take)")
+        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel?.text, "Each table's own — existing: 2,048 for 1 table of 600, which Tonverk doesn't take")
         plan = pickerPlan(.tonverk, [(nil, 600), (nil, 1000), (nil, 1000)])
-        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel, "Each table's own (existing: 2,048 for 3 tables of 600 and 1,000, which Tonverk doesn't take)")
+        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel?.text, "Each table's own — existing: 2,048 for 3 tables of 600 and 1,000, which Tonverk doesn't take")
         // Nothing to convert.
         for item in plan.items { plan.setSelected(item.id, false) }
         XCTAssertEqual(plan.existingFrameSizes(), [:])
-        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel, "Each table's own")
+        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel, ConvertPlan.ChoiceLabel(value: "Each table's own"))
         // The label's rule is the writer's: what each of those tables is written at.
         for n in [2048, 600, 1024] {
             XCTAssertEqual(WavetableWriter.frameSize(for: .tonverk, source: n), WavetableWriter.tonverkFrameSizes.contains(n) ? n : 2048)

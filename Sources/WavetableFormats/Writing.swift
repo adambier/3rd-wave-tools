@@ -421,12 +421,13 @@ public extension OutputPreset {
     }
 
     /// Where the preset's sources are incomplete or unconfirmed, what that leaves open (shown
-    /// with the destination); nil when the sources settle its behaviour. From the open questions
-    /// in docs/WAVETABLES.md.
+    /// with the destination's sources; the Wavetables page warns in the open only when the
+    /// tables to convert bring one of these about, see `ConvertPlan.caveat(for:)`); nil when the
+    /// sources settle its behaviour. From the open questions in docs/WAVETABLES.md.
     var caveat: String? {
         switch self {
         case .wav2048:
-            return "Vital's behaviour is from its public source code, which the current release may differ from. Pigments reads no metadata, so the interpolation saved in the file doesn't apply to it."
+            return "Vital's behaviour is taken from its public source code; the current release may differ. Pigments reads no metadata, so the interpolation saved in the file does not reach it."
         case .miniFreak:
             return "How MiniFreak V reduces 2,048-sample frames to 512, and how it treats fewer than 64 frames, is not documented."
         case .phasePlant:
