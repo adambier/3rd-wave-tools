@@ -56,35 +56,41 @@ struct ConvertView: View {
             DropSupport.load(providers) { state.addToConvert(urls: $0) }
             return true
         }
+        // A row that goes (removed here, or by Remove All) leaves the selection, whichever way
+        // it went.
+        .onChange(of: state.convertPlan.items.map(\.id)) { (ids: [UUID]) in
+            selection = selection.filter { (id: UUID) -> Bool in ids.contains(id) }
+        }
     }
 
+    // The keyboard shortcuts (Open, Convert) are the File menu's; see main.swift.
     private var controls: some View {
         let plan = state.convertPlan
         let marked = plan.selectedItems.count
         return HStack(spacing: 14) {
             Button("Add Files or Folders…") {
-                state.addToConvert(urls: Panels.chooseFiles(message: "Choose wavetable files (.wav, .flac, .wt, .pgdata) or folders to search"))
+                state.addToConvert(urls: Panels.chooseFiles(message: "Choose wavetable files (.wav, .flac, .wt, .pgdata) or folders to search",
+                                                            allowedExtensions: ["wav", "flac", "wt", "pgdata"]))
             }
-            .keyboardShortcut("o")
             Button("Clean Up Names…") { showNameCleanup = true }
                 .disabled(plan.items.allSatisfy { $0.factorySlot != nil })
                 .help("Propose tidier names for the tables listed (e.g., slot numbers removed, title case), used for the converted files. Factory wavetables keep their names.")
                 .sheet(isPresented: $showNameCleanup) { NameCleanupSheet(state: state, page: .convert) }
             Spacer()
-            Button("Remove Selected") { state.removeConvertItems(selection); selection = [] }.disabled(selection.isEmpty)
+            Button("Remove Selected") { state.removeConvertItems(selection); selection = [] }
+                .disabled(selection.isEmpty || state.isWorking)
                 .help("Remove the selected tables from this list (the files are not touched)")
-            Button("Remove All…") { state.removeAllConvert(); if state.convertPlan.items.isEmpty { selection = [] } }
-                .disabled(plan.items.isEmpty)
+            Button("Remove All…") { state.removeAllConvert() }
+                .disabled(plan.items.isEmpty || state.isWorking)
                 .help("Remove every table from this page (the files are not touched)")
             // Always shown, so the toolbar keeps its width; available for the 3rd Wave presets.
             Button("Send to Pack…") { state.convertTables(sendToPack: true) }
-                .disabled(marked == 0 || !plan.preset.isThirdWave)
+                .disabled(marked == 0 || !plan.preset.isThirdWave || state.isWorking)
                 .help(plan.preset.isThirdWave
                       ? "Convert the tables marked to convert into .wt files in a folder you choose, then add them to the Pack page"
                       : "Available when converting to a 3rd Wave table")
             Button("Convert…") { state.convertTables() }
-                .disabled(marked == 0)
-                .keyboardShortcut("s", modifiers: [.command, .shift])
+                .disabled(marked == 0 || state.isWorking)
                 .buttonStyle(.borderedProminent)
                 .help("Convert the tables marked to convert into a folder you choose")
         }
@@ -131,6 +137,7 @@ struct ConvertPaneDivider: View {
                 .onEnded { _ in heightAtStart = nil }
         )
         .accessibilityLabel("Preview height")
+        .accessibilityValue("\(Int(height)) points")
         .accessibilityAdjustableAction { (direction: AccessibilityAdjustmentDirection) in
             let step: CGFloat = 20
             height = min(max(height + (direction == .increment ? step : -step), Self.minimumHeight), tallest)
@@ -206,22 +213,26 @@ struct ConvertBlockedCount: View {
     }
 }
 
-/// The table itself: whether it is converted, its state, its name (editable) and origin, its
-/// size and where that came from, what the destination writes, and what changes on the way.
+/// The table itself: whether it is converted, its state, its name (edited after a double-click
+/// on the row) and origin, its size and where that came from, what the destination writes, and
+/// what changes on the way.
 struct ConvertTable: View {
     @ObservedObject var state: AppState
     let items: [ConvertPlan.Item]
     @Binding var selection: Set<UUID>
+    /// The row whose name is being edited, if any (see `ConvertNameField`).
+    @State private var renaming: UUID?
 
     var body: some View {
         let st = state
         let plan = st.convertPlan
         Table(items, selection: $selection) {
+            // Wide enough for its header: at 44 points "Convert" was cut to "Conv…".
             TableColumn("Convert") { (item: ConvertPlan.Item) in ConvertCheckCell(state: st, item: item) }
-                .width(44)
+                .width(min: 66, ideal: 66, max: 66)
             TableColumn("") { (item: ConvertPlan.Item) in ConvertStatusCell(status: plan.status(item), tip: plan.statusDescription(item)) }
                 .width(22)
-            TableColumn("Name") { (item: ConvertPlan.Item) in ConvertNameCell(state: st, item: item, selection: $selection) }
+            TableColumn("Name") { (item: ConvertPlan.Item) in ConvertNameCell(state: st, item: item, renaming: $renaming) }
                 .width(min: 140, ideal: 260)
             // Input and Output are both frames × samples per frame: the headers say the unit (a
             // Table header takes no tooltip on macOS 13), the cells spell it out on hover. The
@@ -245,8 +256,30 @@ struct ConvertTable: View {
             }
                 .width(min: 200, ideal: 330)
         }
-        .visibleScrollers()
+        // A double-click on a row edits its name: the Table's own double-click, so a single
+        // click selects the row as it does anywhere else in the table. (A double-tap gesture on
+        // the name would most likely claim the first click, as the Input column's button and the
+        // old name field do, which is why both had to select their row by hand.) The rows'
+        // contextual menu offers the same, and removing, for the rows clicked.
+        .contextMenu(forSelectionType: UUID.self) { (ids: Set<UUID>) in
+            if ids.count == 1, let id = ids.first {
+                Button("Rename") { rename(id) }
+                    .disabled(st.isWorking)
+            }
+            if !ids.isEmpty {
+                Button("Remove") { st.removeConvertItems(ids) }
+                    .disabled(st.isWorking)
+            }
+        } primaryAction: { (ids: Set<UUID>) in
+            if ids.count == 1, let id = ids.first { rename(id) }
+        }
         .onDeleteCommand { state.removeConvertItems(selection); selection = [] }
+    }
+
+    /// Starts editing the row's name, with the row selected so the preview below shows the table.
+    private func rename(_ id: UUID) {
+        selection = [id]
+        renaming = id
     }
 }
 
@@ -254,8 +287,9 @@ struct ConvertCheckCell: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
     var body: some View {
-        Toggle("", isOn: Binding(get: { state.convertPlan.isSelected(item) },
-                                 set: { state.convertPlan.setSelected(item.id, $0) }))
+        // The title is the checkbox's name for VoiceOver; the column header shows the word.
+        Toggle("Convert \(item.name)", isOn: Binding(get: { state.convertPlan.isSelected(item) },
+                                                      set: { state.convertPlan.setSelected(item.id, $0) }))
             .labelsHidden()
             .help(item.factorySlot != nil && state.convertPlan.preset.isThirdWave
                   ? "Your 3rd Wave is expected to have this factory table (U48–U55 since the 2025 update, which Groove Synthesis offers as a download), so it starts unchecked" : "")
@@ -286,28 +320,31 @@ struct ConvertStatusCell: View {
         switch status {
         case .needsFrameSize:
             Image(systemName: "exclamationmark.octagon.fill").foregroundStyle(.red).help(tip)
+                .accessibilityLabel("Needs a frame size")
         case .cannotSplit:
             Image(systemName: "xmark.octagon.fill").foregroundStyle(.red).help(tip)
+                .accessibilityLabel("Can't be split into frames")
         case .ready:
             Image(systemName: "checkmark.circle").foregroundStyle(.secondary).help(tip)
+                .accessibilityLabel("Ready to convert")
         case .excluded:
             Text("").help(tip)
         }
     }
 }
 
-/// The table's name, editable in place, with its badges: where it came from when that matters
-/// (a slot in a .pgdata, a 3rd Wave or Surge .wt, a FLAC), a factory table, and identical
-/// copies found elsewhere.
+/// The table's name, edited in place after a double-click on the row, with its badges: where it
+/// came from when that matters (a slot in a .pgdata, a 3rd Wave or Surge .wt, a FLAC), a factory
+/// table, and identical copies found elsewhere.
 struct ConvertNameCell: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
-    @Binding var selection: Set<UUID>
+    @Binding var renaming: UUID?
     var body: some View {
         let plan = state.convertPlan
         let included = plan.isSelected(item)
         HStack(spacing: 5) {
-            ConvertNameField(state: state, item: item, included: included, selection: $selection)
+            ConvertNameField(state: state, item: item, included: included, renaming: $renaming)
             if let origin = item.originBadge {
                 ConvertBadge(text: origin, tip: item.location.url.path)
             }
@@ -326,39 +363,63 @@ struct ConvertNameCell: View {
     }
 }
 
-/// The name as plain text that becomes a field when clicked. Return commits, Escape or leaving
-/// the field without a change restores the name; an empty name is not taken. Editing selects
-/// the row, so the preview below shows the table being renamed.
+/// The name as plain text, which becomes a field while the row is being renamed (a double-click
+/// on the row, or Rename in its contextual menu; see `ConvertTable`), as a file's name does in
+/// the Finder; a single click only selects the row, as anywhere else in the table. Return or
+/// leaving the field commits, Escape restores the name, and the text comes back either way; an
+/// empty name is not taken.
 struct ConvertNameField: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
     let included: Bool
-    @Binding var selection: Set<UUID>
+    /// The row being renamed, shared by the table's rows; this one edits while it is `item.id`.
+    @Binding var renaming: UUID?
     @State private var text = ""
     @FocusState private var focused: Bool
 
+    private var editing: Bool { renaming == item.id }
+
     var body: some View {
-        TextField("", text: $text)
-            .textFieldStyle(.plain)
-            .lineLimit(1)
-            .foregroundStyle(included ? Color.primary : Color.secondary)
-            .focused($focused)
-            .onAppear { text = item.name }
-            .onChange(of: item.name) { (name: String) in if !focused { text = name } }
-            .onSubmit { commit() }
-            .onExitCommand { text = item.name; focused = false }
-            .onChange(of: focused) { (now: Bool) in
-                if now { selection = [item.id] } else { commit() }
-            }
-            .help(item.newName == nil ? "The table's name; click to edit it. The name goes on the converted file (and inside a 3rd Wave table); the source file is not changed."
-                                      : "Was \u{201C}\(item.table.name)\u{201D}; click to edit")
+        if editing {
+            TextField("Name", text: $text)
+                .textFieldStyle(.plain)
+                .labelsHidden()
+                .lineLimit(1)
+                .foregroundStyle(included ? Color.primary : Color.secondary)
+                .focused($focused)
+                .onAppear {
+                    text = item.name
+                    // Focus asked for once the field is in the window, not while it is being put there.
+                    DispatchQueue.main.async { focused = true }
+                }
+                .onSubmit { commit() }
+                .onExitCommand { cancel() }
+                .onChange(of: focused) { (now: Bool) in if !now { commit() } }
+        } else {
+            // Fills the cell up to the badges, as the field does, so the badges keep their place
+            // at the cell's end whether the name is being edited or not.
+            Text(item.name)
+                .lineLimit(1)
+                .foregroundStyle(included ? Color.primary : Color.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .help(item.newName == nil ? "The table's name; double-click the row to edit it. The name goes on the converted file (and inside a 3rd Wave table); the source file is not changed."
+                                          : "Was \u{201C}\(item.table.name)\u{201D}; double-click the row to edit")
+        }
     }
 
+    // `renaming` goes first in both: the field's loss of focus commits, and a second pass must
+    // find nothing to do. `focused` is set back by hand so that the next edit's `true` is a change.
     private func commit() {
+        guard editing else { return }
+        renaming = nil
+        focused = false
         let trimmed = text.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty { text = item.name; return }
-        if trimmed != item.name { state.convertPlan.rename(item.id, to: trimmed) }
-        text = trimmed
+        if !trimmed.isEmpty, trimmed != item.name { state.convertPlan.rename(item.id, to: trimmed) }
+    }
+
+    private func cancel() {
+        renaming = nil
+        focused = false
     }
 }
 
@@ -521,7 +582,8 @@ struct ConvertSizePopover: View {
             }
         }
         .padding(12)
-        .frame(width: 480, alignment: .leading)
+        // Three buttons, their two gaps, and the padding.
+        .frame(width: 3 * ConvertSizeButton.width + 2 * 8 + 24, alignment: .leading)
     }
 }
 
@@ -533,8 +595,9 @@ struct ConvertSizeButton: View {
     let size: Int
     var likely: Bool = false
 
-    /// The button's width: three to a row in the chooser (see `ConvertSizePopover`).
-    static let width: CGFloat = 146
+    /// The button's width: three to a row in the chooser (see `ConvertSizePopover`), each wide
+    /// enough for its result in caption type on two lines.
+    static let width: CGFloat = 160
 
     /// "→ 64 × 1,024, 4 → 64 frames, repeated": what the destination writes for this size.
     private var becomes: String {
@@ -562,11 +625,11 @@ struct ConvertSizeButton: View {
                 // The result wraps under the size rather than being cut off: "→ 64 × 1,024,"
                 // then "4 → 64 frames, repeated".
                 Text(becomes)
-                    .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
+                    .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 if likely {
-                    Text("likely").font(.caption2).foregroundStyle(.secondary)
+                    Text("likely").font(.caption).foregroundStyle(.secondary)
                 }
             }
             .padding(6)

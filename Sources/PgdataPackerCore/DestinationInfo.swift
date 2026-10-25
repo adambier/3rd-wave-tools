@@ -17,11 +17,11 @@ public extension OutputPreset {
         /// Every other synth.
         case otherSynths
 
-        /// The heading the group is listed under.
+        /// The heading the group is listed under (a group heading, so in title case).
         public var title: String {
             switch self {
             case .thirdWave: return "3rd Wave"
-            case .otherSynths: return "Other synths"
+            case .otherSynths: return "Other Synths"
             }
         }
 
