@@ -4,6 +4,9 @@ import Foundation
 #if canImport(PgdataFormats)
 import PgdataFormats   // SwiftPM build; absent in the single-module swiftc build
 #endif
+#if canImport(WavetableFormats)
+import WavetableFormats
+#endif
 #if canImport(PgdataPackerCore)
 import PgdataPackerCore
 #endif
@@ -11,10 +14,14 @@ import PgdataPackerCore
 /// All app state. Plain ObservableObject, used only from the main thread (as in ThirdWaveWT).
 final class AppState: ObservableObject {
     enum Section: String, CaseIterable, Identifiable {
-        case pack = "Pack", unpack = "Unpack"
+        case pack = "Pack", unpack = "Unpack", convert = "Convert"
         var id: String { rawValue }
         var icon: String {
-            switch self { case .pack: return "shippingbox"; case .unpack: return "tray.and.arrow.up" }
+            switch self {
+            case .pack: return "shippingbox"
+            case .unpack: return "tray.and.arrow.up"
+            case .convert: return "arrow.left.arrow.right"
+            }
         }
     }
 
@@ -89,6 +96,11 @@ final class AppState: ObservableObject {
     @Published var unpacks: [UnpackItem] = []
     @Published var selectedUnpack: UUID?
 
+    // Convert
+    /// The wavetables added to the Convert page, the destination, and its options. The
+    /// destination and the frame-count choice are remembered between sessions.
+    @Published var convertPlan = ConvertPlan() { didSet { saveSettings() } }
+
     // Messages
     @Published var log: [String] = []
     @Published var alertMessage: String?
@@ -113,6 +125,12 @@ final class AppState: ObservableObject {
         if defaults.object(forKey: "skipFactoryDuplicates") != nil {
             skipFactoryDuplicates = defaults.bool(forKey: "skipFactoryDuplicates")
         }
+        if let raw = defaults.string(forKey: "convertPreset"), let p = OutputPreset(rawValue: raw) {
+            convertPlan.preset = p
+        }
+        if let raw = defaults.string(forKey: "convertFrameCountPolicy"), let p = FrameCountPolicy(rawValue: raw) {
+            convertPlan.options.frameCountPolicy = p
+        }
         // Settings from versions that asked for the factory .wt files and tracked the 3rd Wave's slots.
         for key in ["factoryFolders", "embedFactory", "synthHasAllFactory"] { defaults.removeObject(forKey: key) }
         loading = false
@@ -130,6 +148,8 @@ final class AppState: ObservableObject {
         defaults.set(nameCleaner.underscoresToSpaces, forKey: "cleanUnderscores")
         defaults.set(nameCleaner.titleCase, forKey: "cleanTitleCase")
         defaults.set(nameCleaner.fixedSpellings, forKey: "cleanFixedSpellings")
+        defaults.set(convertPlan.preset.rawValue, forKey: "convertPreset")
+        defaults.set(convertPlan.options.frameCountPolicy.rawValue, forKey: "convertFrameCountPolicy")
     }
 
     // MARK: Messages
@@ -567,6 +587,113 @@ final class AppState: ObservableObject {
         note(msg + " (\(folder.path))")
         alertReveal = folder
         alertMessage = msg
+    }
+
+    // MARK: Convert
+
+    /// Adds the wavetables in files and folders to the Convert page. Folders are searched; files
+    /// that cannot hold a wavetable, or hold none, are passed over. Read on a background queue
+    /// with progress shown, like `add(urls:)`; the tables are listed on the main thread in one go,
+    /// identical ones collapsed into one entry.
+    func addToConvert(urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        batchesReading += 1
+        reading = reading ?? LoadProgress(done: 0, total: 0)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let (files, ignored) = ConvertPlan.filesToRead(in: urls)
+            DispatchQueue.main.async { self?.reading = LoadProgress(done: 0, total: files.count) }
+            var collected = ConvertPlan.read(files, progress: { done, total in
+                if done % 5 == 0 || done == total {
+                    DispatchQueue.main.async { self?.reading = LoadProgress(done: done, total: total) }
+                }
+            })
+            collected.ignored = ignored
+            DispatchQueue.main.async { self?.finishAddingToConvert(collected) }
+        }
+    }
+
+    private func finishAddingToConvert(_ c: ConvertPlan.Collected) {
+        batchesReading -= 1
+        if batchesReading <= 0 { batchesReading = 0; reading = nil }
+        let s = convertPlan.add(c.found, factory: factory)
+        func count(_ n: Int, _ word: String) -> String { "\(n) \(word)\(n == 1 ? "" : "s")" }
+        if s.added > 0 {
+            var msg = "Added \(count(s.added, "wavetable")) to Convert"
+            if s.duplicates > 0 { msg += " (and \(s.duplicates) identical cop\(s.duplicates == 1 ? "y" : "ies"), shown with the table they match)" }
+            note(msg + ".")
+        } else if c.problems.isEmpty {
+            // Nothing happened; say why, so a drop that does nothing is not a mystery.
+            var why: [String] = []
+            if s.duplicates > 0 { why.append("\(s.duplicates) identical to tables already listed") }
+            if s.repeated > 0 { why.append("\(s.repeated) already in the list") }
+            if c.withoutTables > 0 { why.append("\(count(c.withoutTables, "file")) without a wavetable") }
+            if c.ignored > 0 { why.append("\(count(c.ignored, "file")) of other kinds") }
+            note("No wavetables added" + (why.isEmpty ? "." : ": " + why.joined(separator: "; ") + "."))
+        }
+        if !c.problems.isEmpty {
+            c.problems.forEach { note("Could not read \($0)") }
+            alertMessage = "Some files could not be read.\n\n" + c.problems.prefix(8).map { ReportText.item($0) }.joined(separator: "\n")
+                + (c.problems.count > 8 ? "\n\n…and \(c.problems.count - 8) more (see the log)." : "")
+        }
+    }
+
+    func removeConvertItems(_ ids: Set<UUID>) { convertPlan.remove(ids) }
+
+    /// Empties the Convert page after asking. Files are not touched.
+    func removeAllConvert() {
+        let n = convertPlan.items.count
+        guard n > 0 else { return }
+        let what = "\(n) wavetable\(n == 1 ? "" : "s")"
+        guard Panels.confirm(title: "Remove everything from the Convert page?",
+                             message: "This removes \(what) from the list, with any ticks and frame sizes you chose. The files themselves are not touched.",
+                             ok: "Remove All") else { return }
+        convertPlan.items = []
+        note("Removed \(what) from the Convert page.")
+    }
+
+    /// Converts the ticked tables for the chosen destination into a folder the user chooses. With
+    /// `sendToPack` (3rd Wave destinations), the .wt files written are then added to the Pack page.
+    func convertTables(sendToPack: Bool = false) {
+        let plan = convertPlan
+        let ticked = plan.selectedItems
+        guard !ticked.isEmpty else {
+            alertMessage = "Nothing is ticked to convert. Tick the tables to convert in the Convert column."
+            return
+        }
+        guard ticked.contains(where: plan.canConvert) else {
+            alertMessage = (ticked.count == 1 ? "The ticked table can't be converted yet: its file doesn't settle the frame size."
+                                              : "None of the ticked tables can be converted yet: their files don't settle the frame size.")
+                + "\n\nChoose a frame size in the Frames column."
+            return
+        }
+        let toPack = sendToPack && plan.preset.isThirdWave
+        guard let folder = Panels.chooseFolder(
+            prompt: toPack ? "Convert and Send" : "Convert Here",
+            message: toPack ? "Choose where to put the .wt files; they are then added to the Pack page"
+                            : "Choose where to put the converted files") else { return }
+        let conversion = plan.convert()
+        let report = ConvertPlan.write(conversion.files, into: folder)
+        let n = report.written.count
+        var msg = "Converted \(n) table\(n == 1 ? "" : "s") for \(plan.preset.title) into \"\(folder.lastPathComponent)\"."
+        // Each section: a heading line ending in ":" and one item per line (see ReportText).
+        if !conversion.errors.isEmpty { msg += "\n\nNot converted:\n" + conversion.errors.map { ReportText.item($0) }.joined(separator: "\n") }
+        if !report.failed.isEmpty { msg += "\n\nNot written:\n" + report.failed.map { ReportText.item($0) }.joined(separator: "\n") }
+        if !report.renamed.isEmpty {
+            msg += "\n\nAlready in the folder, so written under a new name (nothing was replaced):\n"
+                + report.renamed.map { ReportText.item($0) }.joined(separator: "\n")
+        }
+        if !conversion.notes.isEmpty { msg += "\n\nWhat the conversion did:\n" + conversion.notes.map { ReportText.item($0) }.joined(separator: "\n") }
+        let packFiles = toPack ? ConvertPlan.filesForPack(report.written, preset: plan.preset) : []
+        if !packFiles.isEmpty {
+            msg += "\n\n" + (packFiles.count == 1 ? "The .wt file is" : "The \(packFiles.count) .wt files are") + " added to the Pack page."
+        }
+        note(msg + " (\(folder.path))")
+        alertReveal = folder
+        alertMessage = msg
+        if !packFiles.isEmpty {
+            add(urls: packFiles)
+            section = .pack
+        }
     }
 }
 
