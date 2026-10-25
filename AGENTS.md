@@ -243,6 +243,15 @@ No tests cover the SwiftUI views; a UI change is verified by building and using 
   README and FORMATS.md (e.g. **Import program**), in curly quotes in the app.
 - Code comments that state a fact about the 3rd Wave cite the FORMATS.md section
   (e.g. "See section 2 of FORMATS.md").
+- Plain, short words; one term for one thing (table, frame, frame size, interpolation, destination,
+  "to convert"); nothing said twice in one view, report, or paragraph; counts that read naturally
+  ("Both tables", "1 change"; see `CountWords`); labels that say exactly what they mean (name the
+  company or document, not "the maker"); every distinct label actually different.
+- **Language review before a build is handed over, docs are merged, or a release is made:** read
+  every user-facing string and document that changed for accuracy against the evidence, currency
+  after renames (page, column, and feature names), agreement of tense, number, case, and mood, and
+  the rules above; fix, and report any change of meaning. Tests assert some strings
+  (`ConvertPlanTests`, `WorkbenchTests`, `ReadingTests`): keep them in step.
 
 ## 10. Recipes
 

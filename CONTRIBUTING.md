@@ -76,6 +76,15 @@ The README, FORMATS.md, the documentation, and the app's text follow a few conve
 - Standing behaviour in the present tense; single observations as "has been observed to …".
 - Inferences said to be inferences.
 - The serial (Oxford) comma.
+- Plain, short words; one term for one thing (table, frame, frame size, interpolation,
+  destination); nothing said twice in one view, report, or paragraph; counts that read naturally
+  ("Both tables", "1 change", never "All 2 tables" or "1 changes"); labels that say exactly what
+  they mean ("Xfer Records, Serum 2 User Guide", not "the maker's documentation").
+
+**Language review.** A change to user-facing text or documentation gets a careful read before it
+is merged, checking that each statement is accurate against its evidence and still current (names
+of pages, columns, and features change), that tense, number, case, and mood agree, and that the
+conventions above hold. Say in the pull request if a sentence's meaning changed.
 
 ## Pull requests
 
