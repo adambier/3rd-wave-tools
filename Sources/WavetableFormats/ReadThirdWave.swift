@@ -24,7 +24,7 @@ extension WavetableReader {
     static func readThirdWaveText(_ text: [UInt8], fileName: String) throws -> [FoundTable] {
         let wt: WavetableFile
         do { wt = try WavetableFile(data: Data(text)) } catch {
-            throw WavetableError("\"\(fileName)\" begins like a 3rd Wave wavetable but could not be read: \(error)")
+            throw WavetableError("\"\(fileName)\" begins like a 3rd Wave wavetable (.wt), but it could not be read: \(error)")
         }
         let name = wt.name.isEmpty ? fileStem(fileName) : wt.name
         return [thirdWaveTable(wt, name: name, fileName: fileName,
@@ -36,7 +36,7 @@ extension WavetableReader {
     static func readUnifiedProgram(_ bytes: [UInt8], fileName: String) throws -> [FoundTable] {
         let u: UnifiedProgram
         do { u = try UnifiedProgram(data: Data(bytes)) } catch {
-            throw WavetableError("\"\(fileName)\" is a 3rd Wave unified program (.pgdata) that could not be read: \(error)")
+            throw WavetableError("\"\(fileName)\" begins like a 3rd Wave unified program (.pgdata), but it could not be read: \(error)")
         }
         var out: [FoundTable] = []
         for src in u.sources {
@@ -44,7 +44,7 @@ extension WavetableReader {
             let isP = src.ref.isP
             let wt = WavetableFile(kind: isP ? .p : .u, name: nameField.text, dataBytes: data)
             guard wt.values.count == wt.kind.valueCount else {
-                throw WavetableError("The \(src.ref.label) table in \(fileName) has \(wt.values.count) values; a \(wt.kind.letter) table needs \(wt.kind.valueCount).")
+                throw WavetableError("The \(src.ref.label) table in \"\(fileName)\" holds \(grouped(wt.values.count)) values, but a \(wt.kind.letter) table has \(grouped(wt.kind.valueCount)); the file is damaged.")
             }
             let label = src.ref.label
             out.append(thirdWaveTable(wt, name: wt.name.isEmpty ? label : wt.name, fileName: fileName,
@@ -60,7 +60,7 @@ extension WavetableReader {
         let samples = wt.frames.flatMap { $0 }
         return FoundTable(name: name, fileName: fileName, source: source, samples: samples,
                           frameSize: isP ? 128 : 1024,
-                          frameSizeBasis: isP ? "3rd Wave P table" : "3rd Wave U table",
+                          frameSizeBasis: isP ? "3rd Wave P table (always 64 frames of 128)" : "3rd Wave U table (always 64 frames of 1,024)",
                           thirdWaveFingerprint: wt.fingerprint,
                           notes: peakNote(wt.peak).map { [$0] } ?? [])
     }

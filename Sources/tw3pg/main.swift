@@ -402,20 +402,35 @@ case "wtscan":
             print([u.path, source, t.name, size, t.frameSizeBasis, t.candidateFrameSizes.map(String.init).joined(separator: ","),
                    t.interpolation?.rawValue ?? "", factory, t.notes.joined(separator: " | ")].joined(separator: "\t"))
             guard check, let w = t.wavetable() else { continue }
+            // Round trip: each preset's file, read back, must show the frame size and frame count
+            // the preset promises, and when neither changed, the same samples (within what a
+            // 16-bit file or six-decimal text can hold).
             for preset in OutputPreset.allCases {
+                func fail(_ why: String) { writerFailures += 1; print("  WRITER \(preset.rawValue): \(why) for \(u.lastPathComponent)") }
                 do {
                     let out = try WavetableWriter.write(w, preset: preset)
                     let back = try WavetableReader.read(out.data, fileName: out.fileName)
-                    let want = preset.frameSize ?? w.frameSize
-                    guard back.count == 1, back[0].frameSize == want || (preset == .waveEdit && back[0].frameSize == nil)
-                            || (preset == .tonverk || preset == .surge) else {
-                        writerFailures += 1
-                        print("  WRITER \(preset.rawValue): read back \(back.map { "\($0.frameSize.map(String.init) ?? "?")" }) for \(u.lastPathComponent)")
-                        continue
+                    let isPow2 = w.frameSize & (w.frameSize - 1) == 0
+                    let wantSize: Int
+                    switch preset {
+                    case .tonverk: wantSize = (64...4096).contains(w.frameSize) && isPow2 ? w.frameSize : 2048
+                    case .surge: wantSize = (2...4096).contains(w.frameSize) && isPow2 ? w.frameSize : 2048
+                    default: wantSize = preset.frameSize ?? 2048
                     }
-                } catch {
-                    writerFailures += 1; print("  WRITER \(preset.rawValue): \(error) for \(u.lastPathComponent)")
-                }
+                    let wantCount = preset.requiredFrameCount ?? min(preset.maxFrameCount, w.frameCount)
+                    guard back.count == 1 else { fail("read back \(back.count) tables"); continue }
+                    let gotSize = back[0].frameSize ?? (preset == .waveEdit ? back[0].candidateFrameSizes.first : nil)
+                    guard gotSize == wantSize, let r = back[0].wavetable(frameSize: gotSize) else {
+                        fail("read back frame size \(back[0].frameSize.map(String.init) ?? "open (\(back[0].candidateFrameSizes))"), wanted \(wantSize)"); continue
+                    }
+                    guard r.frameCount == wantCount else { fail("read back \(r.frameCount) frames, wanted \(wantCount)"); continue }
+                    if wantSize == w.frameSize, wantCount == w.frameCount, w.peak <= 1 {
+                        let tolerance: Float = preset == .waveEdit ? 1.0 / 32_768 : 1e-5
+                        var worst: Float = 0
+                        for (a, b) in zip(w.frames, r.frames) { for (x, y) in zip(a, b) { worst = max(worst, abs(x - y)) } }
+                        if worst > tolerance { fail("samples differ by up to \(worst)") }
+                    }
+                } catch { fail("\(error)") }
             }
         }
     }
