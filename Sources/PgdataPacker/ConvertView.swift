@@ -27,7 +27,7 @@ struct ConvertView: View {
             Divider()
             if state.convertPlan.items.isEmpty {
                 EmptyHint(title: "Drop wavetables here",
-                          detail: "Add WAV wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table then shows its frames, its frame size, and how that was decided. Convert converts existing wavetables between formats; it does not make wavetables from other audio.")
+                          detail: "Add WAV wavetables (Serum, Vital, and others), FLAC wavetables (Phase Plant), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table then shows its frames, its frame size, and how that was decided. Convert converts existing wavetables between formats; it does not make wavetables from other audio.")
             } else {
                 HSplitView {
                     VSplitView {
@@ -53,7 +53,7 @@ struct ConvertView: View {
         let ticked = plan.selectedItems.count
         return HStack(spacing: 14) {
             Button("Add Files or Folders…") {
-                state.addToConvert(urls: Panels.chooseFiles(message: "Choose wavetable files (.wav, .wt, .pgdata) or folders to search"))
+                state.addToConvert(urls: Panels.chooseFiles(message: "Choose wavetable files (.wav, .flac, .wt, .pgdata) or folders to search"))
             }
             .keyboardShortcut("o")
             Button("Clean Up Names…") { showNameCleanup = true }

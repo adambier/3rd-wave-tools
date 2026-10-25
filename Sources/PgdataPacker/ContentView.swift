@@ -106,7 +106,7 @@ struct LogBar: View {
                 }
                 Spacer()
                 Label(state.section == .convert
-                        ? "Drop .wav, .wt, or .pgdata files or folders onto the page above to add them"
+                        ? "Drop .wav, .flac, .wt, or .pgdata files or folders onto the page above to add them"
                         : "Drop .pro, .wt, .bin, or .pgdata files or folders onto the page above to add them", systemImage: "arrow.down.doc")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
