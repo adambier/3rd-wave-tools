@@ -204,6 +204,18 @@ rm -rf "$SPARKLE_FW/XPCServices" "$SPARKLE_FW/Versions/B/XPCServices"
 # Sparkle's MIT licence asks for its notice to go with every copy.
 cp "$SPARKLE_DIR/LICENSE" "$APP/Contents/Resources/Sparkle-LICENSE.txt"
 
+# Document types. The app claims no file type or suffix: it must never become the default app for
+# .pro, .wt, .bin, .pgdata, WAV, or FLAC files, nor appear in the Finder's "Open With" list for
+# them. Every CFBundleDocumentTypes entry therefore has LSHandlerRank "None", which per Apple's
+# documentation of LSHandlerRank means the app does not claim the type and Launch Services never
+# offers it as a handler, while a file of the type dropped on the app's icon in the Dock or the
+# Finder still opens in it (AppDelegate's application(_:open:)). This is from the documentation,
+# not yet verified on a Mac. The 3rd Wave's four formats have no public UTIs, so they are declared
+# here as imported types (UTImportedTypeDeclarations: definitions the system uses when nothing else
+# defines the suffix; not a claim to open them). macOS already types ".bin" as a MacBinary archive
+# (com.apple.macbinary-archive), which wins over an imported declaration, so that UTI is listed for
+# multisamples as well (from memory of the system's CoreTypes declarations; check with
+# `mdls -name kMDItemContentType <file>.bin` if Dock drops of .bin files are refused).
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -228,6 +240,79 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>NSPrincipalClass</key>         <string>NSApplication</string>
     <key>SUFeedURL</key>                <string>$FEED_URL</string>
     <key>SUPublicEDKey</key>            <string>$SPARKLE_PUBLIC_ED_KEY</string>
+    <!-- The 3rd Wave's file formats, defined (not claimed) so the system has a type for each. -->
+    <key>UTImportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>  <string>$BUNDLE_ID.pro</string>
+            <key>UTTypeDescription</key> <string>3rd Wave Program</string>
+            <key>UTTypeConformsTo</key>  <array><string>public.data</string><string>public.plain-text</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict><key>public.filename-extension</key><array><string>pro</string></array></dict>
+        </dict>
+        <dict>
+            <key>UTTypeIdentifier</key>  <string>$BUNDLE_ID.wt</string>
+            <key>UTTypeDescription</key> <string>3rd Wave Wavetable</string>
+            <key>UTTypeConformsTo</key>  <array><string>public.data</string><string>public.plain-text</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict><key>public.filename-extension</key><array><string>wt</string></array></dict>
+        </dict>
+        <dict>
+            <key>UTTypeIdentifier</key>  <string>$BUNDLE_ID.bin</string>
+            <key>UTTypeDescription</key> <string>3rd Wave Multisample</string>
+            <key>UTTypeConformsTo</key>  <array><string>public.data</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict><key>public.filename-extension</key><array><string>bin</string></array></dict>
+        </dict>
+        <dict>
+            <key>UTTypeIdentifier</key>  <string>$BUNDLE_ID.pgdata</string>
+            <key>UTTypeDescription</key> <string>3rd Wave Unified Program</string>
+            <key>UTTypeConformsTo</key>  <array><string>public.data</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict><key>public.filename-extension</key><array><string>pgdata</string></array></dict>
+        </dict>
+    </array>
+    <!-- Files the app opens when dropped on its icon. LSHandlerRank None: never the default app,
+         never offered in "Open With" (deliberate; see the comment above this plist). -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>     <string>3rd Wave Program</string>
+            <key>CFBundleTypeRole</key>     <string>Viewer</string>
+            <key>LSHandlerRank</key>        <string>None</string>
+            <key>LSItemContentTypes</key>   <array><string>$BUNDLE_ID.pro</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>     <string>3rd Wave Wavetable</string>
+            <key>CFBundleTypeRole</key>     <string>Viewer</string>
+            <key>LSHandlerRank</key>        <string>None</string>
+            <key>LSItemContentTypes</key>   <array><string>$BUNDLE_ID.wt</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>     <string>3rd Wave Multisample</string>
+            <key>CFBundleTypeRole</key>     <string>Viewer</string>
+            <key>LSHandlerRank</key>        <string>None</string>
+            <key>LSItemContentTypes</key>   <array><string>$BUNDLE_ID.bin</string><string>com.apple.macbinary-archive</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>     <string>3rd Wave Unified Program</string>
+            <key>CFBundleTypeRole</key>     <string>Viewer</string>
+            <key>LSHandlerRank</key>        <string>None</string>
+            <key>LSItemContentTypes</key>   <array><string>$BUNDLE_ID.pgdata</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>     <string>WAV Audio</string>
+            <key>CFBundleTypeRole</key>     <string>Viewer</string>
+            <key>LSHandlerRank</key>        <string>None</string>
+            <key>LSItemContentTypes</key>   <array><string>com.microsoft.waveform-audio</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>     <string>FLAC Audio</string>
+            <key>CFBundleTypeRole</key>     <string>Viewer</string>
+            <key>LSHandlerRank</key>        <string>None</string>
+            <key>LSItemContentTypes</key>   <array><string>org.xiph.flac</string></array>
+        </dict>
+    </array>
 </dict>
 </plist>
 PLIST

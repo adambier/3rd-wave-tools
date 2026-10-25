@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 // Sparkle (in-app updates) is linked by make-app.sh. Package.swift does not declare it, so a build
 // through Xcode or a plain `swift build` compiles without it and has no "Check for Updates…" item.
@@ -18,7 +19,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     #endif
 
+    /// The app's state, set once it exists (it is made after the delegate; see the end of this file).
+    var appState: AppState? { didSet { openPendingFiles() } }
+    /// Files to open that arrived before the state existed (a launch by dropping files on the
+    /// app's icon, should macOS deliver them that early).
+    private var pendingOpenURLs: [URL] = []
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    /// Files dropped on the app's icon (in the Dock or the Finder). The app claims no file type
+    /// (see the Info.plist in make-app.sh), so this is the one way the Finder hands it files.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        pendingOpenURLs += urls
+        openPendingFiles()
+    }
+
+    /// Sends the files waiting to be opened to the page that reads them: WAV and FLAC files to
+    /// the Wavetables page; everything else, folders included, through `add(urls:)`, which puts
+    /// 3rd Wave files on the Pack or Unpack page and shows it, as a drop on either page does.
+    private func openPendingFiles() {
+        guard let state = appState, !pendingOpenURLs.isEmpty else { return }
+        let urls = pendingOpenURLs
+        pendingOpenURLs = []
+        let wavetables = urls.filter { ["wav", "wave", "flac"].contains($0.pathExtension.lowercased()) }
+        let rest = urls.filter { !wavetables.contains($0) }
+        if !wavetables.isEmpty {
+            state.addToConvert(urls: wavetables)
+            if rest.isEmpty { state.section = .convert }
+        }
+        if !rest.isEmpty { state.add(urls: rest) }
+    }
 
     @objc func showAbout(_ sender: Any?) {
         // Centred paragraphs with a blank line's space between them.
@@ -71,9 +101,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         openIfAvailable(allReleases.appendingPathComponent("tag").appendingPathComponent("v\(version)"), orElse: allReleases)
     }
 
-    /// Opens the README as it was at the running version's tag, since it describes the app; falls
-    /// back to the current README on main, as Release Notes does.
-    @objc func showReadMe(_ sender: Any?) {
+    /// Opens the README as it was at the running version's tag, since it describes the app (the
+    /// Help menu's first item); falls back to the current README on main, as Release Notes does.
+    @objc func showHelp(_ sender: Any?) {
         guard let current = URL(string: "\(Self.repository)/blob/main/README.md") else { return }
         guard let version = runningVersion,
               let tagged = URL(string: "\(Self.repository)/blob/v\(version)/README.md") else {
@@ -91,7 +121,170 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-private func buildMainMenu(appDelegate: AppDelegate) -> NSMenu {
+/// The target of the menu items whose action, title, or state depends on the page: the File
+/// menu's commands and the View menu's pages and log. Validation gives the dynamic items their
+/// titles and check marks, and disables a command when the page's own button for it is disabled
+/// (see the `controls` of PackView, UnpackView, and ConvertView) or while a pack, unpack, or
+/// conversion is running.
+final class MenuActions: NSObject, NSMenuItemValidation {
+    private let appState: AppState
+
+    init(appState: AppState) {
+        self.appState = appState
+        super.init()
+    }
+
+    /// The current page's "Add Files or Folders…": the same panel as its button, with files of
+    /// other kinds dimmed.
+    @objc func addFiles(_ sender: Any?) {
+        switch appState.section {
+        case .pack:
+            appState.add(urls: Panels.chooseFiles(message: "Choose .pro programs and the .wt and .bin files they use",
+                                                  allowedExtensions: ["pro", "wt", "bin", "pgdata"]))
+        case .unpack:
+            appState.add(urls: Panels.chooseFiles(message: "Choose .pgdata files to unpack",
+                                                  allowedExtensions: ["pgdata"]))
+        case .convert:
+            appState.addToConvert(urls: Panels.chooseFiles(message: "Choose wavetable files (.wav, .flac, .wt, .pgdata) or folders to search",
+                                                           allowedExtensions: ["wav", "flac", "wt", "pgdata"]))
+        }
+    }
+
+    /// The current page's main action: Pack All…, Unpack All…, or Convert….
+    @objc func mainAction(_ sender: Any?) {
+        switch appState.section {
+        case .pack: appState.writeUnified(appState.programs.map(\.id))
+        case .unpack: appState.unpack(appState.unpacks.map(\.id))
+        case .convert: appState.convertTables()
+        }
+    }
+
+    /// The Wavetables page's "Send to Pack…".
+    @objc func sendToPack(_ sender: Any?) {
+        appState.convertTables(sendToPack: true)
+    }
+
+    /// Shows the page the item's tag names (its index in `AppState.Section.allCases`).
+    @objc func showPage(_ sender: Any?) {
+        guard let item = sender as? NSMenuItem else { return }
+        let sections = AppState.Section.allCases
+        guard sections.indices.contains(item.tag) else { return }
+        appState.section = sections[item.tag]
+    }
+
+    @objc func toggleLog(_ sender: Any?) {
+        appState.showLog.toggle()
+    }
+
+    private var mainActionTitle: String {
+        switch appState.section {
+        case .pack: return "Pack All…"
+        case .unpack: return "Unpack All…"
+        case .convert: return "Convert…"
+        }
+    }
+
+    /// Mirrors the `.disabled` condition of the page's own button.
+    private var mainActionEnabled: Bool {
+        guard !appState.isWorking else { return false }
+        switch appState.section {
+        case .pack: return !appState.programs.isEmpty
+        case .unpack: return !appState.unpacks.isEmpty
+        case .convert: return !appState.convertPlan.selectedItems.isEmpty
+        }
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        guard let action = menuItem.action else { return true }
+        switch action {
+        case #selector(addFiles(_:)):
+            return !appState.isWorking
+        case #selector(mainAction(_:)):
+            menuItem.title = mainActionTitle
+            return mainActionEnabled
+        case #selector(sendToPack(_:)):
+            // Enabled as the Wavetables page's button is: tables marked, and a 3rd Wave destination.
+            let plan = appState.convertPlan
+            return appState.section == .convert && !appState.isWorking
+                && !plan.selectedItems.isEmpty && plan.preset.isThirdWave
+        case #selector(showPage(_:)):
+            let current = AppState.Section.allCases.firstIndex(of: appState.section) ?? -1
+            menuItem.state = menuItem.tag == current ? .on : .off
+            return true
+        case #selector(toggleLog(_:)):
+            menuItem.title = appState.showLog ? "Hide Log" : "Show Log"
+            return true
+        default:
+            return true
+        }
+    }
+}
+
+/// The window's toolbar: one control, the page switcher, centred. It follows `AppState.section`
+/// (which the View menu also sets) and sets it.
+final class ToolbarController: NSObject, NSToolbarDelegate {
+    private static let pageItem = NSToolbarItem.Identifier("page")
+    private let appState: AppState
+    private weak var control: NSSegmentedControl?
+    private var cancellable: AnyCancellable?
+
+    init(appState: AppState) {
+        self.appState = appState
+        super.init()
+        cancellable = appState.$section.sink { [weak self] (section: AppState.Section) in
+            self?.control?.selectedSegment = AppState.Section.allCases.firstIndex(of: section) ?? 0
+        }
+    }
+
+    func makeToolbar() -> NSToolbar {
+        let toolbar = NSToolbar(identifier: "MainToolbar")
+        toolbar.delegate = self
+        toolbar.allowsUserCustomization = false
+        toolbar.displayMode = .iconOnly
+        toolbar.centeredItemIdentifier = Self.pageItem
+        return toolbar
+    }
+
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.flexibleSpace, Self.pageItem, .flexibleSpace]
+    }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.flexibleSpace, Self.pageItem]
+    }
+
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
+                 willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        guard itemIdentifier == Self.pageItem else { return nil }
+        let sections = AppState.Section.allCases
+        let control = NSSegmentedControl(labels: sections.map(\.rawValue), trackingMode: .selectOne,
+                                         target: self, action: #selector(pageChosen(_:)))
+        control.segmentStyle = .automatic
+        for (i, s) in sections.enumerated() {
+            control.setImage(NSImage(systemSymbolName: s.icon, accessibilityDescription: s.rawValue), forSegment: i)
+            control.setImageScaling(.scaleProportionallyDown, forSegment: i)
+        }
+        control.selectedSegment = sections.firstIndex(of: appState.section) ?? 0
+        control.setAccessibilityLabel("Page")
+        self.control = control
+        let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+        item.view = control
+        item.label = "Page"
+        item.paletteLabel = "Page"
+        item.isNavigational = false
+        return item
+    }
+
+    @objc private func pageChosen(_ sender: NSSegmentedControl) {
+        let sections = AppState.Section.allCases
+        guard sections.indices.contains(sender.selectedSegment) else { return }
+        appState.section = sections[sender.selectedSegment]
+    }
+}
+
+/// The menu bar. Items that depend on the page have `menuActions` as their target; the rest go to
+/// the first responder or to `appDelegate`.
+private func buildMainMenu(appDelegate: AppDelegate, menuActions: MenuActions) -> NSMenu {
     let mainMenu = NSMenu()
 
     let appMenuItem = NSMenuItem()
@@ -106,10 +299,28 @@ private func buildMainMenu(appDelegate: AppDelegate) -> NSMenu {
     #endif
     appMenu.addItem(.separator())
     appMenu.addItem(withTitle: "Hide \(name)", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+    let hideOthers = appMenu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+    hideOthers.keyEquivalentModifierMask = [.command, .option]
+    appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
     appMenu.addItem(.separator())
     appMenu.addItem(withTitle: "Quit \(name)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     appMenuItem.submenu = appMenu
     mainMenu.addItem(appMenuItem)
+
+    // File: the current page's commands (validation gives the main one its title) and Close.
+    let fileMenuItem = NSMenuItem()
+    let fileMenu = NSMenu(title: "File")
+    let addItem = fileMenu.addItem(withTitle: "Add Files or Folders…", action: #selector(MenuActions.addFiles(_:)), keyEquivalent: "o")
+    addItem.target = menuActions
+    let mainItem = fileMenu.addItem(withTitle: "Pack All…", action: #selector(MenuActions.mainAction(_:)), keyEquivalent: "e")
+    mainItem.keyEquivalentModifierMask = [.command, .shift]
+    mainItem.target = menuActions
+    let sendItem = fileMenu.addItem(withTitle: "Send to Pack…", action: #selector(MenuActions.sendToPack(_:)), keyEquivalent: "")
+    sendItem.target = menuActions
+    fileMenu.addItem(.separator())
+    fileMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+    fileMenuItem.submenu = fileMenu
+    mainMenu.addItem(fileMenuItem)
 
     let editMenuItem = NSMenuItem()
     let editMenu = NSMenu(title: "Edit")
@@ -120,22 +331,42 @@ private func buildMainMenu(appDelegate: AppDelegate) -> NSMenu {
     editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
     editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
     editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+    editMenu.addItem(.separator())
+    // To the first responder: the pages' lists answer it (`onDeleteCommand`) by removing the
+    // selected rows. The key equivalent is the Delete key alone.
+    let deleteItem = editMenu.addItem(withTitle: "Delete", action: NSSelectorFromString("delete:"), keyEquivalent: "\u{8}")
+    deleteItem.keyEquivalentModifierMask = []
     editMenuItem.submenu = editMenu
     mainMenu.addItem(editMenuItem)
+
+    // View: the pages (⌘1–⌘3; validation checks the current one) and the log.
+    let viewMenuItem = NSMenuItem()
+    let viewMenu = NSMenu(title: "View")
+    for (i, section) in AppState.Section.allCases.enumerated() {
+        let item = viewMenu.addItem(withTitle: section.rawValue, action: #selector(MenuActions.showPage(_:)), keyEquivalent: "\(i + 1)")
+        item.tag = i
+        item.target = menuActions
+    }
+    viewMenu.addItem(.separator())
+    let logItem = viewMenu.addItem(withTitle: "Show Log", action: #selector(MenuActions.toggleLog(_:)), keyEquivalent: "l")
+    logItem.keyEquivalentModifierMask = [.command, .option]
+    logItem.target = menuActions
+    viewMenuItem.submenu = viewMenu
+    mainMenu.addItem(viewMenuItem)
 
     let windowMenuItem = NSMenuItem()
     let windowMenu = NSMenu(title: "Window")
     windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m")
     windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.zoom(_:)), keyEquivalent: "")
     windowMenu.addItem(.separator())
-    windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+    windowMenu.addItem(withTitle: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
     windowMenuItem.submenu = windowMenu
     mainMenu.addItem(windowMenuItem)
     NSApplication.shared.windowsMenu = windowMenu
 
     let helpMenuItem = NSMenuItem()
     let helpMenu = NSMenu(title: "Help")
-    helpMenu.addItem(withTitle: "Read Me", action: #selector(AppDelegate.showReadMe(_:)), keyEquivalent: "")
+    helpMenu.addItem(withTitle: "\(name) Help", action: #selector(AppDelegate.showHelp(_:)), keyEquivalent: "")
     helpMenu.addItem(withTitle: "File Format Reference", action: #selector(AppDelegate.showFormats(_:)), keyEquivalent: "")
     helpMenu.addItem(.separator())
     helpMenu.addItem(withTitle: "Release Notes", action: #selector(AppDelegate.showReleaseNotes(_:)), keyEquivalent: "")
@@ -151,9 +382,12 @@ application.setActivationPolicy(.regular)
 
 let appDelegate = AppDelegate()
 application.delegate = appDelegate
-application.mainMenu = buildMainMenu(appDelegate: appDelegate)
 
 let appState = AppState()
+appDelegate.appState = appState
+let menuActions = MenuActions(appState: appState)
+let toolbarController = ToolbarController(appState: appState)
+application.mainMenu = buildMainMenu(appDelegate: appDelegate, menuActions: menuActions)
 
 // Wide enough for the program list and every column of the Pack and Wavetables tables, but never
 // larger than the screen.
@@ -167,6 +401,10 @@ let window = NSWindow(
 )
 window.title = appName
 window.isReleasedWhenClosed = false
+// The page switcher sits in the toolbar beside the title, as a view switcher does on the Mac.
+window.titleVisibility = .visible
+window.toolbarStyle = .unified
+window.toolbar = toolbarController.makeToolbar()
 let hosting = NSHostingView(rootView: ContentView().environmentObject(appState))
 // By default (macOS 13+) the hosting view also sizes the window to the content's ideal size,
 // which overrode the default size above. Let it set only the minimum.

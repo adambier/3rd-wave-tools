@@ -67,6 +67,9 @@ final class AppState: ObservableObject {
     }
 
     @Published var section: Section = .pack
+    /// Whether the log is open under the status bar (the View menu and the status bar's button
+    /// both toggle it).
+    @Published var showLog = false
     /// Text typed into the filter field above the program list.
     @Published var programFilter = ""
     /// Show only programs that cannot be packed yet or carry a warning.
@@ -74,6 +77,14 @@ final class AppState: ObservableObject {
     /// Files being read in the background: how many of how many so far.
     struct LoadProgress { var done: Int; var total: Int }
     @Published var reading: LoadProgress?
+    /// Packing, unpacking, or converting in the background: the verb for the status bar
+    /// ("Packing", "Writing", "Converting") and the item being worked on of how many; `total` 0
+    /// when the count is not known (the bar then shows no value).
+    struct WorkProgress { var verb: String; var done: Int; var total: Int }
+    @Published var working: WorkProgress?
+    /// Whether a pack, unpack, or conversion is running: the pages' action buttons and the File
+    /// menu's commands are disabled meanwhile.
+    var isWorking: Bool { working != nil }
     /// A folder the current alert can open in the Finder.
     @Published var alertReveal: URL?
 
@@ -408,11 +419,13 @@ final class AppState: ObservableObject {
         if n > 0 { parts.append("\(n) program\(n == 1 ? "" : "s")") }
         if f > 0 { parts.append("\(f) added file\(f == 1 ? "" : "s")") }
         let what = parts.joined(separator: " and ")
-        guard Panels.confirm(title: "Remove everything from the Pack page?",
-                             message: "This removes \(what) from the lists, with any slots, choices, and names you set for them. The files themselves are not touched.",
-                             ok: "Remove All") else { return }
-        programs = []; contentFiles = []; contentNames = [:]; selectedProgram = nil
-        note("Removed \(what) from the Pack page.")
+        Panels.confirm(title: "Remove everything from the Pack page?",
+                       message: "This removes \(what) from the lists, with any slots, choices, and names you set for them. The files themselves are not touched.",
+                       ok: "Remove All") { [weak self] (confirmed: Bool) in
+            guard confirmed, let self else { return }
+            self.programs = []; self.contentFiles = []; self.contentNames = [:]; self.selectedProgram = nil
+            self.note("Removed \(what) from the Pack page.")
+        }
     }
 
     func describe(_ choice: PackPlan.Choice, for ref: SourceRef) -> String {
@@ -432,8 +445,11 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Writes .pgdata files for the given programs into a folder chosen by the user.
+    /// Writes .pgdata files for the given programs into a folder chosen by the user. Asks first
+    /// when some of them cannot be packed yet; the packing and writing then run in the background
+    /// (see `pack(_:)`).
     func writeUnified(_ ids: [UUID]) {
+        guard !isWorking else { return }
         let items = programs.filter { ids.contains($0.id) }
         guard !items.isEmpty else { return }
         // Programs missing content cannot be packed: ask before writing the rest.
@@ -453,79 +469,114 @@ final class AppState: ObservableObject {
                 return
             }
             let n = missing.count
-            guard Panels.confirm(
+            Panels.confirm(
                 title: "\(n) of \(items.count) programs can't be packed yet",
                 message: "\(n == 1 ? "It needs files that aren't here and" : "They need files that aren't here and") will be left out. Pack the other \(ok == 1 ? "one" : String(ok))?",
                 details: missing.joined(separator: "\n"),
-                ok: "Pack \(ok)") else { return }
+                ok: "Pack \(ok)") { [weak self] (confirmed: Bool) in
+                guard confirmed else { return }
+                self?.pack(items)
+            }
+            return
         }
+        pack(items)
+    }
+
+    /// Asks for the folder, then packs the programs (those that can be) on a background queue and
+    /// writes the files, with progress in the status bar; the report is shown on the main thread.
+    /// Everything the packing reads is taken from the page before it starts, so changes made on
+    /// the page meanwhile do not reach it.
+    private func pack(_ items: [PackItem]) {
+        guard !isWorking else { return }
         guard let folder = Panels.chooseFolder(prompt: "Pack Here", message: "Choose where to put the .pgdata files") else { return }
-        var outputs: [(name: String, data: Data)] = []
-        var planned: [(item: PackItem, plan: PackPlan)] = []     // one per output, in order
-        var blocked: [String] = [], failed: [String] = []
+        let plans: [UUID: PackPlan] = Dictionary(uniqueKeysWithValues: items.map { ($0.id, plan(for: $0)) })
+        let files = contentFiles, names = contentNames
         // Prefix each file with its program location (or its position among the files written) so
         // the 3rd Wave's alphabetical bulk import keeps the programs in order.
         let prefixes = OutputNames.orderPrefixes(urls: items.map(\.url))
         let prefixByID = Dictionary(uniqueKeysWithValues: zip(items.map(\.id), prefixes))
-        for item in items {
-            let plan = plan(for: item)
-            switch plan.verdict {
-            case .blocked:
-                blocked.append(ReportText.item(item.name, plan.missingSummary ?? "content missing")); continue
-            default: break
+        working = WorkProgress(verb: "Packing", done: 0, total: items.count)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            var outputs: [(name: String, data: Data)] = []
+            var planned: [(item: PackItem, plan: PackPlan)] = []     // one per output, in order
+            var blocked: [String] = [], failed: [String] = []
+            for (i, item) in items.enumerated() {
+                let current = i + 1
+                DispatchQueue.main.async { self?.working = WorkProgress(verb: "Packing", done: current, total: items.count) }
+                guard let plan = plans[item.id] else { continue }
+                switch plan.verdict {
+                case .blocked:
+                    blocked.append(ReportText.item(item.name, plan.missingSummary ?? "content missing")); continue
+                default: break
+                }
+                do {
+                    let content = plan.content(files: files, names: names)
+                    let g = try Packer.pack(item.effectiveProgram, content: content)
+                    outputs.append((name: OutputNames.unified(item.effectiveProgram, prefix: prefixByID[item.id]), data: g.serialized()))
+                    planned.append((item, plan))
+                } catch { failed.append(ReportText.item(item.name, Self.describe(error))) }
             }
-            do {
-                let content = plan.content(files: contentFiles, names: contentNames)
-                let g = try Packer.pack(item.effectiveProgram, content: content)
-                outputs.append((name: OutputNames.unified(item.effectiveProgram, prefix: prefixByID[item.id]), data: g.serialized()))
-                planned.append((item, plan))
-            } catch { failed.append(ReportText.item(item.name, Self.describe(error))) }
+            DispatchQueue.main.async {
+                self?.writePacked(outputs, planned: planned, blocked: blocked, failed: failed, into: folder, files: files)
+            }
         }
-        guard let result = Panels.write(outputs, into: folder) else { note("Packing cancelled; nothing written."); return }
-        failed += result.failed.map { ReportText.item(splitting: $0) }
-        // The report's sections cover the files that were really written.
-        var packedPlans: [PackPlan] = []
-        var unfamiliar: [String] = [], replaced: [String] = [], converted: [String] = []
-        for (i, (item, plan)) in planned.enumerated() where result.writtenIndices.contains(i) {
-            packedPlans.append(plan)
-            if !plan.warnings.isEmpty { unfamiliar.append(ReportText.item(item.name)) }
-            if plan.conversion != nil { converted.append(ReportText.item(item.name)) }
-            for r in plan.rows where r.replacesFactory {
-                if case .file(let id)? = r.choice, let f = contentFiles.first(where: { $0.id == id }) {
-                    replaced.append(ReportText.item(item.name, "\(r.ref.label) uses \(f.url.lastPathComponent) instead of factory \(factory.name(r.ref).map { "\"\($0)\"" } ?? "table")"))
+    }
+
+    /// Writes the packed programs (asking about files already in the folder) and reports.
+    /// `files` are the added files as they were when the programs were packed.
+    private func writePacked(_ outputs: [(name: String, data: Data)], planned: [(item: PackItem, plan: PackPlan)],
+                             blocked: [String], failed: [String], into folder: URL, files: [ContentFile]) {
+        Panels.write(outputs, into: folder, progress: { [weak self] (done: Int, total: Int) in
+            self?.working = WorkProgress(verb: "Writing", done: done, total: total)
+        }, completion: { [weak self] (result: Panels.WriteResult?) in
+            guard let self else { return }
+            self.working = nil
+            guard let result else { self.note("Packing cancelled; nothing written."); return }
+            let failed = failed + result.failed.map { ReportText.item(splitting: $0) }
+            // The report's sections cover the files that were really written.
+            var packedPlans: [PackPlan] = []
+            var unfamiliar: [String] = [], replaced: [String] = [], converted: [String] = []
+            for (i, (item, plan)) in planned.enumerated() where result.writtenIndices.contains(i) {
+                packedPlans.append(plan)
+                if !plan.warnings.isEmpty { unfamiliar.append(ReportText.item(item.name)) }
+                if plan.conversion != nil { converted.append(ReportText.item(item.name)) }
+                for r in plan.rows where r.replacesFactory {
+                    if case .file(let id)? = r.choice, let f = files.first(where: { $0.id == id }) {
+                        replaced.append(ReportText.item(item.name, "\(r.ref.label) uses \(f.url.lastPathComponent) instead of factory \(self.factory.name(r.ref).map { "\u{201C}\($0)\u{201D}" } ?? "table")"))
+                    }
                 }
             }
-        }
-        let written = result.written
-        var msg = "Packed \(written) program\(written == 1 ? "" : "s") into \"\(folder.lastPathComponent)\"."
-        // Each section: a heading line ending in ":" and one item per line (see ReportText).
-        if !blocked.isEmpty { msg += "\n\nNot packed (files missing):\n" + blocked.joined(separator: "\n") }
-        if !failed.isEmpty { msg += "\n\nNot packed:\n" + failed.joined(separator: "\n") }
-        // When every packed program was converted (a whole older bank), one line says so instead
-        // of a list as long as the bank.
-        let howConverted = "in the same way the 3rd Wave's \u{201C}Import program\u{201D} function handles older programs"
-        if !converted.isEmpty && converted.count == written {
-            msg += "\n\n" + (written == 1 ? "The program was" : CountWords.all(written, "programs") + " were") + " converted from an older format, \(howConverted)."
-        } else if !converted.isEmpty {
-            msg += "\n\nConverted from an older format, \(howConverted):\n" + converted.joined(separator: "\n")
-        }
-        if !replaced.isEmpty { msg += "\n\nFactory tables replaced by added files (check these are meant):\n" + replaced.joined(separator: "\n") }
-        if !unfamiliar.isEmpty { msg += "\n\nPacked, but check these on the 3rd Wave (see each program's notes):\n" + unfamiliar.joined(separator: "\n") }
-        // Files none of the packed programs use (other added programs may use them).
-        let unused = PackPlan.unusedFiles(contentFiles, plans: packedPlans, factory: factory, programs: "packed")
-        if !unused.isEmpty {
-            // The reason is given only when it adds to the heading: an assigned file that is still
-            // not used, or one identical to the factory table of its slot.
-            msg += "\n\nAdded files that no packed program uses (left out):\n" + contentFiles.filter { unused[$0.id] != nil }
-                .map { f -> String in
-                    let why = unused[f.id]!
-                    return why.hasPrefix("Not used by any") ? ReportText.item(f.url.lastPathComponent)
-                                                           : ReportText.item(f.url.lastPathComponent, ReportText.lowerFirst(why))
-                }.joined(separator: "\n")
-        }
-        note(msg + " (\(folder.path))")
-        alertReveal = folder
-        alertMessage = msg
+            let written = result.written
+            var msg = "Packed \(written) program\(written == 1 ? "" : "s") into \u{201C}\(folder.lastPathComponent)\u{201D}."
+            // Each section: a heading line ending in ":" and one item per line (see ReportText).
+            if !blocked.isEmpty { msg += "\n\nNot packed (files missing):\n" + blocked.joined(separator: "\n") }
+            if !failed.isEmpty { msg += "\n\nNot packed:\n" + failed.joined(separator: "\n") }
+            // When every packed program was converted (a whole older bank), one line says so instead
+            // of a list as long as the bank.
+            let howConverted = "in the same way the 3rd Wave's \u{201C}Import program\u{201D} function handles older programs"
+            if !converted.isEmpty && converted.count == written {
+                msg += "\n\n" + (written == 1 ? "The program was" : CountWords.all(written, "programs") + " were") + " converted from an older format, \(howConverted)."
+            } else if !converted.isEmpty {
+                msg += "\n\nConverted from an older format, \(howConverted):\n" + converted.joined(separator: "\n")
+            }
+            if !replaced.isEmpty { msg += "\n\nFactory tables replaced by added files (check these are meant):\n" + replaced.joined(separator: "\n") }
+            if !unfamiliar.isEmpty { msg += "\n\nPacked, but check these on the 3rd Wave (see each program's notes):\n" + unfamiliar.joined(separator: "\n") }
+            // Files none of the packed programs use (other added programs may use them).
+            let unused = PackPlan.unusedFiles(files, plans: packedPlans, factory: self.factory, programs: "packed")
+            if !unused.isEmpty {
+                // The reason is given only when it adds to the heading: an assigned file that is still
+                // not used, or one identical to the factory table of its slot.
+                msg += "\n\nAdded files that no packed program uses (left out):\n" + files.filter { unused[$0.id] != nil }
+                    .map { (f: ContentFile) -> String in
+                        let why = unused[f.id]!
+                        return why.hasPrefix("Not used by any") ? ReportText.item(f.url.lastPathComponent)
+                                                               : ReportText.item(f.url.lastPathComponent, ReportText.lowerFirst(why))
+                    }.joined(separator: "\n")
+            }
+            self.note(msg + " (\(folder.path))")
+            self.alertReveal = folder
+            self.alertMessage = msg
+        })
     }
 
     // MARK: Unpack
@@ -564,14 +615,19 @@ final class AppState: ObservableObject {
         let n = unpacks.count
         guard n > 0 else { return }
         let what = "\(n) .pgdata file\(n == 1 ? "" : "s")"
-        guard Panels.confirm(title: "Remove everything from the Unpack page?",
-                             message: "This removes \(what) from the list, with the files you unchecked and the names you changed. The files themselves are not touched.",
-                             ok: "Remove All") else { return }
-        unpacks = []; selectedUnpack = nil
-        note("Removed \(what) from the Unpack page.")
+        Panels.confirm(title: "Remove everything from the Unpack page?",
+                       message: "This removes \(what) from the list, with the files you unchecked and the names you changed. The files themselves are not touched.",
+                       ok: "Remove All") { [weak self] (confirmed: Bool) in
+            guard confirmed, let self else { return }
+            self.unpacks = []; self.selectedUnpack = nil
+            self.note("Removed \(what) from the Unpack page.")
+        }
     }
 
+    /// Writes the checked files of the given .pgdata files into a folder chosen by the user, on a
+    /// background queue with progress in the status bar; the report is shown on the main thread.
     func unpack(_ ids: [UUID]) {
+        guard !isWorking else { return }
         let items = unpacks.filter { ids.contains($0.id) }
         guard !items.isEmpty else { return }
         guard items.contains(where: { $0.plan.items.contains(where: \.write) }) else {
@@ -597,12 +653,20 @@ final class AppState: ObservableObject {
             let sub = f.file.ref == nil ? "PROGRAMS" : (f.file.ref!.isSample ? "AUDIO" : "WAVES")
             return (sub + "/" + f.name, f.file.data)
         }
-        guard let result = Panels.write(outputs, into: folder) else { note("Unpacking cancelled; nothing written."); return }
-        var msg = "Unpacked \(items.count) file\(items.count == 1 ? "" : "s") into \"\(folder.lastPathComponent)\": \(result.written) file\(result.written == 1 ? "" : "s") written."
-        if !result.failed.isEmpty { msg += "\n\nNot written:\n" + result.failed.map { ReportText.item(splitting: $0) }.joined(separator: "\n") }
-        note(msg + " (\(folder.path))")
-        alertReveal = folder
-        alertMessage = msg
+        let count = items.count
+        working = WorkProgress(verb: "Writing", done: 0, total: outputs.count)
+        Panels.write(outputs, into: folder, progress: { [weak self] (done: Int, total: Int) in
+            self?.working = WorkProgress(verb: "Writing", done: done, total: total)
+        }, completion: { [weak self] (result: Panels.WriteResult?) in
+            guard let self else { return }
+            self.working = nil
+            guard let result else { self.note("Unpacking cancelled; nothing written."); return }
+            var msg = "Unpacked \(count) file\(count == 1 ? "" : "s") into \u{201C}\(folder.lastPathComponent)\u{201D}: \(result.written) file\(result.written == 1 ? "" : "s") written."
+            if !result.failed.isEmpty { msg += "\n\nNot written:\n" + result.failed.map { ReportText.item(splitting: $0) }.joined(separator: "\n") }
+            self.note(msg + " (\(folder.path))")
+            self.alertReveal = folder
+            self.alertMessage = msg
+        })
     }
 
     // MARK: Wavetables
@@ -663,17 +727,22 @@ final class AppState: ObservableObject {
         let n = convertPlan.items.count
         guard n > 0 else { return }
         let what = "\(n) wavetable\(n == 1 ? "" : "s")"
-        guard Panels.confirm(title: "Remove everything from the Wavetables page?",
-                             message: "This removes \(what) from the list, with the tables you marked to convert and the frame sizes you chose. The files themselves are not touched.",
-                             ok: "Remove All") else { return }
-        convertPlan.items = []
-        convertPreviews.removeAll()
-        note("Removed \(what) from the Wavetables page.")
+        Panels.confirm(title: "Remove everything from the Wavetables page?",
+                       message: "This removes \(what) from the list, with the tables you marked to convert and the frame sizes you chose. The files themselves are not touched.",
+                       ok: "Remove All") { [weak self] (confirmed: Bool) in
+            guard confirmed, let self else { return }
+            self.convertPlan.items = []
+            self.convertPreviews.removeAll()
+            self.note("Removed \(what) from the Wavetables page.")
+        }
     }
 
     /// Converts the tables marked to convert for the chosen destination into a folder the user chooses. With
     /// `sendToPack` (3rd Wave destinations), the .wt files written are then added to the Pack page.
+    /// The converting and writing run on a background queue, with progress in the status bar; the
+    /// plan is taken as it is when the folder is chosen, and the preview cache is left alone.
     func convertTables(sendToPack: Bool = false) {
+        guard !isWorking else { return }
         let plan = convertPlan
         let marked = plan.selectedItems
         guard !marked.isEmpty else {
@@ -691,18 +760,35 @@ final class AppState: ObservableObject {
             prompt: toPack ? "Convert and Send" : "Convert Here",
             message: toPack ? "Choose where to put the .wt files; they are then added to the Pack page"
                             : "Choose where to put the converted files") else { return }
-        let conversion = plan.convert()
-        let written = ConvertPlan.write(conversion.files, into: folder)
-        let packFiles = toPack ? ConvertPlan.filesForPack(written.written, preset: plan.preset) : []
-        // The texts are assembled in PgdataPackerCore (ConvertReport); ReportText, which they and
-        // the Pack and Unpack reports use, lives there too.
-        let report = ConvertReport(plan: plan, conversion: conversion, written: written, folder: folder, packFiles: packFiles)
-        note(report.log)
-        alertReveal = folder
-        alertMessage = report.message
-        if !packFiles.isEmpty {
-            add(urls: packFiles)
-            section = .pack
+        let total = marked.filter(plan.canConvert).count
+        working = WorkProgress(verb: "Converting", done: 0, total: total)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            // The plan converts each table through this writer; it counts them for the status bar.
+            var current = 0
+            let conversion = plan.convert { (table: Wavetable, preset: OutputPreset, options: OutputOptions) throws -> OutputFile in
+                current += 1
+                let n = current
+                DispatchQueue.main.async { self?.working = WorkProgress(verb: "Converting", done: n, total: total) }
+                return try WavetableWriter.write(table, preset: preset, options: options)
+            }
+            // The files are written without a count (ConvertPlan.write reports at the end).
+            DispatchQueue.main.async { self?.working = WorkProgress(verb: "Writing", done: 0, total: 0) }
+            let written = ConvertPlan.write(conversion.files, into: folder)
+            let packFiles = toPack ? ConvertPlan.filesForPack(written.written, preset: plan.preset) : []
+            // The texts are assembled in PgdataPackerCore (ConvertReport); ReportText, which they and
+            // the Pack and Unpack reports use, lives there too.
+            let report = ConvertReport(plan: plan, conversion: conversion, written: written, folder: folder, packFiles: packFiles)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.working = nil
+                self.note(report.log)
+                self.alertReveal = folder
+                self.alertMessage = report.message
+                if !packFiles.isEmpty {
+                    self.add(urls: packFiles)
+                    self.section = .pack
+                }
+            }
         }
     }
 }

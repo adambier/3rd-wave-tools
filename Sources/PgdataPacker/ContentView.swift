@@ -10,26 +10,10 @@ import PgdataPackerCore
 
 struct ContentView: View {
     @EnvironmentObject var state: AppState
-    @State private var showLog = false
 
     var body: some View {
         VStack(spacing: 0) {
-            // Three pages, chosen with a segmented control rather than a sidebar, which would take
-            // width the Pack and Wavetables tables need.
-            HStack {
-                Spacer()
-                Picker("", selection: $state.section) {
-                    ForEach(AppState.Section.allCases) { s in
-                        Label(s.rawValue, systemImage: s.icon).tag(s)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 360)
-                Spacer()
-            }
-            .padding(.vertical, 8)
-            Divider()
+            // The page is chosen in the window's toolbar (see main.swift) or from the View menu.
             Group {
                 switch state.section {
                 case .pack: PackView()
@@ -41,7 +25,7 @@ struct ContentView: View {
             // pushed the top of the window out of view).
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider()
-            LogBar(showLog: $showLog)
+            LogBar()
         }
         // Tall enough for both Pack panes at their minimum heights with the log open.
         .frame(minWidth: 900, minHeight: 700)
@@ -76,24 +60,60 @@ extension View {
 
 // MARK: - Log
 
+/// The status bar under the pages: the log's button; the last log line, or the progress of files
+/// being read or of a pack, unpack, or conversion; while the page lists nothing, how to add files
+/// (once it has content, the hint would only be noise); and the log itself below, when open.
 struct LogBar: View {
     @EnvironmentObject var state: AppState
-    @Binding var showLog: Bool
+
+    /// Whether the current page lists nothing yet.
+    private var pageIsEmpty: Bool {
+        switch state.section {
+        case .pack: return state.programs.isEmpty && state.contentFiles.isEmpty
+        case .unpack: return state.unpacks.isEmpty
+        case .convert: return state.convertPlan.items.isEmpty
+        }
+    }
+
+    /// What the current page takes, for the hint while it is empty.
+    private var dropHint: String {
+        switch state.section {
+        case .pack: return "Drop .pro, .wt, .bin, or .pgdata files or folders onto the page above to add them"
+        case .unpack: return "Drop .pgdata files or folders onto the page above to add them"
+        case .convert: return "Drop .wav, .flac, .wt, or .pgdata files or folders onto the page above to add them"
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 // A labelled button rather than a bare arrow, so it is clear what it opens.
-                Button { showLog.toggle() } label: {
-                    Label(showLog ? "Hide Log" : "Show Log", systemImage: showLog ? "chevron.down" : "chevron.right")
+                Button { state.showLog.toggle() } label: {
+                    Label(state.showLog ? "Hide Log" : "Show Log", systemImage: state.showLog ? "chevron.down" : "chevron.right")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .help(showLog ? "Hide the log" : "Show the log: everything the app has done in this session")
+                .help(state.showLog ? "Hide the log" : "Show the log: everything the app has done in this session")
                 Divider().frame(height: 14)
-                // While files are read, their progress takes the place of the last log line, here
-                // rather than in the page's toolbar, so the toolbar never changes width.
-                if let p = state.reading {
+                // While files are read, or programs are packed, unpacked, or converted, the
+                // progress takes the place of the last log line, here rather than in the page's
+                // toolbar, so the toolbar never changes width.
+                if let w = state.working {
+                    if w.total > 0 {
+                        ProgressView(value: Double(w.done), total: Double(max(w.total, 1)))
+                            .frame(width: 120)
+                        Text("\(w.verb) \(w.done) of \(w.total)…")
+                            .lineLimit(1)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ProgressView()
+                            .progressViewStyle(.linear)
+                            .frame(width: 120)
+                        Text("\(w.verb)…")
+                            .lineLimit(1)
+                            .foregroundStyle(.secondary)
+                    }
+                } else if let p = state.reading {
                     ProgressView(value: Double(p.done), total: Double(max(p.total, 1)))
                         .frame(width: 120)
                     Text("Reading \(p.done) of \(p.total)…")
@@ -106,15 +126,14 @@ struct LogBar: View {
                         .help(state.log.last ?? "Nothing added yet.")
                 }
                 Spacer()
-                let dropHint = state.section == .convert
-                    ? "Drop .wav, .flac, .wt, or .pgdata files or folders onto the page above to add them"
-                    : "Drop .pro, .wt, .bin, or .pgdata files or folders onto the page above to add them"
-                Label(dropHint, systemImage: "arrow.down.doc")
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    .help(dropHint)
+                if pageIsEmpty {
+                    Label(dropHint, systemImage: "arrow.down.doc")
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        .help(dropHint)
+                }
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
-            if showLog {
+            if state.showLog {
                 ScrollView {
                     Text(state.log.joined(separator: "\n"))
                         .font(.system(.caption, design: .monospaced))
@@ -122,7 +141,6 @@ struct LogBar: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(8)
                 }
-                .visibleScrollers()
                 .frame(height: 140)
             }
         }
@@ -385,6 +403,9 @@ enum AlertPresenter {
             button.trailingAnchor.constraint(equalTo: content.trailingAnchor),
             vertical,
         ])
+        // The icon was added after the alert built its key view loop: rebuild it so Full Keyboard
+        // Access (Tab) reaches the icon as well as the buttons.
+        alert.window.recalculateKeyViewLoop()
     }
 
     /// The text field showing `text` (the alert's title), anywhere under `view`.
@@ -420,9 +441,9 @@ enum AlertPresenter {
         let height = min(max(used, 20), maxHeight)
         tv.frame = NSRect(x: 0, y: 0, width: width, height: max(used, height))
         let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: width, height: height))
-        // A long report scrolls: then show a classic scroll bar and a frame, so that is obvious.
+        // A long report scrolls: then a frame makes that obvious. The scroll bar follows the
+        // user's system setting, as everywhere else in the app.
         let scrolls = used > maxHeight
-        scroll.scrollerStyle = .legacy
         scroll.hasVerticalScroller = scrolls
         scroll.drawsBackground = false
         scroll.borderType = scrolls ? .bezelBorder : .noBorder

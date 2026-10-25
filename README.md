@@ -29,8 +29,8 @@ Macs. Requires macOS 13 or later.
 
 From 1.0.4, the app updates itself, using [Sparkle](https://sparkle-project.org): on its second
 launch it asks whether to check automatically, and **Check for Updates…** in the app menu checks
-at any time. In the Help menu, **Read Me** opens this page and **File Format Reference** the format
-reference; **Release Notes** opens the notes for the version you have.
+at any time. In the Help menu, **pgdata Packer Help** opens this page and **File Format Reference**
+the format reference; **Release Notes** opens the notes for the version you have.
 
 ## Build
 
@@ -57,8 +57,12 @@ command-line tools alone. Such a build has no Sparkle, so no **Check for Updates
 
 ## Using it
 
-The window has three pages, **Pack**, **Unpack**, and **Wavetables**. There is nothing to set up. Every report or
-list of problems the app shows has a copy icon beside its title that puts the text on the clipboard.
+The window has three pages, **Pack**, **Unpack**, and **Wavetables**, chosen in the toolbar or from
+the View menu (⌘1, ⌘2, ⌘3). There is nothing to set up. Files and folders can be dropped onto a
+page, chosen with **Add Files or Folders…** (⌘O) in the File menu or on the page, or dropped onto
+the app's icon in the Dock, which sends each file to the page that reads it (the app does not
+claim any of these file types as its own). Every report or list of problems the app shows has a
+copy icon beside its title that puts the text on the clipboard.
 
 ### Factory wavetables
 
@@ -210,7 +214,7 @@ programs, since six-decimal floats become 4-byte words), though a program with a
 section can come out a little larger. Each embedded U table adds about 0.5 MB, each P table about
 65 KB, and a multisample its audio.
 
-**Pack Selected…** and **Pack All…** (⌘⇧S) ask for a folder. If some programs can't be packed yet,
+**Pack Selected…** and **Pack All…** (⇧⌘E) ask for a folder. If some programs can't be packed yet,
 the app asks first whether to pack the others. Existing files are never replaced without asking,
 and the report at the end can open the folder in the Finder.
 
