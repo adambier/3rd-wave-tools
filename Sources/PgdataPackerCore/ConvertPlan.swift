@@ -281,6 +281,11 @@ public struct ConvertPlan: Equatable {
         public var frameCountGrows: Bool? { changesCount ? tableFrameCount > frameCountIn : nil }
         /// Whether the source's peak is above 1 but kept (32-bit destinations).
         public var peakKept: Bool { peak > 1 && !scaledToFit }
+        /// Whether the table may be turned down even though its own peak is within ±1: growing
+        /// the frame size can raise the peak a little between the original samples, and the
+        /// writer then turns the table down for a destination that cannot hold more than ±1.
+        /// Only converting settles it; the report says what was done.
+        public var mayScaleToFit: Bool
     }
 
     /// Content identity: frame size, sample count, and an FNV-1a hash of the samples' bits.
@@ -658,7 +663,9 @@ public struct ConvertPlan: Equatable {
                               frameCountIn: count, frameCountOut: outCount,
                               countPolicy: options.frameCountPolicy, addsPPGWaves: ppg,
                               peak: item.peak, scaledToFit: item.peak > 1 && destinationScalesToFit,
-                              interpolationRecorded: interpolationRecorded(for: item))
+                              interpolationRecorded: interpolationRecorded(for: item),
+                              mayScaleToFit: item.peak <= 1 && destinationScalesToFit
+                                  && destinationFrameSize(source: size) > size)
     }
 
     /// `expected(for:)` as one line (e.g., "64 × 1,024; resized from 2,048 samples per frame;
@@ -674,6 +681,7 @@ public struct ConvertPlan: Equatable {
             parts.append("\(Self.formatCount(e.frameCountIn)) frame\(e.frameCountIn == 1 ? "" : "s") → \(e.tableFrameCount), " + Self.methodWord(e.countPolicy, grows: e.frameCountGrows == true))
         }
         if e.scaledToFit { parts.append("turned down to fit (peak \(Self.decimal(e.peak)))") }
+        else if e.mayScaleToFit { parts.append("may be turned down a little to fit after resizing") }
         if e.addsPPGWaves { parts.append("the PPG's four standard waves at 60–63") }
         return parts.joined(separator: "; ")
     }
@@ -740,6 +748,7 @@ public struct ConvertPlan: Equatable {
             changes.append("\(Self.formatCount(e.frameCountIn)) → \(e.tableFrameCount) frames, " + Self.methodWord(e.countPolicy, grows: e.frameCountGrows == true))
         }
         if e.scaledToFit { changes.append("turned down") }
+        else if e.mayScaleToFit { changes.append("may be turned down") }
         if e.addsPPGWaves { changes.append("+ PPG waves") }
         if preset.isThirdWave, WavetableWriter.thirdWaveName(item.name).name != item.name.trimmingCharacters(in: .whitespaces) {
             changes.append("name changed")
@@ -766,7 +775,7 @@ public struct ConvertPlan: Equatable {
             return note.contains("samples per frame") ? "size tags disagree" : "interpolation tags disagree"
         }
         if note.contains("cut short") { return "file cut short" }
-        if note.contains("ignored") { return "unreadable size tag ignored" }
+        if note.contains("ignored") { return note.contains(".txt") ? ".txt size out of range, ignored" : "unreadable size tag ignored" }
         return "see note"
     }
 
@@ -915,10 +924,16 @@ public struct ConvertPlan: Equatable {
     static func numbered(_ name: String, taken: (String) -> Bool) -> String {
         guard taken(name) else { return name }
         let ext = (name as NSString).pathExtension
-        let base = ext.isEmpty ? name : String(name.dropLast(ext.count + 1))
+        var base = ext.isEmpty ? name : String(name.dropLast(ext.count + 1))
+        // A Tonverk tag must stay at the very end of the name, where Tonverk reads it:
+        // "Pad_wt128r.wav" becomes "Pad 2_wt128r.wav", not "Pad_wt128r 2.wav".
+        var tag = ""
+        if let r = WavetableWriter.trailingTonverkTag(in: base) {
+            tag = String(base[r]); base = String(base[..<r.lowerBound])
+        }
         var n = 2
         while true {
-            let candidate = "\(base) \(n)" + (ext.isEmpty ? "" : "." + ext)
+            let candidate = "\(base) \(n)" + tag + (ext.isEmpty ? "" : "." + ext)
             if !taken(candidate) { return candidate }
             n += 1
         }

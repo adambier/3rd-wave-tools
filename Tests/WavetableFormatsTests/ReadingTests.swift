@@ -157,7 +157,7 @@ final class ReadingTests: XCTestCase {
 
     func testSampleFormats() throws {
         let v: [Float] = [0, 0.5, -0.5, 0.25, -1, 0.75, -0.75, 0.125]
-        let input = Array((0..<2048).map { v[$0 % v.count] })   // one frame of 2,048, by length
+        let input = Array((0..<4096).map { v[$0 % v.count] })   // two frames of 2,048, by length
         for f in [WAVSampleFormat.pcm16, .pcm24, .pcm32, .float32, .float64] {
             for ext in [false, true] {
                 let t = try XCTUnwrap(WavetableReader.read(wavFile([input], format: f, extensible: ext),
@@ -348,10 +348,12 @@ final class ReadingTests: XCTestCase {
 
     func testSingleLoopedCycleIsNotAWavetable() throws {
         // A single-cycle sample with a loop over its whole length (one frame): a sample, not a table.
+        // The name must not end in a note name here, or that rule would decide instead.
         for n in [674, 2048] {
-            XCTAssertEqual(try WavetableReader.read(wavFile([ramp(n)], chunks: [smpl(loops: [(0, n - 1)])]), fileName: "SAW-C1.wav"), [], "\(n)")
+            XCTAssertEqual(try WavetableReader.read(wavFile([ramp(n)], chunks: [smpl(loops: [(0, n - 1)])]), fileName: "Saw.wav"), [], "\(n)")
+            XCTAssertEqual(try WavetableReader.read(wavFile([ramp(n)]), fileName: "Saw.wav"), [], "no loop \(n)")
             let stereo = wavFile([ramp(n), ramp(n)], format: .pcm24, chunks: [smpl(loops: [(0, n - 1)])])
-            XCTAssertEqual(try WavetableReader.read(stereo, fileName: "SAW-C1.wav"), [], "stereo \(n)")
+            XCTAssertEqual(try WavetableReader.read(stereo, fileName: "Saw.wav"), [], "stereo \(n)")
         }
         // Two frames are enough (as in Surge's "Triangle HQ.wav").
         XCTAssertEqual(try readOne(wavFile([ramp(4096)], format: .pcm16, chunks: [smpl(loops: [(0, 2047)])]), "Triangle HQ.wav").frameSize, 2048)

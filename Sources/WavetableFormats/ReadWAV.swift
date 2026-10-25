@@ -202,7 +202,8 @@ extension WavetableReader {
         } else if count % 2048 == 0 {
             // Length alone: more than the 256 frames Serum, Vital, and Pigments take is taken to be
             // ordinary audio (a 16-second sample at 48 kHz is 375 × 2,048).
-            guard count / 2048 <= 256 else { return try none() }
+            // A single frame is a single cycle, not a wavetable (WAVETABLES.md §3).
+            guard count / 2048 <= 256, count >= 2 * 2048 else { return try none() }
             frameSize = 2048
             evidence = .length
             basis = "file length only (2,048 per frame, the usual size; the file does not say)"
@@ -298,7 +299,7 @@ extension WavetableReader {
             case 2: what = "ADPCM compression"
             case 6, 7: what = "telephone (A-law or µ-law) compression"
             case 0x50, 0x55: what = "MPEG compression"
-            default: what = "an audio format Convert does not read (format code \(tag))"
+            default: what = "an audio format this reader does not handle (format code \(tag))"
             }
             return .unsupported(reason: "its audio uses \(what). Save it as a 16-bit, 24-bit, or 32-bit float WAV and try again.",
                                 chunks: chunks)

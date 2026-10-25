@@ -329,3 +329,18 @@ final class FLACTests: XCTestCase {
         return h
     }
 }
+
+final class FLACHostileHeaderTests: XCTestCase {
+    /// A STREAMINFO claiming 2³⁶ − 1 samples with no frames must throw, not allocate.
+    func testHugeSampleCountDoesNotAllocate() {
+        var b: [UInt8] = Array("fLaC".utf8)
+        b += [0x80, 0x00, 0x00, 0x22]                       // last block, STREAMINFO, 34 bytes
+        b += [0x10, 0x00, 0x10, 0x00]                       // block sizes 4096
+        b += [0x00, 0x00, 0x00, 0x00, 0x00, 0x00]           // frame sizes
+        // 20 bits rate (48000), 3 bits channels-1 (0), 5 bits bps-1 (15), 36 bits total = all ones
+        let tail: [UInt8] = [0x0B, 0xB8, 0x0F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
+        b += tail
+        b += [UInt8](repeating: 0, count: 16)               // MD5
+        XCTAssertThrowsError(try WavetableReader.read(Data(b), fileName: "huge.flac"))
+    }
+}

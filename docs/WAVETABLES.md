@@ -187,11 +187,15 @@ partitions, and missing or wrong MD5 signatures, with ffmpeg's decoding as the r
 
 ## 4. Changing frame size and frame count
 
-Frames are resized by zero-padding or truncating their spectrum, which is exact for a single
-cycle: going from 1,024 samples to 2,048 and back returns the original samples (to within
-0.0001), and shrinking a frame removes the harmonics the smaller frame cannot hold. Upsampling
-can raise the peak slightly between the original samples; such peaks are kept in 32-bit
-float files and scales the table down for the 3rd Wave and for 16-bit files, saying so.
+Frames are resized through their spectrum. Growing a frame keeps every harmonic, so the
+original samples are reproduced at their positions and the new samples between them are the
+band-limited waveform's values; growing a frame and shrinking it again returns the original
+samples (the tests check this to within 0.0001). Shrinking a frame removes the harmonics the
+smaller frame cannot hold (those above its Nyquist frequency) and keeps the rest, so a 2,048-sample
+frame with content above the 512th harmonic loses it when it becomes a 1,024-sample frame; the
+report says when a frame was resized. Growing can raise the peak slightly between the original
+samples; such peaks are kept in 32-bit float files, and for the 3rd Wave and 16-bit files the table
+is turned down to fit, which the report says.
 
 When a destination needs a different number of frames, you choose how:
 
@@ -227,8 +231,8 @@ Results from any of these are welcome:
 [^tonverk]: *Tonverk User Manual*, OS 1.4.1, section 5.2.5, "Wavetables".
     <https://www.elektron.se/wp-content/uploads/2026/09/Tonverk-User-Manual_ENG_OS1.4.1_260923.pdf>
 [^phaseplant]: Kilohearts, Phase Plant manual and "Wavetables".
-[^flac]: RFC 9639, "Free Lossless Audio Codec" (IETF, 2024).
     <https://kilohearts.com/docs/wavetables>
+[^flac]: RFC 9639, "Free Lossless Audio Codec" (IETF, 2024).
 [^surge-code]: Surge XT's source code: `resources/data/wavetables/WT fileformat.txt`,
     `src/common/WAVFileSupport.cpp`, and `src/common/dsp/Wavetable.h`.
     <https://github.com/surge-synthesizer/surge>

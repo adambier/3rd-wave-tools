@@ -65,13 +65,14 @@ final class ResamplingTests: XCTestCase {
 
     // MARK: Shrinking
 
-    func testShrinkingDropsHarmonicsAtAndAboveNewNyquist() {
+    func testShrinkingDropsHarmonicsAboveNewNyquistAndKeepsTheCosineAtIt() {
         let n = 1024
         let low = sine(n, amplitude: 0.5, harmonic: 3)
-        let high = sine(n, amplitude: 0.3, harmonic: 300)                                       // above 256
-        let atNyquist = (0..<n).map { Float(0.2 * cos(2 * Double.pi * Double(256 * $0) / Double(n))) }   // exactly 256
+        let high = sine(n, amplitude: 0.3, harmonic: 300)                                       // above 256: dropped
+        let atNyquist = (0..<n).map { Float(0.2 * cos(2 * Double.pi * Double(256 * $0) / Double(n))) }   // exactly 256: kept
         let mixed = (0..<n).map { low[$0] + high[$0] + atNyquist[$0] }
-        assertClose(Resampling.resizeCycle(mixed, to: 512), sine(512, amplitude: 0.5, harmonic: 3), 3e-5)
+        let want = (0..<512).map { sine(512, amplitude: 0.5, harmonic: 3)[$0] + Float(0.2 * ($0 % 2 == 0 ? 1 : -1)) }
+        assertClose(Resampling.resizeCycle(mixed, to: 512), want, 3e-5)
     }
 
     func testShrinkingKeepsHarmonicsBelowNyquist() {
@@ -217,5 +218,31 @@ final class ResamplingLargeOddSizeTests: XCTestCase {
             XCTAssertLessThan(zip(out, want).map { abs($0 - $1) }.max() ?? 1, 1e-5)
         }
         XCTAssertLessThan(Date().timeIntervalSince(start), 20, "64 frames of 9,973 samples should resize in well under a second in a release build")
+    }
+}
+
+final class ResamplingNyquistTests: XCTestCase {
+    /// A cycle with content at its own Nyquist (the 512th harmonic of 1,024 samples) survives
+    /// growing to 2,048 and shrinking back; the shrink keeps the cosine part at the new Nyquist.
+    func testGrowThenShrinkIsExactWithNyquistContent() {
+        let n = 1024
+        let cycle: [Float] = (0..<n).map { i in
+            let x = 2 * Double.pi * Double(i) / Double(n)
+            return Float(0.5 * sin(x) + 0.1 * cos(Double(n / 2) * x))   // the Nyquist term alternates ±0.1
+        }
+        let back = Resampling.resizeCycle(Resampling.resizeCycle(cycle, to: 2048), to: n)
+        XCTAssertEqual(back.count, n)
+        XCTAssertLessThan(zip(back, cycle).map { abs($0 - $1) }.max() ?? 1, 1e-5)
+    }
+
+    /// Shrinking gives the band-limited waveform's samples at the new positions: harmonic 4 of
+    /// an 8-sample cycle (its Nyquist) comes out as the alternating cosine it is there.
+    func testShrinkKeepsTheCosineAtTheNewNyquist() {
+        let n = 32
+        let cycle: [Float] = (0..<n).map { i in Float(cos(2 * Double.pi * 4 * Double(i) / Double(n) + 0.3)) }
+        let small = Resampling.resizeCycle(cycle, to: 8)
+        for (k, v) in small.enumerated() {
+            XCTAssertEqual(v, Float(cos(0.3)) * (k % 2 == 0 ? 1 : -1), accuracy: 1e-5)
+        }
     }
 }

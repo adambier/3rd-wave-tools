@@ -38,13 +38,17 @@ extension Resampling {
             self.re = re; self.im = im
         }
 
-        /// The cycle at `size` samples, keeping harmonics 1…`maxHarmonic` that also lie strictly
-        /// below the new Nyquist (size/2), plus the mean. Inverse FFT for a power-of-two size,
-        /// plain synthesis otherwise.
+        /// The cycle at `size` samples, keeping harmonics 1…`maxHarmonic` that lie below the new
+        /// Nyquist (size/2), plus the mean, plus the cosine part of a harmonic exactly at the new
+        /// Nyquist when `size` is even and the source has one: that is what the band-limited
+        /// waveform's samples at the new positions hold (its sine part is zero there), so growing a
+        /// cycle and shrinking it again returns the original samples. Inverse FFT for a
+        /// power-of-two size, plain synthesis otherwise.
         func synthesize(size m: Int, maxHarmonic: Int = .max) -> [Float] {
             guard m > 0 else { return [] }
             let belowNyquist = (m - 1) / 2   // the largest h with h < m/2
             let keep = Swift.max(0, Swift.min(maxHarmonic, belowNyquist, top))
+            let nyquist = m % 2 == 0 && m / 2 <= top && m / 2 <= maxHarmonic && m / 2 >= 1 ? m / 2 : nil
             if FFT.isPowerOfTwo(m) {
                 var yr = [Double](repeating: 0, count: m), yi = [Double](repeating: 0, count: m)
                 let g = Double(m)
@@ -55,6 +59,7 @@ extension Resampling {
                         yr[m - h] = re[h] * g; yi[m - h] = -im[h] * g
                     }
                 }
+                if let h = nyquist { yr[h] = 2 * re[h] * g }   // one bin carries both halves
                 FFT.transform(&yr, &yi, inverse: true)
                 return yr.map { Float($0) }
             }
@@ -68,6 +73,7 @@ extension Resampling {
                         v += 2 * (re[h] * table.cos[k] - im[h] * table.sin[k])
                     }
                 }
+                if let h = nyquist { v += 2 * re[h] * (i % 2 == 0 ? 1 : -1) }   // cos(π·i)
                 out[i] = Float(v)
             }
             return out

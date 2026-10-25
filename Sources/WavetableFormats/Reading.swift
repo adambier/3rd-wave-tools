@@ -37,7 +37,7 @@ public enum WavetableReader {
         if isRIFFWave(bytes) { return try readWAV(bytes, fileName: fileName, sidecarText: sidecarText) }
         if hasPrefix(bytes, "fLaC") { return try readFLAC(bytes, fileName: fileName, sidecarText: sidecarText) }
         if hasPrefix(bytes, "RIFX"), bytes.count >= 12, hasPrefix(Array(bytes[8..<12]), "WAVE") {
-            throw WavetableError("\"\(fileName)\" is a WAV stored in big-endian byte order (RIFX), which Convert does not read. Save it as a standard WAV and try again.")
+            throw WavetableError("\"\(fileName)\" is a WAV stored in big-endian byte order (RIFX), which this reader does not read. Save it as a standard WAV and try again.")
         }
         if hasPrefix(bytes, UnifiedProgram.magicText) { return try readUnifiedProgram(bytes, fileName: fileName) }
         if let text = thirdWaveText(bytes) { return try readThirdWaveText(text, fileName: fileName) }

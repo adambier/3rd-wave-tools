@@ -15,6 +15,17 @@ extension WavetableWriter {
         Names.thirdWave(name)
     }
 
+    /// The range of a Tonverk tag (`_wt<N>` or `_wt<N>r`, N one of Tonverk's frame sizes) at the
+    /// end of a file-name stem, or nil. For tools that must keep the tag where Tonverk reads it.
+    public static func trailingTonverkTag(in stem: String) -> Range<String.Index>? {
+        guard let r = stem.range(of: "_wt", options: [.backwards, .caseInsensitive]) else { return nil }
+        var digits = stem[r.upperBound...]
+        if digits.last == "r" || digits.last == "R" { digits = digits.dropLast() }
+        guard !digits.isEmpty, digits.allSatisfy({ $0.isASCII && $0.isNumber }),
+              let n = Int(digits), tonverkFrameSizes.contains(n) else { return nil }
+        return r.lowerBound..<stem.endIndex
+    }
+
     /// Makes names fit their destination, saying what changed.
     enum Names {
         /// The most characters the 3rd Wave shows of a table's name.

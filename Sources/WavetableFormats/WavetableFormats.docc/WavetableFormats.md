@@ -9,10 +9,10 @@ WavetableFormats is the library behind pgdata Packer's Wavetables page, offered 
 building their own wavetable tools. It converts existing wavetables between formats; it does
 not make wavetables from other audio.
 
-- ``WavetableReader`` finds the wavetables in a file by its content, not its name: WAV files
-  with their `clm `, `srge`, `uhWT`, `cue `, and `smpl` chunks, a Tonverk-style `_wt<N>` tag in
-  the name, or a Serum `.txt` file beside them; Surge `.wt` files; and the 3rd Wave's `.wt` and
-  `.pgdata` files (through PgdataFormats). Each ``FoundTable`` says how its frame size was
+- ``WavetableReader`` finds the wavetables in a file by its content, not its name: WAV and FLAC
+  files with their `clm `, `srge`, `uhWT`, `cue `, and `smpl` chunks (or the matching FLAC
+  blocks), a Tonverk-style `_wt<N>` tag in the name, or a Serum `.txt` file beside them; Surge
+  `.wt` files; and the 3rd Wave's `.wt` and `.pgdata` files (through PgdataFormats). Each ``FoundTable`` says how its frame size was
   decided, and leaves it open, with the sizes that fit, when nothing in the file settles it.
 - ``Resampling`` resizes single cycles by their spectrum, changes a table's frame count by
   picking frames evenly or by crossfading, and builds the mipmap chain a 3rd Wave U table
@@ -61,6 +61,7 @@ Add the library to a Swift package with the product `WavetableFormats` of
 - ``WavetableReader``
 - ``FoundTable``
 - ``SourceFormat``
+- ``FrameSizeEvidence``
 
 ### Tables
 

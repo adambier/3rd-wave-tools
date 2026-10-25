@@ -71,7 +71,7 @@ public extension OutputPreset {
         case .phasePlant:
             return "The same WAV, but exactly 256 frames, as Phase Plant's documentation asks; a shorter table is filled out to 256."
         case .surge:
-            return "Surge's own .wt; keeps the source's frame size."
+            return "Surge's own .wt; keeps the source's frame size when it is a power of two up to 4,096 (otherwise 2,048)."
         case .waveEdit:
             return "16-bit, 64 waves of 256: the bank format the E370 and E352 read."
         }

@@ -170,7 +170,10 @@ enum FLACDecoder {
 
         // Frames.
         var out: [Float] = []
-        out.reserveCapacity(streamInfo.totalSamples > 0 ? streamInfo.totalSamples : 65_536)
+        // The header's sample count guides the reservation but cannot be trusted with memory: a
+        // damaged or hostile header could claim 2³⁶ samples. The file itself bounds it (a FLAC
+        // frame never shrinks below about a quarter of a byte per sample at these bit depths).
+        out.reserveCapacity(min(streamInfo.totalSamples > 0 ? streamInfo.totalSamples : 65_536, bytes.count * 4))
         var frames = 0
         let wantMD5 = streamInfo.md5.contains { $0 != 0 }
         var md5 = MD5()

@@ -13,8 +13,10 @@ public enum Resampling {
     /// Growing a cycle keeps every harmonic, so the original samples are reproduced exactly at
     /// their positions and the new ones are the values of the band-limited waveform in between;
     /// the old Nyquist component (a cosine) is split evenly between its two bins, the standard
-    /// resolution. Shrinking a cycle drops the harmonics at and above the new Nyquist (`size`/2),
-    /// including the new Nyquist itself, which a shorter cycle cannot carry with its phase.
+    /// resolution. Shrinking a cycle drops the harmonics above the new Nyquist (`size`/2) and keeps
+    /// the cosine part of the one at it, which is what the samples at the new positions hold; so
+    /// growing a cycle and shrinking it again returns the original samples exactly, and shrinking
+    /// a cycle gives the samples of its band-limited waveform at the new positions.
     /// Returns the cycle unchanged when it already has `size` samples, an empty array when `size`
     /// is 0 or less, and silence when the cycle is empty.
     public static func resizeCycle(_ cycle: [Float], to size: Int) -> [Float] {

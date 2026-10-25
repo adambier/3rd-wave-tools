@@ -192,7 +192,7 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertTrue(item.basisDescription.hasPrefix("Set manually"))
         XCTAssertEqual(item.sizeSource, .setManually)
         XCTAssertEqual(plan.status(item), .ready)
-        XCTAssertEqual(plan.expectedResult(for: item), "64 × 1,024; resized from 256 samples per frame")
+        XCTAssertEqual(plan.expectedResult(for: item), "64 × 1,024; resized from 256 samples per frame; may be turned down a little to fit after resizing")
         c = plan.convert(write: Self.fakeWriter)
         XCTAssertEqual(c.errors, [])
         XCTAssertEqual(c.files.map(\.fileName), ["Edit.wt"])
@@ -894,8 +894,21 @@ final class ConvertOptionsTextTests: XCTestCase {
         XCTAssertEqual(asP?.frameCountIn, 64)
         XCTAssertEqual(asP?.frameCountOut, 64)
         XCTAssertEqual(asP?.frameSizeOut, 1024)
-        XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 128)?.changes, ["resized"])
+        XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 128)?.changes, ["resized", "may be turned down"])   // growing the frame can raise the peak
         XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 2048)?.changes, ["resized", "4 → 64 frames, repeated"])
         XCTAssertNil(p.expected(for: p.items[0], frameSize: 1000), "does not divide")
+    }
+}
+
+final class ConvertPlanTonverkNumberingTests: XCTestCase {
+    func testNumberingKeepsATonverkTagAtTheEnd() {
+        let a = OutputFile(fileName: "Pad_wt128r.wav", data: Data([1]))
+        let b = OutputFile(fileName: "Pad_wt128r.wav", data: Data([2]))
+        let names = ConvertPlan.uniqueNames([a, b]).map(\.fileName)
+        XCTAssertEqual(names, ["Pad_wt128r.wav", "Pad 2_wt128r.wav"])
+        // Reading the second back still gives Tonverk's size and stepping.
+        XCTAssertEqual(ConvertPlan.numbered("Pad_wt2048.wav") { $0 == "Pad_wt2048.wav" }, "Pad 2_wt2048.wav")
+        // A name that merely ends in digits after "_wt" that aren't a Tonverk size is numbered as usual.
+        XCTAssertEqual(ConvertPlan.numbered("KOMPLEXER_WT1.wav") { $0 == "KOMPLEXER_WT1.wav" }, "KOMPLEXER_WT1 2.wav")
     }
 }
