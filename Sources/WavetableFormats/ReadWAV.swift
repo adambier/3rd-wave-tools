@@ -32,8 +32,9 @@ extension WavetableReader {
         var subject: String
     }
 
-    /// The audio and chunks of a WAV, decoded.
-    fileprivate struct DecodedWAV {
+    /// The audio and chunks of a WAV, decoded. (The FLAC reader builds one too, with its
+    /// application blocks as the chunks, and hands it to the same rules.)
+    struct DecodedWAV {
         /// The first (left) channel's samples.
         var samples: [Float]
         var channels: Int
@@ -63,6 +64,16 @@ extension WavetableReader {
             return []
         case let .audio(w): wav = w
         }
+        return try tables(in: wav, fileName: fileName, sidecarText: sidecarText, source: .wav, chunkWord: "chunk")
+    }
+
+    /// The frame-size rules, applied to decoded audio and its metadata chunks: the wavetable in
+    /// it, or none. `chunkWord` names the kind of container the chunks came from in the text
+    /// shown to the user ("chunk" in a WAV, "block" in a FLAC file).
+    static func tables(in wav: DecodedWAV, fileName: String, sidecarText: String?, source: SourceFormat,
+                       chunkWord: String) throws -> [FoundTable] {
+        let stem = fileStem(fileName)
+        let tag = tonverkTag(in: stem)
         if wav.chunks["srgo"] != nil { return [] }   // Surge's one-shot sample marker
         let count = wav.samples.count
         guard count > 0 else { return [] }
@@ -94,18 +105,18 @@ extension WavetableReader {
         // 1. clm (Serum): "<!>2048 10000000 wavetable ...": any frame size, and the interpolation digit.
         if let clm = wav.chunks["clm "] {
             let parsed = parseCLM(clm)
-            let subject = "the Serum-style tag inside the file (clm chunk)"
-            if let n = parsed.size { offer(n, basis: "Serum-style tag inside the file (clm chunk)", subject: subject) }
-            else { notes.append("The file's wavetable tag (clm chunk) does not give a readable frame size; it is ignored.") }
+            let subject = "the Serum-style tag inside the file (clm \(chunkWord))"
+            if let n = parsed.size { offer(n, basis: "Serum-style tag inside the file (clm \(chunkWord))", subject: subject) }
+            else { notes.append("The file's wavetable tag (clm \(chunkWord)) does not give a readable frame size; it is ignored.") }
             if let i = parsed.interpolation { interps.append(InterpolationClaim(value: i, subject: subject)) }
         }
         // 2. srge (Surge): int32 version, int32 frame size.
         if let srge = wav.chunks["srge"] {
             if srge.count >= 8 {
-                offer(Int(Int32(bitPattern: le32(srge, 4))), basis: "Surge tag inside the file (srge chunk)",
-                      subject: "the Surge tag inside the file (srge chunk)")
+                offer(Int(Int32(bitPattern: le32(srge, 4))), basis: "Surge tag inside the file (srge \(chunkWord))",
+                      subject: "the Surge tag inside the file (srge \(chunkWord))")
             } else {
-                notes.append("The file's Surge tag (srge chunk) is too short to give a frame size; it is ignored.")
+                notes.append("The file's Surge tag (srge \(chunkWord)) is too short to give a frame size; it is ignored.")
             }
         }
         // 3. uhWT (u-he). Surge reads it as 2,048 only. In the 76 files of Hive's library the chunk
@@ -118,7 +129,7 @@ extension WavetableReader {
                 let stated = Int(le32(uh, 8))
                 if (2...65_536).contains(stated), stated & (stated - 1) == 0 { n = stated }
             }
-            offer(n, basis: "u-he tag inside the file (uhWT chunk)", subject: "the u-he tag inside the file (uhWT chunk)")
+            offer(n, basis: "u-he tag inside the file (uhWT \(chunkWord))", subject: "the u-he tag inside the file (uhWT \(chunkWord))")
         }
         // 4. Tonverk file-name tag.
         if let t = tag {
@@ -224,7 +235,7 @@ extension WavetableReader {
         if let note = peakNote(wav.samples.reduce(0) { max($0, abs($1)) }) { notes.append(note) }
         var name = stem
         if let t = tag, !t.nameBeforeTag.isEmpty { name = t.nameBeforeTag }
-        return [FoundTable(name: name, fileName: fileName, source: .wav, samples: samples, frameSize: frameSize,
+        return [FoundTable(name: name, fileName: fileName, source: source, samples: samples, frameSize: frameSize,
                            frameSizeBasis: basis, candidateFrameSizes: candidates, interpolation: interpolation,
                            notes: notes, frameSizeEvidence: evidence)]
     }

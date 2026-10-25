@@ -6,16 +6,18 @@ import PgdataFormats
 /// Finds the wavetables in a file.
 ///
 /// Files are judged by their content, not their extension: a Surge `.wt` starts with `vawt`, a
-/// 3rd Wave `.wt` is text starting `PNAME` or `UNAME`, a `.pgdata` starts with `W3_UNIPROG_1`, and
-/// a WAV is a RIFF file of type `WAVE`. Anything else holds no wavetable.
+/// 3rd Wave `.wt` is text starting `PNAME` or `UNAME`, a `.pgdata` starts with `W3_UNIPROG_1`, a
+/// WAV is a RIFF file of type `WAVE`, and a FLAC file starts with `fLaC`. Anything else holds no
+/// wavetable.
 ///
-/// The format-specific parts are in `ReadThirdWave.swift`, `ReadSurge.swift`, and `ReadWAV.swift`.
+/// The format-specific parts are in `ReadThirdWave.swift`, `ReadSurge.swift`, `ReadWAV.swift`, and
+/// `ReadFLAC.swift`.
 public enum WavetableReader {
     /// The file extensions worth reading, lowercased.
-    static let wavetableExtensions: Set<String> = ["wt", "pgdata", "wav", "wave"]
+    static let wavetableExtensions: Set<String> = ["wt", "pgdata", "wav", "wave", "flac"]
 
-    /// Whether a file name is worth reading at all: `.wt`, `.pgdata`, `.wav`, or `.wave` (in any
-    /// case), and not a hidden file (one whose name starts with a period).
+    /// Whether a file name is worth reading at all: `.wt`, `.pgdata`, `.wav`, `.wave`, or `.flac`
+    /// (in any case), and not a hidden file (one whose name starts with a period).
     public static func mayContainWavetables(fileName: String) -> Bool {
         guard !fileName.hasPrefix("."), let dot = fileName.lastIndex(of: ".") else { return false }
         return wavetableExtensions.contains(fileName[fileName.index(after: dot)...].lowercased())
@@ -24,15 +26,16 @@ public enum WavetableReader {
     /// Every wavetable in `data`, judged by content rather than extension; empty when the file
     /// holds none (e.g., a program, a multisample, a one-shot sample, or audio whose length does
     /// not divide into frames). `sidecarText` is the contents of a Serum-style `.txt` sidecar for a
-    /// WAV, if one exists.
+    /// WAV or FLAC file, if one exists.
     ///
     /// - Throws: ``WavetableError`` when the file is recognisably a wavetable format (a Surge
-    ///   `.wt`, a 3rd Wave `.wt` or `.pgdata`, or a WAV) but is damaged, or is a WAV marked as a
-    ///   wavetable in a sample format this reader does not decode.
+    ///   `.wt`, a 3rd Wave `.wt` or `.pgdata`, a WAV, or a FLAC file) but is damaged, or is a WAV
+    ///   marked as a wavetable in a sample format this reader does not decode.
     public static func read(_ data: Data, fileName: String, sidecarText: String? = nil) throws -> [FoundTable] {
         let bytes = [UInt8](data)
         if hasPrefix(bytes, "vawt") { return try readSurge(bytes, fileName: fileName) }
         if isRIFFWave(bytes) { return try readWAV(bytes, fileName: fileName, sidecarText: sidecarText) }
+        if hasPrefix(bytes, "fLaC") { return try readFLAC(bytes, fileName: fileName, sidecarText: sidecarText) }
         if hasPrefix(bytes, "RIFX"), bytes.count >= 12, hasPrefix(Array(bytes[8..<12]), "WAVE") {
             throw WavetableError("\"\(fileName)\" is a WAV stored in big-endian byte order (RIFX), which Convert does not read. Save it as a standard WAV and try again.")
         }
@@ -41,8 +44,8 @@ public enum WavetableReader {
         return []
     }
 
-    /// Reads a file, and for a WAV also its Serum-style sidecar (`<name>.txt`, or `FolderInfo.txt`
-    /// in the same folder) when present.
+    /// Reads a file, and for a WAV or FLAC file also its Serum-style sidecar (`<name>.txt`, or
+    /// `FolderInfo.txt` in the same folder) when present.
     ///
     /// - Throws: ``WavetableError`` when the file cannot be read, or for the reasons
     ///   ``read(_:fileName:sidecarText:)`` gives.
@@ -52,7 +55,7 @@ public enum WavetableReader {
             throw WavetableError("\"\(url.lastPathComponent)\" could not be read: \(error.localizedDescription)")
         }
         var sidecar: String?
-        if data.count >= 12, isRIFFWave([UInt8](data.prefix(12))) {
+        if data.count >= 12, isRIFFWave([UInt8](data.prefix(12))) || hasPrefix([UInt8](data.prefix(4)), "fLaC") {
             let folder = url.deletingLastPathComponent()
             let stem = url.deletingPathExtension().lastPathComponent
             for name in [stem + ".txt", "FolderInfo.txt"] {
