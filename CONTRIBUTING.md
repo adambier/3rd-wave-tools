@@ -64,6 +64,8 @@ bank 3"), or share only your own programs and exports.
   names, Clean Up Names), also without UI, so that other front ends can share them. **`PgdataPacker`** is the
   SwiftUI app. **`tw3pg`** is the developer tool.
 - Changes to what the 3rd Wave is said to do belong in FORMATS.md as well as in the code.
+- [`AGENTS.md`](AGENTS.md) states these rules, the layout, and the test commands in a form for AI
+  coding tools (Claude Code reads it through `CLAUDE.md`); keep it current when they change.
 
 ## Writing
 
