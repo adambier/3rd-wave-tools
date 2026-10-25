@@ -510,9 +510,10 @@ struct ConvertChangesCell: View {
     }
 }
 
-/// For a 3rd Wave destination: a scissors icon when the `.wt` will carry a different name (cut to
-/// 31 characters, accents outside Latin-1 removed, other characters as "?"), the name on hover;
-/// with `compact` off (the Clean Up Names sheet), the name itself.
+/// For a 3rd Wave destination: a scissors icon when the `.wt` will carry a different name, the
+/// name and the writer's notes on hover; with `compact` off (the Clean Up Names sheet), the name
+/// itself. The name is what the writer will write: `NameField.fitted` (the rule the Pack page's
+/// `NameLengthNote` describes too), after the writer trims spaces at the ends.
 struct ThirdWaveNameNote: View {
     let name: String
     var compact: Bool = true

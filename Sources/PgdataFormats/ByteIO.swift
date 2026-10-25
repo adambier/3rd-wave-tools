@@ -86,6 +86,10 @@ struct ByteWriter {
 ///
 /// The 3rd Wave's name fields (`char[32]` in `.pgdata` and `.bin` files) hold up to 31
 /// single-byte (Latin-1) characters followed by a NUL. See section 8 of FORMATS.md.
+///
+/// ``fitted(_:)`` is the one rule for making any name fit such a field, and ``init(_:width:)``
+/// applies it; tools that write a name for the 3rd Wave another way (the name line of a `.wt`)
+/// should apply it too, so that the same name comes out the same everywhere.
 public struct NameField: Equatable, Hashable {
     /// The field's bytes exactly as stored, terminator and padding included.
     public private(set) var raw: [UInt8]
@@ -95,10 +99,12 @@ public struct NameField: Equatable, Hashable {
 
     /// Creates a field of `width` bytes holding `text`.
     ///
-    /// The text is composed (so "e" plus a combining accent becomes "é"), then stored one byte per
-    /// Unicode scalar, with any scalar above 255 stored as "?". It is cut to `width` − 1 bytes, so that at least one NUL follows it, and padded with NUL bytes.
+    /// The text is made to fit with ``fitted(_:)`` (composed, control characters as spaces,
+    /// characters outside Latin-1 without their accents or as "?", at most ``displayLimit``
+    /// characters), stored one byte per character, cut to `width` − 1 bytes so that at least one
+    /// NUL follows it, and padded with NUL bytes.
     public init(_ text: String, width: Int = 32) {
-        var b = Array(text.precomposedStringWithCanonicalMapping.unicodeScalars.map { $0.value < 256 ? UInt8($0.value) : UInt8(ascii: "?") }.prefix(width - 1))
+        var b = Array(Self.fitted(text).text.unicodeScalars.map { UInt8($0.value) }.prefix(width - 1))
         b += [UInt8](repeating: 0, count: width - b.count)
         raw = b
     }
@@ -109,16 +115,92 @@ public struct NameField: Equatable, Hashable {
         return Array(raw[..<end]).latin1
     }
 
-    /// The number of bytes `s` takes in a name field.
+    // MARK: Fitting a name
+
+    /// The most characters a name field holds: 31, which the 3rd Wave displays in full for
+    /// programs, wavetables, and multisamples. See section 8 of FORMATS.md.
+    public static let displayLimit = 31
+
+    /// One change ``fitted(_:)`` made to a name.
     ///
-    /// The 3rd Wave's name fields hold single-byte (Latin-1) characters, so a name takes one byte
-    /// per Unicode scalar, and any scalar above 255 (an en dash, a curly quote, an emoji) is stored
-    /// as "?".
-    public static func storedLength(_ s: String) -> Int { s.precomposedStringWithCanonicalMapping.unicodeScalars.count }
-    /// The characters of `s` that cannot be stored, each once, in order.
-    public static func unstorable(in s: String) -> String {
-        var seen = Set<UInt32>()
-        return String(s.precomposedStringWithCanonicalMapping.unicodeScalars.filter { $0.value > 255 && seen.insert($0.value).inserted }.map(Character.init))
+    /// Each case's ``description`` is a sentence about the name, for a report or a tooltip.
+    public enum Change: Equatable, Hashable, Sendable, CustomStringConvertible {
+        /// Line breaks, tabs, or other control characters became spaces.
+        case controlCharactersReplaced
+        /// Letters outside Latin-1 whose base letter is in Latin-1 lost their accents. `from`
+        /// holds each such letter once, in order of first appearance, and `to` what each became,
+        /// character for character ("Ő" to "O", "ź" to "z").
+        case accentsRemoved(from: String, to: String)
+        /// Characters outside Latin-1 with no Latin-1 base letter (an en dash, a curly quote, an
+        /// emoji, a Greek letter) became "?"; `characters` holds each once, in order of first
+        /// appearance.
+        case replacedWithQuestionMark(characters: String)
+        /// The name had `from` characters and was cut to ``displayLimit``, giving `to` (without
+        /// any space the cut left at the end).
+        case shortened(from: Int, to: String)
+
+        /// The change as a sentence: "Name shortened to “…”: …".
+        public var description: String {
+            switch self {
+            case .controlCharactersReplaced:
+                return "Line breaks and other control characters in the name are written as spaces."
+            case let .accentsRemoved(from, to):
+                let pairs = zip(from, to).map { "\u{201C}\($0)\u{201D} → \u{201C}\($1)\u{201D}" }.joined(separator: ", ")
+                return "\(from.count == 1 ? "A letter" : "Letters") the 3rd Wave's name fields cannot hold (outside Latin-1) \(from.count == 1 ? "loses its" : "lose their") accents: \(pairs)."
+            case let .replacedWithQuestionMark(chars):
+                let list = chars.map { "\u{201C}\($0)\u{201D}" }.joined(separator: ", ")
+                return "\(chars.count == 1 ? "A character" : "Characters") the 3rd Wave's name fields cannot hold (outside Latin-1) \(chars.count == 1 ? "is" : "are") written as \u{201C}?\u{201D}: \(list)."
+            case let .shortened(from, to):
+                return "Name shortened to \u{201C}\(to)\u{201D}: it has \(from) characters, and the 3rd Wave's name fields hold \(displayLimit)."
+            }
+        }
+    }
+
+    /// The name as the 3rd Wave's name fields can hold it, and what changed to get there.
+    ///
+    /// The name is composed first, so that "e" plus a combining accent (as macOS file names store
+    /// "é") becomes the Latin-1 letter. Then, character by character: a line break, tab, or other
+    /// control character becomes a space; a character outside Latin-1 loses its accents when a
+    /// Latin-1 letter is left ("Ő" to "O", "ź" to "z") and becomes "?" otherwise (an en dash, a
+    /// curly quote, an emoji); everything else is kept. Finally the name is cut to
+    /// ``displayLimit`` characters, dropping any space the cut leaves at the end. Spaces at the
+    /// ends are otherwise kept, and an empty name stays empty.
+    ///
+    /// The result holds only Latin-1 characters, so it is stored one byte each and read back
+    /// unchanged. `changes` is empty when the name fits as it is.
+    public static func fitted(_ name: String) -> (text: String, changes: [Change]) {
+        var changes: [Change] = []
+        var out = ""
+        var controls = false
+        var accentFrom = "", accentTo = "", questioned = ""
+        for ch in name.precomposedStringWithCanonicalMapping {
+            if ch.isNewline || ch.unicodeScalars.contains(where: { $0.properties.generalCategory == .control }) {
+                controls = true
+                out.append(" ")
+                continue
+            }
+            if ch.unicodeScalars.allSatisfy({ $0.value < 256 }) { out.append(ch); continue }
+            let base = String(ch).decomposedStringWithCanonicalMapping.unicodeScalars.filter { $0.value < 256 }
+            if base.isEmpty {
+                out.append("?")
+                if !questioned.contains(ch) { questioned.append(ch) }
+            } else {
+                let kept = String(String.UnicodeScalarView(base))
+                out += kept
+                if !accentFrom.contains(ch) { accentFrom.append(ch); accentTo += kept }
+            }
+        }
+        if controls { changes.append(.controlCharactersReplaced) }
+        if !accentFrom.isEmpty { changes.append(.accentsRemoved(from: accentFrom, to: accentTo)) }
+        if !questioned.isEmpty { changes.append(.replacedWithQuestionMark(characters: questioned)) }
+        let count = out.count
+        if count > displayLimit {
+            var cut = Substring(out.prefix(displayLimit))
+            while let last = cut.last, last.isWhitespace { cut = cut.dropLast() }
+            out = String(cut)
+            changes.append(.shortened(from: count, to: out))
+        }
+        return (out, changes)
     }
 }
 
@@ -128,8 +210,10 @@ extension Array where Element == UInt8 {
 }
 
 extension String {
-    /// Composed first, so an accent stored as a separate combining mark (as in macOS file names)
-    /// becomes the Latin-1 letter rather than "?".
+    /// The bytes of a whole text file (`.pro`, `.wt`): composed first, so an accent stored as a
+    /// separate combining mark (as in macOS file names) becomes the Latin-1 letter rather than
+    /// "?". A name meant for the 3rd Wave is fitted with `NameField.fitted` before it gets here,
+    /// so the "?" is a last resort for text that never went through it.
     var latin1Bytes: [UInt8] { precomposedStringWithCanonicalMapping.unicodeScalars.map { $0.value < 256 ? UInt8($0.value) : UInt8(ascii: "?") } }
 }
 

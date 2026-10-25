@@ -7,10 +7,12 @@ import PgdataFormats
 // Windows, and exFAT.
 
 extension WavetableWriter {
-    /// The name a 3rd Wave `.wt` gets for `name`, and notes on what changed: control characters
-    /// become spaces, a character outside Latin-1 loses its accents when that leaves a Latin-1
-    /// letter ("Ő" to "O") and becomes "?" otherwise, and the name is cut to the 31 characters
-    /// the 3rd Wave shows. An empty name becomes "Untitled".
+    /// The name a 3rd Wave `.wt` gets for `name`, and notes on what changed. Spaces and line
+    /// breaks at the ends go silently; the rest is `NameField.fitted`, the one rule for names the
+    /// 3rd Wave keeps (control characters become spaces, a character outside Latin-1 loses its
+    /// accents when that leaves a Latin-1 letter, "Ő" to "O", and becomes "?" otherwise, and the
+    /// name is cut to `NameField.displayLimit` characters), with a note for each change. An empty
+    /// name becomes "Untitled".
     public static func thirdWaveName(_ name: String) -> (name: String, notes: [String]) {
         Names.thirdWave(name)
     }
@@ -28,32 +30,14 @@ extension WavetableWriter {
 
     /// Makes names fit their destination, saying what changed.
     enum Names {
-        /// The most characters the 3rd Wave shows of a table's name.
-        static let thirdWaveNameLimit = 31
-
-        /// A name for a 3rd Wave `.wt` (its line 2): Latin-1 only, at most 31 characters, one line.
-        /// A character outside Latin-1 loses its accents when that leaves a Latin-1 letter ("Ő" to
-        /// "O"), and becomes "?" otherwise, as the 3rd Wave would show it.
+        /// A name for a 3rd Wave `.wt` (its line 2), as `NameField.fitted` makes it: Latin-1 only,
+        /// at most `NameField.displayLimit` characters, one line. Spaces and line breaks at the
+        /// ends (common in names taken from file names) are dropped without a note; the fitting
+        /// itself gets one note per change.
         static func thirdWave(_ name: String) -> (name: String, notes: [String]) {
-            var notes: [String] = []
-            // Composed first: macOS file names store "é" as "e" plus a combining accent.
-            let oneLine = String(name.precomposedStringWithCanonicalMapping.map { isControl($0) ? " " : $0 })
-                .trimmingCharacters(in: .whitespaces)
-            var replaced = false
-            var out = ""
-            for ch in oneLine {
-                if ch.unicodeScalars.allSatisfy({ $0.value < 256 }) { out.append(ch); continue }
-                replaced = true
-                let base = String(ch).decomposedStringWithCanonicalMapping.unicodeScalars.filter { $0.value < 256 }
-                out += base.isEmpty ? "?" : String(String.UnicodeScalarView(base))
-            }
-            if replaced {
-                notes.append("Characters the 3rd Wave cannot show (outside Latin-1) were replaced: “\(oneLine)” became “\(out)”.")
-            }
-            if out.count > thirdWaveNameLimit {
-                out = String(out.prefix(thirdWaveNameLimit)).trimmingCharacters(in: .whitespaces)
-                notes.append("Name shortened to “\(out)”: the 3rd Wave shows at most \(thirdWaveNameLimit) characters.")
-            }
+            let fit = NameField.fitted(name.trimmingCharacters(in: .whitespacesAndNewlines))
+            var out = fit.text.trimmingCharacters(in: .whitespaces)
+            var notes = fit.changes.map(\.description)
             if out.isEmpty {
                 out = "Untitled"
                 notes.append("The table has no name, so it is called “Untitled”.")
@@ -83,10 +67,6 @@ extension WavetableWriter {
                   let n = Int(digits), WavetableWriter.tonverkFrameSizes.contains(n) else { return (stem, nil) }
             let rest = trimEnds(String(stem[..<r.lowerBound]))
             return (rest.isEmpty ? "Untitled" : rest, String(stem[r.lowerBound...]))
-        }
-
-        private static func isControl(_ ch: Character) -> Bool {
-            ch.isNewline || ch.unicodeScalars.contains { $0.properties.generalCategory == .control }
         }
 
         /// Without leading spaces and dots (a leading dot hides a file on macOS) or trailing spaces

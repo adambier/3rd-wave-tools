@@ -144,7 +144,7 @@ PgdataFormats (`Sources/PgdataFormats/`):
 | `ProgramConverter` | `ProgramConverter.swift` | Older layouts to `ProgramConverter.current` (181/137/182): `needsConversion`, `convert(_:for:format:)`, `Model` (`.eightM`, `.twentyFour`) |
 | `FactoryLibrary` | `FactoryLibrary.swift` | Factory tables by slot, name, and fingerprint; `.builtIn` from generated `FactoryCatalog` |
 | `ExportNames` | `FactoryHistory.swift` | The 3rd Wave's own export file names and `B05P06`-style locations; also `SourceRef.is2025FactorySlot`, `ProgramFile.predates2025FactoryTables` |
-| `NameField`, `FormatError`, `fnv1a64(_:)` | `ByteIO.swift` | 32-byte name fields, the library's error type, the fingerprint hash |
+| `NameField`, `FormatError`, `fnv1a64(_:)` | `ByteIO.swift` | 32-byte name fields and `NameField.fitted` (the one rule for a name the 3rd Wave keeps: `displayLimit` = 31, `Change`), the library's error type, the fingerprint hash |
 | `SafeFileName` | `SafeFileName.swift` | File names safe on macOS, Windows, and FAT/exFAT |
 
 WavetableFormats (`Sources/WavetableFormats/`):
@@ -184,7 +184,7 @@ App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle
 | `.bin` fields and versions | `Multisample.swift`; FORMATS.md section 5.2 | `fixtures/multisample.bin*` |
 | Older-program conversion | `ProgramConverter.swift`; FORMATS.md section 6 and appendix | `ConverterTests`, `fixtures/program-2022-layout*`, `tw3pg convert`, `tw3pg convertcheck` |
 | Factory tables, U48–U55 history | `FactoryLibrary.swift`, `FactoryHistory.swift`, `FactoryCatalog.swift` (generated) | README "Factory wavetables" |
-| Names, 31-character limit, file names | `ByteIO.swift` (`NameField`), `SafeFileName.swift`, `ExportNames`, `OutputNames`, `WriteNames.swift` | `SafeFileNameTests`, `WorkbenchTests` |
+| Names, 31-character limit, file names | `ByteIO.swift` (`NameField.fitted`, which `NameField.init`, `WriteNames.swift`, `PackPlan.nameWarnings`, and the app's `NameLengthNote` all apply), `SafeFileName.swift`, `ExportNames`, `OutputNames` | `NameFittingTests`, `SafeFileNameTests`, `WorkbenchTests` |
 | Read another wavetable format | `Reading.swift` dispatch, a new `Read<Format>.swift`, `SourceFormat` | `ReadingTests`, `CorpusCaseTests`, `RoundTripTests`; WAVETABLES.md |
 | Write for another synth | `OutputPreset` in `Wavetable.swift`, `Writing.swift`, `PresetInfo.swift` | `WritingTests`, `RoundTripTests`; WAVETABLES.md section 2; README destination table |
 | Frame size decisions | `ReadWAV.swift`, `FrameSizeEvidence`, `FrameSizeFit.swift`; WAVETABLES.md section 3 | `ReadingTests`, `ReviewFixTests` |

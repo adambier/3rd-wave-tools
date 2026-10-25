@@ -159,17 +159,21 @@ final class RobustnessTests: XCTestCase {
     // MARK: Names and file names
 
     func testNamesOutsideLatin1AreFlagged() {
-        XCTAssertEqual(NameField.unstorable(in: "Pad \u{2013} Wide \u{2018}A\u{2019}"), "\u{2013}\u{2018}\u{2019}")
-        XCTAssertEqual(NameField.unstorable(in: "Plain-Name"), "")
-        XCTAssertEqual(NameField.storedLength("e\u{301}"), 1)          // e + combining accent: composed to é, one byte
+        XCTAssertEqual(NameField.fitted("Pad \u{2013} Wide \u{2018}A\u{2019}").changes,
+                       [.replacedWithQuestionMark(characters: "\u{2013}\u{2018}\u{2019}")])
+        XCTAssertEqual(NameField.fitted("Plain-Name").changes, [])
+        XCTAssertEqual(NameField.fitted("e\u{301}").text.count, 1)     // e + combining accent: composed to é, one byte
         XCTAssertEqual(NameField("Cafe\u{301}").text, "Caf\u{E9}")    // as macOS file names store it
-        XCTAssertEqual(NameField.storedLength("\u{E9}"), 1)            // é precomposed: one byte
+        XCTAssertEqual(NameField.fitted("\u{E9}").text.count, 1)       // é precomposed: one byte
         XCTAssertEqual(NameField("Pad \u{2013} Wide").text, "Pad ? Wide")
+        XCTAssertEqual(NameField("Pad \u{150}").text, "Pad O")         // Ő: the accent goes, the letter stays
         var p = makeCurrentProgram(); p.name = "Pad \u{2013} Wide"
         let plan = PackPlan.make(program: p, files: [], factory: FactoryLibrary())
         XCTAssertTrue(plan.warnings.contains { $0.contains("cannot hold (\u{201C}\u{2013}\u{201D})") }, "\(plan.warnings)")
         p.name = String(repeating: "e\u{301}", count: 40)             // 40 characters once composed
         XCTAssertTrue(PackPlan.make(program: p, files: [], factory: FactoryLibrary()).warnings.contains { $0.contains("is 40 characters") })
+        p.name = "Pad \u{150}"
+        XCTAssertTrue(PackPlan.make(program: p, files: [], factory: FactoryLibrary()).warnings.contains { $0.contains("written without accents: \u{201C}\u{150}\u{201D} → \u{201C}O\u{201D}") })
     }
 
     func testImplausibleContentIsFlagged() throws {
