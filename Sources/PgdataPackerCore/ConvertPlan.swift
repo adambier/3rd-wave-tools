@@ -6,7 +6,7 @@ import PgdataFormats   // SwiftPM build; absent in the app's single-module swift
 import WavetableFormats
 #endif
 
-// The Convert tab's decisions, kept free of UI code like the rest of PgdataPackerCore: which files
+// The Wavetables page's decisions, kept free of UI code like the rest of PgdataPackerCore: which files
 // to read, how the wavetables found in them are listed (duplicates collapsed, factory tables
 // flagged, frame sizes the files leave open), what each conversion is expected to produce, and how
 // the converted files are named and written.
@@ -14,7 +14,7 @@ import WavetableFormats
 // Convert converts existing wavetables between formats. It does not make wavetables from other
 // audio: that is the 3rd Wave's Wave Maker.
 
-/// The wavetables added to the Convert tab, the destination chosen for them, and the conversion.
+/// The wavetables added to the Wavetables page, the destination chosen for them, and the conversion.
 public struct ConvertPlan: Equatable {
 
     // MARK: Types

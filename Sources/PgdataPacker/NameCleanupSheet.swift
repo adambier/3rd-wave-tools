@@ -9,7 +9,7 @@ import PgdataPackerCore
 /// "Clean Up Names…": proposes tidier names (never for factory wavetables). Every change is shown
 /// and can be edited or unchecked; the source files are not changed. On the Pack page it covers the
 /// programs and the added wavetables and multisamples, and the names are applied when packing; on
-/// the Convert page it covers the tables listed there, and the names are applied when converting.
+/// the Wavetables page it covers the tables listed there, and the names are applied when converting.
 struct NameCleanupSheet: View {
     /// The page the sheet renames for.
     enum Page { case pack, convert }
@@ -129,7 +129,7 @@ struct NameCleanupSheet: View {
                     edited = [:]
                 }
                 .disabled(!anyRenamed)
-                .help(page == .pack ? "Undo every rename, for all programs and files" : "Undo every rename on the Convert page")
+                .help(page == .pack ? "Undo every rename, for all programs and files" : "Undo every rename on the Wavetables page")
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Apply \(toApply.count) Name\(toApply.count == 1 ? "" : "s")") { apply() }

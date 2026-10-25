@@ -3,7 +3,7 @@ import XCTest
 @testable import WavetableFormats
 @testable import PgdataPackerCore
 
-// The Convert tab's decisions, with the reader and writer injected: WavetableReader and
+// The Wavetables page's decisions, with the reader and writer injected: WavetableReader and
 // WavetableWriter are not called here. Every table is synthetic.
 final class ConvertPlanTests: XCTestCase {
     var dir: URL!
@@ -310,7 +310,7 @@ final class ConvertPlanRenameTests: XCTestCase {
     }
 }
 
-/// The state the Convert page shows per item (status, attention, notes by severity, the expected
+/// The state the Wavetables page shows per item (status, attention, notes by severity, the expected
 /// result), the preview and its cache, and what each destination says about itself.
 final class ConvertPlanStateTests: XCTestCase {
     private func table(_ name: String, frames: Int = 4, size: Int? = 2048, samples: Int? = nil, peak: Float = 0.5,

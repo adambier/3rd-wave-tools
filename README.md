@@ -57,7 +57,7 @@ command-line tools alone. Such a build has no Sparkle, so no **Check for Updates
 
 ## Using it
 
-The window has three pages, **Pack**, **Unpack**, and **Convert**. There is nothing to set up. Every report or
+The window has three pages, **Pack**, **Unpack**, and **Wavetables**. There is nothing to set up. Every report or
 list of problems the app shows has a copy icon beside its title that puts the text on the clipboard.
 
 ### Factory wavetables
@@ -259,7 +259,7 @@ A `.pgdata` does not record the program's format. One that holds a program in an
 unpacked, in the same way as in Pack, and the box says so. The app works out the old format from
 the layout, so the unpacked `.pro` is always in the current format, `W3_PROG_5`.
 
-### Convert
+### Wavetables
 
 Drop wavetable files or folders: WAV and FLAC wavetables (the kinds Serum, Vital, Phase Plant,
 and many other synths use), the 3rd Wave's `.wt` and `.pgdata` files, and Surge `.wt` files. Folders are searched, and
@@ -272,7 +272,7 @@ destination they start unchecked, since every 3rd Wave already has them.
 
 Then choose a destination:
 
-| Destination | What Convert writes |
+| Destination | What the Wavetables page writes |
 |---|---|
 | 3rd Wave U table | a `.wt` of 64 frames of 1,024 samples, with its mipmap chain |
 | 3rd Wave P table | a `.wt` of 64 frames of 128 samples, optionally with the PPG's four standard waves at 60–63 |
@@ -289,7 +289,7 @@ tested in its synth (none yet). The destination and its options apply to every t
 convert. The preview below the table is read-only and shows one table: the source and the result
 stacked frame by frame (with the interpolation drawn between frames where a file records one),
 its file, its frame size and what that rests on, and what converting changes. Names are edited
-in the table, and a frame size the file leaves open is chosen from the Size column, where each
+in the table, and a frame size the file leaves open is chosen from the Input column, where each
 size the file allows is drawn so the one that cuts the wave in the right place is visible. When
 a destination needs a different number of frames, **Options** lets you choose how to get there:
 **Keep Original Frames** (evenly spaced frames, the first and last among them, adding no new
@@ -365,7 +365,7 @@ in any language. Everything here is open source under the MIT licence.
   The library is versioned with the app (tags `v1.0.5` and on).
 - **Other synths' wavetable formats.** `WavetableFormats`, the package's second library, finds
   wavetables in files (WAV with its metadata chunks, Surge `.wt`, and the 3rd Wave's `.wt` and
-  `.pgdata`), resizes them, and writes them for the destinations the Convert page offers. Like
+  `.pgdata`), resizes them, and writes them for the destinations the Wavetables page offers. Like
   `PgdataFormats`, on which it builds, it depends only on Foundation and is tested on macOS, Linux,
   and Windows.
   [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes the formats, with sources, and the

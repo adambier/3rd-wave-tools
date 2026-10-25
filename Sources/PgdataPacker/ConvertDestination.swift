@@ -10,7 +10,7 @@ import WavetableFormats
 import PgdataPackerCore
 #endif
 
-/// The right-hand pane of the Convert page: the destinations in two groups, a line on what they
+/// The right-hand pane of the Wavetables page: the destinations in two groups, a line on what they
 /// rest on, and the options that apply to the one chosen.
 struct ConvertDestinationPane: View {
     @EnvironmentObject var state: AppState

@@ -16,7 +16,7 @@ import WavetableFormats
 //   tw3pg convertcheck <in dir> <3rd Wave export dir> [8m|24]   convert each input (sorted) and compare with
 //                                        what the 3rd Wave's bulk import made of it (B05P001… in order)
 //   tw3pg wtcheck <wt dirs>... -- <pgdata dirs>...   match .wt files against the tables embedded in .pgdata files
-//   tw3pg wtscan [--all] [--check-writers] <files or dirs>...   what the Convert page would list for
+//   tw3pg wtscan [--all] [--check-writers] <files or dirs>...   what the Wavetables page would list for
 //                                        each file (TSV); --all also lists files without tables;
 //                                        --check-writers writes every table for every preset and
 //                                        reads it back

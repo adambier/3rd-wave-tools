@@ -5,7 +5,7 @@ another synth.
 
 ## Overview
 
-WavetableFormats is the library behind pgdata Packer's Convert page, offered for anyone
+WavetableFormats is the library behind pgdata Packer's Wavetables page, offered for anyone
 building their own wavetable tools. It converts existing wavetables between formats; it does
 not make wavetables from other audio.
 

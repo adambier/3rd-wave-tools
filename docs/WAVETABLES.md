@@ -1,6 +1,6 @@
 # Wavetable formats of other synths
 
-What pgdata Packer's Convert page and the `WavetableFormats` library rely on when they read
+What pgdata Packer's Wavetables page and the `WavetableFormats` library rely on when they read
 wavetables made for other synths and write tables for them. The 3rd Wave's own formats (`.wt` P
 and U tables, and the tables a `.pgdata` embeds) are in [FORMATS.md](FORMATS.md), section 5.1.
 

@@ -1,6 +1,6 @@
 import Foundation
 
-// What the Convert page shows about each destination: a short title, its size in one line, the
+// What the Wavetables page shows about each destination: a short title, its size in one line, the
 // group it belongs to, why it is a separate destination, and what its files can record. The
 // facts the writer works from (frame size, frame count, file extension) are in Writing.swift.
 

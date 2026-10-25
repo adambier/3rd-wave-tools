@@ -47,7 +47,7 @@ public struct ContentFile: Identifiable, Equatable {
         case "wt":
             // Surge's binary .wt shares the extension; say where it can go instead of failing to parse.
             if data.prefix(4) == Data("vawt".utf8) {
-                throw FormatError.invalid("\(url.lastPathComponent) is a Surge wavetable, not a 3rd Wave one. The Convert page can convert it to a 3rd Wave table.")
+                throw FormatError.invalid("\(url.lastPathComponent) is a Surge wavetable, not a 3rd Wave one. The Wavetables page can convert it to a 3rd Wave table.")
             }
             let w = try WavetableFile(data: data)
             var slot = SourceRef.suggested(byFilename: url.lastPathComponent)

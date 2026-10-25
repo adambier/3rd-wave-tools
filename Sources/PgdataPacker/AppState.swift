@@ -14,13 +14,13 @@ import PgdataPackerCore
 /// All app state. Plain ObservableObject, used only from the main thread (as in ThirdWaveWT).
 final class AppState: ObservableObject {
     enum Section: String, CaseIterable, Identifiable {
-        case pack = "Pack", unpack = "Unpack", convert = "Convert"
+        case pack = "Pack", unpack = "Unpack", convert = "Wavetables"
         var id: String { rawValue }
         var icon: String {
             switch self {
             case .pack: return "shippingbox"
             case .unpack: return "tray.and.arrow.up"
-            case .convert: return "arrow.left.arrow.right"
+            case .convert: return "waveform"
             }
         }
     }
@@ -97,10 +97,10 @@ final class AppState: ObservableObject {
     @Published var selectedUnpack: UUID?
 
     // Convert
-    /// The wavetables added to the Convert page, the destination, and its options. The
+    /// The wavetables added to the Wavetables page, the destination, and its options. The
     /// destination and the frame-count choice are remembered between sessions.
     @Published var convertPlan = ConvertPlan() { didSet { saveSettings() } }
-    /// Show only the Convert tables that need a look (blocked, guessed frame size, or a warning).
+    /// Show only the Wavetables page's tables that need a look (blocked, guessed frame size, or a warning).
     @Published var convertOnlyAttention = false
     /// The writer's results for the tables the Convert detail pane shows, kept between passes.
     let convertPreviews = ConvertPreviewCache()
@@ -277,8 +277,8 @@ final class AppState: ObservableObject {
         }
         if skipped.wav > 0 {
             note(skipped.wav == 1
-                 ? "1 WAV file was left out: Pack takes 3rd Wave files. If it is a wavetable, the Convert page can convert it to a 3rd Wave table."
-                 : "\(skipped.wav) WAV files were left out: Pack takes 3rd Wave files. Wavetables among them can be converted to 3rd Wave tables on the Convert page.")
+                 ? "1 WAV file was left out: Pack takes 3rd Wave files. If it is a wavetable, the Wavetables page can convert it to a 3rd Wave table."
+                 : "\(skipped.wav) WAV files were left out: Pack takes 3rd Wave files. Wavetables among them can be converted to 3rd Wave tables on the Wavetables page.")
         }
         // Show the page the dropped files belong to.
         if addedUnified > 0 && addedPrograms == 0 && addedContent == 0 { section = .unpack }
@@ -601,7 +601,7 @@ final class AppState: ObservableObject {
 
     // MARK: Convert
 
-    /// Adds the wavetables in files and folders to the Convert page. Folders are searched; files
+    /// Adds the wavetables in files and folders to the Wavetables page. Folders are searched; files
     /// that cannot hold a wavetable, or hold none, are passed over. Read on a background queue
     /// with progress shown, like `add(urls:)`; the tables are listed on the main thread in one go,
     /// identical ones collapsed into one entry.
@@ -649,17 +649,17 @@ final class AppState: ObservableObject {
 
     func removeConvertItems(_ ids: Set<UUID>) { convertPlan.remove(ids); convertPreviews.removeAll() }
 
-    /// Empties the Convert page after asking. Files are not touched.
+    /// Empties the Wavetables page after asking. Files are not touched.
     func removeAllConvert() {
         let n = convertPlan.items.count
         guard n > 0 else { return }
         let what = "\(n) wavetable\(n == 1 ? "" : "s")"
-        guard Panels.confirm(title: "Remove everything from the Convert page?",
+        guard Panels.confirm(title: "Remove everything from the Wavetables page?",
                              message: "This removes \(what) from the list, with the tables you marked to convert and the frame sizes you chose. The files themselves are not touched.",
                              ok: "Remove All") else { return }
         convertPlan.items = []
         convertPreviews.removeAll()
-        note("Removed \(what) from the Convert page.")
+        note("Removed \(what) from the Wavetables page.")
     }
 
     /// Converts the tables marked to convert for the chosen destination into a folder the user chooses. With

@@ -11,7 +11,7 @@ import WavetableFormats
 import PgdataPackerCore
 #endif
 
-/// The Convert page: the wavetables found in the files added (top left), a read-only preview of
+/// The Wavetables page: the wavetables found in the files added (top left), a read-only preview of
 /// the selected one (bottom left), and the destination with its options, which apply to every
 /// table to convert (right). The decisions are in `ConvertPlan`; the preview is in
 /// ConvertDetail.swift and the destination pane in ConvertDestination.swift.

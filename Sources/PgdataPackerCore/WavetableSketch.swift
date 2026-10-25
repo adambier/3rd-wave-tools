@@ -4,7 +4,7 @@ import WavetableFormats   // SwiftPM build; absent in the app's single-module sw
 #endif
 
 /// Reduces a wavetable to what a small picture of it needs: a few dozen frames, each a few
-/// dozen values. The Convert page draws the result as frames stacked front to back.
+/// dozen values. The Wavetables page draws the result as frames stacked front to back.
 public enum WavetableSketch {
     /// Up to `maxFrames` frames chosen evenly (always the first and last), each reduced to
     /// `columns` values: the sample of largest magnitude in each column's span, so a peak is

@@ -64,7 +64,7 @@ final class WorkbenchTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: u) }
         XCTAssertThrowsError(try ContentFile.load(u)) { e in
             XCTAssertTrue("\(e)".contains("Surge wavetable"), "\(e)")
-            XCTAssertTrue("\(e)".contains("Convert page"), "\(e)")
+            XCTAssertTrue("\(e)".contains("Wavetables page"), "\(e)")
         }
     }
 

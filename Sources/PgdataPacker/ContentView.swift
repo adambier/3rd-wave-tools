@@ -25,7 +25,7 @@ struct ContentView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 330)
+                .frame(width: 360)
                 Spacer()
             }
             .padding(.vertical, 8)
@@ -233,7 +233,7 @@ extension PackPlan.Verdict {
         switch self {
         case .factoryOnly: return "checkmark.circle"
         case .embedsContent: return "shippingbox.fill"
-        case .blocked: return "exclamationmark.octagon.fill"   // a blocker, as on the Convert page; warnings are orange triangles
+        case .blocked: return "exclamationmark.octagon.fill"   // a blocker, as on the Wavetables page; warnings are orange triangles
         }
     }
     var tint: Color {
