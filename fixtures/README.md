@@ -6,7 +6,7 @@ should parse to, so a new implementation can be checked against it without a 3rd
 [`docs/FORMATS.md`](../docs/FORMATS.md) describes the formats; the section numbers below refer
 to it.
 
-The files are synthetic: the PgdataFormats library built them, and they contain no one else's
+The files are synthetic: the PgdataFormats and WavetableFormats libraries built them, and they contain no one else's
 sounds, so they can be used freely under this project's MIT licence. They exercise the structure
 of each format; they are not meant as sounds, and loading them on a 3rd Wave has not been tested.
 
@@ -16,7 +16,7 @@ of each format; they are not meant as sounds, and loading them on a 3rd Wave has
 | `program-2022-layout.pro` | A program in the 2022 layout (`W3_PROG_3`, 173/126/73), whose event records name parts by number. |
 | `program-2022-layout-converted.pro` | The same program converted to the current layout for a 4-part model (section 6.2): integer 34 becomes 100, global 1 becomes 2, and the note's target becomes the layer's part mask (3). |
 | `wavetable-p.wt` | A P table: 60 waves morphing from a sine to a sawtooth, then the PPG's four standard waves (section 5.1). Each point is stored as the sample and the difference to the next. |
-| `wavetable-u.wt` | A U table: 64 band-limited sawtooth waves of 1,024 samples, followed by a mipmap chain at 512, 256, 128, 64, and 64 samples per wave (section 5.1). |
+| `wavetable-u.wt` | A U table: 64 band-limited sawtooth waves of 1,024 samples, followed by a mipmap chain at 512, 256, 128, 64, and 64 samples per wave (section 5.1), made as the WavetableFormats library writes one. |
 | `multisample.bin` | A version 5 multisample of two 64-frame samples with different key ranges, loop modes, and crossfades (section 5.2). |
 | `unified.pgdata` | `program-current.pro` packed (section 4): U56 and S00 embedded (they are `wavetable-u.wt` and `multisample.bin`), the factory and analog sources listed without data. Unpacking it gives `program-current.pro` back, byte for byte. |
 

@@ -1,6 +1,7 @@
 import XCTest
 import Foundation
 @testable import PgdataFormats
+import WavetableFormats
 
 // The published test files in fixtures/: small synthetic files of each kind, with a JSON file
 // next to each saying what it parses to. They exist for people writing their own readers and
@@ -197,51 +198,32 @@ enum FixtureBuilder {
         return ProgramFile(version: "W3_PROG_3", name: "Fixture 2022 Layout", values: v)
     }
 
-    /// A P table: 60 waves morphing from sine to sawtooth, then the PPG's four standard waves.
+    /// A P table: 60 waves morphing from sine to sawtooth, then the PPG's four standard waves
+    /// (WavetableFormats' `PPGStandardWaves`), laid out by `WavetableFile(kind:name:frames:)`.
     static func pTable() -> WavetableFile {
-        var vals: [Float] = []
-        for w in 0..<64 {
-            var wave: [Float] = []
-            for i in 0..<128 {
-                let x = Double(i) / 128
-                let v: Double
-                switch w {
-                case 60: v = x < 0.25 ? 4 * x : (x < 0.75 ? 2 - 4 * x : 4 * x - 4)    // triangle
-                case 61: v = x < 0.125 ? 1 : -1                                       // narrow pulse
-                case 62: v = x < 0.5 ? 1 : -1                                         // square
-                case 63: v = 2 * x - 1                                                // sawtooth
-                default:
-                    let t = Double(w) / 59
-                    v = (1 - t) * sin(2 * .pi * x) + t * (2 * x - 1)
-                }
-                wave.append(Float(v))
+        let morph: [[Float]] = (0..<60).map { w in
+            (0..<128).map { i in
+                let x = Double(i) / 128, t = Double(w) / 59
+                return Float((1 - t) * sin(2 * .pi * x) + t * (2 * x - 1))
             }
-            for i in 0..<128 { vals.append(wave[i]); vals.append(wave[(i + 1) % 128] - wave[i]) }
         }
-        return WavetableFile(kind: .p, name: "Fixture P Sine to Saw", values: vals)
+        return try! WavetableFile(kind: .p, name: "Fixture P Sine to Saw", frames: morph + PPGStandardWaves.frames)
     }
 
     /// A U table: wave w is a band-limited sawtooth of 1 + w/2 harmonics, followed by the mipmap
-    /// chain (512, 256, 128, 64, and 64 samples per wave), each level keeping the harmonics below
-    /// its cutoff, as section 5.1 of FORMATS.md recommends a writer do.
+    /// chain that WavetableFormats' `Resampling.thirdWaveMipmapChain` makes from it (what Convert
+    /// writes).
     static func uTable() -> WavetableFile {
-        let levels: [(size: Int, maxHarmonic: Int)] = [(1024, 384), (512, 192), (256, 96), (128, 48), (64, 24), (64, 3)]
-        var out = [[Float]](repeating: [], count: levels.count)
-        for w in 0..<64 {
+        let waves: [[Float]] = (0..<64).map { w in
             let harmonics = 1 + w / 2
-            func sample(_ i: Int, _ n: Int, _ maxH: Int) -> Double {
-                var v = 0.0
-                for h in 1...harmonics where h < maxH { v += sin(2 * .pi * Double(h * i) / Double(n)) / Double(h) }
-                return v
+            func sample(_ i: Int) -> Double {
+                (1...harmonics).reduce(0.0) { $0 + sin(2 * .pi * Double($1 * i) / 1024) / Double($1) }
             }
-            var peak = 0.0
-            for i in 0..<1024 { peak = max(peak, abs(sample(i, 1024, 384))) }
-            let gain = 0.9 / peak
-            for (l, level) in levels.enumerated() {
-                for i in 0..<level.size { out[l].append(Float(sample(i, level.size, level.maxHarmonic) * gain)) }
-            }
+            let peak = (0..<1024).reduce(0.0) { max($0, abs(sample($1))) }
+            return (0..<1024).map { Float(sample($0) * 0.9 / peak) }
         }
-        return WavetableFile(kind: .u, name: "Fixture U Saw Harmonics", values: out.flatMap { $0 })
+        return try! WavetableFile(kind: .u, name: "Fixture U Saw Harmonics", frames: waves,
+                                  mipmapChain: Resampling.thirdWaveMipmapChain(waves))
     }
 
     /// A multisample of two short samples, a sine below middle C and a square from it up. Note

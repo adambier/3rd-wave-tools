@@ -56,7 +56,7 @@ products.append(.executable(name: "PgdataPacker", targets: ["PgdataPacker"]))
 #endif
 
 if includeTests {
-    targets.append(.testTarget(name: "PgdataFormatsTests", dependencies: ["PgdataFormats", "PgdataPackerCore"]))
+    targets.append(.testTarget(name: "PgdataFormatsTests", dependencies: ["PgdataFormats", "WavetableFormats", "PgdataPackerCore"]))
     targets.append(.testTarget(name: "WavetableFormatsTests", dependencies: ["PgdataFormats", "WavetableFormats", "PgdataPackerCore"]))
 }
 
