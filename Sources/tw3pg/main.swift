@@ -413,13 +413,7 @@ case "wtscan":
                 do {
                     let out = try WavetableWriter.write(w, preset: preset)
                     let back = try WavetableReader.read(out.data, fileName: out.fileName)
-                    let isPow2 = w.frameSize & (w.frameSize - 1) == 0
-                    let wantSize: Int
-                    switch preset {
-                    case .tonverk: wantSize = (64...4096).contains(w.frameSize) && isPow2 ? w.frameSize : 2048
-                    case .surge: wantSize = (2...4096).contains(w.frameSize) && isPow2 ? w.frameSize : 2048
-                    default: wantSize = preset.frameSize ?? 2048
-                    }
+                    let wantSize = WavetableWriter.frameSize(for: preset, source: w.frameSize)
                     let wantCount = preset.requiredFrameCount ?? min(preset.maxFrameCount, w.frameCount)
                     guard back.count == 1 else { fail("read back \(back.count) tables"); continue }
                     let gotSize = back[0].frameSize ?? (preset == .waveEdit ? back[0].candidateFrameSizes.first : nil)

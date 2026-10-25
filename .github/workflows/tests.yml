@@ -27,6 +27,16 @@ jobs:
       - uses: actions/checkout@v5
       - name: Test
         run: PGDATA_TESTS=1 swift test
+      # The shipped app is one module compiled from all four Sources folders (make-app.sh), which
+      # SwiftPM never checks: a top-level name shared by two folders, or a symbol one folder uses
+      # from another without `public`, fails only there. This type-checks that build without
+      # Sparkle (main.swift guards it) and without producing an app bundle.
+      - name: Type-check the app as one module
+        run: |
+          SDK=$(xcrun --sdk macosx --show-sdk-path)
+          swiftc -typecheck -sdk "$SDK" -target arm64-apple-macos13.0 -module-name PgdataPacker \
+            Sources/PgdataFormats/*.swift Sources/WavetableFormats/*.swift \
+            Sources/PgdataPackerCore/*.swift Sources/PgdataPacker/*.swift
 
   windows:
     runs-on: windows-2022

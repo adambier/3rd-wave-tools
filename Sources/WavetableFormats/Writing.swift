@@ -23,8 +23,8 @@ public enum WavetableWriter {
         return try job.run()
     }
 
-    /// Frame sizes Tonverk accepts in a `_wt<N>` tag.
-    static let tonverkFrameSizes = [64, 128, 256, 512, 1024, 2048, 4096]
+    /// Frame sizes Tonverk accepts in a `_wt<N>` tag: powers of two from 64 to 4,096.
+    public static let tonverkFrameSizes = [64, 128, 256, 512, 1024, 2048, 4096]
 
     static func validate(_ table: Wavetable) throws {
         guard let first = table.frames.first, !first.isEmpty else {
@@ -109,17 +109,10 @@ public enum WavetableWriter {
         }
 
         mutating func tonverk() throws -> OutputFile {
-            let size: Int
-            if let asked = options.tonverkFrameSize {
-                guard WavetableWriter.tonverkFrameSizes.contains(asked) else {
-                    throw WavetableError("Tonverk takes frames of 64, 128, 256, 512, 1,024, 2,048, or 4,096 samples, not \(grouped(asked)).")
-                }
-                size = asked
-            } else if WavetableWriter.tonverkFrameSizes.contains(table.frameSize) {
-                size = table.frameSize
-            } else {
-                size = 2048
+            if let asked = options.tonverkFrameSize, !WavetableWriter.tonverkFrameSizes.contains(asked) {
+                throw WavetableError("Tonverk takes frames of 64, 128, 256, 512, 1,024, 2,048, or 4,096 samples, not \(grouped(asked)).")
             }
+            let size = WavetableWriter.frameSize(for: .tonverk, source: table.frameSize, options: options)
             reshape(size: size, count: 64, exact: false, reason: "Tonverk takes at most 64")
             notePeakKept()
             let stepped = interpolation == .none
@@ -140,7 +133,7 @@ public enum WavetableWriter {
 
         mutating func surge() -> OutputFile {
             let n = table.frameSize
-            let size = WavetableWriter.isSurgeFrameSize(n) ? n : 2048
+            let size = WavetableWriter.frameSize(for: .surge, source: n)
             reshape(size: size, count: 512, exact: false, reason: "Surge takes at most 512")
             notePeakKept()
             noteUnrecordedInterpolation()
@@ -246,18 +239,26 @@ public enum WavetableWriter {
     }
 
     /// Whether Surge accepts `n` samples per frame in a `.wt`: a power of two from 2 to 4,096.
-    static func isSurgeFrameSize(_ n: Int) -> Bool { n >= 2 && n <= 4096 && (n & (n - 1)) == 0 }
+    public static func isSurgeFrameSize(_ n: Int) -> Bool { n >= 2 && n <= 4096 && (n & (n - 1)) == 0 }
 
-    /// An integer with thousands separators ("2,048"), independent of the locale.
-    static func grouped(_ n: Int) -> String {
-        let digits = String(abs(n))
-        var out = ""
-        for (i, c) in digits.enumerated() {
-            if i > 0 && (digits.count - i) % 3 == 0 { out += "," }
-            out.append(c)
+    /// The frame size `preset` writes for a table of `source` samples per frame with `options`:
+    /// the preset's fixed size; for Tonverk the requested size, else the source's when Tonverk
+    /// accepts it, else 2,048; for Surge the source's when it is a power of two up to 4,096, else
+    /// 2,048. The writer and any preview of its result both use this.
+    public static func frameSize(for preset: OutputPreset, source: Int, options: OutputOptions = OutputOptions()) -> Int {
+        switch preset {
+        case .tonverk:
+            if let n = options.tonverkFrameSize { return n }
+            return tonverkFrameSizes.contains(source) ? source : 2048
+        case .surge:
+            return isSurgeFrameSize(source) ? source : 2048
+        default:
+            return preset.frameSize ?? source
         }
-        return (n < 0 ? "-" : "") + out
     }
+
+    /// An integer with thousands separators ("2,048"); see `WavetableReader.grouped`.
+    static func grouped(_ n: Int) -> String { WavetableReader.grouped(n) }
 
     static func decimal(_ v: Double, _ places: Int) -> String {
         String(format: "%.\(places)f", v).replacingOccurrences(of: "-", with: "−")

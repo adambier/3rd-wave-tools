@@ -59,8 +59,9 @@ public struct ConvertPlan: Equatable {
     public struct Item: Identifiable, Equatable {
         /// Identity in the list.
         public let id: UUID
-        /// The table as the reader found it (the first copy).
-        public var table: FoundTable
+        /// The table as the reader found it (the first copy). Read-only: `peak`, the frame-size
+        /// hint, and the content key are computed from it when the item is added.
+        public let table: FoundTable
         /// Where the first copy was found.
         public var location: Location
         /// Where identical copies were found ("also in …"), in the order they were added.
@@ -616,17 +617,9 @@ public struct ConvertPlan: Equatable {
 
     // MARK: Destination
 
-    /// The frame size the destination writes for a source frame size.
+    /// The frame size the destination writes for a source frame size (the writer's own rule).
     public func destinationFrameSize(source: Int) -> Int {
-        if preset == .tonverk {
-            if let n = options.tonverkFrameSize { return n }
-            let accepted = (6...12).map { 1 << $0 }   // 64 … 4,096
-            return accepted.contains(source) ? source : 2048
-        }
-        if preset == .surge {   // Surge keeps a power of two from 2 to 4,096; the writer resizes others to 2,048
-            return source >= 2 && source <= 4096 && source & (source - 1) == 0 ? source : 2048
-        }
-        return preset.frameSize ?? source
+        WavetableWriter.frameSize(for: preset, source: source, options: options)
     }
 
     /// The frame count the destination writes for a source frame count.
@@ -939,16 +932,9 @@ public struct ConvertPlan: Equatable {
         }
     }
 
-    /// A count with thousands separators, independent of the locale ("1,024").
-    public static func formatCount(_ n: Int) -> String {
-        let digits = String(abs(n))
-        var out = ""
-        for (i, c) in digits.enumerated() {
-            if i > 0 && (digits.count - i) % 3 == 0 { out.append(",") }
-            out.append(c)
-        }
-        return (n < 0 ? "-" : "") + out
-    }
+    /// A count with thousands separators, independent of the locale ("1,024"); the same formatting
+    /// as the library's notes (`WavetableReader.grouped`).
+    public static func formatCount(_ n: Int) -> String { WavetableReader.grouped(n) }
 
     /// A peak with two decimals ("1.23"), independent of the locale.
     static func decimal(_ v: Float) -> String { String(format: "%.2f", Double(v)) }

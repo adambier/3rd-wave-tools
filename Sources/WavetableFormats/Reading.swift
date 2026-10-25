@@ -97,8 +97,9 @@ extension WavetableReader {
         return String(fileName[..<dot])
     }
 
-    /// An integer with thousands separators ("16,384"), independent of locale.
-    static func grouped(_ n: Int) -> String {
+    /// An integer with thousands separators ("16,384"), independent of the locale; the readers,
+    /// the writers, and the app's plans all format counts with it.
+    public static func grouped(_ n: Int) -> String {
         let digits = String(abs(n))
         var out = ""
         for (i, c) in digits.enumerated() {
