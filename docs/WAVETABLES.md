@@ -145,9 +145,9 @@ float files and scales the table down for the 3rd Wave and for 16-bit files, say
 
 When a destination needs a different number of frames, you choose how:
 
-- **Pick evenly** keeps the first and last frames and spaces the rest evenly. It adds no new
-  waveforms. Bringing a table *up* to more frames this way repeats frames.
-- **Interpolate** crossfades between neighbouring frames.
+- **Keep original frames** uses evenly spaced frames, the first and last among them. It adds no
+  new waves. Bringing a table *up* to more frames this way repeats frames.
+- **Blend new frames** crossfades neighbouring frames to make the new ones.
 
 The report after converting says what was done to each table.
 

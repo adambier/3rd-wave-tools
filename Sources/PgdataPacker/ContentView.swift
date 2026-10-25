@@ -184,7 +184,7 @@ struct StatusText: View {
         switch status {
         case .ok(let s): Text(brief).foregroundStyle(.secondary).lineLimit(1).help(s)
         case .warning(let s): Label(brief, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).lineLimit(1).help(s)
-        case .missing(let s): Label(brief, systemImage: "xmark.octagon").foregroundStyle(.red).lineLimit(1).help(s)
+        case .missing(let s): Label(brief, systemImage: "exclamationmark.octagon.fill").foregroundStyle(.red).lineLimit(1).help(s)
         }
     }
 }
@@ -233,7 +233,7 @@ extension PackPlan.Verdict {
         switch self {
         case .factoryOnly: return "checkmark.circle"
         case .embedsContent: return "shippingbox.fill"
-        case .blocked: return "exclamationmark.triangle.fill"
+        case .blocked: return "exclamationmark.octagon.fill"   // a blocker, as on the Convert page; warnings are orange triangles
         }
     }
     var tint: Color {

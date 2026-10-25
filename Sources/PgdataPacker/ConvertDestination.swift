@@ -135,7 +135,7 @@ struct ConvertOptionsBox: View {
         GroupBox("Options") {
             VStack(alignment: .leading, spacing: 12) {
                 ConvertFrameCountOption(state: state)
-                if preset.recordsInterpolation { ConvertMorphOption(state: state) }
+                if preset.recordsInterpolation { ConvertInterpolationOption(state: state) }
                 if preset == .tonverk { ConvertTonverkSizeOption(state: state) }
                 if preset == .thirdWaveP { ConvertPPGOption(state: state) }
             }
@@ -166,25 +166,25 @@ struct ConvertFrameCountOption: View {
     }
 }
 
-/// What the file records about moving between frames, for destinations whose files can.
-struct ConvertMorphOption: View {
+/// The interpolation the file records, for destinations whose files can.
+struct ConvertInterpolationOption: View {
     @ObservedObject var state: AppState
 
     var body: some View {
         let tonverk = state.convertPlan.preset == .tonverk
         VStack(alignment: .leading, spacing: 4) {
-            Text("Morph saved in file")
+            Text("Interpolation saved in file")
             Picker("", selection: $state.convertPlan.options.interpolation) {
                 Text("Same as source").tag(Optional<Interpolation>.none)
-                Text("Steps").tag(Optional<Interpolation>.some(Interpolation.none))
+                Text("None (stepped)").tag(Optional<Interpolation>.some(Interpolation.none))
                 Text("Crossfade").tag(Optional<Interpolation>.some(Interpolation.crossfade))
                 Text("Spectral").tag(Optional<Interpolation>.some(Interpolation.spectral))
             }
             .labelsHidden()
             .frame(maxWidth: 200)
             .help(tonverk
-                  ? "Tonverk reads stepping from the file name (a trailing r means steps); it has no spectral morph, so Spectral is written as smooth. Other synths set this on the oscillator."
-                  : "Serum and Vital read it from the WAV; Tonverk reads stepping from the file name. Other synths set this on the oscillator.")
+                  ? "Tonverk reads it from the file name (a trailing r means none); it has no spectral mode, so Spectral is written as smooth. Other synths set interpolation on the oscillator."
+                  : "Serum and Vital read it from the WAV; Tonverk reads it from the file name. Other synths set interpolation on the oscillator.")
             Text("Same as source saves crossfade when the source doesn't say.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

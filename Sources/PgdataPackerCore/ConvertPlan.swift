@@ -126,14 +126,14 @@ public struct ConvertPlan: Equatable {
             case .none: return .notStated
             }
         }
-        /// How the frame size was decided, as a sentence or two for the user.
+        /// How the frame size was decided, as a sentence or two for the user. The reader's own
+        /// phrase (`FoundTable.frameSizeBasis`, a noun phrase such as "Serum-style tag inside the
+        /// file (clm chunk)") is used where it says what settled the size.
         public var basisDescription: String {
-            let file = table.frameSizeBasis
+            let file = ConvertPlan.capitalized(table.frameSizeBasis)
             switch sizeSource {
-            case .inFile: return "Stated in the file: \(file)."
-            case .fileName: return ConvertPlan.capitalized(file) + "."
-            case .sidecar: return ConvertPlan.capitalized(file) + "."
-            case .markers: return "Loop or cue markers (\(file)); less certain than a frame size the file states."
+            case .inFile, .fileName, .sidecar: return file + "."
+            case .markers: return file + "; less certain than a frame size the file states."
             case .guessed:
                 return "Nothing in the file says, so the usual \(ConvertPlan.formatCount(table.frameSize ?? 2048)) is assumed. If it sounds wrong, pick another size."
             case .notStated:
@@ -147,7 +147,7 @@ public struct ConvertPlan: Equatable {
                 return "Your choice; the file doesn't say."
             }
         }
-        /// How the source asks to move between frames: Steps, Crossfade, Spectral, or Not stated.
+        /// The interpolation the source asks for: None (stepped), Crossfade, Spectral, or Not stated.
         public var interpolationDescription: String { Interpolation.displayName(table.interpolation) }
         /// "factory table U07 Knob Grotto 6" for a 3rd Wave factory table; nil otherwise.
         public var factoryLabel: String? {
@@ -239,7 +239,7 @@ public struct ConvertPlan: Equatable {
         public var peak: Float
         /// Whether the table is turned down to fit (3rd Wave and 16-bit destinations).
         public var scaledToFit: Bool
-        /// How to move between frames, as the file will record it; nil when the format cannot
+        /// The interpolation as the file will record it; nil when the format cannot
         /// record it.
         public var interpolationRecorded: Interpolation?
 
@@ -608,7 +608,7 @@ public struct ConvertPlan: Equatable {
     /// stay within ±1; 16-bit samples cannot go beyond it).
     public var destinationScalesToFit: Bool { preset.isThirdWave || preset == .waveEdit }
 
-    /// How to move between frames, as the destination's file will record it: the option, else
+    /// The interpolation as the destination's file will record it: the option, else
     /// the source's, else crossfade; nil when the format cannot record it.
     public func interpolationRecorded(for item: Item) -> Interpolation? {
         guard preset.recordsInterpolation else { return nil }
@@ -809,9 +809,10 @@ public struct ConvertPlan: Equatable {
     /// A peak with two decimals ("1.23"), independent of the locale.
     static func decimal(_ v: Float) -> String { String(format: "%.2f", Double(v)) }
 
-    /// The phrase with its first letter in capitals.
+    /// The phrase with its first letter in capitals, when it starts with an ordinary word ("cue
+    /// markers" to "Cue markers"); a name such as "u-he" or "clm" alone is left as it is.
     static func capitalized(_ s: String) -> String {
-        guard let first = s.first else { return s }
+        guard let first = s.first, first.isLowercase, s.dropFirst().first?.isLetter == true else { return s }
         return first.uppercased() + s.dropFirst()
     }
 

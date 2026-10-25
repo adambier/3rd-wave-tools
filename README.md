@@ -291,7 +291,7 @@ size the file allows, the source and the result stacked frame by frame, and what
 changes. When a destination needs a different number of frames, **Options** lets you choose how
 to get there: **Keep original frames** (evenly spaced frames, the first and last among them,
 adding no new waves) or **Blend new frames** (crossfades neighbouring frames). It also sets the
-morph saved in the file where the format records one, Tonverk's frame size, and the PPG waves for
+interpolation saved in the file where the format records one, Tonverk's frame size, and the PPG waves for
 P tables. **Clean Up Names…** works as on the Pack page. **Convert…** writes the files into a folder you choose (3rd
 Wave tables into a `WAVES` folder inside it) and reports everything it changed; it never replaces
 an existing file. For a 3rd Wave destination, **Send to Pack…** does the same and then adds the

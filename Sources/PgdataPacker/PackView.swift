@@ -97,6 +97,7 @@ struct PackView: View {
                 .toggleStyle(.checkbox).font(.caption)
                 .padding(.horizontal, 10).padding(.bottom, 4)
                 .help("Programs that can't be packed yet, or that carry a warning")
+            PackSummaryLine(state: st, shown: shownPrograms.count)
             Divider()
             List(selection: $selection) {
                 ForEach(shownPrograms) { item in
@@ -111,9 +112,6 @@ struct PackView: View {
                 } else if shownPrograms.isEmpty {
                     ListPlaceholder(text: "No programs match the filter.")
                 }
-            }
-            if shownPrograms.count != state.programs.count {
-                Text("\(shownPrograms.count) of \(state.programs.count) programs").font(.caption).foregroundStyle(.secondary).padding(4)
             }
         }
         .onChange(of: selection) { s in
@@ -131,6 +129,36 @@ struct PackView: View {
             Text(state.programs.isEmpty ? "Add a program to see what it will pack" : "Select a program")
                 .foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+}
+
+/// One line above the program list: how many programs there are (and are shown, when the
+/// filter hides some), and how many can't be packed yet.
+struct PackSummaryLine: View {
+    @ObservedObject var state: AppState
+    let shown: Int
+
+    private var blocked: Int {
+        state.programs.filter { (item: AppState.PackItem) -> Bool in
+            if case .blocked = state.plan(for: item).verdict { return true }
+            return false
+        }.count
+    }
+
+    var body: some View {
+        let total = state.programs.count
+        HStack(spacing: 10) {
+            Text(shown == total ? "\(total) program\(total == 1 ? "" : "s")" : "\(shown) of \(total) programs shown")
+                .monospacedDigit()
+            if blocked > 0 {
+                Label("\(blocked) can't pack yet", systemImage: "exclamationmark.octagon.fill")
+                    .foregroundStyle(.red)
+                    .help("Programs that need a file that isn't here; select one to see which slot")
+            }
+            Spacer()
+        }
+        .font(.caption)
+        .padding(.horizontal, 10).padding(.bottom, 4)
     }
 }
 

@@ -63,13 +63,13 @@ public extension OutputPreset {
         case .thirdWaveP:
             return "The 3rd Wave's PPG-style P set: 64 waves of 128."
         case .wav2048:
-            return "The common 2,048-sample WAV; records how to move between frames for Serum and Vital."
+            return "The common 2,048-sample WAV, up to 256 frames; the file records the interpolation, which Serum and Vital read."
         case .miniFreak:
-            return "The same WAV, cut to the 64 frames a MiniFreak keeps. Convert does the cutting, since MiniFreak V doesn't say how it would."
+            return "The same WAV, but at most 64 frames, which is what a MiniFreak keeps; Convert cuts the table down, since MiniFreak V doesn't say how it would."
         case .tonverk:
             return "Up to 64 frames; Tonverk reads the frame size and stepping from the file name."
         case .phasePlant:
-            return "Exactly 256 frames, as Phase Plant's documentation asks; shorter tables are filled out."
+            return "The same WAV, but exactly 256 frames, as Phase Plant's documentation asks; a shorter table is filled out to 256."
         case .surge:
             return "Surge's own .wt; keeps the source's frame size."
         case .waveEdit:
@@ -77,7 +77,7 @@ public extension OutputPreset {
         }
     }
 
-    /// Whether the preset's files record how to move between frames: a `clm ` chunk (Serum,
+    /// Whether the preset's files record the interpolation: a `clm ` chunk (Serum,
     /// Vital, Pigments, MiniFreak V, Phase Plant) or Tonverk's file name.
     var recordsInterpolation: Bool {
         switch self {
@@ -88,10 +88,11 @@ public extension OutputPreset {
 }
 
 public extension Interpolation {
-    /// The word shown for the value: "Steps", "Crossfade", or "Spectral" (never the raw name).
+    /// The word shown for the value: "None (stepped)", "Crossfade", or "Spectral" (never the raw
+    /// name "none" alone).
     var displayName: String {
         switch self {
-        case .none: return "Steps"
+        case .none: return "None (stepped)"
         case .crossfade: return "Crossfade"
         case .spectral: return "Spectral"
         }
