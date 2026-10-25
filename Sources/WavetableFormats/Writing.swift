@@ -98,7 +98,7 @@ public enum WavetableWriter {
             let n = frames.count
             reshape(size: 2048, count: 64, exact: false, reason: "a MiniFreak stores 64")
             if n < 64 {
-                notes.append("The table has \(n) frame\(n == 1 ? "" : "s"), fewer than the 64 a MiniFreak stores, and is left as it is; how MiniFreak V treats fewer than 64 frames is not documented.")
+                notes.append("\(n) frame\(n == 1 ? "" : "s"), fewer than the 64 a MiniFreak stores; left as it is, since how MiniFreak V treats fewer than 64 is not documented.")
             }
             return serumStyleWAV()
         }
@@ -124,7 +124,7 @@ public enum WavetableWriter {
             notePeakKept()
             let stepped = interpolation == .none
             if interpolation == .spectral {
-                notes.append("Tonverk has no spectral morph; the table is marked to interpolate smoothly.")
+                notes.append("Tonverk has no spectral morph, so the file is marked smooth.")
             }
             noteDefaultInterpolation(as: "marked as smooth")
             let named = WavetableWriter.Names.fileStem(table.name)
@@ -190,9 +190,9 @@ public enum WavetableWriter {
             if from != size {
                 frames = frames.map { Resampling.resizeCycle($0, to: size) }
                 if size > from {
-                    notes.append("Frame size resampled from \(grouped(from)) to \(grouped(size)) samples (band-limited: the waveform is unchanged and no harmonics are added).")
+                    notes.append("Resized from \(grouped(from)) to \(grouped(size)) samples per frame; the waveform is unchanged (band-limited, no harmonics added).")
                 } else {
-                    notes.append("Frame size resampled from \(grouped(from)) to \(grouped(size)) samples (band-limited): anything from the \(ordinal((size - 1) / 2 + 1)) harmonic up is dropped, as a frame of \(grouped(size)) samples cannot hold it.")
+                    notes.append("Resized from \(grouped(from)) to \(grouped(size)) samples per frame; the \(ordinal((size - 1) / 2 + 1)) harmonic and above are dropped, as \(grouped(size)) samples can't hold them.")
                 }
             }
             if target > n { changeCount(to: target, reason: reason) }
@@ -203,11 +203,11 @@ public enum WavetableWriter {
             frames = Resampling.changeFrameCount(frames, to: m, policy: options.frameCountPolicy)
             let how: String
             switch (options.frameCountPolicy, m < n) {
-            case (.pickEvenly, true): how = "by picking evenly spaced frames, keeping the first and last"
-            case (.pickEvenly, false): how = "by repeating frames at evenly spaced positions (no new waveforms)"
-            case (.interpolate, _): how = "by crossfading between neighbouring frames at evenly spaced positions, keeping the first and last"
+            case (.pickEvenly, true): how = "keeping evenly spaced original frames, the first and last among them"
+            case (.pickEvenly, false): how = "repeating frames at evenly spaced positions (no new waves)"
+            case (.interpolate, _): how = "crossfading neighbouring frames at evenly spaced positions, keeping the first and last"
             }
-            notes.append("Frame count changed from \(grouped(n)) to \(grouped(m)) (\(reason) frames) \(how).")
+            notes.append("Frame count changed from \(grouped(n)) to \(grouped(m)) (\(reason) frames), \(how).")
         }
 
         /// Scales the frames down so the peak is 1 when it is above 1.
@@ -216,26 +216,28 @@ public enum WavetableWriter {
             guard peak > 1 else { return }
             let g = 1 / peak
             frames = frames.map { $0.map { $0 * g } }
-            notes.append("Scaled by \(decimal(Double(g), 3)) (\(decimal(20 * log10(Double(g)), 1)) dB) to bring the peak from \(decimal(Double(peak), 3)) to 1: \(reason).")
+            notes.append("Turned down to fit (peak was \(decimal(Double(peak), 2)), \(decimal(20 * log10(Double(g)), 1)) dB); plays a little quieter: \(reason).")
         }
 
         mutating func notePeakKept() {
             let peak = currentPeak
             guard peak > 1 else { return }
-            notes.append("The peak is \(decimal(Double(peak), 3)), beyond ±1; kept unscaled, as 32-bit float holds it.")
+            notes.append("Peak \(decimal(Double(peak), 2)) kept; the synth may clip it.")
         }
 
-        /// For destinations that record interpolation: says when crossfade was chosen by default.
-        mutating func noteDefaultInterpolation(as words: String = "recorded as crossfade") {
+        /// For destinations that record how to move between frames: says when crossfade (or
+        /// Tonverk's smooth) was chosen because nothing said otherwise.
+        mutating func noteDefaultInterpolation(as words: String = "saved as crossfade") {
             if options.interpolation == nil && table.interpolation == nil {
-                notes.append("Interpolation \(words): the source does not say.")
+                notes.append("Morph \(words); the source doesn't say.")
             }
         }
 
-        /// For destinations whose files cannot record interpolation: says when one was asked for.
+        /// For destinations whose files can't record how to move between frames: says so when
+        /// the source or the options asked for one.
         mutating func noteUnrecordedInterpolation() {
             if let asked = options.interpolation ?? table.interpolation {
-                notes.append("This format has no interpolation setting, so “\(asked.rawValue)” is not recorded; the destination's own setting applies.")
+                notes.append("This format can't store how to move between frames (\(asked.displayName) asked for); set it on the destination's oscillator.")
             }
         }
 

@@ -80,6 +80,9 @@ public struct ConvertPlan: Equatable {
         public var userSelection: Bool?
         /// A new name from Clean Up Names (nil: the name the file gives).
         public var newName: String?
+        /// The largest absolute sample, computed once when the table is added (the views ask for
+        /// it on every pass).
+        public let peak: Float
         /// Content identity for collapsing duplicates.
         let contentKey: ContentKey
 
@@ -100,25 +103,52 @@ public struct ConvertPlan: Equatable {
             guard let n = frameSize, n > 0, !table.samples.isEmpty, table.samples.count % n == 0 else { return nil }
             return table.samples.count / n
         }
-        /// Frames × samples ("64 × 1,024"), or what is missing.
+        /// Frames × samples ("64 × 1,024"), or what is missing ("Choose a frame size", "Can't
+        /// split into frames").
         public var sizeDescription: String {
             if let n = frameSize, let c = frameCount { return "\(c) × \(ConvertPlan.formatCount(n))" }
-            if frameSize != nil { return "Samples do not divide into frames" }
-            return "Frame size needed"
+            if frameSize != nil { return "Can't split into frames" }
+            return "Choose a frame size"
         }
-        /// How the frame size was decided, in a short phrase.
-        public var basisDescription: String {
-            if !needsFrameSize {
-                guard let c = chosenFrameSize, c != table.frameSize else { return table.frameSizeBasis }
-                return "Your choice (the \(table.frameSizeBasis) suggested \(ConvertPlan.formatCount(table.frameSize ?? 0)))"
+        /// Whether the frame size rests on the file's length alone (an assumption the user may
+        /// want to change), with no choice made.
+        public var isGuessed: Bool { chosenFrameSize == nil && !needsFrameSize && table.frameSizeEvidence == .length }
+        /// What the frame size used rests on.
+        public var sizeSource: SizeSource {
+            if chosenFrameSize != nil { return .yourChoice }
+            if needsFrameSize { return .notStated }
+            switch table.frameSizeEvidence {
+            case .statedInFile: return .inFile
+            case .fileName: return .fileName
+            case .sidecar: return .sidecar
+            case .markers: return .markers
+            case .length: return .guessed
+            case .none: return .notStated
             }
-            let open = table.candidateFrameSizes.isEmpty
-                ? "not settled by the file"
-                : "not settled by the file; its length allows " + ConvertPlan.candidateList(table)
-            return chosenFrameSize == nil ? open : "Your choice (" + open + ")"
         }
-        /// The interpolation the source asks for, or "not stated".
-        public var interpolationDescription: String { table.interpolation?.rawValue ?? "not stated" }
+        /// How the frame size was decided, as a sentence or two for the user.
+        public var basisDescription: String {
+            let file = table.frameSizeBasis
+            switch sizeSource {
+            case .inFile: return "Stated in the file: \(file)."
+            case .fileName: return ConvertPlan.capitalized(file) + "."
+            case .sidecar: return ConvertPlan.capitalized(file) + "."
+            case .markers: return "Loop or cue markers (\(file)); less certain than a frame size the file states."
+            case .guessed:
+                return "Nothing in the file says, so the usual \(ConvertPlan.formatCount(table.frameSize ?? 2048)) is assumed. If it sounds wrong, pick another size."
+            case .notStated:
+                return "The file doesn't say how long each wave is."
+                    + (table.candidateFrameSizes.isEmpty ? " Its length allows none of the usual sizes."
+                                                          : " Its length allows " + ConvertPlan.candidateList(table) + ".")
+            case .yourChoice:
+                if let suggested = table.frameSize {
+                    return "Your choice; the file's length suggested \(ConvertPlan.formatCount(suggested))."
+                }
+                return "Your choice; the file doesn't say."
+            }
+        }
+        /// How the source asks to move between frames: Steps, Crossfade, Spectral, or Not stated.
+        public var interpolationDescription: String { Interpolation.displayName(table.interpolation) }
         /// "factory table U07 Knob Grotto 6" for a 3rd Wave factory table; nil otherwise.
         public var factoryLabel: String? {
             guard let slot = factorySlot else { return nil }
@@ -128,6 +158,103 @@ public struct ConvertPlan: Equatable {
         public var alsoInDescription: String? {
             alsoIn.isEmpty ? nil : "also in " + ConvertPlan.listPhrase(alsoIn.map(\.label))
         }
+    }
+
+    /// What an item's frame size rests on, as the Size from column shows it.
+    public enum SizeSource: String, Equatable, CaseIterable {
+        /// Stated in the file's contents (a `clm ` chunk, a Surge header, a 3rd Wave layout).
+        case inFile
+        /// A Tonverk `_wt<N>` tag in the file name.
+        case fileName
+        /// A Serum `.txt` file beside the WAV.
+        case sidecar
+        /// Loop or cue markers, which ordinary samples carry too.
+        case markers
+        /// The file's length alone: 2,048 assumed.
+        case guessed
+        /// Nothing says: the user must choose.
+        case notStated
+        /// The user chose a size.
+        case yourChoice
+
+        /// A word or two for the column ("In file", "Guessed", "Your choice").
+        public var label: String {
+            switch self {
+            case .inFile: return "In file"
+            case .fileName: return "File name"
+            case .sidecar: return "Serum .txt"
+            case .markers: return "Markers"
+            case .guessed: return "Guessed"
+            case .notStated: return "Not stated"
+            case .yourChoice: return "Your choice"
+            }
+        }
+    }
+
+    /// Whether an item will convert, and if not, why.
+    public enum Status: Equatable {
+        /// Ticked, with a frame size that divides the samples into frames.
+        case ready
+        /// Ticked, but the file leaves the frame size open and none has been chosen.
+        case needsFrameSize
+        /// Ticked, but the samples do not divide into frames of the size given.
+        case cannotSplit
+        /// Not ticked: left out of the conversion.
+        case unticked
+
+        /// Whether the item is ticked but cannot convert.
+        public var isBlocked: Bool { self == .needsFrameSize || self == .cannotSplit }
+    }
+
+    /// Notes for an item, by severity.
+    public struct ItemNotes: Equatable {
+        /// Things that may change the sound or that the user should check (over full scale,
+        /// metadata that disagrees, samples left out, a frame size still to choose).
+        public var warnings: [String]
+        /// Everything else worth knowing.
+        public var information: [String]
+        /// Whether there is anything to show.
+        public var isEmpty: Bool { warnings.isEmpty && information.isEmpty }
+        /// Warnings first, then information.
+        public var all: [String] { warnings + information }
+    }
+
+    /// What converting an item is expected to produce, from the preset's facts and the options;
+    /// the writer's own notes, after converting, say what was done.
+    public struct ExpectedResult: Equatable {
+        /// Samples per frame in the source.
+        public var frameSizeIn: Int
+        /// Samples per frame written.
+        public var frameSizeOut: Int
+        /// Frames in the source.
+        public var frameCountIn: Int
+        /// Frames written (with the PPG waves, the 60 the table goes into plus the 4 waves).
+        public var frameCountOut: Int
+        /// How the frame count is changed, when it is.
+        public var countPolicy: FrameCountPolicy
+        /// Whether the PPG's four standard waves are added at 60–63.
+        public var addsPPGWaves: Bool
+        /// The source's peak; above 1, the writer turns the table down for destinations that
+        /// cannot hold it (`scaledToFit`).
+        public var peak: Float
+        /// Whether the table is turned down to fit (3rd Wave and 16-bit destinations).
+        public var scaledToFit: Bool
+        /// How to move between frames, as the file will record it; nil when the format cannot
+        /// record it.
+        public var interpolationRecorded: Interpolation?
+
+        /// Whether the frame size changes.
+        public var resizes: Bool { frameSizeIn != frameSizeOut }
+        /// Whether the frame size grows (nil when it does not change).
+        public var frameSizeGrows: Bool? { resizes ? frameSizeOut > frameSizeIn : nil }
+        /// The frames the table itself goes into (60 with the PPG waves, else `frameCountOut`).
+        public var tableFrameCount: Int { addsPPGWaves ? frameCountOut - 4 : frameCountOut }
+        /// Whether the table's frame count changes.
+        public var changesCount: Bool { tableFrameCount != frameCountIn }
+        /// Whether the table gets more frames (nil when the count does not change).
+        public var frameCountGrows: Bool? { changesCount ? tableFrameCount > frameCountIn : nil }
+        /// Whether the source's peak is above 1 but kept (32-bit destinations).
+        public var peakKept: Bool { peak > 1 && !scaledToFit }
     }
 
     /// Content identity: frame size, sample count, and an FNV-1a hash of the samples' bits.
@@ -281,7 +408,7 @@ public struct ConvertPlan: Equatable {
                 factoryName = factory.name(ref).flatMap { $0 == "Wavetable \(ref.label)" ? nil : $0 }
             }
             items.append(Item(id: UUID(), table: t, location: location, sourceDescription: Self.sourceDescription(t),
-                              factorySlot: slot, factoryName: factoryName, contentKey: key))
+                              factorySlot: slot, factoryName: factoryName, peak: t.peak, contentKey: key))
             s.added += 1
         }
         return s
@@ -314,26 +441,106 @@ public struct ConvertPlan: Equatable {
         items[i].chosenFrameSize = size == items[i].table.frameSize ? nil : size
     }
 
-    /// Notes for an item: the reader's, and what the destination means for it.
-    public func notes(for item: Item) -> [String] {
-        var out = item.table.notes
+    /// Notes for an item, warnings first: the reader's, and what the destination means for it.
+    public func notes(for item: Item) -> [String] { itemNotes(for: item).all }
+
+    /// Notes for an item by severity. The reader's note about samples over full scale is replaced
+    /// by one built from the item's peak (so the wording is the same whichever reader found it),
+    /// and the reader's notes about disagreeing metadata or samples left out count as warnings.
+    public func itemNotes(for item: Item) -> ItemNotes {
+        var warnings: [String] = [], information: [String] = []
+        for note in item.table.notes {
+            if Self.isPeakNote(note) { continue }
+            if Self.isWarningNote(note) { warnings.append(note) } else { information.append(note) }
+        }
+        if item.peak > 1 {
+            warnings.insert("Peak \(Self.decimal(item.peak)): over full scale (±1).", at: 0)
+        }
         if let slot = item.factorySlot {
-            if preset.isThirdWave {
-                out.append("Identical to the 3rd Wave's \(item.factoryLabel ?? slot.label). Every 3rd Wave already has it, so it starts unticked.")
-            } else {
-                out.append("Identical to the 3rd Wave's \(item.factoryLabel ?? slot.label).")
-            }
+            let label = "factory " + slot.label + (item.factoryName.map { " " + $0 } ?? "")
+            information.append(preset.isThirdWave
+                ? "Same as \(label); every 3rd Wave has it, so it starts unticked."
+                : "Same as \(label).")
         }
-        if item.needsFrameSize && item.chosenFrameSize == nil {
-            out.append(item.table.candidateFrameSizes.isEmpty
-                ? "The file does not settle the frame size, and its length allows none of the usual sizes."
-                : "The file does not settle the frame size. Choose one: its length allows \(Self.candidateList(item.table)).")
+        return ItemNotes(warnings: warnings, information: information)
+    }
+
+    /// Whether a reader's note is about samples over full scale (replaced by the plan's own).
+    static func isPeakNote(_ note: String) -> Bool {
+        note.contains("beyond ±1") || note.contains("over full scale")
+    }
+
+    /// Whether a reader's note is a warning: metadata that disagrees, samples left out, channels
+    /// dropped, or a damaged file.
+    static func isWarningNote(_ note: String) -> Bool {
+        for mark in ["is used.", "left out", "not used", "cut short", "only the left", "does not divide", "more than the"] {
+            if note.contains(mark) { return true }
         }
-        return out
+        return false
     }
 
     /// Whether an item can be converted: its frame size is known and its samples divide into frames.
     public func canConvert(_ item: Item) -> Bool { item.frameCount != nil }
+
+    /// Whether an item converts, and if not, why.
+    public func status(_ item: Item) -> Status {
+        guard isSelected(item) else { return .unticked }
+        if item.frameSize == nil { return .needsFrameSize }
+        return item.frameCount == nil ? .cannotSplit : .ready
+    }
+
+    /// The item's status as a sentence or two: what blocks it and what to do, or that it is
+    /// ready, or that it is not ticked.
+    public func statusDescription(_ item: Item) -> String {
+        switch status(item) {
+        case .ready: return "Ready to convert."
+        case .unticked: return "Not ticked: left out of the conversion."
+        case .needsFrameSize:
+            return "Choose a frame size: the file doesn't say how long each wave is."
+                + (item.table.candidateFrameSizes.isEmpty ? " Its length allows none of the usual sizes."
+                                                           : " Its length allows \(Self.candidateList(item.table)).")
+        case .cannotSplit:
+            return "Can't split into frames: \(Self.formatCount(item.table.samples.count)) samples don't divide into frames of \(Self.formatCount(item.frameSize ?? 0))."
+        }
+    }
+
+    /// Whether a ticked item needs a look: it is blocked, its frame size is guessed from the
+    /// file's length, or it carries a warning.
+    public func needsAttention(_ item: Item) -> Bool {
+        let s = status(item)
+        guard s != .unticked else { return false }
+        return s.isBlocked || item.isGuessed || !itemNotes(for: item).warnings.isEmpty
+    }
+
+    /// The ticked items that need a look (see `needsAttention`).
+    public var attentionCount: Int { items.filter(needsAttention).count }
+
+    /// The ticked items that still need a frame size.
+    public var needsFrameSizeCount: Int { items.filter { status($0) == .needsFrameSize }.count }
+
+    /// The ticked items whose samples do not divide into frames.
+    public var cannotSplitCount: Int { items.filter { status($0) == .cannotSplit }.count }
+
+    /// The ticked items that cannot convert, for either reason.
+    public var blockedCount: Int { items.filter { status($0).isBlocked }.count }
+
+    /// The ticked items whose frame count the destination changes.
+    public var frameCountChangeCount: Int {
+        selectedItems.filter { expected(for: $0)?.changesCount == true }.count
+    }
+
+    /// The line under the destination list: that nothing has been tested yet, or which
+    /// destinations have been, from each preset's `testedIn`.
+    public static var testingFootnote: String {
+        let tested = OutputPreset.allCases.filter { !$0.testedIn.isEmpty }
+        if tested.isEmpty {
+            return "Not yet tested in these synths; each follows its maker's documentation (hover for sources)."
+        }
+        if tested.count == OutputPreset.allCases.count {
+            return "Every destination has been tested in its synth (hover for details)."
+        }
+        return "Tested: " + listPhrase(tested.map(\.shortTitle)) + ". The rest follow their makers' documentation (hover for sources)."
+    }
 
     // MARK: Destination
 
@@ -355,26 +562,63 @@ public struct ConvertPlan: Equatable {
         preset.requiredFrameCount ?? min(source, preset.maxFrameCount)
     }
 
-    /// What converting an item to the destination is expected to produce, from the preset's facts
-    /// (e.g., "64 × 1,024; frames resized from 2,048 samples; 256 frames reduced to 64 by picking
-    /// evenly"). The writer's own notes, after converting, say what was done.
-    public func expectedResult(for item: Item) -> String {
-        guard let size = item.frameSize else { return "Choose a frame size first" }
-        guard let count = item.frameCount else { return "Cannot be converted: the samples do not divide into frames of \(Self.formatCount(size))" }
-        let outSize = destinationFrameSize(source: size)
+    /// Whether the destination turns a table over full scale down to fit (the 3rd Wave's tables
+    /// stay within ±1; 16-bit samples cannot go beyond it).
+    public var destinationScalesToFit: Bool { preset.isThirdWave || preset == .waveEdit }
+
+    /// How to move between frames, as the destination's file will record it: the option, else
+    /// the source's, else crossfade; nil when the format cannot record it.
+    public func interpolationRecorded(for item: Item) -> Interpolation? {
+        guard preset.recordsInterpolation else { return nil }
+        return options.interpolation ?? item.table.interpolation ?? .crossfade
+    }
+
+    /// What converting an item is expected to produce, from the preset's facts and the options;
+    /// nil when the item cannot convert (no frame size, or samples that do not divide).
+    public func expected(for item: Item) -> ExpectedResult? {
+        guard let size = item.frameSize, let count = item.frameCount else { return nil }
         let ppg = preset == .thirdWaveP && options.appendPPGStandardWaves
         // With the PPG waves, the table itself goes into 60 frames and the four waves follow.
-        let outCount = ppg ? 60 : destinationFrameCount(source: count)
-        var parts = ["\(ppg ? 64 : outCount) × \(Self.formatCount(outSize))"]
-        if outSize != size { parts.append("frames resized from \(Self.formatCount(size)) samples") }
-        let how = options.frameCountPolicy == .pickEvenly ? "picking evenly" : "interpolating"
-        if outCount < count {
-            parts.append("\(Self.formatCount(count)) frames reduced to \(outCount) by \(how)")
-        } else if outCount > count {
-            parts.append("\(count) frame\(count == 1 ? "" : "s") brought up to \(outCount) by \(how)")
+        let outCount = ppg ? 64 : destinationFrameCount(source: count)
+        return ExpectedResult(frameSizeIn: size, frameSizeOut: destinationFrameSize(source: size),
+                              frameCountIn: count, frameCountOut: outCount,
+                              countPolicy: options.frameCountPolicy, addsPPGWaves: ppg,
+                              peak: item.peak, scaledToFit: item.peak > 1 && destinationScalesToFit,
+                              interpolationRecorded: interpolationRecorded(for: item))
+    }
+
+    /// `expected(for:)` as one line (e.g., "64 × 1,024; resized from 2,048 samples per frame;
+    /// 256 frames → 64, keeping original frames"), or why the item cannot convert.
+    public func expectedResult(for item: Item) -> String {
+        guard let size = item.frameSize else { return "Choose a frame size first" }
+        guard let e = expected(for: item) else {
+            return "Can't split into frames: the samples don't divide into frames of \(Self.formatCount(size))"
         }
-        if ppg { parts.append("the PPG's four standard waves at 60–63") }
+        var parts = ["\(e.frameCountOut) × \(Self.formatCount(e.frameSizeOut))"]
+        if e.resizes { parts.append("resized from \(Self.formatCount(e.frameSizeIn)) samples per frame") }
+        if e.changesCount {
+            parts.append("\(Self.formatCount(e.frameCountIn)) frame\(e.frameCountIn == 1 ? "" : "s") → \(e.tableFrameCount), " + Self.policyPhrase(e.countPolicy))
+        }
+        if e.scaledToFit { parts.append("turned down to fit (peak \(Self.decimal(e.peak)))") }
+        if e.addsPPGWaves { parts.append("the PPG's four standard waves at 60–63") }
         return parts.joined(separator: "; ")
+    }
+
+    /// "keeping original frames" or "blending new frames".
+    public static func policyPhrase(_ policy: FrameCountPolicy) -> String {
+        policy == .pickEvenly ? "keeping original frames" : "blending new frames"
+    }
+
+    // MARK: Preview
+
+    /// Runs the writer for one item (the ticked state does not matter), so the detail pane can
+    /// show what converting it does; nil when the item cannot convert or the writer fails.
+    public func preview(_ item: Item,
+                        write: (Wavetable, OutputPreset, OutputOptions) throws -> OutputFile = WavetableWriter.write)
+        -> OutputFile? {
+        guard var table = item.table.wavetable(frameSize: item.frameSize) else { return nil }
+        table.name = item.name
+        return try? write(table, preset, options)
     }
 
     // MARK: Names
@@ -404,7 +648,7 @@ public struct ConvertPlan: Equatable {
             guard var table = item.table.wavetable(frameSize: item.frameSize) else {
                 errors.append("\(item.name): " + (item.frameSize == nil
                     ? "choose a frame size first"
-                    : "the samples do not divide into frames of \(Self.formatCount(item.frameSize!))"))
+                    : "can't split into frames of \(Self.formatCount(item.frameSize ?? 0))"))
                 continue
             }
             table.name = item.name
@@ -492,6 +736,15 @@ public struct ConvertPlan: Equatable {
         return (n < 0 ? "-" : "") + out
     }
 
+    /// A peak with two decimals ("1.23"), independent of the locale.
+    static func decimal(_ v: Float) -> String { String(format: "%.2f", Double(v)) }
+
+    /// The phrase with its first letter in capitals.
+    static func capitalized(_ s: String) -> String {
+        guard let first = s.first else { return s }
+        return first.uppercased() + s.dropFirst()
+    }
+
     /// A list in words, with the serial comma: "A", "A and B", "A, B, and C".
     public static func listPhrase(_ xs: [String]) -> String {
         switch xs.count {
@@ -517,12 +770,12 @@ public struct ConvertPlan: Equatable {
         }
     }
 
-    /// The kind of source, for display.
+    /// The kind of source, in a few words ("Serum WAV", "U56 in Set.pgdata", "3rd Wave U .wt").
     static func sourceDescription(_ t: FoundTable) -> String {
         switch t.source {
-        case .thirdWaveWavetable(let isP): return "3rd Wave \(isP ? "P" : "U") table (.wt)"
+        case .thirdWaveWavetable(let isP): return "3rd Wave \(isP ? "P" : "U") .wt"
         case .unifiedProgram(let slot, _): return "\(slot) in \(t.fileName)"
-        case .wav: return t.frameSize == 2048 ? "Serum-style WAV" : "WAV"
+        case .wav: return t.frameSize == 2048 ? "Serum WAV" : "WAV"
         case .surgeWavetable: return "Surge .wt"
         }
     }
@@ -533,4 +786,41 @@ public struct ConvertPlan: Equatable {
         if case let .unifiedProgram(slot, _) = t.source { return "\(slot) in \(file)" }
         return file
     }
+}
+
+/// Keeps the writer's result for the items the detail pane shows, so a selection that does not
+/// change is not converted again on every pass. A result is reused while the item's name,
+/// frame size, and samples, and the plan's destination and options, are the same.
+public final class ConvertPreviewCache {
+    private struct Key: Equatable {
+        var itemID: UUID
+        var name: String
+        var frameSize: Int?
+        var sampleCount: Int
+        var preset: OutputPreset
+        var options: OutputOptions
+    }
+    private var entries: [UUID: (key: Key, file: OutputFile?)] = [:]
+    private let write: (Wavetable, OutputPreset, OutputOptions) throws -> OutputFile
+    /// How many times the writer has run (for tests).
+    public private(set) var writerRuns = 0
+
+    /// An empty cache that converts with `write` (the real writer by default).
+    public init(write: @escaping (Wavetable, OutputPreset, OutputOptions) throws -> OutputFile = WavetableWriter.write) {
+        self.write = write
+    }
+
+    /// `plan.preview(item)`, from the cache when nothing that affects it has changed.
+    public func preview(_ item: ConvertPlan.Item, in plan: ConvertPlan) -> OutputFile? {
+        let key = Key(itemID: item.id, name: item.name, frameSize: item.frameSize, sampleCount: item.table.samples.count,
+                      preset: plan.preset, options: plan.options)
+        if let hit = entries[item.id], hit.key == key { return hit.file }
+        writerRuns += 1
+        let file = plan.preview(item, write: write)
+        entries[item.id] = (key, file)
+        return file
+    }
+
+    /// Forgets everything (e.g., when items are removed).
+    public func removeAll() { entries = [:] }
 }

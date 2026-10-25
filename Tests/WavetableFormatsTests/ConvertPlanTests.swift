@@ -79,7 +79,7 @@ final class ConvertPlanTests: XCTestCase {
         let pg = plan.items.first { $0.name == "One" }!
         XCTAssertEqual(pg.sourceDescription, "U56 in c.pgdata")
         XCTAssertEqual(pg.location.label, "U56 in c.pgdata")
-        XCTAssertEqual(plan.items.first { $0.name == "a.wav" }?.sourceDescription, "Serum-style WAV")
+        XCTAssertEqual(plan.items.first { $0.name == "a.wav" }?.sourceDescription, "Serum WAV")
     }
 
     // MARK: Items
@@ -125,7 +125,7 @@ final class ConvertPlanTests: XCTestCase {
         let factory = plan.items[0]
         XCTAssertEqual(factory.factorySlot, ref)
         XCTAssertEqual(factory.factoryLabel, "factory table U07 \(name)")
-        XCTAssertEqual(factory.sourceDescription, "3rd Wave U table (.wt)")
+        XCTAssertEqual(factory.sourceDescription, "3rd Wave U .wt")
         XCTAssertNil(plan.items[1].factorySlot)
         XCTAssertNil(plan.items[2].factorySlot)   // not a 3rd Wave source: no fingerprint, never flagged
 
@@ -133,13 +133,13 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertFalse(plan.isSelected(factory))
         XCTAssertTrue(plan.isSelected(plan.items[1]))
         XCTAssertTrue(plan.isSelected(plan.items[2]))
-        XCTAssertTrue(plan.notes(for: factory).contains { $0.contains("Every 3rd Wave already has it") })
+        XCTAssertTrue(plan.notes(for: factory).contains { $0.contains("every 3rd Wave has it") })
         XCTAssertEqual(plan.selectedItems.map(\.name), ["Mine", "Pad"])
 
         // Another destination: ticked, flagged without the 3rd Wave note.
         plan.preset = .wav2048
         XCTAssertTrue(plan.isSelected(plan.items[0]))
-        XCTAssertFalse(plan.notes(for: plan.items[0]).contains { $0.contains("already has it") })
+        XCTAssertFalse(plan.notes(for: plan.items[0]).contains { $0.contains("every 3rd Wave has it") })
         XCTAssertTrue(plan.notes(for: plan.items[0]).contains { $0.contains("U07") })
 
         // The user's tick wins over the default either way.
@@ -169,12 +169,15 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertNil(item.frameSize)
         XCTAssertNil(item.frameCount)
         XCTAssertEqual(item.sourceDescription, "WAV")
-        XCTAssertEqual(item.sizeDescription, "Frame size needed")
-        XCTAssertEqual(item.basisDescription, "not settled by the file; its length allows 256 (64 frames) or 2,048 (8 frames)")
+        XCTAssertEqual(item.sizeDescription, "Choose a frame size")
+        XCTAssertEqual(item.sizeSource, .notStated)
+        XCTAssertEqual(item.basisDescription, "The file doesn't say how long each wave is. Its length allows 256 (64 frames) or 2,048 (8 frames).")
         XCTAssertFalse(plan.canConvert(item))
         XCTAssertTrue(plan.isSelected(item))   // ticked, but not converted until a size is chosen
         XCTAssertEqual(plan.expectedResult(for: item), "Choose a frame size first")
-        XCTAssertTrue(plan.notes(for: item).contains { $0.contains("Choose one") })
+        XCTAssertEqual(plan.status(item), .needsFrameSize)
+        XCTAssertTrue(plan.statusDescription(item).contains("Choose a frame size"))
+        XCTAssertNil(plan.expected(for: item))
 
         var c = plan.convert(write: Self.fakeWriter)
         XCTAssertTrue(c.files.isEmpty)
@@ -187,8 +190,9 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertEqual(item.frameSize, 256)
         XCTAssertEqual(item.sizeDescription, "64 × 256")
         XCTAssertTrue(item.basisDescription.hasPrefix("Your choice"))
-        XCTAssertFalse(plan.notes(for: item).contains { $0.contains("Choose one") })
-        XCTAssertEqual(plan.expectedResult(for: item), "64 × 1,024; frames resized from 256 samples")
+        XCTAssertEqual(item.sizeSource, .yourChoice)
+        XCTAssertEqual(plan.status(item), .ready)
+        XCTAssertEqual(plan.expectedResult(for: item), "64 × 1,024; resized from 256 samples per frame")
         c = plan.convert(write: Self.fakeWriter)
         XCTAssertEqual(c.errors, [])
         XCTAssertEqual(c.files.map(\.fileName), ["Edit.wt"])
@@ -208,11 +212,11 @@ final class ConvertPlanTests: XCTestCase {
                   found(table("U", file: "U.wt", source: .thirdWaveWavetable(isP: false), frames: 64, size: 1024, seed: 0.2), "U.wt")],
                  factory: FactoryLibrary())
         let (big, few, u) = (plan.items[0], plan.items[1], plan.items[2])
-        XCTAssertEqual(plan.expectedResult(for: big), "64 × 1,024; frames resized from 2,048 samples; 256 frames reduced to 64 by picking evenly")
-        XCTAssertEqual(plan.expectedResult(for: few), "64 × 1,024; frames resized from 2,048 samples; 8 frames brought up to 64 by picking evenly")
+        XCTAssertEqual(plan.expectedResult(for: big), "64 × 1,024; resized from 2,048 samples per frame; 256 frames → 64, keeping original frames")
+        XCTAssertEqual(plan.expectedResult(for: few), "64 × 1,024; resized from 2,048 samples per frame; 8 frames → 64, keeping original frames")
         XCTAssertEqual(plan.expectedResult(for: u), "64 × 1,024")
         plan.options.frameCountPolicy = .interpolate
-        XCTAssertTrue(plan.expectedResult(for: big).hasSuffix("256 frames reduced to 64 by interpolating"))
+        XCTAssertTrue(plan.expectedResult(for: big).hasSuffix("256 frames → 64, blending new frames"))
 
         plan.preset = .wav2048
         XCTAssertEqual(plan.expectedResult(for: few), "8 × 2,048")
@@ -220,13 +224,13 @@ final class ConvertPlanTests: XCTestCase {
 
         plan.preset = .tonverk
         XCTAssertEqual(plan.expectedResult(for: u), "64 × 1,024")    // Tonverk takes 1,024: kept
-        XCTAssertEqual(plan.expectedResult(for: big), "64 × 2,048; 256 frames reduced to 64 by interpolating")
+        XCTAssertEqual(plan.expectedResult(for: big), "64 × 2,048; 256 frames → 64, blending new frames")
         plan.options.tonverkFrameSize = 512
-        XCTAssertEqual(plan.expectedResult(for: few), "8 × 512; frames resized from 2,048 samples")
+        XCTAssertEqual(plan.expectedResult(for: few), "8 × 512; resized from 2,048 samples per frame")
 
         plan.preset = .thirdWaveP
         plan.options.appendPPGStandardWaves = true
-        XCTAssertEqual(plan.expectedResult(for: u), "64 × 128; frames resized from 1,024 samples; 64 frames reduced to 60 by interpolating; the PPG's four standard waves at 60–63")
+        XCTAssertEqual(plan.expectedResult(for: u), "64 × 128; resized from 1,024 samples per frame; 64 frames → 60, blending new frames; the PPG's four standard waves at 60–63")
     }
 
     // MARK: Converting and writing
@@ -303,5 +307,184 @@ final class ConvertPlanRenameTests: XCTestCase {
         XCTAssertFalse(plan.anyRenamed)
         plan.rename(id, to: "X"); plan.undoRenames()
         XCTAssertEqual(plan.items.first?.name, "SAW_STACK_01")
+    }
+}
+
+/// The state the Convert page shows per item (status, attention, notes by severity, the expected
+/// result), the preview and its cache, and what each destination says about itself.
+final class ConvertPlanStateTests: XCTestCase {
+    private func table(_ name: String, frames: Int = 4, size: Int? = 2048, samples: Int? = nil, peak: Float = 0.5,
+                       candidates: [Int] = [], evidence: FrameSizeEvidence? = nil, notes: [String] = [],
+                       interpolation: Interpolation? = nil) -> FoundTable {
+        let n = samples ?? frames * (size ?? 2048)
+        return FoundTable(name: name, fileName: name + ".wav", source: .wav,
+                          samples: (0..<n).map { Float(sin(Double($0) * 2 * .pi / 2048)) * peak },
+                          frameSize: size, frameSizeBasis: "clm chunk", candidateFrameSizes: candidates,
+                          interpolation: interpolation, notes: notes, frameSizeEvidence: evidence)
+    }
+
+    private func plan(_ tables: [FoundTable], preset: OutputPreset = .thirdWaveU) -> ConvertPlan {
+        var p = ConvertPlan(preset: preset)
+        p.add(tables.map { ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/" + $0.fileName), table: $0) },
+              factory: FactoryLibrary())
+        return p
+    }
+
+    func testStatusAndAttention() {
+        var p = plan([table("Ready"),
+                      table("Open", size: nil, samples: 16_384, candidates: [256, 2048]),
+                      table("Odd", size: 1000, samples: 2500),
+                      table("Guess", frames: 8, candidates: [1024], evidence: .length),
+                      table("Loud", peak: 1.3)])
+        let (ready, open, odd, guess, loud) = (p.items[0], p.items[1], p.items[2], p.items[3], p.items[4])
+        XCTAssertEqual(p.status(ready), .ready)
+        XCTAssertEqual(p.status(open), .needsFrameSize)
+        XCTAssertEqual(p.status(odd), .cannotSplit)
+        XCTAssertEqual(odd.sizeDescription, "Can't split into frames")
+        XCTAssertTrue(p.statusDescription(odd).hasPrefix("Can't split into frames: 2,500 samples"))
+        XCTAssertEqual(p.status(guess), .ready)
+        XCTAssertTrue(guess.isGuessed)
+        XCTAssertEqual(guess.sizeSource, .guessed)
+        XCTAssertEqual(guess.sizeSource.label, "Guessed")
+        XCTAssertTrue(guess.basisDescription.contains("the usual 2,048 is assumed"))
+        XCTAssertEqual(ready.sizeSource, .inFile)
+        XCTAssertEqual(ready.basisDescription, "Stated in the file: clm chunk.")
+
+        XCTAssertFalse(p.needsAttention(ready))
+        XCTAssertTrue(p.needsAttention(open))
+        XCTAssertTrue(p.needsAttention(odd))
+        XCTAssertTrue(p.needsAttention(guess))
+        XCTAssertTrue(p.needsAttention(loud))
+        XCTAssertEqual(p.attentionCount, 4)
+        XCTAssertEqual(p.needsFrameSizeCount, 1)
+        XCTAssertEqual(p.cannotSplitCount, 1)
+        XCTAssertEqual(p.blockedCount, 2)
+
+        // Unticked tables need no attention and are not blocked.
+        p.setSelected(open.id, false)
+        XCTAssertEqual(p.status(p.items[1]), .unticked)
+        XCTAssertFalse(p.needsAttention(p.items[1]))
+        XCTAssertEqual(p.blockedCount, 1)
+        XCTAssertEqual(p.attentionCount, 3)
+
+        // Choosing a size for a guessed table makes it the user's choice.
+        p.chooseFrameSize(guess.id, 1024)
+        XCTAssertEqual(p.items[3].sizeSource, .yourChoice)
+        XCTAssertFalse(p.items[3].isGuessed)
+        XCTAssertEqual(p.items[3].basisDescription, "Your choice; the file's length suggested 2,048.")
+        XCTAssertFalse(p.needsAttention(p.items[3]))
+    }
+
+    func testNotesBySeverity() {
+        let p = plan([table("Loud", peak: 1.234, notes: ["Its samples reach 1.23, beyond ±1.", "The file has 2 channels; only the left (first) channel is read."]),
+                      table("Quiet", notes: ["The clm chunk gives 2,048 samples per frame, but the Serum .txt sidecar gives 1,024; the clm chunk is used."])])
+        let loud = p.itemNotes(for: p.items[0])
+        XCTAssertEqual(loud.warnings, ["Peak 1.23: over full scale (±1).", "The file has 2 channels; only the left (first) channel is read."])
+        XCTAssertEqual(loud.information, [])
+        XCTAssertEqual(p.notes(for: p.items[0]), loud.all)
+        XCTAssertEqual(p.items[0].peak, 1.234, accuracy: 1e-5)
+        let quiet = p.itemNotes(for: p.items[1])
+        XCTAssertEqual(quiet.warnings.count, 1)
+        XCTAssertTrue(quiet.warnings[0].hasSuffix("is used."))
+        XCTAssertTrue(quiet.information.isEmpty)
+        XCTAssertFalse(quiet.isEmpty)
+    }
+
+    func testExpectedResultStruct() throws {
+        var p = plan([table("Big", frames: 256, peak: 1.5), table("Small", frames: 8, size: 1024, interpolation: .spectral)])
+        let big = try XCTUnwrap(p.expected(for: p.items[0]))
+        XCTAssertEqual(big.frameSizeIn, 2048)
+        XCTAssertEqual(big.frameSizeOut, 1024)
+        XCTAssertEqual(big.frameSizeGrows, false)
+        XCTAssertEqual(big.frameCountIn, 256)
+        XCTAssertEqual(big.frameCountOut, 64)
+        XCTAssertEqual(big.frameCountGrows, false)
+        XCTAssertTrue(big.scaledToFit)
+        XCTAssertFalse(big.peakKept)
+        XCTAssertNil(big.interpolationRecorded)   // a 3rd Wave .wt cannot record it
+        XCTAssertTrue(p.expectedResult(for: p.items[0]).contains("turned down to fit (peak 1.50)"))
+        let small = try XCTUnwrap(p.expected(for: p.items[1]))
+        XCTAssertFalse(small.resizes)
+        XCTAssertNil(small.frameSizeGrows)
+        XCTAssertEqual(small.frameCountGrows, true)
+        XCTAssertFalse(small.scaledToFit)
+        XCTAssertEqual(p.frameCountChangeCount, 2)
+
+        p.preset = .wav2048
+        let kept = try XCTUnwrap(p.expected(for: p.items[0]))
+        XCTAssertFalse(kept.scaledToFit)
+        XCTAssertTrue(kept.peakKept)
+        XCTAssertEqual(kept.interpolationRecorded, .crossfade)   // the source does not say
+        XCTAssertEqual(p.expected(for: p.items[1])?.interpolationRecorded, .spectral)
+        p.options.interpolation = Interpolation.none
+        XCTAssertEqual(p.expected(for: p.items[1])?.interpolationRecorded, Interpolation.none)
+        XCTAssertEqual(p.frameCountChangeCount, 0)
+
+        p.preset = .thirdWaveP
+        p.options.appendPPGStandardWaves = true
+        let ppg = try XCTUnwrap(p.expected(for: p.items[1]))
+        XCTAssertTrue(ppg.addsPPGWaves)
+        XCTAssertEqual(ppg.frameCountOut, 64)
+        XCTAssertEqual(ppg.tableFrameCount, 60)
+        XCTAssertTrue(ppg.changesCount)
+    }
+
+    func testPreviewRunsTheWriterForOneItemAndTheCacheKeepsIt() throws {
+        var p = plan([table("One"), table("Open", size: nil, samples: 16_384, candidates: [256, 2048])], preset: .wav2048)
+        var runs = 0
+        let write: (Wavetable, OutputPreset, OutputOptions) throws -> OutputFile = { t, preset, _ in
+            runs += 1
+            return OutputFile(fileName: t.name + "." + preset.fileExtension, data: Data(), notes: ["\(t.frameCount) frames"])
+        }
+        XCTAssertEqual(p.preview(p.items[0], write: write)?.notes, ["4 frames"])
+        XCTAssertNil(p.preview(p.items[1], write: write))   // no frame size yet
+        XCTAssertEqual(runs, 1)
+
+        let cache = ConvertPreviewCache(write: write)
+        XCTAssertEqual(cache.preview(p.items[0], in: p)?.fileName, "One.wav")
+        XCTAssertEqual(cache.preview(p.items[0], in: p)?.fileName, "One.wav")
+        XCTAssertEqual(cache.writerRuns, 1)
+        p.preset = .thirdWaveU
+        XCTAssertEqual(cache.preview(p.items[0], in: p)?.fileName, "One.wt")
+        XCTAssertEqual(cache.writerRuns, 2)
+        p.rename(p.items[0].id, to: "Two")
+        XCTAssertEqual(cache.preview(p.items[0], in: p)?.fileName, "Two.wt")
+        XCTAssertEqual(cache.writerRuns, 3)
+        XCTAssertEqual(cache.preview(p.items[0], in: p)?.fileName, "Two.wt")
+        XCTAssertEqual(cache.writerRuns, 3)
+        cache.removeAll()
+        _ = cache.preview(p.items[0], in: p)
+        XCTAssertEqual(cache.writerRuns, 4)
+
+        // The real writer, through the plan.
+        let real = try XCTUnwrap(p.preview(p.items[0]))
+        XCTAssertEqual(real.folder, "WAVES")
+        XCTAssertTrue(real.notes.contains { $0.hasPrefix("Resized from 2,048 to 1,024") })
+    }
+
+    func testPresetInfo() {
+        let titles = OutputPreset.allCases.map(\.shortTitle)
+        XCTAssertEqual(Set(titles).count, titles.count)
+        for p in OutputPreset.allCases {
+            XCTAssertFalse(p.specLine.isEmpty, "\(p)")
+            XCTAssertFalse(p.distinction.isEmpty, "\(p)")
+            XCTAssertEqual(p.group == .thirdWave, p.isThirdWave, "\(p)")
+        }
+        XCTAssertEqual(OutputPreset.Group.thirdWave.presets, [.thirdWaveU, .thirdWaveP])
+        XCTAssertEqual(OutputPreset.Group.otherSynths.presets.count, 6)
+        XCTAssertEqual(OutputPreset.Group.thirdWave.title, "3rd Wave")
+        XCTAssertEqual(OutputPreset.thirdWaveU.specLine, "64 × 1,024 · .wt")
+        XCTAssertEqual(OutputPreset.allCases.filter(\.recordsInterpolation), [.wav2048, .miniFreak, .tonverk, .phasePlant])
+        XCTAssertEqual(Interpolation.none.displayName, "Steps")
+        XCTAssertEqual(Interpolation.displayName(nil), "Not stated")
+        XCTAssertEqual(Interpolation.displayName(.spectral), "Spectral")
+        XCTAssertTrue(ConvertPlan.testingFootnote.hasPrefix("Not yet tested"))
+        XCTAssertEqual(ConvertPlan.policyPhrase(.pickEvenly), "keeping original frames")
+    }
+
+    func testInterpolationWordsNeverShowTheRawName() {
+        let p = plan([table("Stepped", interpolation: Interpolation.none), table("Silent", peak: 0.25)])
+        XCTAssertEqual(p.items[0].interpolationDescription, "Steps")
+        XCTAssertEqual(p.items[1].interpolationDescription, "Not stated")
     }
 }

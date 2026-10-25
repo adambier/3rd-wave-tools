@@ -11,8 +11,10 @@ import WavetableFormats
 import PgdataPackerCore
 #endif
 
-/// The Convert page: wavetables found in the files added (left), and the destination with its
-/// options (right). The decisions are in `ConvertPlan`.
+/// The Convert page: the wavetables found in the files added (top left), how the selected one
+/// will be converted (bottom left), and the destination with its options (right). The decisions
+/// are in `ConvertPlan`; the detail pane is in ConvertDetail.swift and the destination pane in
+/// ConvertDestination.swift.
 struct ConvertView: View {
     @EnvironmentObject var state: AppState
     @State private var selection = Set<UUID>()
@@ -28,10 +30,14 @@ struct ConvertView: View {
                           detail: "Add WAV wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table then shows its frames, its frame size, and how that was decided. Convert converts existing wavetables between formats; it does not make wavetables from other audio.")
             } else {
                 HSplitView {
-                    ConvertTablesPane(selection: $selection)
-                        .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
+                    VSplitView {
+                        ConvertTablesPane(selection: $selection)
+                            .frame(minWidth: 520, maxWidth: .infinity, minHeight: 200, maxHeight: .infinity)
+                        ConvertDetailPane(selection: selection)
+                            .frame(maxWidth: .infinity, minHeight: 120, idealHeight: 180, maxHeight: .infinity)
+                    }
                     ConvertDestinationPane()
-                        .frame(minWidth: 280, idealWidth: 330, maxWidth: 440, maxHeight: .infinity)
+                        .frame(minWidth: 260, idealWidth: 300, maxWidth: 380, maxHeight: .infinity)
                 }
             }
         }
@@ -82,43 +88,99 @@ struct ConvertTablesPane: View {
     @EnvironmentObject var state: AppState
     @Binding var selection: Set<UUID>
 
+    /// The rows shown: every table, or only those needing attention.
+    private var shown: [ConvertPlan.Item] {
+        let plan = state.convertPlan
+        return state.convertOnlyAttention ? plan.items.filter(plan.needsAttention) : plan.items
+    }
+
+    var body: some View {
+        let st = state
+        VStack(alignment: .leading, spacing: 0) {
+            ConvertSummaryStrip(state: st)
+            ConvertTable(state: st, items: shown, selection: $selection)
+                .overlay {
+                    if shown.isEmpty {
+                        ListPlaceholder(text: "No tables need attention.")
+                    }
+                }
+        }
+    }
+}
+
+/// One line above the table: how many tables there are and are ticked, what blocks any of
+/// them, and the filter for tables needing attention.
+struct ConvertSummaryStrip: View {
+    @ObservedObject var state: AppState
+
+    var body: some View {
+        let plan = state.convertPlan
+        let total = plan.items.count
+        HStack(spacing: 12) {
+            Text("\(total) table\(total == 1 ? "" : "s") · \(plan.selectedItems.count) ticked")
+                .monospacedDigit()
+            ConvertBlockedCount(count: plan.needsFrameSizeCount, what: "a frame size", plural: "frame sizes")
+            ConvertBlockedCount(count: plan.cannotSplitCount, what: "splitting", plural: "splitting")
+            Spacer()
+            Toggle("Only tables needing attention", isOn: $state.convertOnlyAttention)
+                .toggleStyle(.checkbox).font(.caption)
+                .help("Tables that can't convert yet, whose frame size is guessed, or that carry a warning")
+        }
+        .frame(height: 28)
+        .padding(.horizontal, 12)
+    }
+}
+
+/// "1 needs a frame size" in red, or nothing when the count is 0.
+struct ConvertBlockedCount: View {
+    let count: Int
+    let what: String
+    let plural: String
+
+    var body: some View {
+        if count > 0 {
+            let text = count == 1 ? "1 needs \(what)" : "\(count) need \(plural)"
+            Label(text, systemImage: "exclamationmark.octagon.fill")
+                .foregroundStyle(.red)
+                .help(what == "splitting"
+                      ? "Ticked tables whose samples don't divide into frames of the size given"
+                      : "Ticked tables whose file doesn't say how long each wave is: choose a size in the Size column")
+        }
+    }
+}
+
+/// The table itself: whether it is converted, its state, what it is, its size and where that
+/// came from, what it becomes, and whether there are notes.
+struct ConvertTable: View {
+    @ObservedObject var state: AppState
+    let items: [ConvertPlan.Item]
+    @Binding var selection: Set<UUID>
+
     var body: some View {
         let st = state
         let plan = st.convertPlan
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Wavetables found").font(.headline).padding(.horizontal, 12).padding(.top, 8)
-            Text("Identical tables are listed once, and factory tables are marked.")
-                .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12)
-            // Most important first: whether it is converted, what it is, and its size.
-            Table(plan.items, selection: $selection) {
-                TableColumn("Convert") { (item: ConvertPlan.Item) in ConvertTickCell(state: st, item: item) }
-                    .width(52)
-                TableColumn("Name") { (item: ConvertPlan.Item) in ConvertNameCell(state: st, item: item) }
-                    .width(min: 120, ideal: 190)
-                TableColumn("Source") { (item: ConvertPlan.Item) in ConvertSourceCell(item: item) }
-                    .width(min: 110, ideal: 170)
-                TableColumn("Frames") { (item: ConvertPlan.Item) in ConvertFrameSizeCell(state: st, item: item) }
-                    .width(min: 110, ideal: 130)
-                TableColumn("Frame size from") { (item: ConvertPlan.Item) in
-                    Text(item.basisDescription).foregroundStyle(.secondary).lineLimit(1).help(item.basisDescription)
-                }
-                    .width(min: 100, ideal: 150)
-                TableColumn("Interpolation") { (item: ConvertPlan.Item) in
-                    Text(item.interpolationDescription).foregroundStyle(.secondary).lineLimit(1)
-                }
-                    .width(min: 70, ideal: 90)
-                TableColumn("Result") { (item: ConvertPlan.Item) in
-                    ConvertResultCell(text: plan.expectedResult(for: item), ticked: plan.isSelected(item))
-                }
-                    .width(min: 160, ideal: 260)
-                TableColumn("Notes") { (item: ConvertPlan.Item) in
-                    ConvertNotesCell(notes: plan.notes(for: item), waiting: item.needsFrameSize && item.chosenFrameSize == nil)
-                }
-                    .width(min: 160, ideal: 280)
+        Table(items, selection: $selection) {
+            TableColumn("Convert") { (item: ConvertPlan.Item) in ConvertTickCell(state: st, item: item) }
+                .width(44)
+            TableColumn("") { (item: ConvertPlan.Item) in ConvertStatusCell(status: plan.status(item), tip: plan.statusDescription(item)) }
+                .width(22)
+            TableColumn("Name") { (item: ConvertPlan.Item) in ConvertNameCell(state: st, item: item) }
+                .width(min: 120, ideal: 240)
+            TableColumn("Source") { (item: ConvertPlan.Item) in ConvertSourceCell(item: item, ticked: plan.isSelected(item)) }
+                .width(min: 80, ideal: 130)
+            TableColumn("Size") { (item: ConvertPlan.Item) in ConvertFrameSizeCell(state: st, item: item) }
+                .width(min: 100, ideal: 120)
+            TableColumn("Size from") { (item: ConvertPlan.Item) in ConvertSizeFromCell(item: item, ticked: plan.isSelected(item)) }
+                .width(min: 90, ideal: 120)
+            TableColumn("Becomes") { (item: ConvertPlan.Item) in
+                ConvertBecomesCell(expected: plan.expected(for: item), summary: plan.expectedResult(for: item), ticked: plan.isSelected(item))
             }
-            .visibleScrollers()
-            .onDeleteCommand { state.removeConvertItems(selection); selection = [] }
+                .width(min: 150, ideal: 220)
+            TableColumn("") { (item: ConvertPlan.Item) in ConvertNotesCell(notes: plan.itemNotes(for: item)) }
+                .width(24)
         }
+        .visibleScrollers()
+        .onDeleteCommand { state.removeConvertItems(selection); selection = [] }
     }
 }
 
@@ -134,23 +196,32 @@ struct ConvertTickCell: View {
     }
 }
 
-/// The kind of source; the file's path (and those of identical copies) on hover.
-struct ConvertSourceCell: View {
-    let item: ConvertPlan.Item
+/// Red when the table can't convert yet, a grey check when it is ready, nothing when unticked.
+struct ConvertStatusCell: View {
+    let status: ConvertPlan.Status
+    let tip: String
     var body: some View {
-        Text(item.sourceDescription).lineLimit(1)
-            .help(([item.location.url.path] + item.alsoIn.map { "Also: " + $0.url.path }).joined(separator: "\n"))
+        switch status {
+        case .needsFrameSize:
+            Image(systemName: "exclamationmark.octagon.fill").foregroundStyle(.red).help(tip)
+        case .cannotSplit:
+            Image(systemName: "xmark.octagon.fill").foregroundStyle(.red).help(tip)
+        case .ready:
+            Image(systemName: "checkmark.circle").foregroundStyle(.secondary).help(tip)
+        case .unticked:
+            Text("").help(tip)
+        }
     }
 }
 
-/// What converting the table is expected to produce; grey when it is not ticked.
-struct ConvertResultCell: View {
-    let text: String
+/// The kind of source; the file's path (and those of identical copies) on hover.
+struct ConvertSourceCell: View {
+    let item: ConvertPlan.Item
     let ticked: Bool
     var body: some View {
-        Text(text).lineLimit(1)
+        Text(item.sourceDescription).lineLimit(1)
             .foregroundStyle(ticked ? Color.primary : Color.secondary)
-            .help(ticked ? text : "Not ticked. If ticked: " + text)
+            .help(([item.location.url.path] + item.alsoIn.map { "Also: " + $0.url.path }).joined(separator: "\n"))
     }
 }
 
@@ -160,31 +231,42 @@ struct ConvertNameCell: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
     var body: some View {
-        HStack(spacing: 4) {
+        let plan = state.convertPlan
+        let ticked = plan.isSelected(item)
+        HStack(spacing: 5) {
             Text(item.name).lineLimit(1).help(item.name)
+                .foregroundStyle(ticked ? Color.primary : Color.secondary)
             if let slot = item.factorySlot {
-                ConvertBadge(text: "Factory \(slot.label)",
-                             tip: "Identical to the 3rd Wave's \(item.factoryLabel ?? slot.label)")
+                ConvertBadge(text: "Factory",
+                             tip: "Same as factory \(slot.label)\(item.factoryName.map { " " + $0 } ?? "")")
             }
-            if let also = item.alsoInDescription {
-                ConvertBadge(text: item.alsoIn.count == 1 ? "1 copy" : "\(item.alsoIn.count) copies",
-                             tip: "The same table is " + also + "; it is listed and converted once.")
+            if !item.alsoIn.isEmpty {
+                Label("×\(item.alsoIn.count + 1)", systemImage: "doc.on.doc")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    .help("\(item.alsoIn.count + 1) identical copies, listed and converted once. Also in: "
+                          + item.alsoIn.map(\.label).joined(separator: ", "))
             }
-            if state.convertPlan.preset.isThirdWave { ThirdWaveNameNote(name: item.name) }
+            if plan.preset.isThirdWave { ThirdWaveNameNote(name: item.name) }
         }
     }
 }
 
-/// For a 3rd Wave destination: the name the `.wt` will carry, when it differs from the table's
-/// (cut to 31 characters, accents outside Latin-1 removed, other characters as "?").
+/// For a 3rd Wave destination: a scissors icon when the `.wt` will carry a different name (cut to
+/// 31 characters, accents outside Latin-1 removed, other characters as "?"), the name on hover.
 struct ThirdWaveNameNote: View {
     let name: String
+    /// The icon alone (the table), or with the name it is written as (the Clean Up Names sheet).
+    var compact: Bool = true
     var body: some View {
         let written = WavetableWriter.thirdWaveName(name)
         if written.name != name.trimmingCharacters(in: .whitespaces) {
-            Label("Written as \u{201C}\(written.name)\u{201D}", systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.orange).lineLimit(1)
-                .help(written.notes.joined(separator: "\n"))
+            let tip = "Written as \u{201C}\(written.name)\u{201D}\n" + written.notes.joined(separator: "\n")
+            if compact {
+                Image(systemName: "scissors").foregroundStyle(.orange).help(tip)
+            } else {
+                Label("Written as \u{201C}\(written.name)\u{201D}", systemImage: "scissors")
+                    .foregroundStyle(.orange).lineLimit(1).help(tip)
+            }
         }
     }
 }
@@ -203,8 +285,8 @@ struct ConvertBadge: View {
     }
 }
 
-/// Frames × size. When the file leaves the frame size open, or only its length suggested one, a
-/// menu of the sizes its length allows.
+/// Frames × size. When the file leaves the frame size open, a bordered menu in red asking for
+/// one; when only its length suggested the size, a menu of the sizes its length allows.
 struct ConvertFrameSizeCell: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
@@ -215,185 +297,156 @@ struct ConvertFrameSizeCell: View {
 
     var body: some View {
         let choices = item.frameSizeChoices
+        let ticked = state.convertPlan.isSelected(item)
         if choices.isEmpty && !item.needsFrameSize {
             Text(item.sizeDescription).monospacedDigit().lineLimit(1)
+                .foregroundStyle(ticked ? Color.primary : Color.secondary)
+                .help(item.sizeDescription + " (frames × samples per frame)")
         } else if choices.isEmpty {
-            Label("Size unknown", systemImage: "xmark.octagon").foregroundStyle(.red).lineLimit(1)
-                .help("The file does not settle the frame size, and its length allows none of the usual sizes.")
+            Label("Can't split", systemImage: "xmark.octagon.fill").foregroundStyle(.red).lineLimit(1)
+                .help(state.convertPlan.statusDescription(item))
         } else {
             Menu {
-                ForEach(choices, id: \.self) { size in
+                ForEach(choices, id: \.self) { (size: Int) in
                     Button { state.convertPlan.chooseFrameSize(item.id, size) } label: {
                         if size == item.frameSize { Label(title(size), systemImage: "checkmark") }
                         else { Text(title(size)) }
                     }
                 }
             } label: {
-                Text(item.frameSize.map { title($0) } ?? "Choose size…").monospacedDigit().lineLimit(1)
+                ConvertSizeMenuLabel(text: item.frameSize.map { title($0) } ?? "Choose size…", needed: item.frameSize == nil)
             }
             // A bordered pop-up with its chevron, so it reads as a menu rather than as text.
             .menuStyle(.button)
             .buttonStyle(.bordered)
             .menuIndicator(.visible)
             .help(item.needsFrameSize
-                  ? "The file does not settle the frame size: choose one of the sizes its length allows (frames × samples per frame)."
-                  : "Only the file's length suggested this frame size: choose another if it is wrong (frames × samples per frame).")
+                  ? "The file doesn't say how long each wave is. Choose one of the sizes its length allows (frames × samples per frame); the pane below shows what each looks like."
+                  : "Only the file's length suggested this frame size. Choose another if it sounds wrong (frames × samples per frame).")
         }
     }
 }
 
-/// The first note, with the rest on hover.
+/// The closed menu's label: red while a size is still needed.
+struct ConvertSizeMenuLabel: View {
+    let text: String
+    let needed: Bool
+    var body: some View {
+        Text(text).monospacedDigit().lineLimit(1)
+            .foregroundStyle(needed ? Color.red : Color.primary)
+    }
+}
+
+/// An icon and a word for what the frame size rests on; the whole story on hover.
+struct ConvertSizeFromCell: View {
+    let item: ConvertPlan.Item
+    let ticked: Bool
+
+    private var symbol: String {
+        switch item.sizeSource {
+        case .inFile: return "doc.text"
+        case .fileName: return "textformat"
+        case .sidecar: return "doc.plaintext"
+        case .markers: return "flag"
+        case .guessed: return "questionmark.circle"
+        case .notStated: return "exclamationmark.octagon.fill"
+        case .yourChoice: return "hand.point.up.left"
+        }
+    }
+
+    private var tint: Color {
+        switch item.sizeSource {
+        case .notStated: return .red
+        case .guessed: return .secondary
+        default: return ticked ? Color.primary : Color.secondary
+        }
+    }
+
+    private var word: Text {
+        let t = Text(item.sizeSource.label)
+        return item.sizeSource == .guessed ? t.italic() : t
+    }
+
+    var body: some View {
+        Label {
+            word
+        } icon: {
+            Image(systemName: symbol)
+        }
+        .foregroundStyle(tint)
+        .lineLimit(1)
+        .help(item.basisDescription)
+    }
+}
+
+/// "→ 64 × 1,024" with the numbers that change in semibold, then small icons for each change
+/// (frame size, frame count, turned down to fit), each explained on hover. "—" when blocked.
+struct ConvertBecomesCell: View {
+    let expected: ConvertPlan.ExpectedResult?
+    let summary: String
+    let ticked: Bool
+
+    var body: some View {
+        if let e = expected {
+            HStack(spacing: 6) {
+                sizeText(e)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .foregroundStyle(ticked ? Color.primary : Color.secondary)
+                ConvertChangeIcons(expected: e)
+            }
+            .help(ticked ? summary : "Not ticked. If ticked: " + summary)
+        } else {
+            Text("—").foregroundStyle(.secondary).help(summary)
+        }
+    }
+
+    private func sizeText(_ e: ConvertPlan.ExpectedResult) -> Text {
+        let countChanged = e.frameCountOut != e.frameCountIn
+        let count = Text("\(e.frameCountOut)").fontWeight(countChanged ? .semibold : .regular)
+        let size = Text(ConvertPlan.formatCount(e.frameSizeOut)).fontWeight(e.resizes ? .semibold : .regular)
+        let arrow = Text("→ ")
+        let times = Text(" × ")
+        return arrow + count + times + size
+    }
+}
+
+/// The small icons after the size: resized, fewer or more frames, turned down to fit.
+struct ConvertChangeIcons: View {
+    let expected: ConvertPlan.ExpectedResult
+
+    var body: some View {
+        let e = expected
+        HStack(spacing: 4) {
+            if e.resizes {
+                Image(systemName: "arrow.left.and.right")
+                    .help("Resized from \(ConvertPlan.formatCount(e.frameSizeIn)) samples per frame")
+            }
+            if let grows = e.frameCountGrows {
+                Image(systemName: grows ? "plus.circle" : "minus.circle")
+                    .help("\(ConvertPlan.formatCount(e.frameCountIn)) → \(e.tableFrameCount) frames, " + ConvertPlan.policyPhrase(e.countPolicy))
+            }
+            if e.scaledToFit {
+                Image(systemName: "speaker.wave.1")
+                    .help("Turned down to fit: peak \(String(format: "%.2f", Double(e.peak)))")
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+}
+
+/// An icon when there are notes: a triangle for warnings, else an information circle. All the
+/// notes on hover.
 struct ConvertNotesCell: View {
-    let notes: [String]
-    /// The table still needs a frame size: shown as a warning.
-    let waiting: Bool
+    let notes: ConvertPlan.ItemNotes
     var body: some View {
         if notes.isEmpty {
-            Text("—").foregroundStyle(.secondary)
+            Text("")
+        } else if notes.warnings.isEmpty {
+            Image(systemName: "info.circle").foregroundStyle(.secondary).help(notes.all.joined(separator: "\n"))
         } else {
-            let text = notes[0] + (notes.count > 1 ? " (+\(notes.count - 1) more)" : "")
-            Label(text, systemImage: waiting ? "exclamationmark.triangle" : "info.circle")
-                .foregroundStyle(waiting ? Color.orange : Color.secondary)
-                .lineLimit(1)
-                .help(notes.joined(separator: "\n"))
-        }
-    }
-}
-
-// MARK: - Destination
-
-struct ConvertDestinationPane: View {
-    @EnvironmentObject var state: AppState
-    @State private var showAdvanced = false
-
-    var body: some View {
-        let plan = state.convertPlan
-        let ticked = plan.selectedItems
-        let waiting = ticked.filter { !plan.canConvert($0) }.count
-        // Scrolls rather than setting the pane's height, so a short window never pushes the
-        // page's top out of view.
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Convert to").font(.headline)
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(OutputPreset.allCases, id: \.self) { p in
-                        ConvertPresetRow(preset: p, chosen: p == plan.preset) { state.convertPlan.preset = p }
-                    }
-                }
-                Divider()
-                Label(summary(ticked: ticked.count, total: plan.items.count, waiting: waiting),
-                      systemImage: waiting > 0 ? "exclamationmark.triangle" : "arrow.left.arrow.right")
-                    .foregroundStyle(waiting > 0 ? Color.orange : Color.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if plan.preset.isThirdWave {
-                    Text("Send to Pack converts the ticked tables and adds the .wt files to the Pack page, to embed in programs.")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                DisclosureGroup("Advanced", isExpanded: $showAdvanced) { advanced }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .visibleScrollers()
-    }
-
-    private func summary(ticked: Int, total: Int, waiting: Int) -> String {
-        var s = "\(ticked) of \(total) table\(total == 1 ? "" : "s") ticked to convert"
-        if waiting > 0 { s += "; \(waiting) still need\(waiting == 1 ? "s" : "") a frame size" }
-        return s
-    }
-
-    @ViewBuilder private var advanced: some View {
-        let preset = state.convertPlan.preset
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("When the destination needs a different number of frames")
-                Picker("", selection: $state.convertPlan.options.frameCountPolicy) {
-                    Text("Pick evenly").tag(FrameCountPolicy.pickEvenly)
-                    Text("Interpolate").tag(FrameCountPolicy.interpolate)
-                }
-                .pickerStyle(.radioGroup)
-                .labelsHidden()
-                Text("Pick evenly keeps the first and last frames and spaces the rest evenly, adding no new waveforms. Interpolate crossfades between neighbouring frames. The report after converting says what was done.")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Interpolation to record")
-                Picker("", selection: $state.convertPlan.options.interpolation) {
-                    Text("As the source says").tag(Optional<Interpolation>.none)
-                    Text("None (steps between frames)").tag(Optional<Interpolation>.some(Interpolation.none))
-                    Text("Crossfade").tag(Optional<Interpolation>.some(Interpolation.crossfade))
-                    Text("Spectral").tag(Optional<Interpolation>.some(Interpolation.spectral))
-                }
-                .labelsHidden()
-                Text("Only for destinations whose files can say: the clm chunk of a WAV, a Tonverk file name.")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            if preset == .tonverk {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Tonverk frame size")
-                    Picker("", selection: $state.convertPlan.options.tonverkFrameSize) {
-                        Text("The source's, if Tonverk takes it; otherwise 2,048").tag(Optional<Int>.none)
-                        ForEach([64, 128, 256, 512, 1024, 2048, 4096], id: \.self) { n in
-                            Text(ConvertPlan.formatCount(n)).tag(Optional<Int>.some(n))
-                        }
-                    }
-                    .labelsHidden()
-                    Text("Written into the file name (_wt<N>), which is where Tonverk reads it.")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            if preset == .thirdWaveP {
-                VStack(alignment: .leading, spacing: 4) {
-                    Toggle("Put the PPG standard waves in frames 60–63", isOn: $state.convertPlan.options.appendPPGStandardWaves)
-                        .toggleStyle(.checkbox)
-                    Text("Triangle, narrow pulse, square, and sawtooth, as in the 3rd Wave's PPG-derived P tables. The table itself is fitted into frames 0–59 first, by the choice above, so its whole sweep is kept.")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-        .padding(.top, 6)
-    }
-}
-
-/// One destination: its title, whether it has been tested and where, and what it rests on.
-struct ConvertPresetRow: View {
-    let preset: OutputPreset
-    let chosen: Bool
-    let choose: () -> Void
-
-    var body: some View {
-        Button(action: choose) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: chosen ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(chosen ? Color.accentColor : Color.secondary)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(preset.title).fixedSize(horizontal: false, vertical: true)
-                    ConvertEvidenceLabel(preset: preset)
-                    Text(preset.basis).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(6)
-            .background(RoundedRectangle(cornerRadius: 6).fill(chosen ? Color.accentColor.opacity(0.12) : Color.clear))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-/// "Tested in …", or that the preset has not been tested in its destination yet (its `basis`, shown
-/// below it, says what it rests on).
-struct ConvertEvidenceLabel: View {
-    let preset: OutputPreset
-    var body: some View {
-        let tested = preset.testedIn
-        if tested.isEmpty {
-            Label("Not yet tested in its destination", systemImage: "doc.text")
-                .font(.caption).foregroundStyle(.secondary)
-        } else {
-            Label("Tested in " + ConvertPlan.listPhrase(tested), systemImage: "checkmark.seal")
-                .font(.caption).foregroundStyle(.green)
+            Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange).help(notes.all.joined(separator: "\n"))
         }
     }
 }

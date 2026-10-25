@@ -95,10 +95,10 @@ final class WritingTests: XCTestCase {
         XCTAssertEqual(wt.values.count, 131_072)
         XCTAssertLessThanOrEqual(wt.peak, 1.00001)
         XCTAssertEqual(wt.values[0..<65_536].map(abs).max()!, 1, accuracy: 1e-6)
-        notes(out, contain: "Frame size resampled from 2,048 to 1,024")
+        notes(out, contain: "Resized from 2,048 to 1,024")
         notes(out, contain: "Frame count changed from 3 to 64")
         notes(out, contain: "repeating frames")
-        notes(out, contain: "Scaled by 0.6")
+        notes(out, contain: "Turned down to fit (peak was 1.50")
     }
 
     func testThirdWaveNameSanitised() throws {
@@ -145,7 +145,7 @@ final class WritingTests: XCTestCase {
         }
         notes(out, contain: "Frame count changed from 64 to 60")
         notes(out, contain: "standard waves")
-        notes(out, contain: "harmonic up is dropped")
+        notes(out, contain: "harmonic and above are dropped")
     }
 
     // MARK: Serum-style WAVs
@@ -184,7 +184,7 @@ final class WritingTests: XCTestCase {
         XCTAssertGreaterThan(w.samples.map(abs).max()!, 1.2)
         notes(out, contain: "Frame count changed from 300 to 256")
         notes(out, contain: "crossfading")
-        notes(out, contain: "kept unscaled")
+        notes(out, contain: "kept; the synth may clip it")
     }
 
     func testMiniFreak() throws {
@@ -289,7 +289,7 @@ final class WritingTests: XCTestCase {
     func testWaveEditScalesToFit() throws {
         let out = try write(table(frames: 64, size: 256, peak: 2), .waveEdit)
         XCTAssertEqual(parseWAV(out.data).samples.map(abs).max(), 32_767)
-        notes(out, contain: "Scaled by 0.500")
+        notes(out, contain: "Turned down to fit (peak was 2.00")
     }
 
     // MARK: Names, validation, presets

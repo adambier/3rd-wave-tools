@@ -100,6 +100,10 @@ final class AppState: ObservableObject {
     /// The wavetables added to the Convert page, the destination, and its options. The
     /// destination and the frame-count choice are remembered between sessions.
     @Published var convertPlan = ConvertPlan() { didSet { saveSettings() } }
+    /// Show only the Convert tables that need a look (blocked, guessed frame size, or a warning).
+    @Published var convertOnlyAttention = false
+    /// The writer's results for the tables the Convert detail pane shows, kept between passes.
+    let convertPreviews = ConvertPreviewCache()
 
     // Messages
     @Published var log: [String] = []
@@ -643,7 +647,7 @@ final class AppState: ObservableObject {
         }
     }
 
-    func removeConvertItems(_ ids: Set<UUID>) { convertPlan.remove(ids) }
+    func removeConvertItems(_ ids: Set<UUID>) { convertPlan.remove(ids); convertPreviews.removeAll() }
 
     /// Empties the Convert page after asking. Files are not touched.
     func removeAllConvert() {
@@ -654,6 +658,7 @@ final class AppState: ObservableObject {
                              message: "This removes \(what) from the list, with any ticks and frame sizes you chose. The files themselves are not touched.",
                              ok: "Remove All") else { return }
         convertPlan.items = []
+        convertPreviews.removeAll()
         note("Removed \(what) from the Convert page.")
     }
 
@@ -667,9 +672,9 @@ final class AppState: ObservableObject {
             return
         }
         guard ticked.contains(where: plan.canConvert) else {
-            alertMessage = (ticked.count == 1 ? "The ticked table can't be converted yet: its file doesn't settle the frame size."
-                                              : "None of the ticked tables can be converted yet: their files don't settle the frame size.")
-                + "\n\nChoose a frame size in the Frames column."
+            alertMessage = (ticked.count == 1 ? "The ticked table can't be converted yet: its file doesn't say how long each wave is."
+                                              : "None of the ticked tables can be converted yet: their files don't say how long each wave is.")
+                + "\n\nChoose a frame size in the Size column first."
             return
         }
         let toPack = sendToPack && plan.preset.isThirdWave

@@ -67,7 +67,7 @@ struct NameCleanupSheet: View {
             Text("Clean up names").font(.title3).bold()
             Text(page == .pack
                  ? "New names go into the .pgdata files you write; the source files are not changed. Factory wavetables keep their names."
-                 : "New names are used for the converted files, and inside them for 3rd Wave tables; the source files are not changed. Factory wavetables keep their names.")
+                 : "New names apply to the converted files (and inside 3rd Wave tables). Source files and factory names stay as they are.")
                 .font(.caption).foregroundStyle(.secondary)
 
             HStack(spacing: 18) {
@@ -111,7 +111,7 @@ struct NameCleanupSheet: View {
                 .width(min: 160, ideal: 220)
                 TableColumn("") { (r: Row) in
                     if page == .pack { NameLengthNote(name: proposed(r)) }
-                    else if namesGoToThe3rdWave { ThirdWaveNameNote(name: proposed(r)) }
+                    else if namesGoToThe3rdWave { ThirdWaveNameNote(name: proposed(r), compact: false) }
                 }
                     .width(min: 100, ideal: 140)
             }
