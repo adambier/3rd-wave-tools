@@ -138,7 +138,8 @@ does not read them.
 **Single-cycle files are not listed.** A WAV holding one wave (for example, the Adventure Kid
 single cycles of 600 samples, looped over the whole file) is a building block for a wavetable
 rather than a wavetable, and making tables from such waves is what the 3rd Wave's Wave Maker
-and other synths' editors do. A file holding several frames is listed even when it is short.
+and other synths' editors do. A short file is listed when its metadata says it holds several
+frames.
 
 ### FLAC files
 
