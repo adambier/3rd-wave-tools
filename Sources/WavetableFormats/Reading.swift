@@ -34,7 +34,7 @@ public enum WavetableReader {
         if hasPrefix(bytes, "vawt") { return try readSurge(bytes, fileName: fileName) }
         if isRIFFWave(bytes) { return try readWAV(bytes, fileName: fileName, sidecarText: sidecarText) }
         if hasPrefix(bytes, "RIFX"), bytes.count >= 12, hasPrefix(Array(bytes[8..<12]), "WAVE") {
-            throw WavetableError("\"\(fileName)\" is a big-endian WAV (RIFX), which Convert does not read.")
+            throw WavetableError("\"\(fileName)\" is a WAV stored in big-endian byte order (RIFX), which Convert does not read. Save it as a standard WAV and try again.")
         }
         if hasPrefix(bytes, UnifiedProgram.magicText) { return try readUnifiedProgram(bytes, fileName: fileName) }
         if let text = thirdWaveText(bytes) { return try readThirdWaveText(text, fileName: fileName) }
@@ -105,15 +105,19 @@ extension WavetableReader {
         return n < 0 ? "-" + out : out
     }
 
-    /// A note for samples beyond ±1, or nil when the peak is within it.
+    /// A note for samples beyond ±1, or nil when the peak is within it. The 3rd Wave's own tables
+    /// and 16-bit files cannot hold more, so converting to those scales the table down.
     static func peakNote(_ peak: Float) -> String? {
         guard peak > 1 else { return nil }
-        return "Its samples reach \(String(format: "%.2f", Double(peak))), beyond ±1."
+        var shown = String(format: "%.2f", Double(peak))
+        if shown == "1.00" { shown = String(format: "%.4f", Double(peak)) }
+        if shown == "1.0000" { shown = "just over 1" }
+        return "Peak \(shown): over full scale (±1). Converting to a 3rd Wave table or a 16-bit file scales it down to fit."
     }
 
     /// A note for a table of more than 256 frames, or nil.
     static func frameCountNote(_ frames: Int) -> String? {
         guard frames > 256 else { return nil }
-        return "It has \(grouped(frames)) frames, more than the 256 that Serum and Pigments take."
+        return "\(grouped(frames)) frames: Serum, Vital, and Pigments take at most 256, so converting for them drops frames (you choose how)."
     }
 }

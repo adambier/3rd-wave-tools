@@ -11,20 +11,20 @@ extension WavetableReader {
     static func readSurge(_ b: [UInt8], fileName: String) throws -> [FoundTable] {
         let what = "\"\(fileName)\" begins like a Surge wavetable (vawt), but"
         guard b.count >= 12 else {
-            throw WavetableError("\(what) it ends after \(b.count) bytes, before its 12-byte header does.")
+            throw WavetableError("\(what) it ends after \(b.count) bytes, inside its 12-byte header; it is damaged or cut short.")
         }
         let size = Int(le32(b, 4)), count = Int(le16(b, 8)), flags = le16(b, 10)
         if flags & 0x01 != 0 { return [] }   // a sample, not a wavetable
         guard (2...65_536).contains(size) else {
-            throw WavetableError("\(what) its header gives a frame size of \(grouped(size)) samples, which is not usable.")
+            throw WavetableError("\(what) its header says \(grouped(size)) samples per frame, which is not a usable size; it is damaged.")
         }
-        guard count >= 1 else { throw WavetableError("\(what) its header gives no frames.") }
+        guard count >= 1 else { throw WavetableError("\(what) its header says it has no frames; it is damaged.") }
         let isInt16 = flags & 0x04 != 0
         let need = size * count * (isInt16 ? 2 : 4)
         guard b.count - 12 >= need else {
             throw WavetableError("\(what) its header promises \(grouped(count)) frames of \(grouped(size)) samples "
                                  + "(\(grouped(need)) bytes), and the file holds only \(grouped(b.count - 12)) bytes "
-                                 + "after the header. It may have been cut short.")
+                                 + "after the header; it has been cut short.")
         }
         var samples = [Float](repeating: 0, count: size * count)
         if isInt16 {
@@ -34,16 +34,16 @@ extension WavetableReader {
             for i in samples.indices {
                 let v = Float(bitPattern: le32(b, 12 + 4 * i))
                 guard v.isFinite else {
-                    throw WavetableError("\(what) sample \(grouped(i)) is not a finite number, so the file is damaged.")
+                    throw WavetableError("\(what) sample \(grouped(i)) is not a number; it is damaged.")
                 }
                 samples[i] = v
             }
         }
         var notes: [String] = []
         if size > 4096 || size & (size - 1) != 0 {
-            notes.append("Its frame size, \(grouped(size)), is not one of the powers of two from 2 to 4,096 that Surge accepts.")
+            notes.append("\(grouped(size)) samples per frame: Surge itself takes only powers of two from 2 to 4,096, so this file may not have come from Surge.")
         }
-        if count > 512 { notes.append("It has \(grouped(count)) frames, more than the 512 that Surge accepts.") }
+        if count > 512 { notes.append("\(grouped(count)) frames: Surge takes at most 512, and Serum, Vital, and Pigments 256, so converting for them drops frames (you choose how).") }
         else if let n = frameCountNote(count) { notes.append(n) }
         if let n = peakNote(samples.reduce(0) { max($0, abs($1)) }) { notes.append(n) }
         return [FoundTable(name: fileStem(fileName), fileName: fileName, source: .surgeWavetable, samples: samples,

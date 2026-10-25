@@ -2,14 +2,17 @@ import Foundation
 
 // WAV files: the RIFF chunks a wavetable can carry, and the order in which they settle the frame
 // size. Sources for the conventions: the project's research notes (Serum's `clm ` chunk and `.txt`
-// sidecar, Vital's and Surge's source code, Tonverk's manual, WaveEdit's source).
+// sidecar, Vital's and Surge's source code, Tonverk's manual, WaveEdit's source), and a scan of
+// about 20,000 files from sample and wavetable libraries (docs/WAVETABLES.md, section 3).
 //
-// Frame size, first rule that applies wins (each needs a size of at least 2 that divides the
-// sample count; one that does not divide is noted and skipped):
-//   1. `clm ` chunk number      2. `srge` chunk          3. `uhWT` chunk → 2,048
+// Frame size, first rule that applies wins:
+//   1. `clm ` chunk number      2. `srge` chunk          3. `uhWT` chunk (its own size field, else 2,048)
 //   4. Tonverk `_wt<N>` tag      5. Serum sidecar `[N]`   6. evenly spaced `cue ` points
-//   7. a single `smpl` loop      8. the file's length
-// An `srgo` chunk marks a one-shot sample: no wavetable.
+//   7. a `smpl` loop from sample 0   8. the file's length
+// Rules 1–5 are written for the purpose and are trusted as long as one whole frame fits; samples
+// past the last whole frame are left out. Rules 6 and 7 are markers ordinary samples have too,
+// so they count only for powers of two up to 4,096 that give at least two frames. An `srgo`
+// chunk marks a one-shot sample: no wavetable.
 
 extension WavetableReader {
     /// A size claim from one of the file's sources of metadata.
@@ -17,7 +20,7 @@ extension WavetableReader {
         var size: Int
         /// Short phrase for `FoundTable.frameSizeBasis`.
         var basis: String
-        /// The source as the subject of a sentence ("the clm chunk").
+        /// The source as the subject of a sentence ("the tag inside the file (clm chunk)").
         var subject: String
         /// What kind of source it is.
         var evidence: FrameSizeEvidence
@@ -65,45 +68,61 @@ extension WavetableReader {
         guard count > 0 else { return [] }
 
         var notes = wav.notes
-        if wav.channels > 1 {
-            notes.append("The file has \(wav.channels) channels; only the left (first) channel is read.")
+        if wav.channels == 2 {
+            notes.append("Stereo file: only the left channel is used.")
+        } else if wav.channels > 2 {
+            notes.append("The file has \(wav.channels) channels: only the first is used.")
         }
         var sizes: [SizeClaim] = []
         var interps: [InterpolationClaim] = []
+        var rejected: [String] = []
         // Metadata written for the purpose (clm, srge, uhWT, a Tonverk tag, a Serum sidecar) is
-        // trusted even when the samples run a little past the last whole frame, as in files from
-        // some editors; the extra samples are then left out. Cue points and loops must divide
-        // the file exactly, since ordinary samples have them too.
-        func offer(_ size: Int, basis: String, subject: String, explicit: Bool = true,
-                   evidence: FrameSizeEvidence = .statedInFile) {
-            if size >= 2, count % size == 0 || (explicit && count >= size) {
+        // trusted when at least one whole frame fits, even when the samples run past the last
+        // whole frame, as in files from some editors and in Surge's own library; the extra samples
+        // are then left out.
+        func offer(_ size: Int, basis: String, subject: String, evidence: FrameSizeEvidence = .statedInFile) {
+            if size >= 2, count >= size {
                 sizes.append(SizeClaim(size: size, basis: basis, subject: subject, evidence: evidence))
+            } else if size < 2 {
+                rejected.append("\(subject) says \(grouped(size)) samples per frame, which is not a usable size; it is ignored.")
             } else {
-                notes.append("\(capitalized(subject)) gives \(grouped(size)) samples per frame, which does not divide "
-                             + "the file's \(grouped(count)) samples, so it is not used.")
+                rejected.append("\(subject) says \(grouped(size)) samples per frame, but the file holds only "
+                                + "\(grouped(count)) samples, less than one frame; it is ignored.")
             }
         }
 
         // 1. clm (Serum): "<!>2048 10000000 wavetable ...": any frame size, and the interpolation digit.
         if let clm = wav.chunks["clm "] {
             let parsed = parseCLM(clm)
-            if let n = parsed.size { offer(n, basis: "clm chunk", subject: "the clm chunk") }
-            else { notes.append("The file's clm chunk does not give a frame size Convert can read.") }
-            if let i = parsed.interpolation { interps.append(InterpolationClaim(value: i, subject: "the clm chunk")) }
+            let subject = "the tag inside the file (clm chunk)"
+            if let n = parsed.size { offer(n, basis: "tag inside the file (clm chunk)", subject: subject) }
+            else { notes.append("The file's wavetable tag (clm chunk) doesn't give a readable frame size; it is ignored.") }
+            if let i = parsed.interpolation { interps.append(InterpolationClaim(value: i, subject: subject)) }
         }
         // 2. srge (Surge): int32 version, int32 frame size.
         if let srge = wav.chunks["srge"] {
             if srge.count >= 8 {
-                offer(Int(Int32(bitPattern: le32(srge, 4))), basis: "Surge srge chunk", subject: "the Surge srge chunk")
+                offer(Int(Int32(bitPattern: le32(srge, 4))), basis: "Surge tag inside the file (srge chunk)",
+                      subject: "the Surge tag inside the file (srge chunk)")
             } else {
-                notes.append("The file's Surge srge chunk is too short to give a frame size.")
+                notes.append("The file's Surge tag (srge chunk) is too short to give a frame size; it is ignored.")
             }
         }
-        // 3. uhWT (u-he): 2,048.
-        if wav.chunks["uhWT"] != nil { offer(2048, basis: "u-he uhWT chunk", subject: "the u-he uhWT chunk") }
+        // 3. uhWT (u-he). Surge reads it as 2,048 only. In the 76 files of Hive's library the chunk
+        // is 272 bytes: u32 0, u32 frame count, u32 frame size (2,048 in all of them), u32 0, then a
+        // description; that size field is used when it is plausible, else 2,048 (an inference from
+        // those files, not documented by u-he).
+        if let uh = wav.chunks["uhWT"] {
+            var n = 2048
+            if uh.count >= 12 {
+                let stated = Int(le32(uh, 8))
+                if (2...65_536).contains(stated), stated & (stated - 1) == 0 { n = stated }
+            }
+            offer(n, basis: "u-he tag inside the file (uhWT chunk)", subject: "the u-he tag inside the file (uhWT chunk)")
+        }
         // 4. Tonverk file-name tag.
         if let t = tag {
-            let subject = "the Tonverk tag in the file name (\(t.text))"
+            let subject = "the file name (\(t.text))"
             offer(t.size, basis: "Tonverk file name (\(t.text))", subject: subject, evidence: .fileName)
             if t.stepped { interps.append(InterpolationClaim(value: .none, subject: subject)) }
         }
@@ -112,61 +131,73 @@ extension WavetableReader {
             let s = parseSidecar(text)
             if let n = s.size {
                 if (32...9999).contains(n) {
-                    offer(n, basis: "Serum .txt sidecar ([\(n)])", subject: "the Serum .txt sidecar ([\(n)])", evidence: .sidecar)
+                    offer(n, basis: "Serum .txt file beside it ([\(n)])", subject: "the .txt file beside it ([\(n)])", evidence: .sidecar)
                 } else {
-                    notes.append("The Serum .txt sidecar gives [\(n)], outside the 32–9,999 Serum accepts, so it is not used.")
+                    notes.append("The .txt file beside it says [\(n)] samples per frame, outside the 32–9,999 Serum accepts; it is ignored.")
                 }
             }
-            if let i = s.interpolation { interps.append(InterpolationClaim(value: i, subject: "the Serum .txt sidecar")) }
+            if let i = s.interpolation { interps.append(InterpolationClaim(value: i, subject: "the .txt file beside it")) }
         }
-        // 6. cue points, evenly spaced. Cue points and loops also mark ordinary samples, so these
-        // two count only for frame sizes a wavetable can have (at most 4,096, Surge's limit).
-        if let cue = wav.chunks["cue "], let d = cueSpacing(cue), d <= 4096 {
-            offer(d, basis: "cue points", subject: "the cue points", explicit: false, evidence: .markers)
+        // 6. cue points, evenly spaced from sample 0. Cue points and loops also mark ordinary
+        // samples, so these two count only for powers of two up to 4,096 (Surge's limit) that give
+        // at least two frames; a single looped cycle is a sample, not a wavetable.
+        if let cue = wav.chunks["cue "], let d = cueSpacing(cue), isMarkerFrameSize(d, count: count) {
+            offer(d, basis: "cue markers", subject: "the cue markers", evidence: .markers)
         }
-        // 7. A single smpl loop.
-        if let smpl = wav.chunks["smpl"], let loop = singleLoop(smpl) {
-            let inclusive = loop.end - loop.start + 1, exclusive = loop.end - loop.start
-            let n = count % inclusive != 0 && exclusive >= 2 && count % exclusive == 0 ? exclusive : inclusive
-            if n <= 4096 { offer(n, basis: "smpl loop", subject: "the smpl loop", explicit: false, evidence: .markers) }
+        // 7. A single smpl loop from sample 0 (the loop over the first frame).
+        if let smpl = wav.chunks["smpl"], let loop = singleLoop(smpl), loop.start == 0 {
+            // The loop end is inclusive, but some writers store it exclusively.
+            if let n = [loop.end - loop.start + 1, loop.end - loop.start].first(where: { isMarkerFrameSize($0, count: count) }) {
+                offer(n, basis: "loop markers", subject: "the loop markers", evidence: .markers)
+            }
         }
 
         var frameSize: Int?
         var basis: String
         var candidates: [Int] = []
         var evidence = FrameSizeEvidence.none
+        notes += rejected.map(capitalized)
+        /// No wavetable: silently, unless the file is marked as one whose stated size does not fit.
+        func none() throws -> [FoundTable] {
+            if let reason = rejected.first {
+                throw WavetableError("\"\(fileName)\" is marked as a wavetable, but \(reason)")
+            }
+            return []
+        }
         if let chosen = sizes.first {
             frameSize = chosen.size
             basis = chosen.basis
             evidence = chosen.evidence
             for other in sizes.dropFirst() where other.size != chosen.size {
-                notes.append("\(capitalized(other.subject)) gives \(grouped(other.size)) samples per frame, but "
-                             + "\(chosen.subject) gives \(grouped(chosen.size)); \(chosen.subject) is used.")
+                notes.append("\(capitalized(other.subject)) says \(grouped(other.size)) samples per frame, but "
+                             + "\(chosen.subject) says \(grouped(chosen.size)); \(chosen.subject) is used.")
             }
-        } else if wav.channels > 1 || count % 2048 != 0 && count != 8192 {
-            // No metadata, and stereo or a length that is not a multiple of 2,048: with nothing to
-            // say it is a wavetable, it is taken to be ordinary audio. (Wavetable files without
-            // metadata are mono; among sample libraries scanned, stereo samples and a few one-shots
-            // had lengths that happened to divide into frames.)
-            return []
+        } else if wav.channels > 1 || count % 2048 != 0 && count != 8192 || endsWithNoteName(stem) {
+            // No metadata, and stereo, a length that is not a multiple of 2,048, or a name that
+            // ends in a note name ("Bass-000-036-c2", "Saw C3"), as the notes of a multisampled
+            // instrument are named: with nothing to say it is a wavetable, it is taken to be
+            // ordinary audio. (Wavetable files without metadata are mono; in the libraries scanned,
+            // stereo samples, a few one-shots, and whole multisampled instruments had lengths that
+            // happened to divide into frames.)
+            return try none()
         } else if count == 8192 {
             // The 3rd Wave's Wave Maker reads this length as a 64 × 128 PPG table, while Serum,
             // Pigments, and Tonverk read 4 × 2,048 (Tonverk's own factory library has one), so ask.
-            basis = "length 8,192: a 64 × 128 PPG table (as the 3rd Wave's Wave Maker reads it) or 4 × 2,048; the file does not say which"
+            basis = "not stated: 8,192 samples is 64 frames of 128 (a PPG-style table, as the 3rd Wave's Wave Maker reads it) or 4 frames of 2,048"
             candidates = [128, 2048]
         } else if count == 16_384 {
-            basis = "length 16,384: WaveEdit's 64 × 256 or 8 × 2,048; the file does not say which"
+            basis = "not stated: 16,384 samples is 64 frames of 256 (a WaveEdit bank) or 8 frames of 2,048"
             candidates = wav.bytesPerSample == 2 ? [256, 2048] : [2048, 256]
         } else if count % 2048 == 0 {
             // Length alone: more than the 256 frames Serum, Vital, and Pigments take is taken to be
             // ordinary audio (a 16-second sample at 48 kHz is 375 × 2,048).
-            guard count / 2048 <= 256 else { return [] }
+            guard count / 2048 <= 256 else { return try none() }
             frameSize = 2048
             evidence = .length
-            basis = "file length (multiples of 2,048, the Serum convention)"
+            basis = "file length (2,048 per frame, the usual size)"
             candidates = fittingFrameSizes(count).filter { $0 != 2048 }
         } else {
-            return []   // unreachable: the first branch takes every other length
+            return try none()   // unreachable: the first branch takes every other length
         }
 
         var interpolation: Interpolation?
@@ -182,7 +213,12 @@ extension WavetableReader {
         if let n = frameSize, count % n != 0 {
             let extra = count % n
             samples.removeLast(extra)
-            notes.append("The file has \(grouped(extra)) sample\(extra == 1 ? "" : "s") after its last whole frame of \(grouped(n)); they are left out.")
+            var note = "\(grouped(extra)) sample\(extra == 1 ? "" : "s") after the last whole frame \(extra == 1 ? "is" : "are") left out"
+            if extra * 2 >= n {
+                let short = n - extra
+                note += " (\(grouped(short)) sample\(short == 1 ? "" : "s") short of another frame)"
+            }
+            notes.append(note + ".")
         }
         if let n = frameSize, let note = frameCountNote(count / n) { notes.append(note) }
         if let note = peakNote(wav.samples.reduce(0) { max($0, abs($1)) }) { notes.append(note) }
@@ -210,8 +246,7 @@ extension WavetableReader {
             var len = Int(le32(b, off + 4))
             if len > n - body {
                 if id == "data", len != 0xFFFF_FFFF {
-                    notes.append("The file is shorter than its data chunk says (it may have been cut short); "
-                                 + "the samples that are there are read.")
+                    notes.append("The file ends before its audio should (it may have been cut short); what is there is read.")
                 }
                 len = n - body
             }
@@ -226,29 +261,36 @@ extension WavetableReader {
             off = next
         }
         guard let fmt = chunks["fmt "], fmt.count >= 16 else {
-            throw WavetableError("\(damaged) it has no readable format (fmt) chunk, so it is damaged.")
+            throw WavetableError("\(damaged) it has no readable format description (fmt chunk), which every WAV needs; it is damaged.")
         }
-        guard let data = dataRange else { throw WavetableError("\(damaged) it has no data chunk, so it is damaged.") }
+        guard let data = dataRange else { throw WavetableError("\(damaged) it has no audio data (data chunk); it is damaged.") }
         var tag = Int(le16(fmt, 0))
         let channels = Int(le16(fmt, 2)), blockAlign = Int(le16(fmt, 12)), bits = Int(le16(fmt, 14))
         if tag == 0xFFFE {   // WAVE_FORMAT_EXTENSIBLE: the real format is the subformat GUID's first two bytes
             guard fmt.count >= 26 else {
-                throw WavetableError("\(damaged) its extensible format chunk is too short, so it is damaged.")
+                throw WavetableError("\(damaged) its format description (an extensible fmt chunk) is cut short; it is damaged.")
             }
             tag = Int(le16(fmt, 24))
         }
-        guard channels > 0 else { throw WavetableError("\(damaged) its format chunk gives no channels, so it is damaged.") }
+        guard channels > 0 else { throw WavetableError("\(damaged) its format description says it has no channels; it is damaged.") }
         var bytesPerSample = (bits + 7) / 8
         if blockAlign >= channels, blockAlign % channels == 0 { bytesPerSample = blockAlign / channels }
         guard bytesPerSample > 0 else {
-            throw WavetableError("\(damaged) its format chunk gives no sample size, so it is damaged.")
+            throw WavetableError("\(damaged) its format description gives no sample size; it is damaged.")
         }
         let isInt = tag == 1 && (1...4).contains(bytesPerSample)
         let isFloat = tag == 3 && (bytesPerSample == 4 || bytesPerSample == 8)
         guard isInt || isFloat else {
-            let what = tag == 1 || tag == 3 ? "\(bits)-bit \(tag == 3 ? "floating-point" : "integer") samples"
-                                             : "sample format \(tag)"
-            return .unsupported(reason: "it uses \(what), which Convert does not read.", chunks: chunks)
+            let what: String
+            switch tag {
+            case 1, 3: what = "\(bits)-bit \(tag == 3 ? "floating-point" : "integer") samples"
+            case 2: what = "ADPCM compression"
+            case 6, 7: what = "telephone (A-law or µ-law) compression"
+            case 0x50, 0x55: what = "MPEG compression"
+            default: what = "an audio format Convert does not read (format code \(tag))"
+            }
+            return .unsupported(reason: "its audio uses \(what). Save it as a 16-bit, 24-bit, or 32-bit float WAV and try again.",
+                                chunks: chunks)
         }
         let frameBytes = bytesPerSample * channels
         let frames = data.count / frameBytes
@@ -260,7 +302,7 @@ extension WavetableReader {
                     ? Float(bitPattern: le32(b, o))
                     : Float(Double(bitPattern: UInt64(le32(b, o)) | UInt64(le32(b, o + 4)) << 32))
                 guard v.isFinite else {
-                    throw WavetableError("\(damaged) sample \(grouped(i)) is not a finite number, so it is damaged.")
+                    throw WavetableError("\(damaged) sample \(grouped(i)) is not a number; it is damaged.")
                 }
                 samples[i] = v
             } else if bytesPerSample == 1 {
@@ -316,6 +358,22 @@ extension WavetableReader {
         return (n, stepped, "_wt\(digits)\(stepped ? "r" : "")", String(stem[..<r.lowerBound]))
     }
 
+    /// Whether a file stem ends in a note name, as the notes of a multisampled instrument are
+    /// named: a letter A–G, an optional sharp, and an octave digit, at the start of the name or
+    /// after a space, hyphen, or underscore ("Saw C3", "SAW-C1", "Pad-000-036-c2", "Bass_F#-1").
+    /// "Bwt1" or "voc2" do not count: the letter must stand on its own.
+    static func endsWithNoteName(_ stem: String) -> Bool {
+        var s = Substring(stem)
+        guard let octave = s.last, octave.isASCII, octave.isNumber else { return false }
+        s = s.dropLast()
+        if s.last == "-" { s = s.dropLast() }
+        if s.last == "#" { s = s.dropLast() }
+        guard let letter = s.last, letter.isASCII, "abcdefg".contains(letter.lowercased()) else { return false }
+        s = s.dropLast()
+        guard let before = s.last else { return true }
+        return before == " " || before == "-" || before == "_"
+    }
+
     /// Serum's sidecar: line 1 `[N]` samples per cycle, optional line 2 `[interp]` or `[no interp]`.
     fileprivate static func parseSidecar(_ text: String) -> (size: Int?, interpolation: Interpolation?) {
         let lines = text.replacingOccurrences(of: "\u{FEFF}", with: "")
@@ -359,6 +417,12 @@ extension WavetableReader {
         return end > start ? (start, end) : nil
     }
 
+    /// Whether a size from cue points or a loop can be a frame size: a power of two from 2 to
+    /// 4,096 (Surge's range) with at least two whole frames in the file.
+    fileprivate static func isMarkerFrameSize(_ n: Int, count: Int) -> Bool {
+        (2...4096).contains(n) && n & (n - 1) == 0 && count / n >= 2
+    }
+
     /// Powers of two from 64 to 4,096 that divide `count` into 2 to 256 frames.
     fileprivate static func fittingFrameSizes(_ count: Int) -> [Int] {
         (6...12).map { 1 << $0 }.filter { count % $0 == 0 && (2...256).contains(count / $0) }
@@ -366,9 +430,9 @@ extension WavetableReader {
 
     fileprivate static func describe(_ i: Interpolation) -> String {
         switch i {
-        case .none: return "no interpolation"
-        case .crossfade: return "crossfade"
-        case .spectral: return "spectral morph"
+        case .none: return "no interpolation (stepped frames)"
+        case .crossfade: return "a crossfade between frames"
+        case .spectral: return "a spectral morph between frames"
         }
     }
 
