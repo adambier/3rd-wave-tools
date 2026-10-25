@@ -232,8 +232,8 @@ final class ReadingTests: XCTestCase {
         XCTAssertEqual(t.interpolation, .spectral)
         XCTAssertTrue(t.notes.contains { $0.contains("32 samples after its last whole frame") }, "\(t.notes)")
         // A clm size larger than the file is not used.
-        let u = try readOne(wavFile([ramp(8192)], chunks: [clm("<!>9000 20000000")]), "b.wav")
-        XCTAssertEqual(u.frameSize, 128)
+        let u = try readOne(wavFile([ramp(4096)], chunks: [clm("<!>9000 20000000")]), "b.wav")
+        XCTAssertEqual(u.frameSize, 2048)                      // the length rule
         XCTAssertTrue(u.notes.contains { $0.contains("9,000") }, "\(u.notes)")
     }
 
@@ -328,7 +328,8 @@ final class ReadingTests: XCTestCase {
 
     func testLengthHeuristics() throws {
         let p = try readOne(wavFile([ramp(8192)]), "p.wav")
-        XCTAssertEqual(p.frameSize, 128)
+        XCTAssertNil(p.frameSize)                               // PPG 64 × 128, or 4 × 2,048: asked
+        XCTAssertEqual(p.candidateFrameSizes, [128, 2048])
         XCTAssertTrue(p.frameSizeBasis.hasPrefix("length 8,192"))
 
         let we16 = try readOne(wavFile([ramp(16_384)], format: .pcm16), "we.wav")

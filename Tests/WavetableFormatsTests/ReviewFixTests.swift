@@ -47,8 +47,8 @@ final class ReviewFixTests: XCTestCase {
 
     func testEightThousandSamplesOfferOtherSizes() throws {
         let found = try XCTUnwrap(WavetableReader.read(wav16(8192), fileName: "Four.wav").first)
-        XCTAssertEqual(found.frameSize, 128)
-        XCTAssertTrue(found.candidateFrameSizes.contains(2048))
+        XCTAssertNil(found.frameSize)
+        XCTAssertEqual(found.candidateFrameSizes, [128, 2048])
     }
 
     func testMetadataSizeIsNotOfferedForChange() {

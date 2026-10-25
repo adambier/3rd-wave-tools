@@ -139,9 +139,10 @@ extension WavetableReader {
                              + "\(chosen.subject) gives \(grouped(chosen.size)); \(chosen.subject) is used.")
             }
         } else if count == 8192 {
-            frameSize = 128
-            basis = "length 8,192: the 64 × 128 layout the 3rd Wave's Wave Maker reads as a PPG table"
-            candidates = fittingFrameSizes(count).filter { $0 != 128 }
+            // The 3rd Wave's Wave Maker reads this length as a 64 × 128 PPG table, while Serum,
+            // Pigments, and Tonverk read 4 × 2,048 (Tonverk's own factory library has one), so ask.
+            basis = "length 8,192: a 64 × 128 PPG table (as the 3rd Wave's Wave Maker reads it) or 4 × 2,048; the file does not say which"
+            candidates = [128, 2048]
         } else if count == 16_384 {
             basis = "length 16,384: WaveEdit's 64 × 256 or 8 × 2,048; the file does not say which"
             candidates = wav.bytesPerSample == 2 ? [256, 2048] : [2048, 256]
