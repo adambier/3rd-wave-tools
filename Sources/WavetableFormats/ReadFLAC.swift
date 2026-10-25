@@ -3,21 +3,30 @@ import Foundation
 // FLAC files (RFC 9639): a decoder in plain Swift, and the wavetable rules applied to the result.
 //
 // The decoder reads the whole stream: STREAMINFO, every metadata block (APPLICATION and
-// VORBIS_COMMENT are kept), and every frame — CONSTANT, VERBATIM, FIXED, and LPC subframes, Rice
+// VORBIS_COMMENT are kept), and every frame: CONSTANT, VERBATIM, FIXED, and LPC subframes, Rice
 // and Rice2 residuals with escaped partitions, wasted bits, and the left/side, right/side, and
-// mid/side stereo modes; 4- to 32-bit samples, any number of channels. Each frame header's CRC-8
-// and each frame's CRC-16 are checked, and so is the MD5 signature of the decoded audio in
-// STREAMINFO when the file carries one; a file that fails any of them is reported as damaged.
+// mid/side stereo modes; 4- to 32-bit samples (8 to 32 tested), any number of channels, fixed or
+// variable block sizes. Each frame header's CRC-8 and each frame's CRC-16 are checked, and so is
+// the MD5 signature of the decoded audio in STREAMINFO when the file carries one; a file that
+// fails any of them is reported as damaged. Only the first channel is kept, scaled to ±1 by the
+// bit depth; the others are decoded (they are needed for the checks and the stereo modes) and
+// dropped.
 //
-// The wavetable rules are the WAV reader's (ReadWAV.swift): a FLAC file has no RIFF chunks, but
-// Phase Plant's factory library stores a Serum `clm ` chunk and a `smpl` chunk as APPLICATION
-// blocks whose id is the chunk id byte-reversed (" mlc", "lpms"), and this reader hands such blocks
-// to the WAV rules as the chunks they are. Phase Plant's files also carry an APPLICATION block
-// "MsHk" of 8 bytes (a 32-bit 1, then a 32-bit float that varies from file to file while every
-// file's audio peaks at exactly 1.0), which gives neither a frame size nor a frame count, so it is
-// read past; what the float means is not documented (a gain, by the look of it: an inference).
-// A Vorbis comment whose value is a Serum tag ("<!>2048 …") counts as a `clm ` chunk too; other
-// comments that mention frames, cycles, or wavetables are reported but not acted on.
+// The wavetable rules are the WAV reader's (ReadWAV.swift, `tables(in:…)`): a FLAC file has no
+// RIFF chunks, but a writer may store the same metadata as APPLICATION blocks, and this reader
+// hands blocks whose id is one of the WAV chunk ids it knows (`clm `, `srge`, `srgo`, `uhWT`,
+// `cue `, `smpl`), forwards or byte-reversed, to those rules as the chunks they are. The reversed
+// form is what Phase Plant's factory library has: of its 402 files (all mono, 24-bit, 256 × 2,048),
+// 29 carry a 48-byte " mlc" block holding "<!>2048 10000000 Kilohearts (www.kilohearts.com)" and
+// 8 carry a 60-byte "lpms" block (a `smpl` chunk with no loops). Every one of them also carries an
+// 8-byte "MsHk" block: a little-endian 32-bit 1, then a 32-bit float between 0.89 and 3.55 (1.0 in
+// 272 of the files) that has no evident relation to the file's peak (all peak at exactly full
+// scale) or RMS level. It states neither a frame size nor a frame count, so it is read past; what
+// the float means is not documented. A Vorbis comment whose value is a Serum tag ("<!>2048 …")
+// counts as a `clm ` chunk too, with a note saying where it was found (no writer is known to do
+// this; it is read because the tag's form is unmistakable). Other comments that mention frames,
+// cycles, or wavetables are noted but not acted on. With no block that states a size, the
+// Tonverk name tag, Serum sidecar, and length rules apply as they do to a WAV.
 
 extension WavetableReader {
     /// The wavetable in a FLAC file, or none when it holds no wavetable.
@@ -44,7 +53,7 @@ extension WavetableReader {
                     notes.append("The Serum-style tag was found in the file's comments (\(key)), not in a block of its own.")
                 }
             } else if ["FRAME", "CYCLE", "WAVETABLE"].contains(where: { key.uppercased().contains($0) }) {
-                notes.append("The file's comments say \"\(key)=\(value)\"; Convert does not take a frame size from a comment.")
+                notes.append("The file's comments say \"\(key)=\(value)\"; a frame size is not taken from a comment.")
             }
         }
         let info = decoded.info
@@ -83,6 +92,23 @@ enum FLACDecoder {
         var comments: [(key: String, value: String)]
         /// The number of frames decoded.
         var frames: Int
+        /// What the stream used, for tests.
+        var stats: Stats
+    }
+
+    /// Counts of what a stream's frames used.
+    struct Stats: Equatable {
+        var constant = 0, verbatim = 0, fixed = 0, lpc = 0
+        /// Residuals coded with the 5-bit (Rice2) partition parameter.
+        var rice2 = 0
+        /// Escaped (uncoded) partitions.
+        var escaped = 0
+        /// Subframes with wasted bits.
+        var wasted = 0
+        /// Frames in each stereo mode: independent, left/side, right/side, mid/side.
+        var independent = 0, leftSide = 0, rightSide = 0, midSide = 0
+        /// Frames with the variable-block-size strategy.
+        var variable = 0
     }
 
     /// Decodes a whole FLAC stream.
@@ -110,6 +136,7 @@ enum FLACDecoder {
             guard body + length <= bytes.count else {
                 throw WavetableError("\(what) a header block (type \(type)) runs past the end of the file; it is cut short.")
             }
+            if type == 127 { throw WavetableError("\(what) a header block has the invalid type 127; it is damaged.") }
             if info == nil, type != 0 {
                 throw WavetableError("\(what) it does not begin with its stream description (STREAMINFO); it is damaged.")
             }
@@ -135,8 +162,6 @@ enum FLACDecoder {
                 applications.append((Array(bytes[body..<(body + 4)]), Array(bytes[(body + 4)..<(body + length)])))
             case 4:
                 comments += vorbisComments(bytes, body..<(body + length))
-            case 127:
-                throw WavetableError("\(what) a header block has the invalid type 127; it is damaged.")
             default: break   // PADDING, SEEKTABLE, CUESHEET, PICTURE, and reserved types
             }
             off = body + length
@@ -150,12 +175,16 @@ enum FLACDecoder {
         let wantMD5 = streamInfo.md5.contains { $0 != 0 }
         var md5 = MD5()
         var decoded = 0
+        var stats = Stats()
         try bytes.withUnsafeBufferPointer { buffer in
             var reader = Bits(buffer, position: off)
             var frame = FrameDecoder(info: streamInfo, what: what)
             while reader.position < buffer.count {
                 if streamInfo.totalSamples > 0, decoded >= streamInfo.totalSamples { break }   // trailing bytes (a tag, say)
-                let n = try frame.decodeFrame(&reader)
+                let n: Int
+                do { n = try frame.decodeFrame(&reader) } catch is Bits.CutShort {
+                    throw WavetableError("\(what) it ends in the middle of frame \(frames); it is cut short or damaged.")
+                }
                 frames += 1
                 decoded += n
                 if streamInfo.totalSamples > 0, decoded > streamInfo.totalSamples {
@@ -166,6 +195,7 @@ enum FLACDecoder {
                 for i in 0..<n { out.append(Float(ch[i]) * scale) }
                 if wantMD5 { frame.feed(&md5, count: n) }
             }
+            stats = frame.stats
         }
         guard frames > 0 else { throw WavetableError("\(what) it holds no audio frames; it is damaged or cut short.") }
         if streamInfo.totalSamples > 0, decoded < streamInfo.totalSamples {
@@ -174,7 +204,8 @@ enum FLACDecoder {
         if wantMD5, md5.finish() != streamInfo.md5 {
             throw WavetableError("\(what) its audio does not match the MD5 signature in its stream description; it is damaged.")
         }
-        return Decoded(info: streamInfo, firstChannel: out, applications: applications, comments: comments, frames: frames)
+        return Decoded(info: streamInfo, firstChannel: out, applications: applications, comments: comments, frames: frames,
+                       stats: stats)
     }
 
     /// The fields of a VORBIS_COMMENT block, split at the first "=". A malformed block gives what
@@ -279,7 +310,9 @@ enum FLACDecoder {
             count -= drop
         }
 
-        var cutShort: WavetableError { WavetableError("the FLAC stream ends in the middle of a frame; the file is cut short or damaged.") }
+        /// Thrown when the bytes run out; `decode` turns it into a sentence naming the file.
+        struct CutShort: Error {}
+        var cutShort: CutShort { CutShort() }
     }
 
     // MARK: - Frames
@@ -306,6 +339,7 @@ enum FLACDecoder {
         let buffers: SampleBuffers
         var blockSize = 0
         var frameNumber = 0
+        var stats = Stats()
         private var md5Bytes: [UInt8] = []
 
         init(info: StreamInfo, what: String) {
@@ -379,6 +413,13 @@ enum FLACDecoder {
             let crc8 = Int(try r.read(8))
             guard CRC.crc8(r.bytes, start..<(r.bytePosition - 1)) == crc8 else { throw damaged("fails its header checksum (CRC-8)") }
             blockSize = n
+            if variableBlocking { stats.variable += 1 }
+            switch mode {
+            case 8: stats.leftSide += 1
+            case 9: stats.rightSide += 1
+            case 10: stats.midSide += 1
+            default: if channelCount == 2 { stats.independent += 1 }
+            }
 
             // Subframes.
             for c in 0..<channelCount {
@@ -420,12 +461,13 @@ enum FLACDecoder {
             enum Kind { case constant, verbatim, fixed, lpc }
             let kind: Kind
             switch type {
-            case 0: kind = .constant
-            case 1: kind = .verbatim
-            case 8...12: kind = .fixed; order = type - 8
-            case 32...63: kind = .lpc; order = type - 31
+            case 0: kind = .constant; stats.constant += 1
+            case 1: kind = .verbatim; stats.verbatim += 1
+            case 8...12: kind = .fixed; order = type - 8; stats.fixed += 1
+            case 32...63: kind = .lpc; order = type - 31; stats.lpc += 1
             default: throw damaged("uses a reserved subframe type (\(type))")
             }
+            if wasted > 0 { stats.wasted += 1 }
             let s = buffers.channels[channel]
             do {
                 switch kind {
@@ -468,9 +510,10 @@ enum FLACDecoder {
         }
 
         /// The residual of a FIXED or LPC subframe, into `s[order..<n]`.
-        private func decodeResidual(_ r: inout Bits, into s: UnsafeMutablePointer<Int>, count n: Int, order: Int) throws {
+        private mutating func decodeResidual(_ r: inout Bits, into s: UnsafeMutablePointer<Int>, count n: Int, order: Int) throws {
             let method = Int(try r.read(2))
             guard method <= 1 else { throw damaged("uses a reserved residual coding method (\(method))") }
+            if method == 1 { stats.rice2 += 1 }
             let parameterBits = method == 0 ? 4 : 5
             let escape = (1 << parameterBits) - 1
             let partitionOrder = Int(try r.read(4))
@@ -483,6 +526,7 @@ enum FLACDecoder {
                 let end = (p + 1) * perPartition
                 let parameter = Int(try r.read(parameterBits))
                 if parameter == escape {
+                    stats.escaped += 1
                     let raw = Int(try r.read(5))
                     if raw == 0 { while i < end { s[i] = 0; i += 1 } }
                     else { while i < end { s[i] = try r.readSigned(raw); i += 1 } }
