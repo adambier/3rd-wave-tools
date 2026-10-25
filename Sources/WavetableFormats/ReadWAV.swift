@@ -152,9 +152,10 @@ extension WavetableReader {
             basis = "file length (multiples of 2,048, the Serum convention)"
             candidates = fittingFrameSizes(count).filter { $0 != 2048 }
         } else {
-            candidates = fittingFrameSizes(count)
-            guard !candidates.isEmpty else { return [] }
-            basis = "file length; the file does not say the frame size"
+            // No metadata and a length that is not a multiple of 2,048: with nothing to say it is
+            // a wavetable, it is taken to be ordinary audio. (Among one collection's 700 or so
+            // percussion samples, a few had lengths that happened to divide into frames.)
+            return []
         }
 
         var interpolation: Interpolation?

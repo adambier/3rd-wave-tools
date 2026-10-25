@@ -157,7 +157,7 @@ final class ReadingTests: XCTestCase {
 
     func testSampleFormats() throws {
         let v: [Float] = [0, 0.5, -0.5, 0.25, -1, 0.75, -0.75, 0.125]
-        let input = Array((0..<1024).map { v[$0 % v.count] })   // 1,024: 2 × 512 … 16 × 64, never 2,048-based
+        let input = Array((0..<2048).map { v[$0 % v.count] })   // one frame of 2,048, by length
         for f in [WAVSampleFormat.pcm16, .pcm24, .pcm32, .float32, .float64] {
             for ext in [false, true] {
                 let t = try XCTUnwrap(WavetableReader.read(wavFile([input], format: f, extensible: ext),
@@ -342,9 +342,8 @@ final class ReadingTests: XCTestCase {
         XCTAssertEqual(s.frameSizeBasis, "file length (multiples of 2,048, the Serum convention)")
         XCTAssertEqual(s.candidateFrameSizes, [64, 128, 256, 512, 1024])
 
-        let other = try readOne(wavFile([ramp(5 * 1024)]), "o.wav")
-        XCTAssertNil(other.frameSize)
-        XCTAssertEqual(other.candidateFrameSizes, [64, 128, 256, 512, 1024])
+        // No metadata and not a multiple of 2,048 (nor 8,192 or 16,384): ordinary audio.
+        XCTAssertEqual(try WavetableReader.read(wavFile([ramp(5 * 1024)]), fileName: "o.wav"), [])
 
         XCTAssertEqual(try WavetableReader.read(wavFile([ramp(1000)]), fileName: "x.wav"), [])
         XCTAssertEqual(try WavetableReader.read(wavFile([[]]), fileName: "empty.wav"), [])
