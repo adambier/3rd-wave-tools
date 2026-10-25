@@ -58,10 +58,10 @@ def record(name, want_first=None, want_bps=None):
 
 # --- ffmpeg-made ---
 t16 = table(6, 2048, 16)
-ffmpeg_encode('table6_16bit_c0.flac', [t16], 16, ['-compression_level', '0']); record('table6_16bit_c0.flac')
-ffmpeg_encode('table6_16bit_c8.flac', [t16], 16, ['-compression_level', '8', '-lpc_type', 'cholesky', '-exact_rice_parameters', '1']); record('table6_16bit_c8.flac')
+ffmpeg_encode('table6_16bit_level0.flac', [t16], 16, ['-compression_level', '0']); record('table6_16bit_level0.flac')
+ffmpeg_encode('table6_16bit_level8.flac', [t16], 16, ['-compression_level', '8', '-lpc_type', 'cholesky', '-exact_rice_parameters', '1']); record('table6_16bit_level8.flac')
 ffmpeg_encode('table6_16bit_fixed.flac', [t16], 16, ['-compression_level', '5', '-lpc_type', 'fixed', '-max_partition_order', '6']); record('table6_16bit_fixed.flac')
-ffmpeg_encode('table3_24bit_c12.flac', [table(3, 2048, 24)], 24, ['-compression_level', '12']); record('table3_24bit_c12.flac')
+ffmpeg_encode('table3_24bit_level12.flac', [table(3, 2048, 24)], 24, ['-compression_level', '12']); record('table3_24bit_level12.flac')
 noise = [random.randint(-32768, 32767) for _ in range(2048)]; noise[0] = 32767; noise[1] = -32768
 ffmpeg_encode('noise1_fullscale.flac', [noise], 16, ['-compression_level', '5']); record('noise1_fullscale.flac')
 ffmpeg_encode('silence4.flac', [[0] * 8192], 16, []); record('silence4.flac')

@@ -34,10 +34,10 @@ final class FLACTests: XCTestCase {
         "stereo2_left_side.flac": (4096, 2, 0xd3ec5465cde3ea4d),
         "stereo2_mid_side.flac": (4096, 2, 0xd3ec5465cde3ea4d),
         "stereo2_right_side.flac": (4096, 2, 0xd3ec5465cde3ea4d),
-        "table3_24bit_c12.flac": (6144, 1, 0x8cb53f580809d3dd),
+        "table3_24bit_level12.flac": (6144, 1, 0x8cb53f580809d3dd),
         "table4_16bit_96k.flac": (8192, 1, 0xb8806bcb0a388c89),
-        "table6_16bit_c0.flac": (12288, 1, 0xbb54ac6d0c443e45),
-        "table6_16bit_c8.flac": (12288, 1, 0xbb54ac6d0c443e45),
+        "table6_16bit_level0.flac": (12288, 1, 0xbb54ac6d0c443e45),
+        "table6_16bit_level8.flac": (12288, 1, 0xbb54ac6d0c443e45),
         "table6_16bit_fixed.flac": (12288, 1, 0xbb54ac6d0c443e45),
     ]
 
@@ -70,7 +70,7 @@ final class FLACTests: XCTestCase {
 
     func testSameAudioAtEveryCompressionLevelAndStereoMode() throws {
         // ffmpeg encoded the same table three ways and the same stereo pair four ways.
-        let tables = try ["table6_16bit_c0", "table6_16bit_c8", "table6_16bit_fixed"].map { try decode($0 + ".flac").firstChannel }
+        let tables = try ["table6_16bit_level0", "table6_16bit_level8", "table6_16bit_fixed"].map { try decode($0 + ".flac").firstChannel }
         XCTAssertEqual(tables[0], tables[1]); XCTAssertEqual(tables[0], tables[2])
         let pairs = try ["indep", "left_side", "right_side", "mid_side"].map { try decode("stereo2_\($0).flac").firstChannel }
         for p in pairs.dropFirst() { XCTAssertEqual(p, pairs[0]) }
@@ -137,9 +137,9 @@ final class FLACTests: XCTestCase {
     // MARK: - Damaged files
 
     func testCutShortAndCorruptFilesAreReported() throws {
-        let good = try resource("table6_16bit_c0.flac")
+        let good = try resource("table6_16bit_level0.flac")
         let name = "t.flac"
-        let lastFrame = try decode("table6_16bit_c0.flac").frames - 1
+        let lastFrame = try decode("table6_16bit_level0.flac").frames - 1
         // Cut off inside the last frame.
         XCTAssertThrowsError(try WavetableReader.read(good.prefix(good.count - 10), fileName: name)) { e in
             XCTAssertEqual("\(e)", "\"t.flac\" is a FLAC file, but it ends in the middle of frame \(lastFrame); it is cut short or damaged.")
@@ -201,12 +201,12 @@ final class FLACTests: XCTestCase {
         XCTAssertTrue(WavetableReader.mayContainWavetables(fileName: "B.FLAC"))
         XCTAssertFalse(WavetableReader.mayContainWavetables(fileName: ".a.flac"))
         // Content decides, not the extension.
-        let t = try WavetableReader.read(try resource("table6_16bit_c0.flac"), fileName: "Table.wav")
+        let t = try WavetableReader.read(try resource("table6_16bit_level0.flac"), fileName: "Table.wav")
         XCTAssertEqual(t.first?.frameSize, 2048)
     }
 
     func testLengthRulesApplyAsForWAV() throws {
-        let t = try XCTUnwrap(WavetableReader.read(try resource("table6_16bit_c8.flac"), fileName: "Evolving Saw.flac").first)
+        let t = try XCTUnwrap(WavetableReader.read(try resource("table6_16bit_level8.flac"), fileName: "Evolving Saw.flac").first)
         XCTAssertEqual(t.name, "Evolving Saw")
         XCTAssertEqual(t.fileName, "Evolving Saw.flac")
         XCTAssertEqual(t.source, .wav)   // the contract has no FLAC case; see the report
@@ -226,7 +226,7 @@ final class FLACTests: XCTestCase {
         XCTAssertEqual(try WavetableReader.read(try resource("stereo2_mid_side.flac"), fileName: "st.flac"), [])
         XCTAssertEqual(try WavetableReader.read(try resource("hand_32bit_midside.flac"), fileName: "w.flac"), [])
         // A multisample note name is not a wavetable either.
-        XCTAssertEqual(try WavetableReader.read(try resource("table6_16bit_c0.flac"), fileName: "Saw C3.flac"), [])
+        XCTAssertEqual(try WavetableReader.read(try resource("table6_16bit_level0.flac"), fileName: "Saw C3.flac"), [])
     }
 
     func testTonverkTagInTheName() throws {
