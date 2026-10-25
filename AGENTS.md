@@ -221,6 +221,9 @@ Don't:
   user from `candidateFrameSizes`.
 - Don't commit files from other people's sound sets, factory banks, or synth exports; tests build
   their inputs synthetically (see the headers of `CorpusCaseTests.swift` and `ReadingTests.swift`).
+- Don't import a module a test target does not depend on in `Package.swift` (section 4): a
+  local build that has built every target has the module on hand, CI building the targets in
+  parallel does not. A test that needs `PgdataPackerCore` goes in `PgdataPackerCoreTests`.
 - Don't move a published git tag; a fix after a release goes into the next version.
 - Don't touch `appcast.xml`, signing, or notarization: the release flow is the owner's
   (`make-app.sh --sign/--notarize/--appcast`), and its identities and keys are not in this document.
