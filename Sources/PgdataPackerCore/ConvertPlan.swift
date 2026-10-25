@@ -609,10 +609,12 @@ public struct ConvertPlan: Equatable {
     public var destinationScalesToFit: Bool { preset.isThirdWave || preset == .waveEdit }
 
     /// The interpolation as the destination's file will record it: the option, else
-    /// the source's, else crossfade; nil when the format cannot record it.
+    /// the source's, else crossfade; nil when the format cannot record it. A Tonverk name
+    /// can say only stepped or smooth, so spectral is recorded as crossfade there.
     public func interpolationRecorded(for item: Item) -> Interpolation? {
         guard preset.recordsInterpolation else { return nil }
-        return options.interpolation ?? item.table.interpolation ?? .crossfade
+        let asked = options.interpolation ?? item.table.interpolation ?? .crossfade
+        return preset == .tonverk && asked == .spectral ? .crossfade : asked
     }
 
     /// What converting an item is expected to produce, from the preset's facts and the options;

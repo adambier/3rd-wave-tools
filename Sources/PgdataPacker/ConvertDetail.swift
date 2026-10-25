@@ -90,8 +90,9 @@ struct ConvertItemDetail: View {
     }
 }
 
-/// The table's frames stacked front to back, as the synths draw them: the source as read, and
-/// beside it what the destination gets (the preview read back from the bytes the writer made).
+/// The table's frames stacked front to back, as the synths draw them: the source as read, with
+/// its own interpolation, and beside it what the destination gets (the preview read back from
+/// the bytes the writer made), with the interpolation the file records.
 struct ConvertOverviewPair: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
@@ -102,56 +103,100 @@ struct ConvertOverviewPair: View {
             let result = state.convertPreviews.resultFrames(item, in: plan)
             HStack(alignment: .top, spacing: 16) {
                 ConvertOverview(frames: source.frames, tint: .secondary,
-                                caption: "Source · \(source.frameCount) × \(ConvertPlan.formatCount(source.frameSize))")
+                                caption: "Source · \(source.frameCount) × \(ConvertPlan.formatCount(source.frameSize))",
+                                interpolation: item.table.interpolation,
+                                unstatedLegend: "Interpolation not stated; stored frames only.")
                 if let result, let first = result.first {
                     ConvertOverview(frames: result, tint: .accentColor,
-                                    caption: "\(plan.preset.shortTitle) · \(result.count) × \(ConvertPlan.formatCount(first.count))")
+                                    caption: "\(plan.preset.shortTitle) · \(result.count) × \(ConvertPlan.formatCount(first.count))",
+                                    interpolation: plan.interpolationRecorded(for: item),
+                                    unstatedLegend: "Interpolation set on the synth; stored frames only.")
                 }
             }
-            .help("The table's frames, front (first) to back (last): the source as read, and what the destination gets, read back from the file Convert would write. At most 64 frames are drawn, each reduced to the width of the picture.")
+            .help("The table's frames, front (first) to back (last): the source as read, and what the destination gets, read back from the file Convert would write. Solid lines are stored frames (at most 64 are drawn, each reduced to the width of the picture). Faint lines show the interpolation between them: crossfades are exact; spectral blends are an approximation, since Serum's and Vital's exact morphs aren't published.")
         }
     }
 }
 
-/// One stacked-frames picture with its caption.
+/// One stacked-frames picture with its caption and a legend for the faint lines.
 struct ConvertOverview: View {
     let frames: [[Float]]
     let tint: Color
     let caption: String
+    /// The interpolation to draw between the stored frames; nil when nothing says.
+    let interpolation: Interpolation?
+    /// The legend when `interpolation` is nil.
+    let unstatedLegend: String
+
+    private var legend: String {
+        guard let mode = interpolation else { return unstatedLegend }
+        switch mode {
+        case Interpolation.none: return "Stepped: frames play as stored."
+        case .crossfade: return "Faint lines: crossfades between frames."
+        case .spectral: return "Faint lines: spectral blends (approximate)."
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            WavetableStackCanvas(frames: frames, tint: tint)
+            WavetableStackCanvas(frames: frames, tint: tint, interpolation: interpolation)
                 .frame(maxWidth: 360, minHeight: 100, maxHeight: 100)
             Text(caption).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            Text(legend).font(.caption).foregroundStyle(.secondary)
         }
     }
 }
 
-/// Up to 64 frames drawn as polylines stacked diagonally, the first in front, the farthest
-/// fading; each frame is reduced to about a value per two points of width.
+/// Stored frames drawn as polylines stacked diagonally, the first in front, the farthest
+/// fading, each reduced to about a value per two points of width. With a crossfade or spectral
+/// interpolation, faint thinner lines between neighbouring frames show the blends; the stored
+/// frames then thin to 32 so the whole picture stays within about 120 lines.
 struct WavetableStackCanvas: View {
     let frames: [[Float]]
     let tint: Color
+    let interpolation: Interpolation?
+
+    /// A line to draw: its depth in frames from the front, its values, and whether it is faint.
+    private struct Line {
+        var position: Double
+        var values: [Float]
+        var faint: Bool
+    }
 
     var body: some View {
         Canvas { (context: inout GraphicsContext, size: CGSize) in
-            let columns = max(8, Int(size.width * 0.7 / 2))
-            let reduced = WavetableSketch.reduce(frames, maxFrames: 64, columns: columns)
-            let n = reduced.count
-            guard n > 0 else { return }
+            let lines = WavetableStackCanvas.lines(frames, interpolation: interpolation, width: size.width)
+            guard let last = lines.first?.position, last > 0 || lines.count == 1 else { return }
             let depthX = size.width * 0.3
             let depthY = size.height * 0.5
             let waveWidth = size.width - depthX
             let amplitude = (size.height - depthY) / 2 - 1
-            for k in stride(from: n - 1, through: 0, by: -1) {
-                let t: CGFloat = n > 1 ? CGFloat(k) / CGFloat(n - 1) : 0
+            for line in lines {
+                let t: CGFloat = last > 0 ? CGFloat(line.position / last) : 0
                 let x0 = depthX * t
                 let base = size.height - amplitude - 1 - depthY * t
-                let path = WavetableStackCanvas.path(reduced[k], x0: x0, base: base, width: waveWidth, amplitude: amplitude)
-                context.stroke(path, with: .color(tint.opacity(1 - 0.7 * Double(t))), lineWidth: 1)
+                let path = WavetableStackCanvas.path(line.values, x0: x0, base: base, width: waveWidth, amplitude: amplitude)
+                let fade = 1 - 0.7 * Double(t)
+                context.stroke(path, with: .color(tint.opacity(line.faint ? 0.3 * fade : fade)),
+                               lineWidth: line.faint ? 0.5 : 1)
             }
         }
+    }
+
+    /// The lines back to front: the stored frames (reduced) and the faint in-betweens, sorted
+    /// by depth so the front ones are drawn last.
+    private static func lines(_ frames: [[Float]], interpolation: Interpolation?, width: CGFloat) -> [Line] {
+        let columns = max(8, Int(width * 0.7 / 2))
+        let showsBetweens = interpolation == .crossfade || interpolation == .spectral
+        let budget = WavetableSketch.lineBudget(storedFrames: frames.count, showsBetweens: showsBetweens)
+        let reduced = WavetableSketch.reduce(frames, maxFrames: budget.stored, columns: columns)
+        var out: [Line] = reduced.enumerated().map { (pair: (offset: Int, element: [Float])) -> Line in
+            Line(position: Double(pair.offset), values: pair.element, faint: false)
+        }
+        for b in WavetableSketch.inBetweens(reduced, interpolation: interpolation, perGap: budget.perGap) {
+            out.append(Line(position: b.position, values: b.values, faint: true))
+        }
+        return out.sorted { (a: Line, b: Line) -> Bool in a.position > b.position }
     }
 
     /// One frame as a polyline from `x0` across `width`, around the baseline `base`.

@@ -621,3 +621,70 @@ final class WavetableSketchTests: XCTestCase {
         XCTAssertEqual(cache.resultFrames(plan.items[0], in: plan)?.count, 256)
     }
 }
+
+/// The faint frames the overview draws between stored frames.
+final class WavetableSketchInterpolationTests: XCTestCase {
+    private func cycle(_ n: Int, harmonic h: Int, amplitude: Float, phase: Double = 0) -> [Float] {
+        (0..<n).map { Float(sin(2 * Double.pi * Double($0 * h) / Double(n) + phase)) * amplitude }
+    }
+
+    func testLineBudget() {
+        XCTAssertEqual(WavetableSketch.lineBudget(storedFrames: 256, showsBetweens: false).stored, 64)
+        XCTAssertEqual(WavetableSketch.lineBudget(storedFrames: 256, showsBetweens: false).perGap, 0)
+        let b = WavetableSketch.lineBudget(storedFrames: 256, showsBetweens: true)
+        XCTAssertEqual(b.stored, 32)
+        XCTAssertEqual(b.perGap, 2)
+        XCTAssertLessThanOrEqual(b.stored + (b.stored - 1) * b.perGap, 120)
+        XCTAssertEqual(WavetableSketch.lineBudget(storedFrames: 8, showsBetweens: true).perGap, 3)
+        XCTAssertEqual(WavetableSketch.lineBudget(storedFrames: 1, showsBetweens: true).perGap, 0)
+    }
+
+    func testSteppedAndUnstatedAddNothing() {
+        let frames = [cycle(16, harmonic: 1, amplitude: 1), cycle(16, harmonic: 2, amplitude: 1)]
+        XCTAssertTrue(WavetableSketch.inBetweens(frames, interpolation: Interpolation.none, perGap: 2).isEmpty)
+        XCTAssertTrue(WavetableSketch.inBetweens(frames, interpolation: nil, perGap: 2).isEmpty)
+        XCTAssertTrue(WavetableSketch.inBetweens(frames, interpolation: .crossfade, perGap: 0).isEmpty)
+        XCTAssertTrue(WavetableSketch.inBetweens([frames[0]], interpolation: .crossfade, perGap: 2).isEmpty)
+    }
+
+    func testCrossfadeMidpointIsExact() {
+        let a = cycle(16, harmonic: 1, amplitude: 1), b = cycle(16, harmonic: 1, amplitude: 0.5)
+        let between = WavetableSketch.inBetweens([a, b, a], interpolation: .crossfade, perGap: 1)
+        XCTAssertEqual(between.count, 2)
+        XCTAssertEqual(between[0].position, 0.5)
+        XCTAssertEqual(between[1].position, 1.5)
+        for (x, y) in zip(between[0].values, cycle(16, harmonic: 1, amplitude: 0.75)) { XCTAssertEqual(x, y, accuracy: 1e-6) }
+        let thirds = WavetableSketch.inBetweens([a, b], interpolation: .crossfade, perGap: 3)
+        XCTAssertEqual(thirds.map(\.position), [0.25, 0.5, 0.75])
+        XCTAssertEqual(WavetableSketch.blend([0, 1], [1, 1, 1], t: 0.25), [0.25, 1])
+    }
+
+    func testSpectralBlendOfIdenticalFramesIsTheFrame() {
+        let a = cycle(40, harmonic: 1, amplitude: 0.6, phase: 0.3)
+        let same = WavetableSketch.spectralBlend(a, a, t: 0.4)
+        XCTAssertEqual(same.count, 40)
+        for (x, y) in zip(same, a) { XCTAssertEqual(x, y, accuracy: 1e-5) }
+        // An odd length too (bin n/2 is then an ordinary mirrored harmonic).
+        let odd = cycle(33, harmonic: 2, amplitude: 0.8, phase: 1.1)
+        for (x, y) in zip(WavetableSketch.spectralBlend(odd, odd, t: 0.5), odd) { XCTAssertEqual(x, y, accuracy: 1e-5) }
+        // Halfway between harmonic 1 and harmonic 2 has half of each.
+        let b = cycle(40, harmonic: 2, amplitude: 0.6, phase: 0.3)
+        let mid = WavetableSketch.spectralBlend(a, b, t: 0.5)
+        let expected = zip(cycle(40, harmonic: 1, amplitude: 0.3, phase: 0.3), cycle(40, harmonic: 2, amplitude: 0.3, phase: 0.3)).map { $0 + $1 }
+        for (x, y) in zip(mid, expected) { XCTAssertEqual(x, y, accuracy: 1e-5) }
+        XCTAssertEqual(WavetableSketch.inBetweens([a, b], interpolation: .spectral, perGap: 1).first?.position, 0.5)
+    }
+
+    func testTonverkRecordsSpectralAsCrossfade() {
+        let wave = (0..<2048).map { Float(sin(Double($0) * 2 * .pi / 2048)) * 0.5 }
+        let t = FoundTable(name: "T", fileName: "T.wav", source: .wav, samples: wave + wave, frameSize: 2048,
+                           frameSizeBasis: "clm chunk", interpolation: .spectral)
+        var plan = ConvertPlan(preset: .tonverk)
+        plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/T.wav"), table: t)], factory: FactoryLibrary())
+        XCTAssertEqual(plan.interpolationRecorded(for: plan.items[0]), .crossfade)
+        plan.preset = .wav2048
+        XCTAssertEqual(plan.interpolationRecorded(for: plan.items[0]), .spectral)
+        plan.preset = .surge
+        XCTAssertNil(plan.interpolationRecorded(for: plan.items[0]))
+    }
+}

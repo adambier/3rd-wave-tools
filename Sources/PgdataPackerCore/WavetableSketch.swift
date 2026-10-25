@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(WavetableFormats)
+import WavetableFormats   // SwiftPM build; absent in the app's single-module swiftc build
+#endif
 
 /// Reduces a wavetable to what a small picture of it needs: a few dozen frames, each a few
 /// dozen values. The Convert page draws the result as frames stacked front to back.
@@ -36,6 +39,99 @@ public enum WavetableSketch {
             var v: Float = 0
             for s in cycle[lo..<min(hi, cycle.count)] where abs(s) > abs(v) { v = s }
             return v
+        }
+    }
+}
+
+// MARK: - Interpolation between frames
+
+public extension WavetableSketch {
+    /// How many stored frames to draw, and how many faint frames to put in each gap between
+    /// them, within a budget of lines: with in-betweens the stored frames are capped at
+    /// `storedWithBetweens` so the gaps have room, and each gap gets up to three.
+    static func lineBudget(storedFrames count: Int, showsBetweens: Bool, cap: Int = 120,
+                           storedAlone: Int = 64, storedWithBetweens: Int = 32) -> (stored: Int, perGap: Int) {
+        let stored = max(1, min(count, showsBetweens ? storedWithBetweens : storedAlone))
+        guard showsBetweens, stored > 1 else { return (stored, 0) }
+        return (stored, max(0, min(3, (cap - stored) / (stored - 1))))
+    }
+
+    /// The faint frames between each pair of neighbouring frames, `perGap` per gap, in order
+    /// (gap 0's first, then gap 1's, …): linear crossfades for `.crossfade`, spectral blends
+    /// (``spectralBlend(_:_:t:)``) for `.spectral`, and none for `.none` or nil (the table steps
+    /// from frame to frame, or nothing says). Each in-between is paired with its position,
+    /// counted in frames from the first (1.5 is halfway between frames 1 and 2).
+    static func inBetweens(_ frames: [[Float]], interpolation: Interpolation?, perGap: Int) -> [(position: Double, values: [Float])] {
+        guard let mode = interpolation, mode != .none, perGap > 0, frames.count > 1 else { return [] }
+        var out: [(position: Double, values: [Float])] = []
+        for g in 0..<(frames.count - 1) {
+            for j in 1...perGap {
+                let t = Float(j) / Float(perGap + 1)
+                let values = mode == .crossfade ? blend(frames[g], frames[g + 1], t: t) : spectralBlend(frames[g], frames[g + 1], t: t)
+                out.append((Double(g) + Double(t), values))
+            }
+        }
+        return out
+    }
+
+    /// A linear crossfade: `a` at t = 0, `b` at t = 1 (the shorter of the two sets the length).
+    static func blend(_ a: [Float], _ b: [Float], t: Float) -> [Float] {
+        (0..<min(a.count, b.count)).map { a[$0] + (b[$0] - a[$0]) * t }
+    }
+
+    /// A spectral blend: each harmonic's magnitude moves linearly from `a`'s to `b`'s, and its
+    /// phase along the shorter arc between them. This stands in for the spectral morphs of
+    /// Serum and Vital, whose exact methods are not published, so it is an approximation. Two
+    /// identical cycles give that cycle back (to rounding). The cycles must be the same length.
+    static func spectralBlend(_ a: [Float], _ b: [Float], t: Float) -> [Float] {
+        let n = min(a.count, b.count)
+        guard n > 1 else { return blend(a, b, t: t) }
+        let sa = spectrum(Array(a.prefix(n))), sb = spectrum(Array(b.prefix(n)))
+        let bins = sa.magnitude.count
+        var magnitude = [Double](repeating: 0, count: bins), phase = magnitude
+        let tt = Double(t)
+        let silent = 1e-6
+        for k in 0..<bins {
+            magnitude[k] = sa.magnitude[k] + (sb.magnitude[k] - sa.magnitude[k]) * tt
+            // A harmonic one frame lacks has no phase there: keep the other frame's.
+            if sa.magnitude[k] < silent { phase[k] = sb.phase[k]; continue }
+            if sb.magnitude[k] < silent { phase[k] = sa.phase[k]; continue }
+            let d = atan2(sin(sb.phase[k] - sa.phase[k]), cos(sb.phase[k] - sa.phase[k]))
+            phase[k] = sa.phase[k] + d * tt
+        }
+        return synthesize(magnitude: magnitude, phase: phase, count: n)
+    }
+
+    /// The magnitudes and phases of harmonics 0 … n/2 of a real cycle (a plain DFT: the cycles
+    /// here are a few dozen values, so no FFT is needed).
+    static func spectrum(_ x: [Float]) -> (magnitude: [Double], phase: [Double]) {
+        let n = x.count
+        let bins = n / 2 + 1
+        var magnitude = [Double](repeating: 0, count: bins), phase = magnitude
+        for k in 0..<bins {
+            var re = 0.0, im = 0.0
+            for j in 0..<n {
+                let angle = 2 * Double.pi * Double(j * k) / Double(n)
+                re += Double(x[j]) * cos(angle)
+                im -= Double(x[j]) * sin(angle)
+            }
+            magnitude[k] = (re * re + im * im).squareRoot()
+            phase[k] = atan2(im, re)
+        }
+        return (magnitude, phase)
+    }
+
+    /// The real cycle of `count` samples with the given harmonics (the inverse of `spectrum`).
+    static func synthesize(magnitude: [Double], phase: [Double], count n: Int) -> [Float] {
+        let bins = min(magnitude.count, phase.count)
+        return (0..<n).map { j in
+            var v = 0.0
+            for k in 0..<bins {
+                // Bins 0 and n/2 (for even n) occur once; every other harmonic has a mirror.
+                let weight: Double = (k == 0 || (n % 2 == 0 && k == n / 2)) ? 1 : 2
+                v += weight * magnitude[k] * cos(2 * Double.pi * Double(j * k) / Double(n) + phase[k])
+            }
+            return Float(v / Double(n))
         }
     }
 }
