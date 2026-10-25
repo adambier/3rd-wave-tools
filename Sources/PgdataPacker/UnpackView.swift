@@ -15,20 +15,24 @@ struct UnpackView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Keyboard shortcuts for adding and unpacking are on the File menu (main.swift).
             HStack(spacing: 14) {
-                Button("Add Files or Folders…") { state.add(urls: Panels.chooseFiles(message: "Choose .pgdata files to unpack")) }
-                    .keyboardShortcut("o")
+                Button("Add Files or Folders…") {
+                    state.add(urls: Panels.chooseFiles(message: "Choose .pgdata files to unpack", allowedExtensions: ["pgdata"]))
+                }
                 Toggle("Skip factory wavetables", isOn: $state.skipFactoryDuplicates)
                     .help("Leave out wavetables that are identical to the factory table in their slot. The 3rd Wave's own exports embed factory tables too; a repack lists the factory slot instead. Any table can still be checked.")
                 Spacer()
-                Button("Remove Selected") { state.removeUnpacks(selection); selection = [] }.disabled(selection.isEmpty)
+                Button("Remove Selected") { state.removeUnpacks(selection); selection = [] }
+                    .disabled(selection.isEmpty || state.isWorking)
                     .help("Remove the selected files from this list (the files are not touched)")
-                Button("Remove All…") { state.removeAllUnpacks(); if state.unpacks.isEmpty { selection = [] } }
-                    .disabled(state.unpacks.isEmpty)
+                Button("Remove All…") { state.removeAllUnpacks() }
+                    .disabled(state.unpacks.isEmpty || state.isWorking)
                     .help("Remove every file from this list (the files are not touched)")
-                Button("Unpack Selected…") { state.unpack(Array(selection)) }.disabled(selection.isEmpty)
-                Button("Unpack All…") { state.unpack(state.unpacks.map(\.id)) }.disabled(state.unpacks.isEmpty)
-                    .keyboardShortcut("s", modifiers: [.command, .shift])
+                Button("Unpack Selected…") { state.unpack(Array(selection)) }
+                    .disabled(selection.isEmpty || state.isWorking)
+                Button("Unpack All…") { state.unpack(state.unpacks.map(\.id)) }
+                    .disabled(state.unpacks.isEmpty || state.isWorking)
                     .buttonStyle(.borderedProminent)
             }
             .padding(10)
@@ -47,7 +51,6 @@ struct UnpackView: View {
                             .tag(u.id)
                         }
                     }
-                    .visibleScrollers()
                     .onDeleteCommand { state.removeUnpacks(selection); selection = [] }
                     .frame(minWidth: 230, idealWidth: 270, maxWidth: 420)
                     .onChange(of: selection) { s in
@@ -75,6 +78,11 @@ struct UnpackView: View {
             DropSupport.load(providers) { state.add(urls: $0) }
             return true
         }
+        // Files removed in any way (Remove All… asks in a sheet, so nothing runs after it here)
+        // leave the selection; keep it to the files that remain.
+        .onChange(of: state.unpacks.map(\.id)) { (ids: [UUID]) in
+            selection = selection.filter { (id: UUID) -> Bool in ids.contains(id) }
+        }
     }
 }
 
@@ -92,6 +100,16 @@ struct UnpackDetail: View {
         var id: UUID { file.id }
     }
 
+    /// Rows selected in the file table (a row is selected by a click, as in Finder).
+    @State private var tableSelection = Set<UUID>()
+    /// The row whose file name is being edited, after a double-click or the Rename File command.
+    @State private var renaming: UUID?
+
+    /// Starts editing the file name of the one row double-clicked or chosen.
+    private func rename(_ ids: Set<UUID>) {
+        if ids.count == 1, let id = ids.first { renaming = id }
+    }
+
     var body: some View {
         let st = state
         let several = items.count > 1
@@ -105,32 +123,42 @@ struct UnpackDetail: View {
                 }
             }
             BeforeImportBox(items: items)
-            Text(several ? "Files these will produce" : "Files this will produce").font(.headline)
+            Text(several ? "Files These Will Produce" : "Files This Will Produce").font(.headline)
             // Write first (ticks in one line at the left), Contents last (the widest column). The
             // Program column only with several files; macOS 13 has no conditional table columns,
-            // so there are two tables.
+            // so there are two tables. A double-click on a row (or Rename File in its context
+            // menu) edits the file name in place, as in Finder.
             Group {
                 if several {
-                    Table(rows) {
+                    Table(rows, selection: $tableSelection) {
                         TableColumn("Write") { (r: Row) in WriteToggleCell(state: st, unpackID: r.unpackID, file: r.file) }
                             .width(44)
                         TableColumn("Program") { (r: Row) in Text(r.programName).lineLimit(1).help(r.programName) }
                             .width(min: 80, ideal: 150)
-                        TableColumn("File name") { (r: Row) in FileNameCell(state: st, unpackID: r.unpackID, file: r.file) }
+                        TableColumn("File Name") { (r: Row) in FileNameCell(state: st, unpackID: r.unpackID, file: r.file, renaming: $renaming) }
                             .width(min: 180, ideal: 260)
                         TableColumn("Contents") { (r: Row) in Text(r.file.description).foregroundStyle(.secondary).lineLimit(2).help(r.file.description) }
                     }
+                    .contextMenu(forSelectionType: Row.ID.self) { (ids: Set<UUID>) in
+                        if ids.count == 1 { Button("Rename File") { rename(ids) } }
+                    } primaryAction: { (ids: Set<UUID>) in
+                        rename(ids)
+                    }
                 } else {
-                    Table(rows) {
+                    Table(rows, selection: $tableSelection) {
                         TableColumn("Write") { (r: Row) in WriteToggleCell(state: st, unpackID: r.unpackID, file: r.file) }
                             .width(44)
-                        TableColumn("File name") { (r: Row) in FileNameCell(state: st, unpackID: r.unpackID, file: r.file) }
+                        TableColumn("File Name") { (r: Row) in FileNameCell(state: st, unpackID: r.unpackID, file: r.file, renaming: $renaming) }
                             .width(min: 180, ideal: 260)
                         TableColumn("Contents") { (r: Row) in Text(r.file.description).foregroundStyle(.secondary).lineLimit(2).help(r.file.description) }
+                    }
+                    .contextMenu(forSelectionType: Row.ID.self) { (ids: Set<UUID>) in
+                        if ids.count == 1 { Button("Rename File") { rename(ids) } }
+                    } primaryAction: { (ids: Set<UUID>) in
+                        rename(ids)
                     }
                 }
             }
-            .visibleScrollers()
             .frame(minHeight: 140, maxHeight: .infinity)
             if several {
                 Text("A file that several programs share, with the same name and contents, is written once.")
@@ -156,7 +184,7 @@ struct BeforeImportBox: View {
         if !lines.isEmpty {
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(items.count > 1 ? "What these programs need on your 3rd Wave" : "What this program needs on your 3rd Wave")
+                    Text(items.count > 1 ? "What These Programs Need on Your 3rd Wave" : "What This Program Needs on Your 3rd Wave")
                         .font(.headline)
                     ForEach(Array(lines.enumerated()), id: \.offset) { _, m in
                         line(m.text, warning: m.warning)
@@ -250,31 +278,50 @@ struct WriteToggleCell: View {
     let unpackID: UUID
     let file: UnpackPlan.Item
     var body: some View {
-        Toggle("", isOn: Binding(get: { file.write }, set: { state.setUnpackItem(unpackID, file.id, write: $0) }))
+        Toggle("Write \(file.fileName)", isOn: Binding(get: { file.write }, set: { state.setUnpackItem(unpackID, file.id, write: $0) }))
             .labelsHidden()
             .help(file.isFactoryDuplicate ? "Identical to the factory table in this slot" : "")
     }
 }
 
-/// The file name, edited freely and cleaned when editing ends (Return or leaving the field), so
-/// typing a space does not have it trimmed away under the cursor.
+/// The file name: text until its row is double-clicked, then a field (as in Finder). The field is
+/// edited freely and the name cleaned when editing ends, so typing a space does not have it trimmed
+/// away under the cursor. Return or leaving the field keeps the name; Escape drops the edit.
 struct FileNameCell: View {
     @ObservedObject var state: AppState
     let unpackID: UUID
     let file: UnpackPlan.Item
+    @Binding var renaming: UUID?
     @State private var text = ""
     @FocusState private var focused: Bool
 
+    private var editing: Bool { renaming == file.id }
+
     var body: some View {
-        TextField("", text: $text)
-            .textFieldStyle(.roundedBorder)
-            .focused($focused)
-            .onAppear { text = file.fileName }
-            .onChange(of: file.fileName) { text = $0 }
-            .onSubmit { commit() }
-            .onChange(of: focused) { if !$0 { commit() } }
-            .help(file.fileName + "\nClick to edit the file name")
+        if editing {
+            TextField("File name", text: $text)
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .focused($focused)
+                .onAppear {
+                    text = file.fileName
+                    // The field takes focus once it is in the window, not while it is being added.
+                    DispatchQueue.main.async { focused = true }
+                }
+                .onSubmit { commit() }
+                .onExitCommand { renaming = nil }
+                .onChange(of: focused) { (hasFocus: Bool) in if !hasFocus { commit() } }
+        } else {
+            Text(file.fileName).lineLimit(1)
+                .help(file.fileName + "\nDouble-click to rename")
+        }
     }
 
-    private func commit() { text = state.commitUnpackFileName(unpackID, file.id, text) }
+    /// Keeps the edited name (cleaned, or the generated name when emptied) and ends editing; a
+    /// field that Escape has already closed is left alone.
+    private func commit() {
+        guard editing else { return }
+        state.commitUnpackFileName(unpackID, file.id, text)
+        renaming = nil
+    }
 }

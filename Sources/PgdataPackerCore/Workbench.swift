@@ -285,7 +285,7 @@ public struct PackPlan {
                 else if isFactory && !wasUserSlot { choice = .reference }
             }
 
-            let factoryName = factory.name(ref).map { "\"\($0)\"" } ?? "table"
+            let factoryName = factory.name(ref).map { "\u{201C}\($0)\u{201D}" } ?? "table"
             var status: Status
             var brief = ""
             var embeds = false
@@ -297,24 +297,24 @@ public struct PackPlan {
                 let f = files.first { $0.id == id }!
                 embeds = true
                 let name = packedName(f)
-                warnings += nameWarnings(name, what: "\(f.url.lastPathComponent): the name \"\(name)\"")
+                warnings += nameWarnings(name, what: "\(f.url.lastPathComponent): the name \u{201C}\(name)\u{201D}")
                 warnings += f.problems.map { "\(f.url.lastPathComponent): \($0)." }
                 if case let .multisample(m) = f.body {
                     bytes = multisampleBytes(m)
-                    status = .ok("Embeds \"\(name)\" (\(f.url.lastPathComponent)); a 3rd Wave that already has it reuses it, otherwise it goes into a free S slot")
+                    status = .ok("Embeds \u{201C}\(name)\u{201D} (\(f.url.lastPathComponent)); a 3rd Wave that already has it reuses it, otherwise it goes into a free S slot")
                     brief = "Embedded; reused or stored in a free S slot"
                 } else {
                     bytes = tableBytes
                     if let same = factory.slot(withFingerprint: f.fingerprint) {
-                        status = .ok("Embeds \"\(name)\", identical to factory \(same.label); a 3rd Wave that has it reuses it")
+                        status = .ok("Embeds \u{201C}\(name)\u{201D}, identical to factory \(same.label); a 3rd Wave that has it reuses it")
                         brief = "Embedded; same as factory \(same.label), reused"
                     } else if isFactory && !replacingIsExpected {
                         mayNeedSlot = true
-                        status = .warning("Embeds \"\(name)\" (\(f.url.lastPathComponent)) in place of factory \(factoryName); stored in a free \(ref.isP ? "P" : "U") slot on import")
+                        status = .warning("Embeds \u{201C}\(name)\u{201D} (\(f.url.lastPathComponent)) in place of factory \(factoryName); stored in a free \(ref.isP ? "P" : "U") slot on import")
                         brief = "Embedded, replacing the factory table"
                     } else {
                         mayNeedSlot = true
-                        status = .ok("Embeds \"\(name)\" (\(f.url.lastPathComponent)); stored in a free \(ref.isP ? "P" : "U") slot on import")
+                        status = .ok("Embeds \u{201C}\(name)\u{201D} (\(f.url.lastPathComponent)); stored in a free \(ref.isP ? "P" : "U") slot on import")
                         brief = "Embedded; needs a free \(ref.isP ? "P" : "U") slot"
                     }
                 }
@@ -367,9 +367,9 @@ public struct PackPlan {
                 return "\(what) has \(from.count == 1 ? "a letter" : "letters") the 3rd Wave's name fields cannot hold; \(from.count == 1 ? "it is" : "they are") written without accents: \(pairs)."
             case let .replacedWithQuestionMark(chars):
                 let list = chars.map { "\u{201C}\($0)\u{201D}" }.joined(separator: ", ")
-                return "\(what) has \(chars.count == 1 ? "a character" : "characters") the 3rd Wave's name fields cannot hold (\(list)); \(chars.count == 1 ? "it is" : "they are") written as \"?\"."
+                return "\(what) has \(chars.count == 1 ? "a character" : "characters") the 3rd Wave's name fields cannot hold (\(list)); \(chars.count == 1 ? "it is" : "they are") written as \u{201C}?\u{201D}."
             case let .shortened(from, to):
-                return "\(what) is \(from) characters; the 3rd Wave's name fields hold \(NameField.displayLimit), so it is shortened to \"\(to)\"."
+                return "\(what) is \(from) characters; the 3rd Wave's name fields hold \(NameField.displayLimit), so it is shortened to \u{201C}\(to)\u{201D}."
             }
         }
     }
@@ -405,7 +405,7 @@ public struct PackPlan {
             default: return xs.dropLast().joined(separator: ", ") + ", and " + xs.last!
             }
         }
-        func fname(_ r: SourceRef) -> String { "\"\(factory.name(r) ?? "factory table")\"" }
+        func fname(_ r: SourceRef) -> String { "\u{201C}\(factory.name(r) ?? "factory table")\u{201D}" }
         let list = and(slots.map(\.label))
         let first = slots[0]
         let title = one
@@ -418,8 +418,8 @@ public struct PackPlan {
         Until 2025, U48–U55 were user slots, where people loaded their own wavetables. Groove Synthesis then made them factory slots. Loaded as it is, this program would play the factory \(one ? "table" : "tables") \(factoryList) instead of the \(one ? "one" : "ones") the author used.
 
         To fix it, do one of these:
-        • Add the author's wavetable \(one ? "file" : "files") for \(list). Program sets that use these slots usually include them, often named with the slot (for example "\(first.label) Name.wt"). A file whose name starts with the slot is assigned to it automatically; otherwise, use Choose what to play… in the slot's Plays menu and pick the file. \(one ? "The table is" : "The tables are") then included in the .pgdata, and the 3rd Wave stores \(one ? "it in a free slot" : "them in free slots") when it imports the file.
-        • Point the oscillators to a different wavetable you have: Choose what to play… in the slot's Plays menu.
+        • Add the author's wavetable \(one ? "file" : "files") for \(list). Program sets that use these slots usually include them, often named with the slot (for example \u{201C}\(first.label) Name.wt\u{201D}). A file whose name starts with the slot is assigned to it automatically; otherwise, use Choose What to Play… in the slot's Plays menu and pick the file. \(one ? "The table is" : "The tables are") then included in the .pgdata, and the 3rd Wave stores \(one ? "it in a free slot" : "them in free slots") when it imports the file.
+        • Point the oscillators to a different wavetable you have: Choose What to Play… in the slot's Plays menu.
         • Use the factory \(one ? "table" : "tables") anyway: \(one ? "in the slot's Plays menu, choose Factory table — \(factory.name(first) ?? "")" : "in each slot's Plays menu, choose its factory table (Factory table — \(factory.name(first) ?? "") for \(first.label), and so on)"). Choose this if you know the program was made for \(one ? "it" : "them"), or you accept a different sound.
         """
         return Note(title: title, body: body)
@@ -561,7 +561,7 @@ public struct UnpackPlan {
             let name = OutputNames.multisample(ref, m)
             let problems = m.problems
             items.append(Item(ref: ref, fileName: name, data: m.binData(),
-                              description: "\(ref.label) multisample \"\(m.name)\", \(m.samples.count) sample\(m.samples.count == 1 ? "" : "s"), "
+                              description: "\(ref.label) multisample \u{201C}\(m.name)\u{201D}, \(m.samples.count) sample\(m.samples.count == 1 ? "" : "s"), "
                                 + String(format: "%.1f s", secs) + (problems.isEmpty ? "" : " — " + problems.joined(separator: "; ")),
                               isFactoryDuplicate: false, write: true, defaultFileName: name, problem: problems.first))
         }
@@ -577,7 +577,7 @@ public struct UnpackPlan {
         for j in plan.items.indices {
             guard let ref = plan.items[j].ref, let fp = plan.items[j].fingerprint, let name = plan.items[j].contentName else { continue }
             let dup = factory.tables[ref]?.fingerprint == fp
-            var desc = "\(ref.label) wavetable \"\(name)\""
+            var desc = "\(ref.label) wavetable \u{201C}\(name)\u{201D}"
             if dup { desc += " — identical to the factory table" }
             else if let f = factory.slot(withFingerprint: fp) { desc += " — identical to factory \(f.label)" }
             if let problem = plan.items[j].problem { desc += " — " + problem }

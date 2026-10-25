@@ -23,7 +23,7 @@ struct RepointSheet: View {
     @State private var search = ""
     @State private var selectedID: String?
     @FocusState private var focus: Field?
-    private enum Field { case list, filter }
+    private enum Field { case list }
 
     init(state: AppState, request: AppState.RepointRequest) {
         _state = ObservedObject(wrappedValue: state)
@@ -65,7 +65,7 @@ struct RepointSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Change what oscillators play").font(.title3).bold()
+            Text("Change What Oscillators Play").font(.title3).bold()
             Text("Check the oscillators to change, then select what they should play.")
                 .foregroundStyle(.secondary)
             if request.itemID == nil {
@@ -104,7 +104,7 @@ struct RepointSheet: View {
 
     @ViewBuilder private var oscillatorList: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("1  Oscillators to change").font(.headline)
+            Text("1  Oscillators to Change").font(.headline)
             if let item {
                 let current = item.effectiveProgram.sources
                 let original = item.program.sources
@@ -117,23 +117,22 @@ struct RepointSheet: View {
                             ForEach(0..<3, id: \.self) { osc in
                                 let pos = part * 3 + osc
                                 if pos < current.count {
+                                    let title = "Osc \(osc + 1): \(describe(current[pos]))"
+                                        + (current[pos] != original[pos] ? "  (was \(original[pos].label))" : "")
                                     Toggle(isOn: Binding(
                                         get: { picked.contains(pos) },
                                         set: { if $0 { picked.insert(pos) } else { picked.remove(pos) } }
                                     )) {
-                                        Text("Osc \(osc + 1): \(describe(current[pos]))"
-                                             + (current[pos] != original[pos] ? "  (was \(original[pos].label))" : ""))
-                                            .lineLimit(1)
+                                        Text(title).lineLimit(1)
                                     }
                                     .disabled(current[pos].isSample)
-                                    .help(current[pos].isSample ? "Multisample oscillators are not repointed." : "")
+                                    .help(current[pos].isSample ? "Multisample oscillators are not repointed." : title)
                                 }
                             }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .visibleScrollers()
             } else {
                 Text("Choose a program").foregroundStyle(.secondary)
             }
@@ -189,21 +188,15 @@ struct RepointSheet: View {
 
     private var targetList: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("2  What they should play").font(.headline)
+            Text("2  What They Should Play").font(.headline)
             List(selection: $selectedID) {
-                targetSection("Files you added", fileTargets.filter(matches))
-                targetSection("Factory slots", slotTargets.filter(matches))
-                targetSection("Analog waves", analogTargets.filter(matches))
+                targetSection("Files You Added", fileTargets.filter(matches))
+                targetSection("Factory Slots", slotTargets.filter(matches))
+                targetSection("Analog Waves", analogTargets.filter(matches))
             }
-            .visibleScrollers()
             .focused($focus, equals: .list)
             .onChange(of: selectedID) { id in select(id) }
-            HStack(spacing: 6) {
-                Image(systemName: "line.3.horizontal.decrease.circle").foregroundStyle(.secondary)
-                TextField("Filter the list by slot or name (e.g., U56 or vowel)", text: $search)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($focus, equals: .filter)
-            }
+            SearchField(text: $search, placeholder: "Filter the list by slot or name (e.g., U56 or vowel)")
         }
         // Start with the list focused, not the filter field.
         .onAppear { DispatchQueue.main.async { focus = .list } }
@@ -232,15 +225,24 @@ struct RepointSheet: View {
 
     // MARK: Apply
 
+    /// The default button's title. A name can run to 31 characters, so it is cut to about 20 here;
+    /// the list above shows it in full.
     private var applyTitle: String {
         guard let t = target else { return "Apply" }
         let n = picked.count
         let who = "\(n) oscillator\(n == 1 ? "" : "s")"
         if let fid = targetFile, let f = state.contentFiles.first(where: { $0.id == fid }) {
-            if f.slot == nil, let from = request.from, t == from { return "Use \(state.displayName(f)) for \(from.label)" }
-            return "Use \(state.displayName(f)) for \(who)"
+            if f.slot == nil, let from = request.from, t == from { return "Use \(shortened(state.displayName(f))) for \(from.label)" }
+            return "Use \(shortened(state.displayName(f))) for \(who)"
         }
-        return "Use \(t.isBuiltIn ? t.description : t.label) for \(who)"
+        return "Use \(shortened(t.isBuiltIn ? t.description : t.label)) for \(who)"
+    }
+
+    /// The first 19 characters and an ellipsis when the name is longer than 20.
+    private func shortened(_ name: String) -> String {
+        let limit = 20
+        guard name.count > limit else { return name }
+        return String(name.prefix(limit - 1)).trimmingCharacters(in: .whitespaces) + "\u{2026}"
     }
 
     /// Assigning an unassigned file to the slot the program already uses needs no oscillator ticked.

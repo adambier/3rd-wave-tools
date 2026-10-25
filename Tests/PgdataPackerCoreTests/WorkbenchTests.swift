@@ -92,7 +92,7 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertEqual(plain.rows[0].choice, .reference)
         XCTAssertEqual(plain.rows[0].options, [.reference])
         XCTAssertEqual(plain.verdict, .factoryOnly)
-        XCTAssertEqual(plain.rows[0].status, .ok("Factory \"Dub Grind\"; not embedded"))
+        XCTAssertEqual(plain.rows[0].status, .ok("Factory \u{201C}Dub Grind\u{201D}; not embedded"))
 
         // The factory table itself, added (e.g. unpacked from the synth's own export): still listed only.
         var same = dub; same.slot = .u(50)
@@ -125,7 +125,7 @@ final class WorkbenchTests: XCTestCase {
         let note = try XCTUnwrap(plan.userSlotNote)
         XCTAssertEqual(note.title, "U48 probably held the author's own wavetable, which is not included")
         XCTAssertTrue(note.body.contains("it is in the W3_PROG_4 format, older than the W3_PROG_5"))
-        XCTAssertTrue(note.body.contains("U48 \"FM_Crush\""))
+        XCTAssertTrue(note.body.contains("U48 \u{201C}FM_Crush\u{201D}"))
         XCTAssertEqual(plan.missingSummary, "needs U48: probably the author's own wavetable from before 2025")
         XCTAssertEqual(plan.rows.first { $0.ref == .u(7) }!.choice, .reference)   // older factory slots unaffected
         XCTAssertEqual(plan.verdict, .blocked([.u(48)]))
@@ -209,7 +209,7 @@ final class WorkbenchTests: XCTestCase {
         let p3 = PackPlan.make(program: makeProgram(sources: [2003] + Array(repeating: 42, count: 11)), files: [other], factory: lib)
         XCTAssertEqual(p3.rows[0].choice, .file(other.id))
         guard case .warning(let w) = p3.rows[0].status else { return XCTFail() }
-        XCTAssertTrue(w.contains("in place of factory \"MultiWave96k\""))
+        XCTAssertTrue(w.contains("in place of factory \u{201C}MultiWave96k\u{201D}"))
         XCTAssertTrue(p3.rows[0].replacesFactory)
     }
 
