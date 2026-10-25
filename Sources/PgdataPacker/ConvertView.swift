@@ -34,7 +34,7 @@ struct ConvertView: View {
                         ConvertTablesPane(selection: $selection)
                             .frame(minWidth: 520, maxWidth: .infinity, minHeight: 200, maxHeight: .infinity)
                         ConvertDetailPane(selection: selection)
-                            .frame(maxWidth: .infinity, minHeight: 150, idealHeight: 250, maxHeight: .infinity)
+                            .frame(maxWidth: .infinity, minHeight: 170, idealHeight: 300, maxHeight: .infinity)
                     }
                     ConvertDestinationPane()
                         .frame(minWidth: 260, idealWidth: 300, maxWidth: 380, maxHeight: .infinity)
@@ -164,9 +164,11 @@ struct ConvertTable: View {
                 .width(44)
             TableColumn("") { (item: ConvertPlan.Item) in ConvertStatusCell(status: plan.status(item), tip: plan.statusDescription(item)) }
                 .width(22)
-            TableColumn("Name") { (item: ConvertPlan.Item) in ConvertNameCell(state: st, item: item) }
+            TableColumn("Name") { (item: ConvertPlan.Item) in ConvertNameCell(state: st, item: item, selection: $selection) }
                 .width(min: 140, ideal: 280)
-            TableColumn("Size") { (item: ConvertPlan.Item) in ConvertFrameSizeCell(state: st, item: item) }
+            // Input and Output are both frames × samples per frame (the cells say so on hover;
+            // a Table header takes no tooltip on macOS 13).
+            TableColumn("Input") { (item: ConvertPlan.Item) in ConvertFrameSizeCell(state: st, item: item, selection: $selection) }
                 .width(min: 130, ideal: 170)
             TableColumn("Output") { (item: ConvertPlan.Item) in
                 ConvertOutputCell(expected: plan.expected(for: item), summary: plan.expectedResult(for: item), included: plan.isSelected(item))
@@ -220,11 +222,12 @@ struct ConvertStatusCell: View {
 struct ConvertNameCell: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
+    @Binding var selection: Set<UUID>
     var body: some View {
         let plan = state.convertPlan
         let included = plan.isSelected(item)
         HStack(spacing: 5) {
-            ConvertNameField(state: state, item: item, included: included)
+            ConvertNameField(state: state, item: item, included: included, selection: $selection)
             if let origin = item.originBadge {
                 ConvertBadge(text: origin, tip: item.location.url.path)
             }
@@ -243,11 +246,13 @@ struct ConvertNameCell: View {
 }
 
 /// The name as plain text that becomes a field when clicked. Return commits, Escape or leaving
-/// the field without a change restores the name; an empty name is not taken.
+/// the field without a change restores the name; an empty name is not taken. Editing selects
+/// the row, so the preview below shows the table being renamed.
 struct ConvertNameField: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
     let included: Bool
+    @Binding var selection: Set<UUID>
     @State private var text = ""
     @FocusState private var focused: Bool
 
@@ -261,7 +266,9 @@ struct ConvertNameField: View {
             .onChange(of: item.name) { (name: String) in if !focused { text = name } }
             .onSubmit { commit() }
             .onExitCommand { text = item.name; focused = false }
-            .onChange(of: focused) { (now: Bool) in if !now { commit() } }
+            .onChange(of: focused) { (now: Bool) in
+                if now { selection = [item.id] } else { commit() }
+            }
             .help(item.newName == nil ? "The table's name; click to edit it. The name goes on the converted file (and inside a 3rd Wave table); the source file is not changed."
                                       : "Was \u{201C}\(item.table.name)\u{201D}; click to edit")
     }
@@ -288,12 +295,14 @@ struct ConvertBadge: View {
     }
 }
 
-/// Frames × size, with a word after it when the size is not stated in the file ("guessed",
-/// "set manually", "markers"). When the file allows other sizes, the cell is a button that
-/// opens the size chooser; when the size is still open, it is red.
+/// The input as frames × samples per frame, with a word after it when the size is not stated
+/// in the file ("guessed", "set manually", "markers"). When the file allows other sizes, the
+/// cell is a button that opens the size chooser and selects the row, so the preview below
+/// shows the table; when the size is still open, it is red.
 struct ConvertFrameSizeCell: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
+    @Binding var selection: Set<UUID>
     @State private var choosing = false
 
     var body: some View {
@@ -301,12 +310,12 @@ struct ConvertFrameSizeCell: View {
         let choices = item.frameSizeChoices
         if choices.isEmpty && !item.needsFrameSize {
             ConvertSizeText(item: item, included: included)
-                .help(item.sizeDescription + " (frames × samples per frame). " + item.basisDescription)
+                .help("Input: " + item.sizeDescription + " (frames × samples per frame). " + item.basisDescription)
         } else if choices.isEmpty {
             Label("Can't split", systemImage: "xmark.octagon.fill").foregroundStyle(.red).lineLimit(1)
                 .help(state.convertPlan.statusDescription(item))
         } else {
-            Button { choosing.toggle() } label: {
+            Button { selection = [item.id]; choosing.toggle() } label: {
                 HStack(spacing: 4) {
                     if item.frameSize == nil {
                         Text("Choose Size…").foregroundStyle(.red)
@@ -318,8 +327,8 @@ struct ConvertFrameSizeCell: View {
             }
             .buttonStyle(.bordered)
             .help(item.needsFrameSize
-                  ? "The file doesn't say how long each wave is. Click to choose one of the sizes its length allows; the picture of each shows which cuts the wave in the right place."
-                  : item.basisDescription + " Click to choose another size.")
+                  ? "The file doesn't say how long each wave is. Click to choose one of the sizes its length allows (frames × samples per frame)."
+                  : "Input: " + item.sizeDescription + " (frames × samples per frame). " + item.basisDescription + " Click to choose another size.")
             .popover(isPresented: $choosing, arrowEdge: .bottom) {
                 ConvertSizePopover(state: state, item: item)
             }
@@ -342,37 +351,57 @@ struct ConvertSizeText: View {
     }
 }
 
-/// The size chooser: one line on what the frame size is, and a button per size the file allows,
-/// each with the first wave drawn at that size (the one that draws a single cycle is right).
+/// The size chooser: what a frame size is and how to judge one, what the file says, a button
+/// per size the file allows with the first wave drawn at that size, and which size the
+/// samples suggest (see `FrameSizeFit`), marked "likely" but never applied by itself.
 struct ConvertSizePopover: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
 
+    private var fitLine: String? {
+        switch item.frameSizeFit {
+        case .likely(let n):
+            return "The samples suggest \(ConvertPlan.formatCount(n)): frames of that size are alike from one to the next, as a wavetable's are. A suggestion, not a certainty."
+        case .tie:
+            return "The sizes fit the samples equally well; nothing here settles it."
+        case .unclear:
+            return nil
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Frame size").font(.headline)
-            Text("A wavetable file is one long run of samples; the frame size says where each wave starts and ends. If it's wrong, every wave is cut in the wrong place. The size that draws one smooth cycle is the right one.")
+            Text("A wavetable file is one long run of samples; the frame size says where each wave starts and ends. If it's wrong, every wave is cut in the wrong place. The right size usually shows one complete cycle that joins up at both ends. A size that is too large shows the cycle repeated; one that is too small shows part of it. If in doubt, check the result in the destination synth.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Text(item.basisDescription)
                 .font(.caption)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
                 ForEach(item.frameSizeChoices, id: \.self) { (size: Int) in
-                    ConvertSizeButton(state: state, item: item, size: size)
+                    ConvertSizeButton(state: state, item: item, size: size,
+                                      likely: FrameSizeFit.likelySize(item.frameSizeFit) == size)
                 }
+            }
+            if let fitLine {
+                Text(fitLine)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(12)
-        .frame(width: 360, alignment: .leading)
+        .frame(width: 380, alignment: .leading)
     }
 }
 
-/// One size: the first wave cut at that size, and "64 × 128" under it.
+/// One size: the first wave cut at that size, "64 × 128" under it, and "likely" under that
+/// when the samples suggest this size.
 struct ConvertSizeButton: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
     let size: Int
+    var likely: Bool = false
 
     var body: some View {
         let chosen = item.frameSize == size
@@ -383,6 +412,9 @@ struct ConvertSizeButton: View {
                 Text("\(frames) × \(ConvertPlan.formatCount(size))")
                     .font(.caption).monospacedDigit()
                     .foregroundStyle(chosen ? Color.accentColor : Color.primary)
+                if likely {
+                    Text("likely").font(.caption2).foregroundStyle(.secondary)
+                }
             }
             .padding(6)
             .background(RoundedRectangle(cornerRadius: 6).fill(chosen ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.08)))
@@ -407,7 +439,7 @@ struct ConvertOutputCell: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 .foregroundStyle(included ? Color.primary : Color.secondary)
-                .help(included ? summary : "Not marked to convert. If it were: " + summary)
+                .help("Output (frames × samples per frame): " + (included ? summary : "not marked to convert. If it were: " + summary))
         } else {
             Text("—").foregroundStyle(.secondary).help(summary)
         }
@@ -430,8 +462,10 @@ struct ConvertChangesCell: View {
     let notes: ConvertPlan.ItemNotes
     let included: Bool
 
+    /// Plain sentences: the output and what changes, then each warning and note as the reader
+    /// or the plan wrote it.
     private var tip: String {
-        ([summary] + notes.all).joined(separator: "\n")
+        (["Output " + summary + "."] + notes.all).joined(separator: "\n")
     }
 
     var body: some View {

@@ -386,7 +386,7 @@ final class ConvertPlanStateTests: XCTestCase {
         let p = plan([table("Loud", peak: 1.234, notes: ["Its samples reach 1.23, beyond ±1.", "The file has 2 channels; only the left (first) channel is read."]),
                       table("Quiet", notes: ["The clm chunk gives 2,048 samples per frame, but the Serum .txt sidecar gives 1,024; the clm chunk is used."])])
         let loud = p.itemNotes(for: p.items[0])
-        XCTAssertEqual(loud.warnings, ["Peak 1.23: over full scale (±1).", "The file has 2 channels; only the left (first) channel is read."])
+        XCTAssertEqual(loud.warnings, ["Peak 1.23 is over full scale (±1); the table is turned down to fit.", "The file has 2 channels; only the left (first) channel is read."])
         XCTAssertEqual(loud.information, [])
         XCTAssertEqual(p.notes(for: p.items[0]), loud.all)
         XCTAssertEqual(p.items[0].peak, 1.234, accuracy: 1e-5)
@@ -639,10 +639,10 @@ final class WavetableSketchInterpolationTests: XCTestCase {
         XCTAssertEqual(WavetableSketch.lineBudget(storedFrames: 256, showsBetweens: false).stored, 64)
         XCTAssertEqual(WavetableSketch.lineBudget(storedFrames: 256, showsBetweens: false).perGap, 0)
         let b = WavetableSketch.lineBudget(storedFrames: 256, showsBetweens: true)
-        XCTAssertEqual(b.stored, 32)
-        XCTAssertEqual(b.perGap, 2)
-        XCTAssertLessThanOrEqual(b.stored + (b.stored - 1) * b.perGap, 120)
-        XCTAssertEqual(WavetableSketch.lineBudget(storedFrames: 8, showsBetweens: true).perGap, 3)
+        XCTAssertEqual(b.stored, 24)
+        XCTAssertEqual(b.perGap, 5)
+        XCTAssertLessThanOrEqual(b.stored + (b.stored - 1) * b.perGap, 150)
+        XCTAssertEqual(WavetableSketch.lineBudget(storedFrames: 8, showsBetweens: true).perGap, 5)
         XCTAssertEqual(WavetableSketch.lineBudget(storedFrames: 1, showsBetweens: true).perGap, 0)
     }
 
@@ -679,7 +679,9 @@ final class WavetableSketchInterpolationTests: XCTestCase {
         let mid = WavetableSketch.spectralBlend(a, b, t: 0.5)
         let expected = zip(cycle(40, harmonic: 1, amplitude: 0.3, phase: 0.3), cycle(40, harmonic: 2, amplitude: 0.3, phase: 0.3)).map { $0 + $1 }
         for (x, y) in zip(mid, expected) { XCTAssertEqual(x, y, accuracy: 1e-5) }
-        XCTAssertEqual(WavetableSketch.inBetweens([a, b], interpolation: .spectral, perGap: 1).first?.position, 0.5)
+        let between = WavetableSketch.inBetweens([a, b], interpolation: .spectral, perGap: 1)
+        XCTAssertEqual(between.first?.position, 0.5)
+        for (x, y) in zip(between[0].values, mid) { XCTAssertEqual(x, y, accuracy: 1e-6) }
     }
 
     func testTonverkRecordsSpectralAsCrossfade() {
@@ -715,7 +717,7 @@ final class ConvertChangeWordsTests: XCTestCase {
         plan.add([found(big), found(fits)], factory: FactoryLibrary())
         let b = plan.changeWords(for: plan.items[0])
         XCTAssertEqual(b?.changes, ["resized", "256 → 64 frames", "turned down"])
-        XCTAssertEqual(b?.warnings, ["extra samples dropped", "left channel only"])
+        XCTAssertEqual(b?.warnings, ["12 extra samples dropped", "left channel only"])
         let f = plan.changeWords(for: plan.items[1])
         XCTAssertEqual(f?.changes, [])
         XCTAssertEqual(f?.warnings, [])
@@ -724,7 +726,7 @@ final class ConvertChangeWordsTests: XCTestCase {
         plan.preset = .wav2048   // the peak is kept, so it is a warning rather than a change
         let kept = plan.changeWords(for: plan.items[0])
         XCTAssertEqual(kept?.changes, [])
-        XCTAssertEqual(kept?.warnings, ["peak 1.30", "extra samples dropped", "left channel only"])
+        XCTAssertEqual(kept?.warnings, ["peak 1.30, over full scale", "12 extra samples dropped", "left channel only"])
 
         plan.preset = .thirdWaveP
         plan.options.appendPPGStandardWaves = true
@@ -735,7 +737,11 @@ final class ConvertChangeWordsTests: XCTestCase {
                               frameSize: nil, frameSizeBasis: "not stated", candidateFrameSizes: [256, 2048])
         plan.add([found(open)], factory: FactoryLibrary())
         XCTAssertNil(plan.changeWords(for: plan.items[2]))
-        XCTAssertEqual(ConvertPlan.shortWarning("The clm says 2,048, but the .txt says 1,024; the clm is used."), "tags disagree")
+        XCTAssertEqual(ConvertPlan.shortWarning("The clm says 2,048 samples per frame, but the .txt says 1,024; the clm is used."), "size tags disagree")
+        XCTAssertEqual(ConvertPlan.shortWarning("The clm asks for a crossfade, but the .txt asks for none; the clm is used."), "interpolation tags disagree")
+        XCTAssertEqual(ConvertPlan.shortWarning("1 sample after the last whole frame is left out."), "1 extra sample dropped")
+        XCTAssertEqual(ConvertPlan.shortWarning("1,500 samples after the last whole frame are left out."), "1,500 extra samples dropped")
+        XCTAssertEqual(ConvertPlan.firstNumber(in: "no digits here"), nil)
         XCTAssertEqual(ConvertPlan.shortWarning("Something else entirely."), "see note")
     }
 
@@ -751,5 +757,67 @@ final class ConvertChangeWordsTests: XCTestCase {
         var plan = ConvertPlan()
         plan.add(tables.map(found), factory: FactoryLibrary())
         XCTAssertEqual(plan.items.map(\.originBadge), [nil, "FLAC", "Surge .wt", "3rd Wave P", "U56 in Set.pgdata"])
+    }
+}
+
+
+/// The aid for choosing a frame size: how alike neighbouring frames are at each candidate size.
+final class FrameSizeFitTests: XCTestCase {
+    /// `frames` cycles of `size` samples; frame k is a sine with a little of harmonic 2 + k/8,
+    /// so neighbouring frames are alike but not identical.
+    private func table(frames: Int, size: Int) -> [Float] {
+        (0..<frames).flatMap { f -> [Float] in
+            let h = Float(2 + f / 8)
+            return (0..<size).map { i in
+                let x = 2 * Float.pi * Float(i) / Float(size)
+                return 0.7 * sin(x) + 0.2 * sin(h * x)
+            }
+        }
+    }
+
+    func testTheRightSizeIsLikelyAndNeitherAFragmentNorAMultipleIs() {
+        let samples = table(frames: 64, size: 128)   // 8,192 samples: 64 × 128 or 4 × 2,048
+        let ratings = FrameSizeFit.rate(samples, sizes: [128, 2048])
+        XCTAssertEqual(ratings.map(\.size), [128, 2048])
+        XCTAssertTrue(ratings[0].isPlausible, "\(ratings[0].difference)")
+        XCTAssertLessThan(ratings[1].difference, 0.5, "a multiple of the right size also has alike frames")
+        XCTAssertFalse(ratings[1].isPlausible, "but no more alike than its half-frames: \(ratings[1].difference) against \(ratings[1].halfDifference)")
+        XCTAssertEqual(FrameSizeFit.verdict(samples, sizes: [128, 2048]), .likely(128))
+
+        let serum = table(frames: 4, size: 2048)      // the same length, but 4 frames of 2,048
+        let r = FrameSizeFit.rate(serum, sizes: [128, 2048])
+        XCTAssertFalse(r[0].isPlausible, "a fragment of a cycle differs from the next fragment: \(r[0].difference)")
+        XCTAssertTrue(r[1].isPlausible, "\(r[1].difference)")
+        XCTAssertEqual(FrameSizeFit.verdict(serum, sizes: [128, 2048]), .likely(2048))
+    }
+
+    func testUnrelatedFramesFitNoSizeAndSilenceSaysNothing() {
+        // 64 frames of noise-like, unrelated waves: neither size stands out.
+        var seed: UInt32 = 7
+        let bank: [Float] = (0..<16_384).map { _ in
+            seed = seed &* 1_664_525 &+ 1_013_904_223
+            return Float(seed >> 8) / Float(1 << 24) * 2 - 1
+        }
+        let v = FrameSizeFit.verdict(bank, sizes: [256, 2048])
+        XCTAssertNotEqual(v, .likely(256))
+        XCTAssertNotEqual(v, .likely(2048))
+        XCTAssertEqual(FrameSizeFit.rate([Float](repeating: 0, count: 4096), sizes: [2048]), [])
+        XCTAssertEqual(FrameSizeFit.verdict([Float](repeating: 0, count: 4096), sizes: [2048]), .unclear)
+        XCTAssertEqual(FrameSizeFit.rate(table(frames: 1, size: 2048), sizes: [2048]), [], "one frame cannot be compared with a next one")
+        XCTAssertEqual(FrameSizeFit.likelySize(.likely(128)), 128)
+        XCTAssertNil(FrameSizeFit.likelySize(.tie))
+    }
+
+    func testTheVerdictIsStoredWithTheItem() {
+        let t = FoundTable(name: "Open", fileName: "Open.wav", source: .wav, samples: table(frames: 64, size: 128),
+                           frameSize: nil, frameSizeBasis: "not stated", candidateFrameSizes: [128, 2048])
+        var plan = ConvertPlan()
+        plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Open.wav"), table: t)], factory: FactoryLibrary())
+        XCTAssertEqual(plan.items[0].frameSizeFit, .likely(128))
+        XCTAssertNil(plan.items[0].frameSize, "never applied by itself")
+        let settled = FoundTable(name: "Set", fileName: "Set.wav", source: .wav, samples: table(frames: 4, size: 2048),
+                                 frameSize: 2048, frameSizeBasis: "clm chunk")
+        plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Set.wav"), table: settled)], factory: FactoryLibrary())
+        XCTAssertEqual(plan.items[1].frameSizeFit, .unclear)
     }
 }

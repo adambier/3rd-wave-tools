@@ -46,28 +46,37 @@ public enum WavetableSketch {
 // MARK: - Interpolation between frames
 
 public extension WavetableSketch {
-    /// How many stored frames to draw, and how many faint frames to put in each gap between
-    /// them, within a budget of lines: with in-betweens the stored frames are capped at
-    /// `storedWithBetweens` so the gaps have room, and each gap gets up to three.
-    static func lineBudget(storedFrames count: Int, showsBetweens: Bool, cap: Int = 120,
-                           storedAlone: Int = 64, storedWithBetweens: Int = 32) -> (stored: Int, perGap: Int) {
+    /// How many stored frames to draw, and how many in-between frames to put in each gap
+    /// between them, within a budget of lines: with in-betweens the stored frames are capped at
+    /// `storedWithBetweens` so the gaps have room, and each gap gets up to five.
+    static func lineBudget(storedFrames count: Int, showsBetweens: Bool, cap: Int = 150,
+                           storedAlone: Int = 64, storedWithBetweens: Int = 24) -> (stored: Int, perGap: Int) {
         let stored = max(1, min(count, showsBetweens ? storedWithBetweens : storedAlone))
         guard showsBetweens, stored > 1 else { return (stored, 0) }
-        return (stored, max(0, min(3, (cap - stored) / (stored - 1))))
+        return (stored, max(0, min(5, (cap - stored) / (stored - 1))))
     }
 
-    /// The faint frames between each pair of neighbouring frames, `perGap` per gap, in order
-    /// (gap 0's first, then gap 1's, …): linear crossfades for `.crossfade`, spectral blends
-    /// (``spectralBlend(_:_:t:)``) for `.spectral`, and none for `.none` or nil (the table steps
-    /// from frame to frame, or nothing says). Each in-between is paired with its position,
-    /// counted in frames from the first (1.5 is halfway between frames 1 and 2).
+    /// The in-between frames between each pair of neighbouring frames, `perGap` per gap, in
+    /// order (gap 0's first, then gap 1's, …): linear crossfades for `.crossfade`, spectral
+    /// blends (``spectralBlend(_:_:t:)``) for `.spectral`, and none for `.none` or nil (the
+    /// table steps from frame to frame, or nothing says). Each in-between is paired with its
+    /// position, counted in frames from the first (1.5 is halfway between frames 1 and 2). The
+    /// frames must be the same length.
     static func inBetweens(_ frames: [[Float]], interpolation: Interpolation?, perGap: Int) -> [(position: Double, values: [Float])] {
         guard let mode = interpolation, mode != .none, perGap > 0, frames.count > 1 else { return [] }
         var out: [(position: Double, values: [Float])] = []
+        out.reserveCapacity((frames.count - 1) * perGap)
+        // For spectral blends, each frame's spectrum is taken once, not once per in-between.
+        let spectra: [(magnitude: [Double], phase: [Double])] = mode == .spectral ? frames.map(spectrum) : []
         for g in 0..<(frames.count - 1) {
             for j in 1...perGap {
                 let t = Float(j) / Float(perGap + 1)
-                let values = mode == .crossfade ? blend(frames[g], frames[g + 1], t: t) : spectralBlend(frames[g], frames[g + 1], t: t)
+                let values: [Float]
+                if mode == .crossfade {
+                    values = blend(frames[g], frames[g + 1], t: t)
+                } else {
+                    values = synthesize(blendSpectra(spectra[g], spectra[g + 1], t: t), count: frames[g].count)
+                }
                 out.append((Double(g) + Double(t), values))
             }
         }
@@ -86,8 +95,14 @@ public extension WavetableSketch {
     static func spectralBlend(_ a: [Float], _ b: [Float], t: Float) -> [Float] {
         let n = min(a.count, b.count)
         guard n > 1 else { return blend(a, b, t: t) }
-        let sa = spectrum(Array(a.prefix(n))), sb = spectrum(Array(b.prefix(n)))
-        let bins = sa.magnitude.count
+        let blended = blendSpectra(spectrum(Array(a.prefix(n))), spectrum(Array(b.prefix(n))), t: t)
+        return synthesize(blended, count: n)
+    }
+
+    /// The harmonics of a blend between two spectra (see ``spectralBlend(_:_:t:)``).
+    static func blendSpectra(_ sa: (magnitude: [Double], phase: [Double]), _ sb: (magnitude: [Double], phase: [Double]), t: Float)
+        -> (magnitude: [Double], phase: [Double]) {
+        let bins = min(sa.magnitude.count, sb.magnitude.count)
         var magnitude = [Double](repeating: 0, count: bins), phase = magnitude
         let tt = Double(t)
         let silent = 1e-6
@@ -99,7 +114,12 @@ public extension WavetableSketch {
             let d = atan2(sin(sb.phase[k] - sa.phase[k]), cos(sb.phase[k] - sa.phase[k]))
             phase[k] = sa.phase[k] + d * tt
         }
-        return synthesize(magnitude: magnitude, phase: phase, count: n)
+        return (magnitude, phase)
+    }
+
+    /// The real cycle of `count` samples with the given harmonics (the inverse of `spectrum`).
+    static func synthesize(_ spectrum: (magnitude: [Double], phase: [Double]), count n: Int) -> [Float] {
+        synthesize(magnitude: spectrum.magnitude, phase: spectrum.phase, count: n)
     }
 
     /// The magnitudes and phases of harmonics 0 … n/2 of a real cycle (a plain DFT: the cycles

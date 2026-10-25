@@ -83,6 +83,9 @@ public struct ConvertPlan: Equatable {
         /// The largest absolute sample, computed once when the table is added (the views ask for
         /// it on every pass).
         public let peak: Float
+        /// How the sizes in `frameSizeChoices` fit the samples (see `FrameSizeFit`), computed once
+        /// when the table is added; `.unclear` when the file settles the size.
+        public let frameSizeFit: FrameSizeFit.Verdict
         /// Content identity for collapsing duplicates.
         let contentKey: ContentKey
 
@@ -465,8 +468,10 @@ public struct ConvertPlan: Equatable {
                 // The factory P00–P33 tables are named "Wavetable P00" …: a name that only repeats the slot is left out.
                 factoryName = factory.name(ref).flatMap { $0 == "Wavetable \(ref.label)" ? nil : $0 }
             }
+            let choices = (t.frameSize.map { [$0] } ?? []) + t.candidateFrameSizes.filter { $0 != t.frameSize }
+            let fit: FrameSizeFit.Verdict = t.candidateFrameSizes.isEmpty ? .unclear : FrameSizeFit.verdict(t.samples, sizes: choices)
             items.append(Item(id: UUID(), table: t, location: location, sourceDescription: Self.sourceDescription(t),
-                              factorySlot: slot, factoryName: factoryName, peak: t.peak, contentKey: key))
+                              factorySlot: slot, factoryName: factoryName, peak: t.peak, frameSizeFit: fit, contentKey: key))
             s.added += 1
         }
         return s
@@ -512,7 +517,8 @@ public struct ConvertPlan: Equatable {
             if Self.isWarningNote(note) { warnings.append(note) } else { information.append(note) }
         }
         if item.peak > 1 {
-            warnings.insert("Peak \(Self.decimal(item.peak)): over full scale (±1).", at: 0)
+            warnings.insert("Peak \(Self.decimal(item.peak)) is over full scale (±1); "
+                + (destinationScalesToFit ? "the table is turned down to fit." : "it is kept as it is, so the synth may clip it."), at: 0)
         }
         if let slot = item.factorySlot {
             let label = "factory " + slot.label + (item.factoryName.map { " " + $0 } ?? "")
@@ -687,7 +693,7 @@ public struct ConvertPlan: Equatable {
             changes.append("name changed")
         }
         var warnings: [String] = []
-        if e.peakKept { warnings.append("peak \(Self.decimal(e.peak))") }
+        if e.peakKept { warnings.append("peak \(Self.decimal(e.peak)), over full scale") }
         for note in item.table.notes where Self.isWarningNote(note) {
             let word = Self.shortWarning(note)
             if !warnings.contains(word) { warnings.append(word) }
@@ -695,15 +701,31 @@ public struct ConvertPlan: Equatable {
         return (changes, warnings)
     }
 
-    /// A reader's warning in two or three words, for the Changes column.
+    /// A reader's warning in a few words that stand on their own, for the Changes column; the
+    /// note itself is the tooltip.
     static func shortWarning(_ note: String) -> String {
-        if note.contains("left out") { return "extra samples dropped" }
+        if note.contains("left out") {
+            if let n = firstNumber(in: note) { return "\(n) extra sample\(n == "1" ? "" : "s") dropped" }
+            return "extra samples dropped"
+        }
         if note.contains("only the left") { return "left channel only" }
         if note.contains("only the first") { return "first channel only" }
-        if note.contains("is used.") { return "tags disagree" }
+        if note.contains("is used.") {
+            return note.contains("samples per frame") ? "size tags disagree" : "interpolation tags disagree"
+        }
         if note.contains("cut short") { return "file cut short" }
-        if note.contains("ignored") { return "tag ignored" }
+        if note.contains("ignored") { return "unreadable size tag ignored" }
         return "see note"
+    }
+
+    /// The first run of digits (with thousands separators) in a sentence, e.g. "1,024".
+    static func firstNumber(in text: String) -> String? {
+        var out = ""
+        for ch in text {
+            if ch.isNumber || (ch == "," && !out.isEmpty) { out.append(ch) } else if !out.isEmpty { break }
+        }
+        while out.hasSuffix(",") { out.removeLast() }
+        return out.isEmpty ? nil : out
     }
 
     // MARK: Preview

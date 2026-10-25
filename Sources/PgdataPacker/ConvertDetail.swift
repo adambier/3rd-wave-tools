@@ -33,12 +33,9 @@ struct ConvertDetailPane: View {
         let chosen = self.chosen
         Group {
             if chosen.count == 1 {
-                ScrollView {
-                    ConvertItemPreview(state: state, item: chosen[0])
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                }
-                .visibleScrollers()
+                ConvertItemPreview(state: state, item: chosen[0])
+                    .padding(12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
                 ConvertPreviewPlaceholder(items: chosen)
             }
@@ -122,12 +119,20 @@ struct ConvertItemPreview: View {
                 Spacer()
                 Button("Show in Finder") { Panels.reveal(item.location.url) }.buttonStyle(.link)
             }
+            // The pictures take the width and height that are left; the facts sit in a fixed
+            // column that scrolls when the pane is short.
             HStack(alignment: .top, spacing: 20) {
                 ConvertOverviewPair(state: state, item: item)
-                ConvertPreviewFacts(state: state, item: item)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                ScrollView {
+                    ConvertPreviewFacts(state: state, item: item)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+                .visibleScrollers()
+                .frame(width: 300)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
@@ -137,9 +142,12 @@ struct ConvertPreviewFacts: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
 
+    /// "Input: 64 frames × 2,048 samples (guessed)."
     private var frameSizeLine: String {
-        guard let n = item.frameSize else { return "Frame size: not stated. Choose one in the Size column." }
-        let size = "Frame size: \(ConvertPlan.formatCount(n)) samples"
+        guard let n = item.frameSize, let frames = item.frameCount else {
+            return item.frameSize == nil ? "Input: frame size not stated. Choose one in the Input column." : "Input: " + item.sizeDescription + "."
+        }
+        let size = "Input: \(frames) frame\(frames == 1 ? "" : "s") × \(ConvertPlan.formatCount(n)) samples"
         return item.sizeQualifier.map { size + " (\($0))." } ?? size + "."
     }
 
@@ -166,7 +174,8 @@ struct ConvertPreviewFacts: View {
 
 /// The table's frames stacked front to back, as the synths draw them: the source as read, with
 /// its own interpolation, and beside it what the destination gets (the preview read back from
-/// the bytes the writer made), with the interpolation the file records.
+/// the bytes the writer made), with the interpolation the file records. The two pictures share
+/// the width and take the height they are given.
 struct ConvertOverviewPair: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
@@ -176,99 +185,140 @@ struct ConvertOverviewPair: View {
         if let source = item.table.wavetable(frameSize: item.frameSize) {
             let result = state.convertPreviews.resultFrames(item, in: plan)
             HStack(alignment: .top, spacing: 16) {
-                ConvertOverview(frames: source.frames, tint: .secondary,
+                ConvertOverview(frames: source.frames,
                                 caption: "Source · \(source.frameCount) × \(ConvertPlan.formatCount(source.frameSize))",
                                 interpolation: item.table.interpolation,
-                                unstatedLegend: "Interpolation not stated; stored frames only.")
+                                unstatedLegend: "interpolation not stated")
                 if let result, let first = result.first {
-                    ConvertOverview(frames: result, tint: .accentColor,
+                    ConvertOverview(frames: result,
                                     caption: "\(plan.preset.shortTitle) · \(result.count) × \(ConvertPlan.formatCount(first.count))",
                                     interpolation: plan.interpolationRecorded(for: item),
-                                    unstatedLegend: "Interpolation set on the synth; stored frames only.")
+                                    unstatedLegend: "interpolation set on the synth")
                 }
             }
-            .help("The table's frames, front (first) to back (last): the source as read, and what the destination gets, read back from the file Convert would write. Solid lines are stored frames (at most 64 are drawn, each reduced to the width of the picture). Faint lines show the interpolation between them: crossfades are exact; spectral blends are an approximation, since Serum's and Vital's exact morphs aren't published.")
+            .help("The table's frames, front (first) to back (last): the source as read, and what the destination gets, read back from the file Convert would write. Solid lines are stored frames (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation, since Serum's and Vital's exact morphs aren't published.")
         }
     }
 }
 
-/// One stacked-frames picture with its caption and a legend for the faint lines.
+/// One stacked-frames picture, its caption, and a legend with colour swatches for its lines.
 struct ConvertOverview: View {
     let frames: [[Float]]
-    let tint: Color
     let caption: String
     /// The interpolation to draw between the stored frames; nil when nothing says.
     let interpolation: Interpolation?
-    /// The legend when `interpolation` is nil.
+    /// The words after "Stored frames" when `interpolation` is nil.
     let unstatedLegend: String
-
-    private var legend: String {
-        guard let mode = interpolation else { return unstatedLegend }
-        switch mode {
-        case Interpolation.none: return "Stepped: frames play as stored."
-        case .crossfade: return "Faint lines: crossfades between frames."
-        case .spectral: return "Faint lines: spectral blends (approximate)."
-        }
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            WavetableStackCanvas(frames: frames, tint: tint, interpolation: interpolation)
-                .frame(minWidth: 160, maxWidth: 300, minHeight: 100, maxHeight: 100)
+            WavetableStackCanvas(frames: frames, interpolation: interpolation)
+                .frame(maxWidth: .infinity, minHeight: 80, maxHeight: .infinity)
             Text(caption).font(.caption).foregroundStyle(.secondary).monospacedDigit()
-            Text(legend).font(.caption).foregroundStyle(.secondary)
+            ConvertOverviewLegend(interpolation: interpolation, unstated: unstatedLegend)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// The legend under a picture: a swatch and a word for the stored frames, and another for the
+/// in-betweens when there are any.
+struct ConvertOverviewLegend: View {
+    let interpolation: Interpolation?
+    let unstated: String
+
+    private var storedWords: String {
+        guard let mode = interpolation else { return "Stored frames · " + unstated }
+        return mode == Interpolation.none ? "Stored frames (stepped; nothing between)" : "Stored frames"
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ConvertSwatch(color: WavetableStackCanvas.storedColor, text: storedWords)
+            if interpolation == .crossfade {
+                ConvertSwatch(color: WavetableStackCanvas.crossfadeColor, text: "Crossfades")
+            } else if interpolation == .spectral {
+                ConvertSwatch(color: WavetableStackCanvas.spectralColor, text: "Spectral blends (approx.)")
+            }
+        }
+        .font(.caption).foregroundStyle(.secondary)
+    }
+}
+
+/// A short line of colour and a word.
+struct ConvertSwatch: View {
+    let color: Color
+    let text: String
+    var body: some View {
+        HStack(spacing: 4) {
+            RoundedRectangle(cornerRadius: 1.5).fill(color).frame(width: 14, height: 3)
+            Text(text).lineLimit(1)
         }
     }
 }
 
 /// Stored frames drawn as polylines stacked diagonally, the first in front, the farthest
-/// fading, each reduced to about a value per two points of width. With a crossfade or spectral
-/// interpolation, faint thinner lines between neighbouring frames show the blends; the stored
-/// frames then thin to 32 so the whole picture stays within about 120 lines.
+/// fading, each reduced to about a value per two points of width. Stepped tables show the
+/// frames as separate slices with nothing between. With a crossfade or spectral
+/// interpolation, thinner lines in a second colour fill each gap (up to five per gap), the
+/// stored frames thin to 24 and the stack is drawn closer together, so the fill reads as a
+/// surface; the picture stays within about 150 lines.
 struct WavetableStackCanvas: View {
     let frames: [[Float]]
-    let tint: Color
     let interpolation: Interpolation?
 
-    /// A line to draw: its depth in frames from the front, its values, and whether it is faint.
+    /// The colour of stored frames.
+    static let storedColor = Color.primary
+    /// The colour of crossfade in-betweens.
+    static let crossfadeColor = Color.accentColor
+    /// The colour of spectral in-betweens.
+    static let spectralColor = Color.purple
+
+    /// A line to draw: its depth in frames from the front, its values, and whether it is an
+    /// in-between.
     private struct Line {
         var position: Double
         var values: [Float]
-        var faint: Bool
+        var between: Bool
     }
 
     var body: some View {
         Canvas { (context: inout GraphicsContext, size: CGSize) in
-            let lines = WavetableStackCanvas.lines(frames, interpolation: interpolation, width: size.width)
+            let showsBetweens = interpolation == .crossfade || interpolation == .spectral
+            let lines = WavetableStackCanvas.lines(frames, interpolation: interpolation, showsBetweens: showsBetweens, width: size.width)
             guard let last = lines.first?.position, last > 0 || lines.count == 1 else { return }
-            let depthX = size.width * 0.3
-            let depthY = size.height * 0.5
+            // Closer together with in-betweens, so the lines merge into a surface.
+            let depthX = size.width * (showsBetweens ? 0.22 : 0.3)
+            let depthY = size.height * (showsBetweens ? 0.36 : 0.5)
             let waveWidth = size.width - depthX
             let amplitude = (size.height - depthY) / 2 - 1
+            let betweenColor = interpolation == .spectral ? WavetableStackCanvas.spectralColor : WavetableStackCanvas.crossfadeColor
             for line in lines {
                 let t: CGFloat = last > 0 ? CGFloat(line.position / last) : 0
                 let x0 = depthX * t
                 let base = size.height - amplitude - 1 - depthY * t
                 let path = WavetableStackCanvas.path(line.values, x0: x0, base: base, width: waveWidth, amplitude: amplitude)
-                let fade = 1 - 0.7 * Double(t)
-                context.stroke(path, with: .color(tint.opacity(line.faint ? 0.3 * fade : fade)),
-                               lineWidth: line.faint ? 0.5 : 1)
+                let fade = 1 - 0.6 * Double(t)
+                if line.between {
+                    context.stroke(path, with: .color(betweenColor.opacity(0.6 * fade)), lineWidth: 0.6)
+                } else {
+                    context.stroke(path, with: .color(WavetableStackCanvas.storedColor.opacity(fade)), lineWidth: showsBetweens ? 1 : 1.2)
+                }
             }
         }
     }
 
-    /// The lines back to front: the stored frames (reduced) and the faint in-betweens, sorted
-    /// by depth so the front ones are drawn last.
-    private static func lines(_ frames: [[Float]], interpolation: Interpolation?, width: CGFloat) -> [Line] {
+    /// The lines back to front: the stored frames (reduced) and the in-betweens, sorted by
+    /// depth so the front ones are drawn last.
+    private static func lines(_ frames: [[Float]], interpolation: Interpolation?, showsBetweens: Bool, width: CGFloat) -> [Line] {
         let columns = max(8, Int(width * 0.7 / 2))
-        let showsBetweens = interpolation == .crossfade || interpolation == .spectral
         let budget = WavetableSketch.lineBudget(storedFrames: frames.count, showsBetweens: showsBetweens)
         let reduced = WavetableSketch.reduce(frames, maxFrames: budget.stored, columns: columns)
         var out: [Line] = reduced.enumerated().map { (pair: (offset: Int, element: [Float])) -> Line in
-            Line(position: Double(pair.offset), values: pair.element, faint: false)
+            Line(position: Double(pair.offset), values: pair.element, between: false)
         }
         for b in WavetableSketch.inBetweens(reduced, interpolation: interpolation, perGap: budget.perGap) {
-            out.append(Line(position: b.position, values: b.values, faint: true))
+            out.append(Line(position: b.position, values: b.values, between: true))
         }
         return out.sorted { (a: Line, b: Line) -> Bool in a.position > b.position }
     }
@@ -328,7 +378,7 @@ struct ConvertWhatHappens: View {
         VStack(alignment: .leading, spacing: 4) {
             if plan.canConvert(item) {
                 if let file = state.convertPreviews.preview(item, in: plan) {
-                    ConvertNoteList(file: file)
+                    ConvertNoteList(file: file, output: plan.expected(for: item))
                 } else {
                     Label("The table can't be converted; the report after converting says why.", systemImage: "xmark.octagon")
                         .foregroundStyle(.red)
@@ -343,12 +393,20 @@ struct ConvertWhatHappens: View {
     }
 }
 
-/// The file written and the writer's notes as bullets, or that nothing but the format changes.
+/// The output's size and file, and the writer's notes as bullets, or that nothing but the
+/// format changes.
 struct ConvertNoteList: View {
     let file: OutputFile
+    let output: ConvertPlan.ExpectedResult?
+
+    private var outputLine: String {
+        let size = output.map { "\($0.frameCountOut) frame\($0.frameCountOut == 1 ? "" : "s") × \(ConvertPlan.formatCount($0.frameSizeOut)) samples, " } ?? ""
+        return "Output: " + size + "\u{201C}\(file.fileName)\u{201D}" + (file.folder.map { " in \($0)" } ?? "") + "."
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Output: \u{201C}\(file.fileName)\u{201D}" + (file.folder.map { " in \($0)" } ?? ""))
+            Text(outputLine).fixedSize(horizontal: false, vertical: true)
             if file.notes.isEmpty {
                 Text("Nothing changes but the format.").foregroundStyle(.secondary)
             } else {
