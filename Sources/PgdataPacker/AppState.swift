@@ -499,7 +499,7 @@ final class AppState: ObservableObject {
         // of a list as long as the bank.
         let howConverted = "in the same way the 3rd Wave's \u{201C}Import program\u{201D} function handles older programs"
         if !converted.isEmpty && converted.count == written {
-            msg += "\n\n" + (written == 1 ? "The program was" : "All \(written) programs were") + " converted from an older format, \(howConverted)."
+            msg += "\n\n" + (written == 1 ? "The program was" : CountWords.all(written, "programs") + " were") + " converted from an older format, \(howConverted)."
         } else if !converted.isEmpty {
             msg += "\n\nConverted from an older format, \(howConverted):\n" + converted.joined(separator: "\n")
         }

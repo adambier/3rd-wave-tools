@@ -323,7 +323,7 @@ public struct PackPlan {
                 status = .ok("Factory \(factoryName); not embedded"
                              + (assigned.count > distinct.count ? " (the added file is identical to it)" : "")
                              + (keepsFactory ? ". This program is from after \(ref.label) became a factory slot, so the added file is not used; choose it in this menu to use it" : ""))
-                brief = keepsFactory ? "Uses the 3rd Wave's own factory table; added file not used" : "Uses the 3rd Wave's own factory table (not embedded)"
+                brief = keepsFactory ? "Factory table; the added file is not used" : "Factory table (not embedded)"
             case .builtIn?: status = .ok("Built-in analog wave; nothing to embed"); brief = "Built-in analog wave"
             case nil where wasUserSlot:
                 status = .missing("Probably the author's own wavetable; see the note above")

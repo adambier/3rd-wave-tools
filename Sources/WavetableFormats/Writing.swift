@@ -225,19 +225,19 @@ public enum WavetableWriter {
             notes.append("Peak \(decimal(Double(peak), 2)) kept; the synth may clip it.")
         }
 
-        /// For destinations that record how to move between frames: says when crossfade (or
+        /// For destinations that record the interpolation: says when crossfade (or
         /// Tonverk's smooth) was chosen because nothing said otherwise.
         mutating func noteDefaultInterpolation(as words: String = "saved as crossfade") {
             if options.interpolation == nil && table.interpolation == nil {
-                notes.append("Morph \(words); the source doesn't say.")
+                notes.append("Interpolation \(words); the source doesn't say.")
             }
         }
 
-        /// For destinations whose files can't record how to move between frames: says so when
+        /// For destinations whose files can't record the interpolation: says so when
         /// the source or the options asked for one.
         mutating func noteUnrecordedInterpolation() {
             if let asked = options.interpolation ?? table.interpolation {
-                notes.append("This format can't store how to move between frames (\(asked.displayName) asked for); set it on the destination's oscillator.")
+                notes.append("This format can't store the interpolation (\(asked.displayName.lowercased()) asked for); set it on the destination's oscillator.")
             }
         }
 
@@ -325,7 +325,7 @@ public extension OutputPreset {
     var caveat: String? {
         switch self {
         case .wav2048:
-            return "Vital's behaviour is from its public source code, which the current release may differ from. Pigments reads no metadata, so the morph saved in the file doesn't apply to it."
+            return "Vital's behaviour is from its public source code, which the current release may differ from. Pigments reads no metadata, so the interpolation saved in the file doesn't apply to it."
         case .miniFreak:
             return "How MiniFreak V reduces tables to 512 samples and 64 cycles is undocumented; Convert reduces the frame count itself. How it treats fewer than 64 frames is unknown."
         case .phasePlant:

@@ -348,7 +348,7 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(guess.sizeSource.label, "Guessed")
         XCTAssertTrue(guess.basisDescription.contains("the usual 2,048 is assumed"))
         XCTAssertEqual(ready.sizeSource, .inFile)
-        XCTAssertEqual(ready.basisDescription, "Stated in the file: clm chunk.")
+        XCTAssertEqual(ready.basisDescription, "Clm chunk.")   // the reader's own phrase, capitalised
 
         XCTAssertFalse(p.needsAttention(ready))
         XCTAssertTrue(p.needsAttention(open))
@@ -475,7 +475,7 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(OutputPreset.Group.thirdWave.title, "3rd Wave")
         XCTAssertEqual(OutputPreset.thirdWaveU.specLine, "64 × 1,024 · .wt")
         XCTAssertEqual(OutputPreset.allCases.filter(\.recordsInterpolation), [.wav2048, .miniFreak, .tonverk, .phasePlant])
-        XCTAssertEqual(Interpolation.none.displayName, "Steps")
+        XCTAssertEqual(Interpolation.none.displayName, "None (stepped)")
         XCTAssertEqual(Interpolation.displayName(nil), "Not stated")
         XCTAssertEqual(Interpolation.displayName(.spectral), "Spectral")
         XCTAssertTrue(ConvertPlan.testingFootnote.hasPrefix("Not yet tested"))
@@ -484,7 +484,7 @@ final class ConvertPlanStateTests: XCTestCase {
 
     func testInterpolationWordsNeverShowTheRawName() {
         let p = plan([table("Stepped", interpolation: Interpolation.none), table("Silent", peak: 0.25)])
-        XCTAssertEqual(p.items[0].interpolationDescription, "Steps")
+        XCTAssertEqual(p.items[0].interpolationDescription, "None (stepped)")
         XCTAssertEqual(p.items[1].interpolationDescription, "Not stated")
     }
 }
@@ -530,7 +530,7 @@ final class ConvertReportTests: XCTestCase {
         XCTAssertEqual(c.reports, [ConvertPlan.ItemReport(name: "A", notes: ["same", "only A"]),
                                    ConvertPlan.ItemReport(name: "B", notes: ["same", "only B"])])
         XCTAssertEqual(c.notes, ["A: same", "A: only A", "B: same", "B: only B"])
-        XCTAssertEqual(ConvertPlan.groupedNotes(c.reports).map(\.label), ["All 2 tables", "A", "B"])
+        XCTAssertEqual(ConvertPlan.groupedNotes(c.reports).map(\.label), ["Both tables", "A", "B"])
     }
 
     func testReportTitleIsShort() {

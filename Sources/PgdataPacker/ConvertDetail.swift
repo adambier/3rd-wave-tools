@@ -12,7 +12,7 @@ import PgdataPackerCore
 
 /// Below the Convert table: how the selected table will be converted. With one table selected,
 /// its name (editable), its frame size and where that came from (with a picture of the first
-/// wave at each size the file allows), how it moves between frames, and what converting does.
+/// wave at each size the file allows), its interpolation, and what converting does.
 struct ConvertDetailPane: View {
     @EnvironmentObject var state: AppState
     let selection: Set<UUID>
@@ -74,7 +74,7 @@ struct ConvertSeveralDetail: View {
     }
 }
 
-/// One table: its name, its frame size, how it moves between frames, and what converting does.
+/// One table: its name, its frame size, its interpolation, and what converting does.
 struct ConvertItemDetail: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
@@ -210,9 +210,8 @@ struct ConvertFrameSizeSection: View {
         guard let n = item.frameSize else { return "Frame size: not stated. Choose one:" }
         let size = ConvertPlan.formatCount(n) + " samples"
         switch item.sizeSource {
-        case .inFile: return "Frame size: \(size), stated in the file (\(item.table.frameSizeBasis))."
-        case .fileName, .sidecar: return "Frame size: \(size), from the \(item.table.frameSizeBasis)."
-        case .markers: return "Frame size: \(size), from loop or cue markers (\(item.table.frameSizeBasis)); less certain."
+        case .inFile, .fileName, .sidecar: return "Frame size: \(size) — \(item.table.frameSizeBasis)."
+        case .markers: return "Frame size: \(size) — \(item.table.frameSizeBasis); less certain."
         case .guessed: return "Frame size: \(size), guessed from the file's length."
         case .yourChoice: return "Frame size: \(size), your choice."
         case .notStated: return "Frame size: \(size)."
@@ -319,15 +318,15 @@ struct WaveThumbnail: View {
     }
 }
 
-/// "Between frames: Crossfade", with what that means on hover.
+/// "Interpolation: Crossfade", with what interpolation is on hover.
 struct ConvertBetweenFramesLine: View {
     let item: ConvertPlan.Item
     var body: some View {
         HStack(spacing: 6) {
-            Text("Between frames:").foregroundStyle(.secondary)
+            Text("Interpolation:").foregroundStyle(.secondary)
             Text(item.interpolationDescription)
         }
-        .help("How the source file says to move between frames. Most synths set this on the oscillator instead.")
+        .help("How a synth moves from one frame to the next as the table is swept: none (it steps from frame to frame), crossfade (it blends neighbours), or spectral (it blends their harmonics). Some files say which; most synths set it on the oscillator instead.")
     }
 }
 
