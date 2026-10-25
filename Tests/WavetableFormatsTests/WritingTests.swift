@@ -345,3 +345,11 @@ final class WritingTests: XCTestCase {
         }
     }
 }
+
+final class TonverkNameTagTests: XCTestCase {
+    func testOnlyTonverkSizesCountAsTags() {
+        XCTAssertNil(WavetableWriter.Names.removeTonverkTag("KOMPLEXER_WT1").removed)
+        XCTAssertNil(WavetableWriter.Names.removeTonverkTag("Pad_wt100").removed)
+        XCTAssertEqual(WavetableWriter.Names.removeTonverkTag("Pad_wt1024r").stem, "Pad")
+    }
+}

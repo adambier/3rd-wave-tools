@@ -67,7 +67,9 @@ extension WavetableWriter {
             guard let r = stem.range(of: "_wt", options: [.backwards, .caseInsensitive]) else { return (stem, nil) }
             var digits = stem[r.upperBound...]
             if digits.last == "r" || digits.last == "R" { digits = digits.dropLast() }
-            guard !digits.isEmpty, digits.allSatisfy({ $0.isASCII && $0.isNumber }) else { return (stem, nil) }
+            // Only Tonverk's sizes count, as when reading: "KOMPLEXER_WT1" keeps its name.
+            guard !digits.isEmpty, digits.allSatisfy({ $0.isASCII && $0.isNumber }),
+                  let n = Int(digits), WavetableWriter.tonverkFrameSizes.contains(n) else { return (stem, nil) }
             let rest = trimEnds(String(stem[..<r.lowerBound]))
             return (rest.isEmpty ? "Untitled" : rest, String(stem[r.lowerBound...]))
         }
