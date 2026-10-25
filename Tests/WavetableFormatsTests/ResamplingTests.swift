@@ -198,3 +198,24 @@ final class ResamplingTests: XCTestCase {
         XCTAssertEqual(PPGStandardWaves.positions, 60...63)
     }
 }
+
+final class ResamplingLargeOddSizeTests: XCTestCase {
+    /// A Serum sidecar allows up to 9,999 samples per cycle; Bluestein's algorithm keeps a prime
+    /// size as exact and as fast as a power of two.
+    func testPrimeSizeCycleResizesExactly() {
+        func cycle(_ n: Int) -> [Float] {
+            (0..<n).map { i -> Float in
+                let x: Double = 2 * Double.pi * Double(i) / Double(n)
+                let a: Double = 0.6 * sin(x), b: Double = 0.3 * cos(7 * x), c: Double = 0.1 * sin(40 * x)
+                return Float(a + b + c)
+            }
+        }
+        let start = Date()
+        for _ in 0..<64 {
+            let out = Resampling.resizeCycle(cycle(9973), to: 2048)
+            let want = cycle(2048)
+            XCTAssertLessThan(zip(out, want).map { abs($0 - $1) }.max() ?? 1, 1e-5)
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(start), 20, "64 frames of 9,973 samples should resize in well under a second in a release build")
+    }
+}

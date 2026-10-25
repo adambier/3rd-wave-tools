@@ -226,7 +226,7 @@ final class ConvertPlanTests: XCTestCase {
 
         plan.preset = .thirdWaveP
         plan.options.appendPPGStandardWaves = true
-        XCTAssertEqual(plan.expectedResult(for: u), "64 × 128; frames resized from 1,024 samples; the table brought to 60 frames, then the PPG's four standard waves at 60–63")
+        XCTAssertEqual(plan.expectedResult(for: u), "64 × 128; frames resized from 1,024 samples; 64 frames reduced to 60 by interpolating; the PPG's four standard waves at 60–63")
     }
 
     // MARK: Converting and writing

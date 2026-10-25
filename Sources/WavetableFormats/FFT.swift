@@ -1,8 +1,9 @@
 import Foundation
 
-// The spectral core behind Resampling: a radix-2 FFT for power-of-two lengths and a plain DFT for
-// the rest. Adapted from ThirdWaveWT's CycleResampler (MIT, © 2026 Adam Arthur Bier), whose FFT
-// this is; the plain DFT and the harmonic representation are new here.
+// The spectral core behind Resampling: a radix-2 FFT for power-of-two lengths, Bluestein's
+// algorithm (the same FFT on a longer, padded sequence) to analyse any other length, and plain
+// synthesis for other output lengths. Adapted from ThirdWaveWT's CycleResampler (MIT, © 2026 Adam
+// Arthur Bier), whose FFT this is; the rest is new here.
 
 extension Resampling {
     /// One periodic cycle as harmonics: for h ≥ 1, `re[h] + i·im[h]` is the complex amplitude a_h
@@ -15,8 +16,8 @@ extension Resampling {
         /// The highest harmonic present.
         var top: Int { re.count - 1 }
 
-        /// The harmonics of a cycle of any length ≥ 1: by FFT for a power of two, otherwise by a
-        /// plain DFT (O(n²), a few milliseconds at the sizes wavetables use).
+        /// The harmonics of a cycle of any length ≥ 1: by FFT for a power of two, otherwise by
+        /// Bluestein's algorithm, also O(n log n).
         init(of cycle: [Float]) {
             let n = cycle.count
             let top = n / 2
@@ -27,16 +28,8 @@ extension Resampling {
                 FFT.transform(&xr, &xi, inverse: false)
                 for h in 0...top { re[h] = xr[h]; im[h] = xi[h] }
             } else {
-                let table = FFT.unitCircle(n)
-                for h in 0...top {
-                    var sr = 0.0, si = 0.0, k = 0
-                    for i in 0..<n {
-                        let v = Double(cycle[i])
-                        sr += v * table.cos[k]; si -= v * table.sin[k]   // e^{−2πi·h·i/n}
-                        k += h; if k >= n { k -= n }
-                    }
-                    re[h] = sr; im[h] = si
-                }
+                let (xr, xi) = FFT.bluestein(cycle.map(Double.init))
+                for h in 0...top { re[h] = xr[h]; im[h] = xi[h] }
             }
             let scale = 1 / Double(n)
             for h in 0...top { re[h] *= scale; im[h] *= scale }
@@ -84,6 +77,37 @@ extension Resampling {
     /// An in-place iterative radix-2 FFT, from ThirdWaveWT.
     enum FFT {
         static func isPowerOfTwo(_ n: Int) -> Bool { n > 0 && (n & (n - 1)) == 0 }
+
+        /// The unnormalised forward DFT of a real sequence of any length n ≥ 1, by Bluestein's
+        /// algorithm: X[k] = c_k · Σ_j (x_j·c_j) · conj(c_{k−j}) with the chirp c_j = e^{−πi·j²/n},
+        /// a convolution done with power-of-two FFTs of length ≥ 2n − 1.
+        static func bluestein(_ x: [Double]) -> (re: [Double], im: [Double]) {
+            let n = x.count
+            var m = 1
+            while m < 2 * n - 1 { m <<= 1 }
+            // j² mod 2n keeps the chirp's angle small and exact for large j.
+            func angle(_ j: Int) -> Double { Double.pi * Double((j * j) % (2 * n)) / Double(n) }
+            var ar = [Double](repeating: 0, count: m), ai = ar, br = ar, bi = ar
+            for j in 0..<n {
+                let t = angle(j)
+                ar[j] = x[j] * cos(t); ai[j] = -x[j] * sin(t)        // x_j · e^{−iπj²/n}
+                br[j] = cos(t); bi[j] = sin(t)                        // e^{+iπj²/n}
+                if j > 0 { br[m - j] = br[j]; bi[m - j] = bi[j] }
+            }
+            transform(&ar, &ai, inverse: false)
+            transform(&br, &bi, inverse: false)
+            for k in 0..<m {
+                let r = ar[k] * br[k] - ai[k] * bi[k], i = ar[k] * bi[k] + ai[k] * br[k]
+                ar[k] = r; ai[k] = i
+            }
+            transform(&ar, &ai, inverse: true)
+            var re = [Double](repeating: 0, count: n), im = re
+            for k in 0..<n {
+                let t = angle(k), c = cos(t), s = -sin(t)            // e^{−iπk²/n}
+                re[k] = ar[k] * c - ai[k] * s; im[k] = ar[k] * s + ai[k] * c
+            }
+            return (re, im)
+        }
 
         /// cos and sin of 2π·k/n for k in 0..<n.
         static func unitCircle(_ n: Int) -> (cos: [Double], sin: [Double]) {

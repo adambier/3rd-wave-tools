@@ -170,7 +170,21 @@ struct ConvertNameCell: View {
                 ConvertBadge(text: item.alsoIn.count == 1 ? "1 copy" : "\(item.alsoIn.count) copies",
                              tip: "The same table is " + also + "; it is listed and converted once.")
             }
-            if state.convertPlan.preset.isThirdWave { NameLengthNote(name: item.name) }
+            if state.convertPlan.preset.isThirdWave { ThirdWaveNameNote(name: item.name) }
+        }
+    }
+}
+
+/// For a 3rd Wave destination: the name the `.wt` will carry, when it differs from the table's
+/// (cut to 31 characters, accents outside Latin-1 removed, other characters as "?").
+struct ThirdWaveNameNote: View {
+    let name: String
+    var body: some View {
+        let written = WavetableWriter.thirdWaveName(name)
+        if written.name != name.trimmingCharacters(in: .whitespaces) {
+            Label("Written as \u{201C}\(written.name)\u{201D}", systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.orange).lineLimit(1)
+                .help(written.notes.joined(separator: "\n"))
         }
     }
 }
@@ -189,7 +203,8 @@ struct ConvertBadge: View {
     }
 }
 
-/// Frames × size; when the file leaves the frame size open, a menu of the sizes its length allows.
+/// Frames × size. When the file leaves the frame size open, or only its length suggested one, a
+/// menu of the sizes its length allows.
 struct ConvertFrameSizeCell: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
@@ -199,27 +214,30 @@ struct ConvertFrameSizeCell: View {
     }
 
     var body: some View {
-        if !item.needsFrameSize {
+        let choices = item.frameSizeChoices
+        if choices.isEmpty && !item.needsFrameSize {
             Text(item.sizeDescription).monospacedDigit().lineLimit(1)
-        } else if item.table.candidateFrameSizes.isEmpty {
+        } else if choices.isEmpty {
             Label("Size unknown", systemImage: "xmark.octagon").foregroundStyle(.red).lineLimit(1)
                 .help("The file does not settle the frame size, and its length allows none of the usual sizes.")
         } else {
             Menu {
-                ForEach(item.table.candidateFrameSizes, id: \.self) { size in
+                ForEach(choices, id: \.self) { size in
                     Button { state.convertPlan.chooseFrameSize(item.id, size) } label: {
-                        if size == item.chosenFrameSize { Label(title(size), systemImage: "checkmark") }
+                        if size == item.frameSize { Label(title(size), systemImage: "checkmark") }
                         else { Text(title(size)) }
                     }
                 }
             } label: {
-                Text(item.chosenFrameSize.map(title) ?? "Choose size…").monospacedDigit().lineLimit(1)
+                Text(item.frameSize.map { title($0) } ?? "Choose size…").monospacedDigit().lineLimit(1)
             }
             // A bordered pop-up with its chevron, so it reads as a menu rather than as text.
             .menuStyle(.button)
             .buttonStyle(.bordered)
             .menuIndicator(.visible)
-            .help("The file does not settle the frame size: choose one of the sizes its length allows (frames × samples per frame).")
+            .help(item.needsFrameSize
+                  ? "The file does not settle the frame size: choose one of the sizes its length allows (frames × samples per frame)."
+                  : "Only the file's length suggested this frame size: choose another if it is wrong (frames × samples per frame).")
         }
     }
 }
@@ -329,7 +347,7 @@ struct ConvertDestinationPane: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle("Put the PPG standard waves in frames 60–63", isOn: $state.convertPlan.options.appendPPGStandardWaves)
                         .toggleStyle(.checkbox)
-                    Text("Triangle, narrow pulse, square, and sawtooth, as in the 3rd Wave's PPG-derived P tables. They replace the table's own frames 60–63.")
+                    Text("Triangle, narrow pulse, square, and sawtooth, as in the 3rd Wave's PPG-derived P tables. The table itself is fitted into frames 0–59 first, by the choice above, so its whole sweep is kept.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -364,13 +382,14 @@ struct ConvertPresetRow: View {
     }
 }
 
-/// "Tested in …", or that the preset rests on the maker's documentation only.
+/// "Tested in …", or that the preset has not been tested in its destination yet (its `basis`, shown
+/// below it, says what it rests on).
 struct ConvertEvidenceLabel: View {
     let preset: OutputPreset
     var body: some View {
         let tested = preset.testedIn
         if tested.isEmpty {
-            Label("From the maker's documentation, not yet tested", systemImage: "doc.text")
+            Label("Not yet tested in its destination", systemImage: "doc.text")
                 .font(.caption).foregroundStyle(.secondary)
         } else {
             Label("Tested in " + ConvertPlan.listPhrase(tested), systemImage: "checkmark.seal")

@@ -5,8 +5,8 @@ import Foundation
 /// Frame sizes change spectrally: each cycle is taken apart into its harmonics and put back
 /// together at the new size, which is exact for a periodic cycle (adapted from ThirdWaveWT's
 /// `CycleResampler`, MIT, © 2026 Adam Arthur Bier). Power-of-two sizes use an FFT; other sizes
-/// (a Serum sidecar allows any size from 32 to 9,999, e.g. 600) use a plain DFT, which is fast
-/// enough at these sizes.
+/// (a Serum sidecar allows any size from 32 to 9,999, e.g. 600) are analysed with Bluestein's
+/// algorithm, which is as fast.
 public enum Resampling {
     /// Resizes one periodic cycle to `size` samples, band-limited (exact for a periodic cycle).
     ///
@@ -70,9 +70,10 @@ public enum Resampling {
     /// The filters are ideal (spectral) cut-offs. The factory chains show cut-offs of about these
     /// proportions, but their exact filter is not known: they carry small gain changes and, in
     /// tables made from recorded audio, a constant phase shift, so a real filter was presumably
-    /// used. The 3rd Wave identifies a table by its first 65,536 values only (the table, not this
-    /// chain), and whether it plays from the chain is not established, so the chain does not need
-    /// to match the factory's. A low-pass can raise a wave's peak (Gibbs overshoot); a level whose
+    /// used. Tests on a 3rd Wave (FORMATS.md section 5.1) found that it
+    /// identifies a table by its first 65,536 values only and plays a table the same with its chain
+    /// zeroed, so the chain does not need to match the factory's; it is written because the 3rd
+    /// Wave's own tables carry one. A low-pass can raise a wave's peak (Gibbs overshoot); a level whose
     /// peak would exceed the table's own is scaled back to it, so a table within ±1 has a chain
     /// within ±1.
     ///

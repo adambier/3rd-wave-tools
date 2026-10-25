@@ -267,7 +267,7 @@ files without wavetables are passed over. Each table is listed once, with any id
 noted beside it, and with its frames, its frame size, and how the frame size was decided: from
 metadata in the file, a `_wt<N>` tag in its name, a Serum `.txt` file beside it, or its length.
 When nothing settles the size, the table waits for you to choose from the sizes its length
-allows; Convert does not guess. Groove Synthesis's factory tables are marked, and for a 3rd Wave
+allows; when only the length suggested a size, the list says so and lets you choose another. Groove Synthesis's factory tables are marked, and for a 3rd Wave
 destination they start unticked, since every 3rd Wave already has them.
 
 Then choose a destination:
@@ -283,8 +283,7 @@ Then choose a destination:
 | Surge XT | a Surge `.wt` |
 | WaveEdit, E370 | a 16-bit WAV of 64 frames of 256 |
 
-Each destination says whether it has been tested there or rests only on the maker's
-documentation. When a destination needs a different number of frames, **Advanced** lets you
+Each destination says whether it has been tested there yet, and what it rests on. When a destination needs a different number of frames, **Advanced** lets you
 choose how to get there: **Pick evenly** (keeps the first and last frames and spaces the rest,
 adding no new waveforms) or **Interpolate** (crossfades between neighbouring frames). It also sets
 the interpolation to record, Tonverk's frame size, and the PPG waves for P tables. **Clean Up
@@ -359,10 +358,11 @@ in any language. Everything here is open source under the MIT licence.
 - **Other synths' wavetable formats.** `WavetableFormats`, the package's second library, finds
   wavetables in files (WAV with its metadata chunks, Surge `.wt`, and the 3rd Wave's `.wt` and
   `.pgdata`), resizes them, and writes them for the destinations the Convert page offers. Like
-  `PgdataFormats`, it depends only on Foundation and is tested on macOS, Linux, and Windows.
+  `PgdataFormats`, on which it builds, it depends only on Foundation and is tested on macOS, Linux,
+  and Windows.
   [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes the formats, with sources, and the
   library's documentation is at
-  [adambier.github.io/3rd-wave-tools](https://adambier.github.io/3rd-wave-tools/documentation/wavetableformats/.
+  [adambier.github.io/3rd-wave-tools](https://adambier.github.io/3rd-wave-tools/documentation/wavetableformats/).
 - **The app's logic, for other platforms.** `PgdataPackerCore`, the package's third library,
   holds pgdata Packer's own decisions without its user interface: pack, unpack, and convert plans,
   factory table handling, file names, and Clean Up Names. A command-line tool, or an app for Windows or

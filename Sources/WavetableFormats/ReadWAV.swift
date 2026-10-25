@@ -112,15 +112,16 @@ extension WavetableReader {
             }
             if let i = s.interpolation { interps.append(InterpolationClaim(value: i, subject: "the Serum .txt sidecar")) }
         }
-        // 6. cue points, evenly spaced.
-        if let cue = wav.chunks["cue "], let d = cueSpacing(cue) {
+        // 6. cue points, evenly spaced. Cue points and loops also mark ordinary samples, so these
+        // two count only for frame sizes a wavetable can have (at most 4,096, Surge's limit).
+        if let cue = wav.chunks["cue "], let d = cueSpacing(cue), d <= 4096 {
             offer(d, basis: "cue points", subject: "the cue points")
         }
         // 7. A single smpl loop.
         if let smpl = wav.chunks["smpl"], let loop = singleLoop(smpl) {
             let inclusive = loop.end - loop.start + 1, exclusive = loop.end - loop.start
             let n = count % inclusive != 0 && exclusive >= 2 && count % exclusive == 0 ? exclusive : inclusive
-            offer(n, basis: "smpl loop", subject: "the smpl loop")
+            if n <= 4096 { offer(n, basis: "smpl loop", subject: "the smpl loop") }
         }
 
         var frameSize: Int?
@@ -136,6 +137,7 @@ extension WavetableReader {
         } else if count == 8192 {
             frameSize = 128
             basis = "length 8,192: the 64 × 128 layout the 3rd Wave's Wave Maker reads as a PPG table"
+            candidates = fittingFrameSizes(count).filter { $0 != 128 }
         } else if count == 16_384 {
             basis = "length 16,384: WaveEdit's 64 × 256 or 8 × 2,048; the file does not say which"
             candidates = wav.bytesPerSample == 2 ? [256, 2048] : [2048, 256]

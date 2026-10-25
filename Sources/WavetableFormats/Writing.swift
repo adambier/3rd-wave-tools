@@ -299,9 +299,9 @@ public extension OutputPreset {
     var basis: String {
         switch self {
         case .thirdWaveU:
-            return "3rd Wave User Manual v1.9 (Wave Maker) and MIDI CC + SysEx Spec v2a; the factory .wt files and tests on a 3rd Wave (FORMATS.md section 5.1)"
+            return "Groove Synthesis's user manual (v1.9, Wave Maker) and MIDI CC + SysEx Spec (v2a); the factory .wt files and tests on a 3rd Wave (FORMATS.md section 5.1)"
         case .thirdWaveP:
-            return "3rd Wave User Manual v1.9; the factory .wt files (FORMATS.md section 5.1)"
+            return "Groove Synthesis's user manual (v1.9); the factory .wt files (FORMATS.md section 5.1)"
         case .wav2048:
             return "Serum 2 User Guide, p. 38; Vital's source code; Pigments User Manual 7.0, §8.12"
         case .miniFreak:

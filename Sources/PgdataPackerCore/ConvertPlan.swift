@@ -72,7 +72,9 @@ public struct ConvertPlan: Equatable {
         public var factorySlot: SourceRef?
         /// That factory table's name, when the library has one that does more than repeat the slot.
         public var factoryName: String?
-        /// The frame size the user chose, when the file leaves it open (`table.frameSize` is nil).
+        /// The frame size the user chose from the sizes the file's length allows: needed when the
+        /// file leaves the size open (`table.frameSize` is nil), and possible when only its length
+        /// suggested one.
         public var chosenFrameSize: Int?
         /// The user's tick; nil follows the destination's default (see `ConvertPlan.isSelected`).
         public var userSelection: Bool?
@@ -83,8 +85,14 @@ public struct ConvertPlan: Equatable {
 
         /// The name it is converted under: the new name from Clean Up Names, or the file's.
         public var name: String { newName ?? table.name }
-        /// The frame size used: the file's, or the user's choice when the file leaves it open.
-        public var frameSize: Int? { table.frameSize ?? chosenFrameSize }
+        /// The frame size used: the user's choice, or else the file's.
+        public var frameSize: Int? { chosenFrameSize ?? table.frameSize }
+        /// The sizes the user can choose from: the file's own (when it gives one) and the other
+        /// sizes its length allows. Empty when the file settles the size by metadata or name.
+        public var frameSizeChoices: [Int] {
+            guard !table.candidateFrameSizes.isEmpty else { return [] }
+            return (table.frameSize.map { [$0] } ?? []) + table.candidateFrameSizes.filter { $0 != table.frameSize }
+        }
         /// Whether the file leaves the frame size open, so the user must choose one.
         public var needsFrameSize: Bool { table.frameSize == nil }
         /// Frames at the frame size used; nil when no size is known or the samples do not divide.
@@ -100,7 +108,10 @@ public struct ConvertPlan: Equatable {
         }
         /// How the frame size was decided, in a short phrase.
         public var basisDescription: String {
-            if !needsFrameSize { return table.frameSizeBasis }
+            if !needsFrameSize {
+                guard let c = chosenFrameSize, c != table.frameSize else { return table.frameSizeBasis }
+                return "Your choice (the \(table.frameSizeBasis) suggested \(ConvertPlan.formatCount(table.frameSize ?? 0)))"
+            }
             let open = table.candidateFrameSizes.isEmpty
                 ? "not settled by the file"
                 : "not settled by the file; its length allows " + ConvertPlan.candidateList(table)
@@ -295,12 +306,12 @@ public struct ConvertPlan: Equatable {
     /// The ticked items, in list order.
     public var selectedItems: [Item] { items.filter(isSelected) }
 
-    /// Sets the frame size for an item whose file leaves it open; nil clears the choice. Sizes
-    /// that the file's length does not allow are ignored.
+    /// Sets the frame size for an item, from its `frameSizeChoices`; nil, or the file's own size,
+    /// clears the choice. Other sizes are ignored.
     public mutating func chooseFrameSize(_ id: UUID, _ size: Int?) {
-        guard let i = items.firstIndex(where: { $0.id == id }), items[i].needsFrameSize else { return }
-        if let size, !items[i].table.candidateFrameSizes.contains(size) { return }
-        items[i].chosenFrameSize = size
+        guard let i = items.firstIndex(where: { $0.id == id }) else { return }
+        if let size, !items[i].frameSizeChoices.contains(size) { return }
+        items[i].chosenFrameSize = size == items[i].table.frameSize ? nil : size
     }
 
     /// Notes for an item: the reader's, and what the destination means for it.
@@ -351,8 +362,10 @@ public struct ConvertPlan: Equatable {
         guard let size = item.frameSize else { return "Choose a frame size first" }
         guard let count = item.frameCount else { return "Cannot be converted: the samples do not divide into frames of \(Self.formatCount(size))" }
         let outSize = destinationFrameSize(source: size)
-        let outCount = destinationFrameCount(source: count)
-        var parts = ["\(outCount) × \(Self.formatCount(outSize))"]
+        let ppg = preset == .thirdWaveP && options.appendPPGStandardWaves
+        // With the PPG waves, the table itself goes into 60 frames and the four waves follow.
+        let outCount = ppg ? 60 : destinationFrameCount(source: count)
+        var parts = ["\(ppg ? 64 : outCount) × \(Self.formatCount(outSize))"]
         if outSize != size { parts.append("frames resized from \(Self.formatCount(size)) samples") }
         let how = options.frameCountPolicy == .pickEvenly ? "picking evenly" : "interpolating"
         if outCount < count {
@@ -360,9 +373,7 @@ public struct ConvertPlan: Equatable {
         } else if outCount > count {
             parts.append("\(count) frame\(count == 1 ? "" : "s") brought up to \(outCount) by \(how)")
         }
-        if preset == .thirdWaveP && options.appendPPGStandardWaves {
-            parts.append("the table brought to 60 frames, then the PPG's four standard waves at 60–63")
-        }
+        if ppg { parts.append("the PPG's four standard waves at 60–63") }
         return parts.joined(separator: "; ")
     }
 

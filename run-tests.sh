@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run the PgdataFormats tests. Needs full Xcode on a Mac (XCTest is not part of the
+# Run the tests of the package's libraries (PgdataFormats, WavetableFormats, PgdataPackerCore). Needs full Xcode on a Mac (XCTest is not part of the
 # Command Line Tools). The app itself does not — see make-app.sh.
 set -euo pipefail
 cd "$(dirname "$0")"

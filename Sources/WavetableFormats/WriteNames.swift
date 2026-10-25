@@ -7,19 +7,27 @@ import PgdataFormats
 // Windows, and exFAT.
 
 extension WavetableWriter {
+    /// The name a 3rd Wave `.wt` gets for `name`, and notes on what changed: control characters
+    /// become spaces, a character outside Latin-1 loses its accents when that leaves a Latin-1
+    /// letter ("Ő" to "O") and becomes "?" otherwise, and the name is cut to the 31 characters
+    /// the 3rd Wave shows. An empty name becomes "Untitled".
+    public static func thirdWaveName(_ name: String) -> (name: String, notes: [String]) {
+        Names.thirdWave(name)
+    }
+
     /// Makes names fit their destination, saying what changed.
     enum Names {
         /// The most characters the 3rd Wave shows of a table's name.
         static let thirdWaveNameLimit = 31
-        /// The longest file-name stem written, in UTF-8 bytes (file systems allow 255, and a suffix
-        /// such as `_wt4096r.wav` follows).
 
         /// A name for a 3rd Wave `.wt` (its line 2): Latin-1 only, at most 31 characters, one line.
         /// A character outside Latin-1 loses its accents when that leaves a Latin-1 letter ("Ő" to
         /// "O"), and becomes "?" otherwise, as the 3rd Wave would show it.
         static func thirdWave(_ name: String) -> (name: String, notes: [String]) {
             var notes: [String] = []
-            let oneLine = String(name.map { isControl($0) ? " " : $0 }).trimmingCharacters(in: .whitespaces)
+            // Composed first: macOS file names store "é" as "e" plus a combining accent.
+            let oneLine = String(name.precomposedStringWithCanonicalMapping.map { isControl($0) ? " " : $0 })
+                .trimmingCharacters(in: .whitespaces)
             var replaced = false
             var out = ""
             for ch in oneLine {

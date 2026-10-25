@@ -161,13 +161,14 @@ final class RobustnessTests: XCTestCase {
     func testNamesOutsideLatin1AreFlagged() {
         XCTAssertEqual(NameField.unstorable(in: "Pad \u{2013} Wide \u{2018}A\u{2019}"), "\u{2013}\u{2018}\u{2019}")
         XCTAssertEqual(NameField.unstorable(in: "Plain-Name"), "")
-        XCTAssertEqual(NameField.storedLength("e\u{301}"), 2)          // e + combining accent: two bytes
+        XCTAssertEqual(NameField.storedLength("e\u{301}"), 1)          // e + combining accent: composed to é, one byte
+        XCTAssertEqual(NameField("Cafe\u{301}").text, "Caf\u{E9}")    // as macOS file names store it
         XCTAssertEqual(NameField.storedLength("\u{E9}"), 1)            // é precomposed: one byte
         XCTAssertEqual(NameField("Pad \u{2013} Wide").text, "Pad ? Wide")
         var p = makeCurrentProgram(); p.name = "Pad \u{2013} Wide"
         let plan = PackPlan.make(program: p, files: [], factory: FactoryLibrary())
         XCTAssertTrue(plan.warnings.contains { $0.contains("cannot hold (\u{201C}\u{2013}\u{201D})") }, "\(plan.warnings)")
-        p.name = String(repeating: "e\u{301}", count: 20)             // 20 characters, 40 bytes
+        p.name = String(repeating: "e\u{301}", count: 40)             // 40 characters once composed
         XCTAssertTrue(PackPlan.make(program: p, files: [], factory: FactoryLibrary()).warnings.contains { $0.contains("is 40 characters") })
     }
 

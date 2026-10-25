@@ -1,5 +1,5 @@
-# Runs the library's tests on Linux, macOS, and Windows on every push and pull request, so that
-# PgdataFormats and PgdataPackerCore keep building everywhere Swift runs. The macOS app itself is
+# Runs the libraries' tests on Linux, macOS, and Windows on every push and pull request, so that
+# PgdataFormats, WavetableFormats, and PgdataPackerCore keep building everywhere Swift runs. The macOS app itself is
 # built and released separately with make-app.sh.
 
 name: Tests

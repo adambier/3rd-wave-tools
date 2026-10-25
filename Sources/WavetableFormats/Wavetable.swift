@@ -139,8 +139,9 @@ public struct OutputOptions: Equatable, Sendable {
     /// Tonverk only: the frame size to write (64, 128, …, 4,096); nil keeps the source's when
     /// Tonverk accepts it, otherwise 2,048.
     public var tonverkFrameSize: Int?
-    /// 3rd Wave P tables only: replace frames 60–63 with the PPG's four standard waves
-    /// (triangle, narrow pulse, square, sawtooth), as the 3rd Wave's PPG-derived tables have.
+    /// 3rd Wave P tables only: fit the table into frames 0–59 (by `frameCountPolicy`, keeping its
+    /// first and last frames) and put the PPG's four standard waves (triangle, narrow pulse,
+    /// square, sawtooth) at 60–63, as the 3rd Wave's PPG-derived tables have them.
     public var appendPPGStandardWaves: Bool
 
     /// Creates options; the defaults pick frames evenly and keep the source's interpolation.

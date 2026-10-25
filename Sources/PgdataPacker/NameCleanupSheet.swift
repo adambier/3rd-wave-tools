@@ -110,7 +110,8 @@ struct NameCleanupSheet: View {
                 }
                 .width(min: 160, ideal: 220)
                 TableColumn("") { (r: Row) in
-                    if namesGoToThe3rdWave { NameLengthNote(name: proposed(r)) }
+                    if page == .pack { NameLengthNote(name: proposed(r)) }
+                    else if namesGoToThe3rdWave { ThirdWaveNameNote(name: proposed(r)) }
                 }
                     .width(min: 100, ideal: 140)
             }

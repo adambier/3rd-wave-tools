@@ -7,7 +7,7 @@ and U tables, and the tables a `.pgdata` embeds) are in [FORMATS.md](FORMATS.md)
 Each statement names its source: the maker's manual or documentation, or the maker's own source
 code. Where a statement is an inference, it says so. Nothing here has been tested with this
 project's files unless it says so, and each destination in the app is labelled the same way:
-"tested in …" once it has been, "from the maker's documentation, not yet tested" until then.
+"tested in …" once it has been, "not yet tested in its destination" until then.
 Corrections and test results are welcome; see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 This project is not affiliated with Groove Synthesis or with any maker named here; their product
@@ -106,13 +106,15 @@ used:
 5. a Serum `.txt` file beside it;
 6. evenly spaced `cue ` points;
 7. a single `smpl` loop whose length divides the file;
-8. the length: 8,192 samples as 64 × 128 (the layout Wave Maker reads as a P table); other
-   multiples of 2,048 as 2,048 per frame.
+8. the length: 8,192 samples as 64 × 128 (the layout Wave Maker reads as a P table), and other
+   multiples of 2,048 except 16,384 as 2,048 per frame, up to 512 frames.
 
-When two of these disagree, Convert notes both. When none settles the size (for example, a file
-of 16,384 samples, which is 64 × 256 for WaveEdit or 8 × 2,048 for Serum), it lists the sizes the
-length allows and waits for you to choose. A WAV whose length fits no wavetable layout is not
-listed.
+Cue points and loops count only for frame sizes up to 4,096, since ordinary samples have them
+too. When two of these disagree, Convert notes both. When only the length suggested a size, the
+other sizes the length allows can be chosen instead. When nothing settles the size (for example,
+a file of 16,384 samples, which is 64 × 256 for WaveEdit or 8 × 2,048 for Serum), Convert lists
+the sizes the length allows and waits for you to choose. A WAV whose length fits no wavetable
+layout (or that would make more than 512 frames of 2,048) is not listed.
 
 ## 4. Changing frame size and frame count
 

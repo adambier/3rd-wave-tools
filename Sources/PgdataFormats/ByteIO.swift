@@ -95,10 +95,10 @@ public struct NameField: Equatable, Hashable {
 
     /// Creates a field of `width` bytes holding `text`.
     ///
-    /// The text is stored one byte per Unicode scalar, with any scalar above 255 stored as "?". It is
-    /// cut to `width` − 1 bytes, so that at least one NUL follows it, and padded with NUL bytes.
+    /// The text is composed (so "e" plus a combining accent becomes "é"), then stored one byte per
+    /// Unicode scalar, with any scalar above 255 stored as "?". It is cut to `width` − 1 bytes, so that at least one NUL follows it, and padded with NUL bytes.
     public init(_ text: String, width: Int = 32) {
-        var b = Array(text.unicodeScalars.map { $0.value < 256 ? UInt8($0.value) : UInt8(ascii: "?") }.prefix(width - 1))
+        var b = Array(text.precomposedStringWithCanonicalMapping.unicodeScalars.map { $0.value < 256 ? UInt8($0.value) : UInt8(ascii: "?") }.prefix(width - 1))
         b += [UInt8](repeating: 0, count: width - b.count)
         raw = b
     }
@@ -114,11 +114,11 @@ public struct NameField: Equatable, Hashable {
     /// The 3rd Wave's name fields hold single-byte (Latin-1) characters, so a name takes one byte
     /// per Unicode scalar, and any scalar above 255 (an en dash, a curly quote, an emoji) is stored
     /// as "?".
-    public static func storedLength(_ s: String) -> Int { s.unicodeScalars.count }
+    public static func storedLength(_ s: String) -> Int { s.precomposedStringWithCanonicalMapping.unicodeScalars.count }
     /// The characters of `s` that cannot be stored, each once, in order.
     public static func unstorable(in s: String) -> String {
         var seen = Set<UInt32>()
-        return String(s.unicodeScalars.filter { $0.value > 255 && seen.insert($0.value).inserted }.map(Character.init))
+        return String(s.precomposedStringWithCanonicalMapping.unicodeScalars.filter { $0.value > 255 && seen.insert($0.value).inserted }.map(Character.init))
     }
 }
 
@@ -128,7 +128,9 @@ extension Array where Element == UInt8 {
 }
 
 extension String {
-    var latin1Bytes: [UInt8] { unicodeScalars.map { $0.value < 256 ? UInt8($0.value) : UInt8(ascii: "?") } }
+    /// Composed first, so an accent stored as a separate combining mark (as in macOS file names)
+    /// becomes the Latin-1 letter rather than "?".
+    var latin1Bytes: [UInt8] { precomposedStringWithCanonicalMapping.unicodeScalars.map { $0.value < 256 ? UInt8($0.value) : UInt8(ascii: "?") } }
 }
 
 /// Returns the 64-bit FNV-1a hash of `bytes`, used to fingerprint wavetable and multisample
