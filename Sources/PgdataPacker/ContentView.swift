@@ -103,12 +103,15 @@ struct LogBar: View {
                     Text(state.log.last ?? "Nothing added yet.")
                         .lineLimit(1).truncationMode(.tail)
                         .foregroundStyle(.secondary)
+                        .help(state.log.last ?? "Nothing added yet.")
                 }
                 Spacer()
-                Label(state.section == .convert
-                        ? "Drop .wav, .flac, .wt, or .pgdata files or folders onto the page above to add them"
-                        : "Drop .pro, .wt, .bin, or .pgdata files or folders onto the page above to add them", systemImage: "arrow.down.doc")
+                let dropHint = state.section == .convert
+                    ? "Drop .wav, .flac, .wt, or .pgdata files or folders onto the page above to add them"
+                    : "Drop .pro, .wt, .bin, or .pgdata files or folders onto the page above to add them"
+                Label(dropHint, systemImage: "arrow.down.doc")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    .help(dropHint)
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
             if showLog {

@@ -41,8 +41,8 @@ struct UnpackView: View {
                     List(selection: $selection) {
                         ForEach(state.unpacks) { u in
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(u.plan.programName).lineLimit(1)
-                                Text(u.url.lastPathComponent).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                Text(u.plan.programName).lineLimit(1).help(u.plan.programName)
+                                Text(u.url.lastPathComponent).font(.caption).foregroundStyle(.secondary).lineLimit(1).help(u.url.path)
                             }
                             .tag(u.id)
                         }
@@ -114,11 +114,11 @@ struct UnpackDetail: View {
                     Table(rows) {
                         TableColumn("Write") { (r: Row) in WriteToggleCell(state: st, unpackID: r.unpackID, file: r.file) }
                             .width(44)
-                        TableColumn("Program") { (r: Row) in Text(r.programName).lineLimit(1) }
+                        TableColumn("Program") { (r: Row) in Text(r.programName).lineLimit(1).help(r.programName) }
                             .width(min: 80, ideal: 150)
                         TableColumn("File name") { (r: Row) in FileNameCell(state: st, unpackID: r.unpackID, file: r.file) }
                             .width(min: 180, ideal: 260)
-                        TableColumn("Contents") { (r: Row) in Text(r.file.description).foregroundStyle(.secondary).lineLimit(2) }
+                        TableColumn("Contents") { (r: Row) in Text(r.file.description).foregroundStyle(.secondary).lineLimit(2).help(r.file.description) }
                     }
                 } else {
                     Table(rows) {
@@ -126,7 +126,7 @@ struct UnpackDetail: View {
                             .width(44)
                         TableColumn("File name") { (r: Row) in FileNameCell(state: st, unpackID: r.unpackID, file: r.file) }
                             .width(min: 180, ideal: 260)
-                        TableColumn("Contents") { (r: Row) in Text(r.file.description).foregroundStyle(.secondary).lineLimit(2) }
+                        TableColumn("Contents") { (r: Row) in Text(r.file.description).foregroundStyle(.secondary).lineLimit(2).help(r.file.description) }
                     }
                 }
             }
@@ -134,7 +134,8 @@ struct UnpackDetail: View {
             .frame(minHeight: 140, maxHeight: .infinity)
             if several {
                 Text("A file that several programs share, with the same name and contents, is written once.")
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(12)
@@ -272,6 +273,7 @@ struct FileNameCell: View {
             .onChange(of: file.fileName) { text = $0 }
             .onSubmit { commit() }
             .onChange(of: focused) { if !$0 { commit() } }
+            .help(file.fileName + "\nClick to edit the file name")
     }
 
     private func commit() { text = state.commitUnpackFileName(unpackID, file.id, text) }

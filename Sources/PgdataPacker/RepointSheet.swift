@@ -214,7 +214,7 @@ struct RepointSheet: View {
             Section(title) {
                 ForEach(items) { t in
                     HStack {
-                        Text(t.title).lineLimit(1)
+                        Text(t.title).lineLimit(1).help(t.title)
                         Spacer()
                         if let f = t.file, f.slot == nil {
                             Text("→ \(t.ref.label)").font(.caption).foregroundStyle(.secondary)
@@ -222,7 +222,7 @@ struct RepointSheet: View {
                                       ? "Will be assigned to \(t.ref.label), the slot this program uses."
                                       : "Given a free slot automatically; the 3rd Wave chooses the real slot on import.")
                         }
-                        Text(t.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(t.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1).help(t.detail)
                     }
                     .tag(t.id)
                 }

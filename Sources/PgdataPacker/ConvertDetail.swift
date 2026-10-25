@@ -107,7 +107,7 @@ struct ConvertPreviewHeading: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("Preview").font(.caption).foregroundStyle(.secondary)
-            Text(title).font(.headline).lineLimit(1)
+            Text(title).font(.headline).lineLimit(1).help(title)
         }
     }
 }
@@ -123,6 +123,7 @@ struct ConvertItemPreview: View {
                 ConvertPreviewHeading(title: item.name)
                 if item.newName != nil {
                     Text("was \u{201C}\(item.table.name)\u{201D}").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        .help("Was \u{201C}\(item.table.name)\u{201D} in the file; renamed here")
                 }
                 Spacer()
                 Button("Show in Finder") { Panels.reveal(item.location.url) }.buttonStyle(.link)

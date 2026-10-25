@@ -171,9 +171,10 @@ struct ProgramRow: View {
         HStack {
             Image(systemName: verdict.symbol).foregroundStyle(verdict.tint)
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.name).lineLimit(1)
+                Text(item.name).lineLimit(1).help(item.name)
                 Text((item.locationLabel.map { $0 + "  ·  " } ?? "") + item.url.lastPathComponent)
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    .help(item.url.path)
             }
         }
     }
@@ -339,7 +340,7 @@ struct ChoiceCell: View {
     var body: some View {
         let canRepoint = !row.ref.isSample
         if !canRepoint && row.options.count <= 1 {
-            if let c = row.choice { Text(state.describe(c, for: row.ref)).lineLimit(1) }
+            if let c = row.choice { Text(state.describe(c, for: row.ref)).lineLimit(1).help(state.describe(c, for: row.ref)) }
             else { Text("—").foregroundStyle(.secondary) }
         } else if row.choice == nil && canRepoint {
             // Nothing for this slot yet: pointing the oscillators elsewhere is the usual fix, so it
@@ -365,6 +366,7 @@ struct ChoiceCell: View {
                 }
             } label: {
                 Text(row.choice.map { state.describe($0, for: row.ref) } ?? "Choose what to play…").lineLimit(1)
+                    .help(row.choice.map { state.describe($0, for: row.ref) } ?? "Choose what to play…")
             }
             // A bordered pop-up with its chevron, so it reads as a menu rather than as text.
             .menuStyle(.button)

@@ -106,7 +106,7 @@ struct NameCleanupSheet: View {
                 TableColumn("New name") { (r: Row) in
                     TextField("", text: Binding(get: { proposed(r) }, set: { edited[r.id] = $0 }))
                         .textFieldStyle(.roundedBorder)
-                        .help("Edit to change the proposed name")
+                        .help(proposed(r) + "\nEdit to change the proposed name")
                 }
                 .width(min: 160, ideal: 220)
                 TableColumn("") { (r: Row) in
