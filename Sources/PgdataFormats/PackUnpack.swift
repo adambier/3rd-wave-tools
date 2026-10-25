@@ -208,10 +208,7 @@ public enum Unpacker {
         for src in u.sources {
             switch src.payload {
             case let .wavetable(name, data):
-                var r = ByteReader(data)
-                var vals: [Float] = []; vals.reserveCapacity(data.count / 4)
-                while r.remaining >= 4 { vals.append(try! r.f32()) }
-                wts.append((src.ref, WavetableFile(kind: src.ref.isP ? .p : .u, name: name.text, values: vals)))
+                wts.append((src.ref, WavetableFile(kind: src.ref.isP ? .p : .u, name: name.text, dataBytes: [UInt8](data))))
             case let .multisample(m): mss.append((src.ref, m))
             case .none: if !src.ref.isBuiltIn { refs.append(src.ref) }
             }

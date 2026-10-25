@@ -54,8 +54,8 @@ public enum WavetableWriter {
 
         mutating func run() throws -> OutputFile {
             switch preset {
-            case .thirdWaveU: return thirdWaveU()
-            case .thirdWaveP: return thirdWaveP()
+            case .thirdWaveU: return try thirdWaveU()
+            case .thirdWaveP: return try thirdWaveP()
             case .wav2048: return wav2048()
             case .miniFreak: return miniFreak()
             case .tonverk: return try tonverk()
@@ -67,15 +67,14 @@ public enum WavetableWriter {
 
         // MARK: Destinations
 
-        mutating func thirdWaveU() -> OutputFile {
+        mutating func thirdWaveU() throws -> OutputFile {
             reshape(size: 1024, count: 64, exact: true, reason: "a 3rd Wave U table has exactly 64")
             scaleToFit(reason: "the 3rd Wave's own tables stay within ±1")
             noteUnrecordedInterpolation()
-            let values = frames.flatMap { $0 } + Resampling.thirdWaveMipmapChain(frames)
-            return thirdWaveFile(kind: .u, values: values)
+            return try thirdWaveFile(kind: .u, chain: Resampling.thirdWaveMipmapChain(frames))
         }
 
-        mutating func thirdWaveP() -> OutputFile {
+        mutating func thirdWaveP() throws -> OutputFile {
             if options.appendPPGStandardWaves {
                 reshape(size: 128, count: 60, exact: true,
                         reason: "the PPG's standard waves take the last 4 of 64")
@@ -87,12 +86,7 @@ public enum WavetableWriter {
                 scaleToFit(reason: "the 3rd Wave's own tables stay within ±1")
             }
             noteUnrecordedInterpolation()
-            var values: [Float] = []
-            values.reserveCapacity(64 * 256)
-            for f in frames {   // each point: the sample, then the difference to the next (wrapping)
-                for i in f.indices { values.append(f[i]); values.append(f[(i + 1) % f.count] - f[i]) }
-            }
-            return thirdWaveFile(kind: .p, values: values)
+            return try thirdWaveFile(kind: .p, chain: nil)   // WavetableFile computes the differences
         }
 
         mutating func wav2048() -> OutputFile {
@@ -171,10 +165,11 @@ public enum WavetableWriter {
             return OutputFile(fileName: stem() + ".wav", data: data, notes: notes)
         }
 
-        mutating func thirdWaveFile(kind: WavetableFile.Kind, values: [Float]) -> OutputFile {
+        /// The frames (already 64 of the kind's size) as a `.wt`, laid out by PgdataFormats.
+        mutating func thirdWaveFile(kind: WavetableFile.Kind, chain: [Float]?) throws -> OutputFile {
             let named = WavetableWriter.Names.thirdWave(table.name)
             notes += named.notes
-            let data = WavetableFile(kind: kind, name: named.name, values: values).serialized()
+            let data = try WavetableFile(kind: kind, name: named.name, frames: frames, mipmapChain: chain).serialized()
             return OutputFile(fileName: stem() + ".wt", folder: "WAVES", data: data, notes: notes)
         }
 

@@ -41,13 +41,11 @@ extension WavetableReader {
         var out: [FoundTable] = []
         for src in u.sources {
             guard case let .wavetable(nameField, data) = src.payload else { continue }
-            // As Unpacker does: the embedded bytes are the values as little-endian float32.
-            var values: [Float] = []
-            values.reserveCapacity(data.count / 4)
-            var o = 0
-            while o + 4 <= data.count { values.append(Float(bitPattern: le32(data, o))); o += 4 }
             let isP = src.ref.isP
-            let wt = WavetableFile(kind: isP ? .p : .u, name: nameField.text, values: values)
+            let wt = WavetableFile(kind: isP ? .p : .u, name: nameField.text, dataBytes: data)
+            guard wt.values.count == wt.kind.valueCount else {
+                throw WavetableError("The \(src.ref.label) table in \(fileName) has \(wt.values.count) values; a \(wt.kind.letter) table needs \(wt.kind.valueCount).")
+            }
             let label = src.ref.label
             out.append(thirdWaveTable(wt, name: wt.name.isEmpty ? label : wt.name, fileName: fileName,
                                       source: .unifiedProgram(slot: label, isP: isP)))
@@ -59,9 +57,7 @@ extension WavetableReader {
     /// differences, or the U table's first 65,536 values (without its mipmap chain).
     static func thirdWaveTable(_ wt: WavetableFile, name: String, fileName: String, source: SourceFormat) -> FoundTable {
         let isP = wt.kind == .p
-        let samples: [Float] = isP
-            ? stride(from: 0, to: wt.values.count, by: 2).map { wt.values[$0] }
-            : Array(wt.values.prefix(64 * 1024))
+        let samples = wt.frames.flatMap { $0 }
         return FoundTable(name: name, fileName: fileName, source: source, samples: samples,
                           frameSize: isP ? 128 : 1024,
                           frameSizeBasis: isP ? "3rd Wave P table" : "3rd Wave U table",

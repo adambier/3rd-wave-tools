@@ -22,6 +22,10 @@ public struct WavetableFile: Equatable {
         public var valueCount: Int { self == .p ? 16_384 : 131_072 }
         /// The slot letter: "P" or "U".
         public var letter: String { self == .p ? "P" : "U" }
+        /// Waves (frames) in a table: 64 for both kinds.
+        public var frameCount: Int { 64 }
+        /// Samples per wave: 128 for P, 1,024 for U.
+        public var frameSize: Int { self == .p ? 128 : 1024 }
     }
 
     /// Whether this is a P or a U table.
@@ -38,6 +42,65 @@ public struct WavetableFile: Equatable {
     /// The values should number ``Kind/valueCount``; this initializer does not check.
     public init(kind: Kind, name: String, values: [Float]) {
         self.kind = kind; self.name = name; self.values = values; originalBytes = nil
+    }
+
+    /// Creates a wavetable from its waves, laying the values out as a `.wt` stores them.
+    ///
+    /// - For a P table, each of the 64 waves of 128 samples is stored point by point as the sample
+    ///   and the difference to the next sample of the same wave (wrapping), so the differences are
+    ///   computed here.
+    /// - For a U table, the 64 waves of 1,024 samples are followed by `mipmapChain`: the same waves
+    ///   at 512, 256, 128, 64, and 64 samples, 65,536 values in all (section 5.1 of FORMATS.md).
+    ///   The 3rd Wave neither hashes nor plays the chain, but its own tables carry one, so a writer
+    ///   should supply band-limited copies (WavetableFormats' `Resampling.thirdWaveMipmapChain`
+    ///   makes them).
+    ///
+    /// - Throws: ``FormatError`` when there are not 64 waves of the kind's size, a value is not
+    ///   finite, or a U table's chain does not hold 65,536 values (a P table takes none).
+    public init(kind: Kind, name: String, frames: [[Float]], mipmapChain: [Float]? = nil) throws {
+        guard frames.count == kind.frameCount, frames.allSatisfy({ $0.count == kind.frameSize }) else {
+            throw FormatError.invalid("A \(kind.letter) table needs \(kind.frameCount) waves of \(kind.frameSize) samples; got \(frames.count) waves of \(frames.map(\.count).max() ?? 0).")
+        }
+        var vals: [Float] = []
+        vals.reserveCapacity(kind.valueCount)
+        switch kind {
+        case .p:
+            guard mipmapChain == nil else { throw FormatError.invalid("A P table has no mipmap chain.") }
+            for f in frames { for i in f.indices { vals.append(f[i]); vals.append(f[(i + 1) % f.count] - f[i]) } }
+        case .u:
+            guard let chain = mipmapChain, chain.count == kind.valueCount - kind.frameCount * kind.frameSize else {
+                throw FormatError.invalid("A U table needs a mipmap chain of 65,536 values after its waves (section 5.1 of FORMATS.md).")
+            }
+            for f in frames { vals += f }
+            vals += chain
+        }
+        guard vals.allSatisfy(\.isFinite) else { throw FormatError.invalid("Wavetable \"\(name)\" has a value that is not a finite number.") }
+        self.init(kind: kind, name: name, values: vals)
+    }
+
+    /// Creates a wavetable from the bytes a `.pgdata` embeds: its values as little-endian float32.
+    /// Trailing bytes short of a whole value are ignored.
+    public init(kind: Kind, name: String, dataBytes data: [UInt8]) {
+        var r = ByteReader(data)
+        var vals: [Float] = []; vals.reserveCapacity(data.count / 4)
+        while r.remaining >= 4 { vals.append(try! r.f32()) }
+        self.init(kind: kind, name: name, values: vals)
+    }
+
+    /// The table's 64 waves: for a P table its samples without their differences, for a U table its
+    /// first 65,536 values (without the mipmap chain), which are also what the 3rd Wave identifies
+    /// the table by. Empty when the table has fewer values than its kind needs.
+    public var frames: [[Float]] {
+        let n = kind.frameSize, count = kind.frameCount
+        let step = kind == .p ? 2 : 1
+        guard values.count >= n * count * step else { return [] }
+        return (0..<count).map { f in (0..<n).map { values[(f * n + $0) * step] } }
+    }
+
+    /// A U table's mipmap chain: the 65,536 values after its waves. Nil for a P table.
+    public var mipmapChain: [Float]? {
+        guard kind == .u, values.count == kind.valueCount else { return nil }
+        return Array(values[(kind.frameCount * kind.frameSize)...])
     }
 
     /// Reads a `.wt` file, with LF or CRLF line endings.
