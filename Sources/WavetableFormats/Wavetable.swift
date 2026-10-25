@@ -1,0 +1,168 @@
+import Foundation
+
+// The shared types of WavetableFormats. Reading.swift finds wavetables in files, Writing.swift
+// writes them for a destination, and Resampling.swift changes their frame size and count.
+//
+// WavetableFormats converts existing wavetables between formats. It does not build wavetables
+// from other audio (slicing, pitch detection, drawing): that is the 3rd Wave's Wave Maker.
+
+/// A wavetable: a sequence of frames, each one cycle of a waveform, all of the same length.
+public struct Wavetable: Equatable, Sendable {
+    /// The table's name, as its source file gives it (or the file name without its extension).
+    public var name: String
+    /// The frames, in order; each holds one cycle of `frameSize` samples, nominally within ±1.
+    public var frames: [[Float]]
+    /// How the source asks to move between frames, when it says.
+    public var interpolation: Interpolation?
+
+    public init(name: String, frames: [[Float]], interpolation: Interpolation? = nil) {
+        self.name = name; self.frames = frames; self.interpolation = interpolation
+    }
+
+    /// Samples per frame (0 for an empty table).
+    public var frameSize: Int { frames.first?.count ?? 0 }
+    /// Number of frames.
+    public var frameCount: Int { frames.count }
+    /// The largest absolute sample.
+    public var peak: Float { frames.reduce(0) { m, f in f.reduce(m) { max($0, abs($1)) } } }
+}
+
+/// How a synth moves between neighbouring frames, as some file formats can record it.
+public enum Interpolation: String, Equatable, Sendable, CaseIterable {
+    /// Jumps from frame to frame (Serum's "no interp"; Tonverk's trailing `r`).
+    case none
+    /// Crossfades between neighbouring frames.
+    case crossfade
+    /// Morphs between frames' spectra (Serum's and Vital's spectral morph).
+    case spectral
+}
+
+/// The kind of file a wavetable was found in.
+public enum SourceFormat: Equatable, Sendable {
+    /// A 3rd Wave `.wt` text file: a P table (64 × 128) or a U table (64 × 1,024 plus its
+    /// mipmap chain).
+    case thirdWaveWavetable(isP: Bool)
+    /// Embedded in a 3rd Wave `.pgdata`, under the slot label it was stored with (e.g., "U56").
+    case unifiedProgram(slot: String, isP: Bool)
+    /// A WAV file.
+    case wav
+    /// A Surge `.wt` binary file (header "vawt").
+    case surgeWavetable
+}
+
+/// A wavetable found in a file, before or after its frame size is settled.
+public struct FoundTable: Equatable, Sendable {
+    /// The table's name.
+    public var name: String
+    /// The file it came from (its name, not its path).
+    public var fileName: String
+    /// The kind of file.
+    public var source: SourceFormat
+    /// All samples, frame after frame. For a 3rd Wave U table, the first 65,536 values (the
+    /// table, without its mipmap chain); for a P table, the samples without their differences.
+    public var samples: [Float]
+    /// Samples per frame, or nil when the file does not say and its length allows several
+    /// sizes (see `candidateFrameSizes`); a tool must then ask, not guess.
+    public var frameSize: Int?
+    /// How the frame size was decided, as a short phrase for display (e.g., "clm chunk",
+    /// "Tonverk file name (_wt1024)", "3rd Wave U table", "file length").
+    public var frameSizeBasis: String
+    /// Frame sizes the file's length allows, when `frameSize` is nil.
+    public var candidateFrameSizes: [Int]
+    /// How the file asks to move between frames, when it says.
+    public var interpolation: Interpolation?
+    /// For a table from a 3rd Wave `.wt` or `.pgdata`: the content fingerprint pgdata Packer's
+    /// factory library uses (FNV-1a 64 of all the file's values as float32), so factory tables can
+    /// be recognised. Nil for other sources.
+    public var thirdWaveFingerprint: UInt64?
+    /// Things worth telling the user about this table (e.g., samples beyond ±1).
+    public var notes: [String]
+
+    public init(name: String, fileName: String, source: SourceFormat, samples: [Float], frameSize: Int?,
+                frameSizeBasis: String, candidateFrameSizes: [Int] = [], interpolation: Interpolation? = nil,
+                thirdWaveFingerprint: UInt64? = nil, notes: [String] = []) {
+        self.name = name; self.fileName = fileName; self.source = source; self.samples = samples
+        self.frameSize = frameSize; self.frameSizeBasis = frameSizeBasis
+        self.candidateFrameSizes = candidateFrameSizes; self.interpolation = interpolation
+        self.thirdWaveFingerprint = thirdWaveFingerprint; self.notes = notes
+    }
+
+    /// The table cut into frames of `size` samples (default: `frameSize`); nil when no size is
+    /// known or the samples do not divide evenly.
+    public func wavetable(frameSize size: Int? = nil) -> Wavetable? {
+        guard let n = size ?? frameSize, n > 0, !samples.isEmpty, samples.count % n == 0 else { return nil }
+        let frames = stride(from: 0, to: samples.count, by: n).map { Array(samples[$0..<($0 + n)]) }
+        return Wavetable(name: name, frames: frames, interpolation: interpolation)
+    }
+}
+
+/// A destination for a converted wavetable.
+public enum OutputPreset: String, Equatable, Sendable, CaseIterable {
+    /// A 3rd Wave U table `.wt`: 64 frames of 1,024 samples, plus a band-limited mipmap chain.
+    case thirdWaveU
+    /// A 3rd Wave P table `.wt`: 64 frames of 128 samples, each stored with its differences.
+    case thirdWaveP
+    /// A 32-bit float WAV of 2,048-sample frames with a `clm ` chunk (Serum, Vital, Pigments,
+    /// MiniFreak V, and others).
+    case wav2048
+    /// A WAV for Elektron Tonverk, its frame size and interpolation in the file name.
+    case tonverk
+    /// A WAV of exactly 256 frames of 2,048 samples (Phase Plant).
+    case phasePlant
+    /// A Surge `.wt` binary file.
+    case surge
+    /// A 16-bit WAV of 64 frames of 256 samples (WaveEdit, for the Synthesis Technology E370/E352).
+    case waveEdit
+}
+
+/// How to reach a destination's frame count when the source has a different one.
+public enum FrameCountPolicy: String, Equatable, Sendable, CaseIterable {
+    /// Keep the first and last frames and space the rest evenly (no new waveforms).
+    case pickEvenly
+    /// Crossfade between neighbouring source frames.
+    case interpolate
+}
+
+/// Choices that apply to a conversion.
+public struct OutputOptions: Equatable, Sendable {
+    /// How to reach the destination's frame count, when it differs from the source's.
+    public var frameCountPolicy: FrameCountPolicy
+    /// The interpolation to record, for destinations whose files can say (Serum-style `clm `
+    /// chunks, Tonverk names); nil keeps the source's, or the destination's default.
+    public var interpolation: Interpolation?
+    /// Tonverk only: the frame size to write (64, 128, …, 4,096); nil keeps the source's when
+    /// Tonverk accepts it, otherwise 2,048.
+    public var tonverkFrameSize: Int?
+    /// 3rd Wave P tables only: replace frames 60–63 with the PPG's four standard waves
+    /// (triangle, narrow pulse, square, sawtooth), as the 3rd Wave's PPG-derived tables have.
+    public var appendPPGStandardWaves: Bool
+
+    public init(frameCountPolicy: FrameCountPolicy = .pickEvenly, interpolation: Interpolation? = nil,
+                tonverkFrameSize: Int? = nil, appendPPGStandardWaves: Bool = false) {
+        self.frameCountPolicy = frameCountPolicy; self.interpolation = interpolation
+        self.tonverkFrameSize = tonverkFrameSize; self.appendPPGStandardWaves = appendPPGStandardWaves
+    }
+}
+
+/// A converted file, ready to write.
+public struct OutputFile: Equatable, Sendable {
+    /// The file name to write, with its extension.
+    public var fileName: String
+    /// The folder it belongs in on its destination, when there is a convention (e.g., "WAVES" on
+    /// the 3rd Wave's USB drive).
+    public var folder: String?
+    /// The file's bytes.
+    public var data: Data
+    /// What the conversion did that the user should know (e.g., frame count changed, scaled to fit).
+    public var notes: [String]
+
+    public init(fileName: String, folder: String? = nil, data: Data, notes: [String] = []) {
+        self.fileName = fileName; self.folder = folder; self.data = data; self.notes = notes
+    }
+}
+
+/// Why a file could not be read or a table could not be converted, as a sentence for the user.
+public struct WavetableError: Error, Equatable, CustomStringConvertible, Sendable {
+    public var description: String
+    public init(_ description: String) { self.description = description }
+}

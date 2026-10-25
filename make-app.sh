@@ -173,6 +173,7 @@ else
             -Xlinker -rpath -Xlinker @executable_path/../Frameworks \
             -o "$SLICE" \
             Sources/PgdataFormats/*.swift \
+            Sources/WavetableFormats/*.swift \
             Sources/PgdataPackerCore/*.swift \
             Sources/PgdataPacker/*.swift
         SLICES+=("$SLICE")

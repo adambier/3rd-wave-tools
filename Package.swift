@@ -9,6 +9,8 @@ import Foundation
 //   PgdataFormats      the library for other projects: the 3rd Wave's file formats, packing and
 //                      unpacking, program conversion, factory table fingerprints; Foundation only,
 //                      builds on macOS, Linux, and Windows
+//   WavetableFormats   wavetables in the 3rd Wave's and other synths' formats: finding them in files,
+//                      resizing them, and writing them for a destination (the Convert tab)
 //   PgdataPackerCore   pgdata Packer's own decisions (pack and unpack plans, file names, Clean Up
 //                      Names), without UI, for other front ends (a command-line tool, or a GUI on
 //                      another platform) that should behave like the app; its API may change more
@@ -37,22 +39,25 @@ let includeDocsPlugin = ProcessInfo.processInfo.environment["PGDATA_DOCS"] != ni
 
 var targets: [Target] = [
     .target(name: "PgdataFormats"),
-    .target(name: "PgdataPackerCore", dependencies: ["PgdataFormats"]),
+    .target(name: "WavetableFormats", dependencies: ["PgdataFormats"]),
+    .target(name: "PgdataPackerCore", dependencies: ["PgdataFormats", "WavetableFormats"]),
     .executableTarget(name: "tw3pg", dependencies: ["PgdataFormats", "PgdataPackerCore"]),
 ]
 var products: [Product] = [
     .library(name: "PgdataFormats", targets: ["PgdataFormats"]),
+    .library(name: "WavetableFormats", targets: ["WavetableFormats"]),
     .library(name: "PgdataPackerCore", targets: ["PgdataPackerCore"]),
     .executable(name: "tw3pg", targets: ["tw3pg"]),
 ]
 
 #if os(macOS)
-targets.append(.executableTarget(name: "PgdataPacker", dependencies: ["PgdataFormats", "PgdataPackerCore"]))
+targets.append(.executableTarget(name: "PgdataPacker", dependencies: ["PgdataFormats", "WavetableFormats", "PgdataPackerCore"]))
 products.append(.executable(name: "PgdataPacker", targets: ["PgdataPacker"]))
 #endif
 
 if includeTests {
     targets.append(.testTarget(name: "PgdataFormatsTests", dependencies: ["PgdataFormats", "PgdataPackerCore"]))
+    targets.append(.testTarget(name: "WavetableFormatsTests", dependencies: ["PgdataFormats", "WavetableFormats"]))
 }
 
 let package = Package(
