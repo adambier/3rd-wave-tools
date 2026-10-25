@@ -326,16 +326,6 @@ public struct ConvertPlan: Equatable {
 
     // MARK: Destination
 
-    /// Whether the destination always holds exactly `maxFrameCount` frames (fewer are brought up
-    /// to it), rather than up to that many. [inferred from the presets' descriptions in
-    /// Wavetable.swift; the writer's notes after converting say what was done]
-    static func requiresExactFrameCount(_ p: OutputPreset) -> Bool {
-        switch p {
-        case .thirdWaveU, .thirdWaveP, .miniFreak, .phasePlant, .waveEdit: return true
-        case .wav2048, .tonverk, .surge: return false
-        }
-    }
-
     /// The frame size the destination writes for a source frame size.
     public func destinationFrameSize(source: Int) -> Int {
         if preset == .tonverk {
@@ -343,13 +333,15 @@ public struct ConvertPlan: Equatable {
             let accepted = (6...12).map { 1 << $0 }   // 64 … 4,096
             return accepted.contains(source) ? source : 2048
         }
+        if preset == .surge {   // Surge keeps a power of two from 2 to 4,096; the writer resizes others to 2,048
+            return source >= 2 && source <= 4096 && source & (source - 1) == 0 ? source : 2048
+        }
         return preset.frameSize ?? source
     }
 
     /// The frame count the destination writes for a source frame count.
     public func destinationFrameCount(source: Int) -> Int {
-        let maxCount = preset.maxFrameCount
-        return Self.requiresExactFrameCount(preset) ? maxCount : min(source, maxCount)
+        preset.requiredFrameCount ?? min(source, preset.maxFrameCount)
     }
 
     /// What converting an item to the destination is expected to produce, from the preset's facts
@@ -369,7 +361,7 @@ public struct ConvertPlan: Equatable {
             parts.append("\(count) frame\(count == 1 ? "" : "s") brought up to \(outCount) by \(how)")
         }
         if preset == .thirdWaveP && options.appendPPGStandardWaves {
-            parts.append("frames 60–63 replaced by the PPG standard waves")
+            parts.append("the table brought to 60 frames, then the PPG's four standard waves at 60–63")
         }
         return parts.joined(separator: "; ")
     }
