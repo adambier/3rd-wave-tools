@@ -41,7 +41,7 @@ var targets: [Target] = [
     .target(name: "PgdataFormats"),
     .target(name: "WavetableFormats", dependencies: ["PgdataFormats"]),
     .target(name: "PgdataPackerCore", dependencies: ["PgdataFormats", "WavetableFormats"]),
-    .executableTarget(name: "tw3pg", dependencies: ["PgdataFormats", "PgdataPackerCore"]),
+    .executableTarget(name: "tw3pg", dependencies: ["PgdataFormats", "WavetableFormats", "PgdataPackerCore"]),
 ]
 var products: [Product] = [
     .library(name: "PgdataFormats", targets: ["PgdataFormats"]),

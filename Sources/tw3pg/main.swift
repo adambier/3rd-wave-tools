@@ -1,6 +1,7 @@
 import Foundation
 import PgdataFormats
 import PgdataPackerCore
+import WavetableFormats
 
 // Developer harness for the format library. Not the user-facing tool (that is the app).
 //
@@ -15,6 +16,10 @@ import PgdataPackerCore
 //   tw3pg convertcheck <in dir> <3rd Wave export dir> [8m|24]   convert each input (sorted) and compare with
 //                                        what the 3rd Wave's bulk import made of it (B05P001… in order)
 //   tw3pg wtcheck <wt dirs>... -- <pgdata dirs>...   match .wt files against the tables embedded in .pgdata files
+//   tw3pg wtscan [--all] [--check-writers] <files or dirs>...   what the Convert page would list for
+//                                        each file (TSV); --all also lists files without tables;
+//                                        --check-writers writes every table for every preset and
+//                                        reads it back
 //   tw3pg maketests | maketest5 | maketest6 ...   build the hardware-test files (see each command's usage line)
 
 func files(under paths: [String], ext: Set<String>) -> [URL] {
@@ -84,8 +89,8 @@ guard let cmd = args.first else {
 let rest = Array(args.dropFirst())
 // For the commands whose arguments are all existing files or folders, a path that does not exist
 // is a typo, not an empty result.
-if ["inspect", "roundtrip", "repack", "compare", "wtcheck", "convertcheck"].contains(cmd) {
-    for a in rest where a != "8m" && a != "24" && a != "--" && !FileManager.default.fileExists(atPath: a) {
+if ["inspect", "roundtrip", "repack", "compare", "wtcheck", "convertcheck", "wtscan"].contains(cmd) {
+    for a in rest where a != "8m" && a != "24" && a != "--" && !a.hasPrefix("--") && !FileManager.default.fileExists(atPath: a) {
         print("error: no such file or folder: \(a)"); exit(1)
     }
 }
@@ -365,6 +370,58 @@ case "maketest5":
     for (k, r) in q.sources.enumerated() where r == sRef { q.setSourceID(SourceRef.s(20).id, at: k) }
     try Packer.pack(q, content: refs(q)).serialized().write(to: out.appendingPathComponent("TW3_T5b_EmptyS20.pgdata"))
     print("T5a: \(sRef.label) listed without samples; T5b: same oscillators pointed at S20, listed without samples")
+
+case "wtscan":
+    let all = rest.contains("--all"), check = rest.contains("--check-writers")
+    let paths = rest.filter { !$0.hasPrefix("--") }
+    need(1, paths, "wtscan [--all] [--check-writers] <files or dirs>...")
+    let (todo, ignored) = ConvertPlan.filesToRead(in: paths.map { URL(fileURLWithPath: $0) })
+    var tables = 0, open = 0, without = 0, failed = 0, writerFailures = 0
+    var bases: [String: Int] = [:]
+    print(["file", "source", "name", "frames x size", "frame size from", "other sizes", "interpolation", "factory", "notes"].joined(separator: "\t"))
+    for u in todo {
+        let found: [FoundTable]
+        do { found = try WavetableReader.read(url: u) } catch {
+            failed += 1; print("\(u.path)\tERROR\t\t\t\t\t\t\t\(error)"); continue
+        }
+        if found.isEmpty { without += 1; if all { print("\(u.path)\t-") }; continue }
+        for t in found {
+            tables += 1
+            let size = t.frameSize.map { "\(t.samples.count / $0) x \($0)" } ?? "? (\(t.samples.count) samples)"
+            if t.frameSize == nil { open += 1 }
+            let key = t.frameSize == nil ? "(open)" : t.frameSizeBasis.components(separatedBy: " (").first ?? t.frameSizeBasis
+            bases[key, default: 0] += 1
+            let factory = t.thirdWaveFingerprint.flatMap { FactoryLibrary.builtIn.slot(withFingerprint: $0)?.label } ?? ""
+            let source: String
+            switch t.source {
+            case .wav: source = "wav"
+            case .surgeWavetable: source = "surge"
+            case let .thirdWaveWavetable(isP): source = isP ? "3w-P" : "3w-U"
+            case let .unifiedProgram(slot, _): source = "pgdata:" + slot
+            }
+            print([u.path, source, t.name, size, t.frameSizeBasis, t.candidateFrameSizes.map(String.init).joined(separator: ","),
+                   t.interpolation?.rawValue ?? "", factory, t.notes.joined(separator: " | ")].joined(separator: "\t"))
+            guard check, let w = t.wavetable() else { continue }
+            for preset in OutputPreset.allCases {
+                do {
+                    let out = try WavetableWriter.write(w, preset: preset)
+                    let back = try WavetableReader.read(out.data, fileName: out.fileName)
+                    let want = preset.frameSize ?? w.frameSize
+                    guard back.count == 1, back[0].frameSize == want || (preset == .waveEdit && back[0].frameSize == nil)
+                            || (preset == .tonverk || preset == .surge) else {
+                        writerFailures += 1
+                        print("  WRITER \(preset.rawValue): read back \(back.map { "\($0.frameSize.map(String.init) ?? "?")" }) for \(u.lastPathComponent)")
+                        continue
+                    }
+                } catch {
+                    writerFailures += 1; print("  WRITER \(preset.rawValue): \(error) for \(u.lastPathComponent)")
+                }
+            }
+        }
+    }
+    FileHandle.standardError.write(Data(("\(todo.count) files read, \(ignored) other files skipped: \(tables) tables (\(open) with the frame size open), "
+        + "\(without) files without tables, \(failed) errors" + (check ? ", \(writerFailures) writer failures" : "") + "\n"
+        + bases.sorted { $0.value > $1.value }.map { "  \($0.value)\t\($0.key)" }.joined(separator: "\n") + "\n").utf8))
 
 default:
     print("unknown command \(cmd)"); exit(2)
