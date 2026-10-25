@@ -33,14 +33,6 @@ struct ConvertDestinationPane: View {
                         // same 6-point inset).
                         ConvertSourcesHeader().padding(.trailing, 6)
                     }
-                    if let capacity = plan.thirdWaveCapacityNote {
-                        Label {
-                            Text(capacity).fixedSize(horizontal: false, vertical: true)
-                        } icon: {
-                            Image(systemName: "exclamationmark.triangle")
-                        }
-                        .font(.caption).foregroundStyle(.orange)
-                    }
                     // The chosen destination and its note go down as values, so the groups and
                     // rows are laid out again whenever they change. (With the rows reading the
                     // choice from the state object themselves, the radio and highlight stayed on

@@ -154,13 +154,12 @@ struct ConvertPreviewFacts: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
 
-    /// "Input: 64 frames × 2,048 samples (guessed)."
+    /// "Input: 64 frames × 2,048 samples." (the line under it says where the size comes from).
     private var frameSizeLine: String {
         guard let n = item.frameSize, let frames = item.frameCount else {
             return item.frameSize == nil ? "Input: frame size not stated. Choose one in the Input column." : "Input: " + item.sizeDescription + "."
         }
-        let size = "Input: \(frames) frame\(frames == 1 ? "" : "s") × \(ConvertPlan.formatCount(n)) samples"
-        return item.sizeQualifier.map { size + " (\($0))." } ?? size + "."
+        return "Input: \(frames) frame\(frames == 1 ? "" : "s") × \(ConvertPlan.formatCount(n)) samples."
     }
 
     var body: some View {
@@ -186,36 +185,49 @@ struct ConvertPreviewFacts: View {
 
 /// The table's frames stacked front to back, as the synths draw them: the source as read, with
 /// its own interpolation, and beside it what the destination gets (the preview read back from
-/// the bytes the writer made), with the interpolation the file records. The two pictures share
-/// the width they are given, however narrow, and have a set height (see `ConvertOverview`).
+/// the bytes the writer made), with the interpolation the file records. Moving the pointer
+/// across either picture sweeps through the table: the frame under the pointer lights up in
+/// both stacks, and a third picture draws that cycle large, source and result together (see
+/// `ConvertSweepView`). The pictures share the width they are given, however narrow, and have
+/// a set height (see `ConvertOverview`).
 struct ConvertOverviewPair: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
+    /// Where the pointer is across a picture, 0 (first frame) to 1 (last); nil when it is not
+    /// over one.
+    @State private var sweep: Double?
 
     var body: some View {
         let plan = state.convertPlan
         if let source = item.table.wavetable(frameSize: item.frameSize) {
             let result = state.convertPreviews.resultFrames(item, in: plan)
+            let resultInterpolation = plan.interpolationRecorded(for: item)
             HStack(alignment: .top, spacing: 16) {
                 ConvertOverview(frames: source.frames,
                                 caption: "Source · \(source.frameCount) × \(ConvertPlan.formatCount(source.frameSize))",
                                 interpolation: item.table.interpolation,
-                                unstatedLegend: "interpolation not stated")
+                                unstatedLegend: "interpolation not stated",
+                                sweep: $sweep)
                 if let result, let first = result.first {
                     ConvertOverview(frames: result,
                                     caption: "\(plan.preset.shortTitle) · \(result.count) × \(ConvertPlan.formatCount(first.count))",
-                                    interpolation: plan.interpolationRecorded(for: item),
-                                    unstatedLegend: "interpolation not stored in the file")
+                                    interpolation: resultInterpolation,
+                                    unstatedLegend: "interpolation not stored in the file",
+                                    sweep: $sweep)
                 }
+                ConvertSweepView(source: source.frames, sourceInterpolation: item.table.interpolation,
+                                 result: result, resultInterpolation: resultInterpolation,
+                                 resultTitle: plan.preset.shortTitle, position: sweep)
             }
-            .help("The table's frames, front (first) to back (last): the source as read, and what the destination gets, read back from the file this page would write. Solid lines are stored frames (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum's or Vital's own morphs.")
+            .help("The table's frames, front (first) to back (last): the source as read, and what the destination gets, read back from the file this page would write. Solid lines are stored frames (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum's or Vital's own morphs. Move the pointer across a picture to sweep through the table; the third picture draws the cycle at the pointer.")
         }
     }
 }
 
 /// One stacked-frames picture, its caption, and a legend with colour swatches for its lines.
 /// The picture is 130 points high (the pane scrolls when that is too much) and as wide as it
-/// is given; the caption and legend wrap rather than being cut off.
+/// is given; the caption and legend wrap rather than being cut off. The pointer's place across
+/// the picture, left (first frame) to right (last), is reported through `sweep`.
 struct ConvertOverview: View {
     let frames: [[Float]]
     let caption: String
@@ -223,16 +235,101 @@ struct ConvertOverview: View {
     let interpolation: Interpolation?
     /// The words after "Stored frames" when `interpolation` is nil.
     let unstatedLegend: String
+    @Binding var sweep: Double?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            WavetableStackCanvas(frames: frames, interpolation: interpolation)
+            WavetableStackCanvas(frames: frames, interpolation: interpolation, highlight: sweep)
                 .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
+                .overlay(
+                    GeometryReader { (geo: GeometryProxy) in
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onContinuousHover { (phase: HoverPhase) in
+                                switch phase {
+                                case .active(let point):
+                                    sweep = geo.size.width > 0 ? min(max(point.x / geo.size.width, 0), 1) : nil
+                                case .ended:
+                                    sweep = nil
+                                }
+                            }
+                    }
+                )
             Text(caption).font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 .fixedSize(horizontal: false, vertical: true)
             ConvertOverviewLegend(interpolation: interpolation, unstated: unstatedLegend)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+}
+
+/// The cycle at the pointer's place in the sweep, drawn large: the source's in the stored-frame
+/// colour and the result's over it in the accent colour, both to one scale (full scale, or the
+/// louder of the two when a table goes beyond it, so a table that was turned down shows
+/// smaller). Under it, which frames each comes from ("Frame 12 of 64"; "Between frames 12 and
+/// 13 (crossfade)"), from `WavetableSketch.cycle(at:in:interpolation:)`. With the pointer
+/// elsewhere, the first frame and a word on what to do. (The pink line in the stacks marks
+/// where the pointer is; here the two tables need two colours of their own.)
+struct ConvertSweepView: View {
+    let source: [[Float]]
+    let sourceInterpolation: Interpolation?
+    let result: [[Float]]?
+    let resultInterpolation: Interpolation?
+    let resultTitle: String
+    let position: Double?
+
+    var body: some View {
+        let at = position ?? 0
+        let sourcePoint = WavetableSketch.cycle(at: at, in: source, interpolation: sourceInterpolation)
+        let resultPoint = result.flatMap { WavetableSketch.cycle(at: at, in: $0, interpolation: resultInterpolation) }
+        VStack(alignment: .leading, spacing: 3) {
+            SweepCycleCanvas(source: sourcePoint?.values ?? [], result: resultPoint?.values)
+                .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
+            Text(position == nil ? "Cycle · move the pointer across a picture to sweep" : "Cycle at the pointer")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 2) {
+                if let sourcePoint {
+                    ConvertSwatch(color: WavetableStackCanvas.storedColor,
+                                  text: "Source: " + WavetableSketch.sweepWords(sourcePoint, of: source.count, interpolation: sourceInterpolation))
+                }
+                if let resultPoint, let result {
+                    ConvertSwatch(color: SweepCycleCanvas.resultColor,
+                                  text: resultTitle + ": " + WavetableSketch.sweepWords(resultPoint, of: result.count, interpolation: resultInterpolation))
+                }
+            }
+            .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+}
+
+/// Two cycles over each other, to one scale: the source's and, when there is one, the result's.
+struct SweepCycleCanvas: View {
+    let source: [Float]
+    let result: [Float]?
+
+    /// The colour of the result's cycle (the source's is `WavetableStackCanvas.storedColor`).
+    static let resultColor = Color.accentColor
+
+    var body: some View {
+        Canvas { (context: inout GraphicsContext, size: CGSize) in
+            let peak = max(1, (source + (result ?? [])).reduce(Float(0)) { max($0, abs($1)) })
+            let amplitude = (size.height / 2 - 2) / CGFloat(peak)
+            let base = size.height / 2
+            // The centre line, for the scale.
+            var axis = Path()
+            axis.move(to: CGPoint(x: 0, y: base)); axis.addLine(to: CGPoint(x: size.width, y: base))
+            context.stroke(axis, with: .color(Color.secondary.opacity(0.3)), lineWidth: 0.5)
+            if source.count > 1 {
+                context.stroke(WavetableStackCanvas.path(source, x0: 0, base: base, width: size.width, amplitude: amplitude),
+                               with: .color(WavetableStackCanvas.storedColor.opacity(result == nil ? 1 : 0.6)), lineWidth: 1.2)
+            }
+            if let result, result.count > 1 {
+                context.stroke(WavetableStackCanvas.path(result, x0: 0, base: base, width: size.width, amplitude: amplitude),
+                               with: .color(SweepCycleCanvas.resultColor), lineWidth: 1.2)
+            }
+        }
     }
 }
 
@@ -277,10 +374,17 @@ struct ConvertSwatch: View {
 /// frames as separate slices with nothing between. With a crossfade or spectral
 /// interpolation, thinner lines in a second colour fill each gap (up to five per gap), the
 /// stored frames thin to 24 and the stack is drawn closer together, so the fill reads as a
-/// surface; the picture stays within about 150 lines.
+/// surface; the picture stays within about 150 lines. With `highlight` set (0 front to 1
+/// back, the pointer's place in the sweep), the cycle at that depth is drawn over the stack in
+/// the highlight colour: a stored frame, or the in-between the interpolation gives there.
 struct WavetableStackCanvas: View {
     let frames: [[Float]]
     let interpolation: Interpolation?
+    var highlight: Double? = nil
+
+    /// The colour of the highlighted cycle: one the page uses for nothing else (orange is for
+    /// warnings, the accent colour for crossfades, purple for spectral blends).
+    static let highlightColor = Color.pink
 
     /// The colour of stored frames.
     static let storedColor = Color.primary
@@ -318,6 +422,17 @@ struct WavetableStackCanvas: View {
                     context.stroke(path, with: .color(betweenColor.opacity(0.6 * fade)), lineWidth: 0.6)
                 } else {
                     context.stroke(path, with: .color(WavetableStackCanvas.storedColor.opacity(fade)), lineWidth: showsBetweens ? 1 : 1.2)
+                }
+            }
+            // The cycle at the pointer, over everything, at its depth in the stack. Taken from
+            // the drawn (reduced) frames, so it sits exactly on them.
+            if let highlight {
+                let stored = lines.filter { !$0.between }.sorted { $0.position < $1.position }.map(\.values)
+                if let point = WavetableSketch.cycle(at: highlight, in: stored, interpolation: interpolation, columns: stored.first?.count ?? 1) {
+                    let t = CGFloat(highlight)
+                    let base = size.height - amplitude - 1 - depthY * t
+                    let path = WavetableStackCanvas.path(point.values, x0: depthX * t, base: base, width: waveWidth, amplitude: amplitude)
+                    context.stroke(path, with: .color(WavetableStackCanvas.highlightColor), lineWidth: 1.6)
                 }
             }
         }

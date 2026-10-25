@@ -117,15 +117,21 @@ public struct ConvertPlan: Equatable {
         /// Whether the frame size rests on the file's length alone (an assumption the user may
         /// want to change), with no choice made.
         public var isGuessed: Bool { chosenFrameSize == nil && !needsFrameSize && table.frameSizeEvidence == .length }
-        /// A word after the size when it is not stated in the file or its name: "guessed" (from
-        /// the length alone), "set manually" (the user chose it), or "markers" (cue or loop
-        /// markers); nil when the file, its name, or a .txt beside it states the size.
+        /// A word or two after the size in the Input column, saying where the size comes from,
+        /// so every row shows how much to trust it: "in the file" (a chunk or header states
+        /// it, or the format fixes it), "in the name" (a Tonverk tag), "in the .txt" (a Serum
+        /// sidecar), "from markers" (cue or loop markers), "guessed" (from the length alone),
+        /// or "set manually" (the user chose it); nil when there is no size yet. The full
+        /// reason is `basisDescription`.
         public var sizeQualifier: String? {
             switch sizeSource {
+            case .inFile: return "in the file"
+            case .fileName: return "in the name"
+            case .sidecar: return "in the .txt"
+            case .markers: return "from markers"
             case .guessed: return "guessed"
             case .setManually: return "set manually"
-            case .markers: return "markers"
-            case .inFile, .fileName, .sidecar, .notStated: return nil
+            case .notStated: return nil
             }
         }
         /// A short badge for where the table came from, when that matters: the slot and file for
@@ -581,6 +587,8 @@ public struct ConvertPlan: Equatable {
     /// - MiniFreak V: some table has fewer than 64 frames, which it is not documented to handle.
     /// - Phase Plant: some table has fewer than the 256 frames its documentation asks for, so
     ///   frames are added.
+    /// - U table, P table: more of the user's own tables than a 3rd Wave holds at a time
+    ///   (`thirdWaveCapacityNote(for:)`).
     public func caveat(for preset: OutputPreset) -> String? {
         let tables = selectedItems.filter(canConvert)
         switch preset {
@@ -598,7 +606,9 @@ public struct ConvertPlan: Equatable {
             let short = tables.filter { ($0.frameCount ?? 256) < 256 }.count
             guard short > 0 else { return nil }
             return "\(Self.tablesHave(short, of: tables.count)) fewer than 256 frames; whether Phase Plant loads shorter tables is untested, so frames are added to reach 256."
-        case .thirdWaveU, .thirdWaveP, .tonverk, .surge, .waveEdit:
+        case .thirdWaveU, .thirdWaveP:
+            return thirdWaveCapacityNote(for: preset)
+        case .tonverk, .surge, .waveEdit:
             return nil
         }
     }
@@ -820,17 +830,21 @@ public struct ConvertPlan: Equatable {
         return "Affects \(total) tables: " + part(c.gain, "gain", grows: true, noun: false) + ", " + part(c.lose, "lose", grows: false, noun: false) + "."
     }
 
+    /// For the chosen 3rd Wave destination: a warning when more of the user's own tables are to
+    /// be converted than a 3rd Wave holds at a time (see `thirdWaveCapacityNote(for:)`).
+    public var thirdWaveCapacityNote: String? { thirdWaveCapacityNote(for: preset) }
+
     /// For a 3rd Wave destination: a warning when more of the user's own tables are to be
     /// converted than a 3rd Wave holds at a time (U56–U63, P36–P47; factory tables, which it
-    /// already has, do not count); nil otherwise. The 3rd Wave itself, with no slot free,
-    /// offers to overwrite its last tables.
-    public var thirdWaveCapacityNote: String? {
+    /// already has, do not count); nil otherwise, and for other destinations. The 3rd Wave
+    /// itself, with no slot free, offers to overwrite its last tables.
+    public func thirdWaveCapacityNote(for preset: OutputPreset) -> String? {
         guard preset.isThirdWave else { return nil }
         let own = selectedItems.filter { canConvert($0) && $0.factorySlot == nil }.count
         let isP = preset == .thirdWaveP
         let slots = isP ? SourceRef.pCount - SourceRef.factoryPCount : SourceRef.uCount - SourceRef.factoryUCount
         guard own > slots else { return nil }
-        return "\(own) \(isP ? "P" : "U") tables to convert; a 3rd Wave holds \(slots) of your own at a time (with none free, it offers to overwrite its last ones)."
+        return "\(own) \(isP ? "P" : "U") tables to convert; a 3rd Wave holds \(slots) of your own at a time. With none free, it offers to overwrite its last ones."
     }
 
     /// What the Changes column says for an item: short words for each change the destination

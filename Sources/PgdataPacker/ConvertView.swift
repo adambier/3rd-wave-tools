@@ -225,10 +225,10 @@ struct ConvertTable: View {
                 .width(min: 140, ideal: 260)
             // Input and Output are both frames × samples per frame: the headers say the unit (a
             // Table header takes no tooltip on macOS 13), the cells spell it out on hover. The
-            // widths fit the headers and the longest cells ("256 × 2,048  set manually" with its
+            // widths fit the headers and the longest cells ("256 × 2,048  from markers" with its
             // chevron; "256 → 64 frames, picked evenly, turned down" on two lines).
             TableColumn("Input (frames × samples)") { (item: ConvertPlan.Item) in ConvertFrameSizeCell(state: st, item: item, selection: $selection) }
-                .width(min: 200, ideal: 240)
+                .width(min: 210, ideal: 250)
             TableColumn("Output (frames × samples)") { (item: ConvertPlan.Item) in
                 ConvertOutputCell(expected: plan.expected(for: item), summary: plan.expectedResult(for: item), included: plan.isSelected(item))
             }
@@ -354,10 +354,10 @@ struct ConvertBadge: View {
     }
 }
 
-/// The input as frames × samples per frame, with a word after it when the size is not stated
-/// in the file ("guessed", "set manually", "markers"). When the file allows other sizes, the
-/// cell is a button that opens the size chooser and selects the row, so the preview below
-/// shows the table; when the size is still open, it is red.
+/// The input as frames × samples per frame, with a word or two after it on where the size
+/// comes from ("in the file", "guessed", "set manually"; `Item.sizeQualifier`). When the file
+/// allows other sizes, the cell is a button that opens the size chooser and selects the row,
+/// so the preview below shows the table; when the size is still open, it is red.
 struct ConvertFrameSizeCell: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
@@ -368,7 +368,7 @@ struct ConvertFrameSizeCell: View {
         let included = state.convertPlan.isSelected(item)
         let choices = item.frameSizeChoices
         if choices.isEmpty && !item.needsFrameSize {
-            ConvertSizeText(item: item, included: included)
+            ConvertSizeText(item: item, included: included, plain: true)
                 .help("Input: " + item.sizeDescription + " (frames × samples per frame). " + item.basisDescription)
         } else if choices.isEmpty {
             Label("Can't split", systemImage: "xmark.octagon.fill").foregroundStyle(.red).lineLimit(1)
@@ -395,18 +395,54 @@ struct ConvertFrameSizeCell: View {
     }
 }
 
-/// "64 × 2,048" and, in secondary type, the qualifier when there is one.
+/// "64 × 2,048" and, in secondary type, the qualifier when there is one. The count sits in a
+/// column of its own (see `ConvertFramesBySize`), so the × signs line up down the table.
 struct ConvertSizeText: View {
     let item: ConvertPlan.Item
     let included: Bool
+    /// Whether the text stands on its own rather than in a bordered button, which insets its
+    /// label; the plain text is inset the same, so the two line up in one column.
+    var plain: Bool = false
     var body: some View {
         HStack(spacing: 5) {
-            Text(item.sizeDescription).monospacedDigit().lineLimit(1)
-                .foregroundStyle(included ? Color.primary : Color.secondary)
+            if let count = item.frameCount, let size = item.frameSize {
+                ConvertFramesBySize(count: count, size: size)
+                    .foregroundStyle(included ? Color.primary : Color.secondary)
+            } else {
+                Text(item.sizeDescription).lineLimit(1)
+                    .foregroundStyle(included ? Color.primary : Color.secondary)
+            }
             if let word = item.sizeQualifier {
                 Text(word).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
+        .padding(.leading, plain ? ConvertFramesBySize.buttonInset : 0)
+    }
+}
+
+/// "64 × 2,048" in three parts: the count right-aligned in a column wide enough for three
+/// digits, the × sign, and the size; the parts can be styled apart (the Output column puts
+/// a changed number in semibold).
+struct ConvertFramesBySize: View {
+    let count: Int
+    let size: Int
+    var countWeight: Font.Weight = .regular
+    var sizeWeight: Font.Weight = .regular
+
+    /// The width of the count's column: room for three digits.
+    static let countWidth: CGFloat = 26
+    /// What a bordered button insets its label by, applied to plain text in the same column.
+    static let buttonInset: CGFloat = 7
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text("\(count)").fontWeight(countWeight)
+                .frame(minWidth: Self.countWidth, alignment: .trailing)
+            Text("×").foregroundStyle(.secondary)
+            Text(ConvertPlan.formatCount(size)).fontWeight(sizeWeight)
+        }
+        .monospacedDigit()
+        .lineLimit(1)
     }
 }
 
@@ -515,22 +551,14 @@ struct ConvertOutputCell: View {
 
     var body: some View {
         if let e = expected {
-            sizeText(e)
-                .monospacedDigit()
-                .lineLimit(1)
+            ConvertFramesBySize(count: e.frameCountOut, size: e.frameSizeOut,
+                                countWeight: e.frameCountOut != e.frameCountIn ? .semibold : .regular,
+                                sizeWeight: e.resizes ? .semibold : .regular)
                 .foregroundStyle(included ? Color.primary : Color.secondary)
                 .help("Output (frames × samples per frame): " + (included ? summary : "not marked to convert. If it were: " + summary))
         } else {
             Text("—").foregroundStyle(.secondary).help(summary)
         }
-    }
-
-    private func sizeText(_ e: ConvertPlan.ExpectedResult) -> Text {
-        let countChanged = e.frameCountOut != e.frameCountIn
-        let count = Text("\(e.frameCountOut)").fontWeight(countChanged ? .semibold : .regular)
-        let size = Text(ConvertPlan.formatCount(e.frameSizeOut)).fontWeight(e.resizes ? .semibold : .regular)
-        let times = Text(" × ")
-        return count + times + size
     }
 }
 

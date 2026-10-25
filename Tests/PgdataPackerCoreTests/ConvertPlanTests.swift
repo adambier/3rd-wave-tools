@@ -358,7 +358,7 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertFalse(p.needsAttention(loud))
         XCTAssertEqual(p.attentionCount, 2)
         XCTAssertEqual(guess.sizeQualifier, "guessed")
-        XCTAssertNil(ready.sizeQualifier)
+        XCTAssertEqual(ready.sizeQualifier, "in the file")
         XCTAssertNil(open.sizeQualifier)
         XCTAssertNil(ready.originBadge)
         XCTAssertEqual(p.needsFrameSizeCount, 1)
@@ -612,6 +612,40 @@ final class WavetableSketchInterpolationTests: XCTestCase {
         for (x, y) in zip(between[0].values, mid) { XCTAssertEqual(x, y, accuracy: 1e-6) }
     }
 
+    /// The preview's sweep: the cycle at a position through the table, stored or in between.
+    func testCycleAtAPositionFollowsTheInterpolation() throws {
+        let a = cycle(16, harmonic: 1, amplitude: 1), b = cycle(16, harmonic: 1, amplitude: 0.5), c = cycle(16, harmonic: 2, amplitude: 1)
+        let frames = [a, b, c]
+        // Whole positions give the stored frame, whatever the interpolation.
+        for mode in [Interpolation?.none, Interpolation.none, .crossfade, .spectral] {
+            let first = try XCTUnwrap(WavetableSketch.cycle(at: 0, in: frames, interpolation: mode))
+            XCTAssertEqual(first.values, a); XCTAssertEqual(first.lower, 0); XCTAssertEqual(first.upper, 0); XCTAssertFalse(first.isBetween)
+            let last = try XCTUnwrap(WavetableSketch.cycle(at: 1, in: frames, interpolation: mode))
+            XCTAssertEqual(last.values, c); XCTAssertEqual(last.lower, 2); XCTAssertEqual(last.upper, 2)
+            XCTAssertEqual(WavetableSketch.sweepWords(last, of: 3, interpolation: mode), "frame 3 of 3")
+        }
+        // A quarter of the way: between frames 0 and 1 at t = 0.5.
+        let stepped = try XCTUnwrap(WavetableSketch.cycle(at: 0.25, in: frames, interpolation: Interpolation.none))
+        XCTAssertEqual(stepped.values, a, "a stepped table plays the frame before the position")
+        XCTAssertFalse(stepped.isBetween)
+        XCTAssertEqual(WavetableSketch.cycle(at: 0.25, in: frames, interpolation: nil)?.values, a, "nothing stated: the stored frame")
+        let faded = try XCTUnwrap(WavetableSketch.cycle(at: 0.25, in: frames, interpolation: .crossfade))
+        XCTAssertEqual(faded.lower, 0); XCTAssertEqual(faded.upper, 1); XCTAssertEqual(faded.fraction, 0.5, accuracy: 1e-6)
+        for (x, y) in zip(faded.values, cycle(16, harmonic: 1, amplitude: 0.75)) { XCTAssertEqual(x, y, accuracy: 1e-6) }
+        XCTAssertEqual(WavetableSketch.sweepWords(faded, of: 3, interpolation: .crossfade), "between frames 1 and 2 (crossfade)")
+        let spectral = try XCTUnwrap(WavetableSketch.cycle(at: 0.75, in: frames, interpolation: .spectral))
+        XCTAssertEqual(spectral.lower, 1); XCTAssertEqual(spectral.upper, 2)
+        for (x, y) in zip(spectral.values, WavetableSketch.spectralBlend(b, c, t: 0.5)) { XCTAssertEqual(x, y, accuracy: 1e-6) }
+        XCTAssertEqual(WavetableSketch.sweepWords(spectral, of: 3, interpolation: .spectral), "between frames 2 and 3 (spectral blend)")
+        // Long frames are reduced to the columns asked for; positions outside 0…1 are clamped.
+        let long = [cycle(2048, harmonic: 1, amplitude: 1), cycle(2048, harmonic: 3, amplitude: 1)]
+        XCTAssertEqual(WavetableSketch.cycle(at: 0.5, in: long, interpolation: .crossfade, columns: 128)?.values.count, 128)
+        XCTAssertEqual(WavetableSketch.cycle(at: 7, in: long, interpolation: .crossfade)?.lower, 1)
+        XCTAssertEqual(WavetableSketch.cycle(at: -1, in: long, interpolation: .crossfade)?.lower, 0)
+        XCTAssertNil(WavetableSketch.cycle(at: 0.5, in: [], interpolation: .crossfade))
+        XCTAssertEqual(WavetableSketch.cycle(at: 0.5, in: [a], interpolation: .crossfade)?.values, a, "one frame: itself")
+    }
+
     func testTonverkRecordsSpectralAsCrossfade() {
         let wave = (0..<2048).map { Float(sin(Double($0) * 2 * .pi / 2048)) * 0.5 }
         let t = FoundTable(name: "T", fileName: "T.wav", source: .wav, samples: wave + wave, frameSize: 2048,
@@ -804,7 +838,7 @@ final class ConvertOptionsTextTests: XCTestCase {
         // Small tables: the note counts them, whatever their size.
         var tables = (0..<9).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
         var p = plan(tables, preset: .thirdWaveU)
-        XCTAssertEqual(p.thirdWaveCapacityNote, "9 U tables to convert; a 3rd Wave holds 8 of your own at a time (with none free, it offers to overwrite its last ones).")
+        XCTAssertEqual(p.thirdWaveCapacityNote, "9 U tables to convert; a 3rd Wave holds 8 of your own at a time. With none free, it offers to overwrite its last ones.")
         p.setSelected(p.items[0].id, false)
         XCTAssertNil(p.thirdWaveCapacityNote, "8 fit")
         p.preset = .wav2048
@@ -884,10 +918,15 @@ final class ConvertExistingChoicesTests: XCTestCase {
         tall.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Tall.wav"), table: table)], factory: FactoryLibrary())
         XCTAssertNil(tall.caveat(for: .miniFreak))
         XCTAssertNotNil(tall.caveat(for: .phasePlant))
-        // Destinations whose sources settle their behaviour never warn.
+        // Destinations whose sources settle their behaviour never warn; the 3rd Wave ones only
+        // when more tables are to convert than it holds (two fit).
         for preset in [OutputPreset.thirdWaveU, .thirdWaveP, .tonverk, .surge, .waveEdit] {
             XCTAssertNil(two.caveat(for: preset), "\(preset)")
         }
+        let nine = pickerPlan(.thirdWaveU, Array(repeating: (Interpolation?.none, 2048), count: 9))
+        XCTAssertEqual(nine.caveat(for: .thirdWaveU), nine.thirdWaveCapacityNote)
+        XCTAssertEqual(nine.caveat(for: .thirdWaveU)?.hasPrefix("9 U tables to convert; a 3rd Wave holds 8"), true)
+        XCTAssertNil(nine.caveat(for: .thirdWaveP), "12 P slots")
         // A table that cannot convert yet does not count.
         XCTAssertNil(ConvertPlan(preset: .miniFreak).caveat(for: .miniFreak))
     }

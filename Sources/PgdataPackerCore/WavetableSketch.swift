@@ -43,6 +43,58 @@ public enum WavetableSketch {
     }
 }
 
+// MARK: - The cycle at one position (the preview's sweep)
+
+public extension WavetableSketch {
+    /// The cycle a table gives at one position of a sweep through it, and which stored frames
+    /// it comes from. From ``cycle(at:in:interpolation:columns:)``.
+    struct SweepPoint: Equatable {
+        /// The cycle's values (`columns` of them at most), within the table's own range.
+        public var values: [Float]
+        /// The stored frame at or before the position, counted from 0.
+        public var lower: Int
+        /// The stored frame after it (`lower` again at a whole position, or when the table
+        /// steps).
+        public var upper: Int
+        /// How far from `lower` towards `upper` the position lies, 0…1 (0 when `upper == lower`).
+        public var fraction: Float
+
+        /// Whether the cycle is an in-between of two stored frames.
+        public var isBetween: Bool { upper != lower }
+    }
+
+    /// The cycle at `position`, 0 for the first frame to 1 for the last, through `frames`: the
+    /// stored frame at a whole position; between two, a linear crossfade for `.crossfade`, a
+    /// spectral blend (``spectralBlend(_:_:t:)``) for `.spectral`, and the stored frame before
+    /// the position for `.none` or nil (the table steps from frame to frame, or nothing says,
+    /// and a stored frame is the only certain thing to show). Each frame is first reduced to
+    /// `columns` values (``reduceCycle(_:to:)``), enough for a picture, so a spectral blend of
+    /// long frames stays quick. Nil for an empty table.
+    static func cycle(at position: Double, in frames: [[Float]], interpolation: Interpolation?, columns: Int = 256) -> SweepPoint? {
+        guard !frames.isEmpty else { return nil }
+        let last = frames.count - 1
+        let p = min(max(position, 0), 1) * Double(last)
+        let lower = min(Int(p.rounded(.down)), last)
+        let fraction = Float(p - Double(lower))
+        let a = reduceCycle(frames[lower], to: columns)
+        let between = interpolation == .crossfade || interpolation == .spectral
+        guard between, lower < last, fraction > 0.001 else {
+            return SweepPoint(values: a, lower: lower, upper: lower, fraction: 0)
+        }
+        let b = reduceCycle(frames[lower + 1], to: columns)
+        let values = interpolation == .crossfade ? blend(a, b, t: fraction) : spectralBlend(a, b, t: fraction)
+        return SweepPoint(values: values, lower: lower, upper: lower + 1, fraction: fraction)
+    }
+
+    /// The words for a sweep point, to follow a label: "frame 12 of 64", or "between frames 12
+    /// and 13 (crossfade)" or "… (spectral blend)". Frames are counted from 1 for the reader.
+    static func sweepWords(_ point: SweepPoint, of count: Int, interpolation: Interpolation?) -> String {
+        guard point.isBetween else { return "frame \(point.lower + 1) of \(count)" }
+        let how = interpolation == .spectral ? "spectral blend" : "crossfade"
+        return "between frames \(point.lower + 1) and \(point.upper + 1) (\(how))"
+    }
+}
+
 // MARK: - Interpolation between frames
 
 public extension WavetableSketch {
