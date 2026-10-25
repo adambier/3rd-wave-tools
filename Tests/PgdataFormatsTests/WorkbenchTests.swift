@@ -58,6 +58,16 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertEqual(plan.verdict, .blocked([.s(10)]))
     }
 
+    func testSurgeWavetableIsSentToConvert() throws {
+        let u = FileManager.default.temporaryDirectory.appendingPathComponent("surge-\(UUID().uuidString).wt")
+        try Data("vawt".utf8 + [0, 8, 0, 0, 1, 0, 0, 0] + [UInt8](repeating: 0, count: 2048 * 4)).write(to: u)
+        defer { try? FileManager.default.removeItem(at: u) }
+        XCTAssertThrowsError(try ContentFile.load(u)) { e in
+            XCTAssertTrue("\(e)".contains("Surge wavetable"), "\(e)")
+            XCTAssertTrue("\(e)".contains("Convert page"), "\(e)")
+        }
+    }
+
     func testSuppliedFileWinsAndIsSuggestedFromName() throws {
         // Scott McAuley's case: his program uses U50, his file is named "U50 SM OB2.WT".
         let u = try writeWT("U50 SM OB2", kind: .u, seed: 0.7, file: "U50 SM OB2.WT")

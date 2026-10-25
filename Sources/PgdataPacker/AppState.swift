@@ -209,7 +209,8 @@ final class AppState: ObservableObject {
                     DispatchQueue.main.async { self?.reading = LoadProgress(done: done, total: todo.count) }
                 }
             }
-            let skipped = (dropped: all.count - wanted.count, known: wanted.count - todo.count)
+            let wav = all.filter { ["wav", "wave"].contains($0.pathExtension.lowercased()) }.count
+            let skipped = (dropped: all.count - wanted.count, known: wanted.count - todo.count, wav: wav)
             DispatchQueue.main.async { self?.finishAdding(results, skipped: skipped) }
         }
     }
@@ -225,7 +226,7 @@ final class AppState: ObservableObject {
         return error.localizedDescription
     }
 
-    private func finishAdding(_ results: [Loaded], skipped: (dropped: Int, known: Int)) {
+    private func finishAdding(_ results: [Loaded], skipped: (dropped: Int, known: Int, wav: Int)) {
         batchesReading -= 1
         if batchesReading <= 0 { batchesReading = 0; reading = nil }
         var problems: [String] = []
@@ -269,6 +270,11 @@ final class AppState: ObservableObject {
             if repeated > 0 { why.append("\(repeated) already in the lists") }
             if skipped.dropped > 0 { why.append("\(skipped.dropped) not .pro, .wt, .bin, or .pgdata files") }
             note("Nothing added" + (why.isEmpty ? "." : ": " + why.joined(separator: "; ") + "."))
+        }
+        if skipped.wav > 0 {
+            note(skipped.wav == 1
+                 ? "1 WAV file was left out: Pack takes 3rd Wave files. If it is a wavetable, the Convert page can convert it to a 3rd Wave table."
+                 : "\(skipped.wav) WAV files were left out: Pack takes 3rd Wave files. Wavetables among them can be converted to 3rd Wave tables on the Convert page.")
         }
         // Show the page the dropped files belong to.
         if addedUnified > 0 && addedPrograms == 0 && addedContent == 0 { section = .unpack }
