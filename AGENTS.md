@@ -224,8 +224,9 @@ Other checks:
 - **CI** (`.github/workflows/tests.yml`, every push and pull request): `swift test` in
   `swift:6.0-noble` on `ubuntu-24.04`; `PGDATA_TESTS=1 swift test` on `macos-15`; Swift 6.2 on
   `windows-2022`. `swift test` builds every target, so the macOS job also compiles the
-  `PgdataPacker` target through SwiftPM (without Sparkle); CI never runs `make-app.sh` or produces
-  the app bundle. `docs.yml` publishes DocC on pushes to `main` that touch the libraries, only in
+  `PgdataPacker` target through SwiftPM (without Sparkle), and it then type-checks all four
+  Sources folders as one module with `swiftc -typecheck`, as `make-app.sh` compiles them; CI never
+  runs `make-app.sh` or produces the app bundle. `docs.yml` publishes DocC on pushes to `main` that touch the libraries, only in
   the upstream repository.
 
 No tests cover the SwiftUI views; a UI change is verified by building and using the app on a Mac.
