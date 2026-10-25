@@ -64,7 +64,7 @@ struct NameCleanupSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Clean up names").font(.title3).bold()
+            Text("Clean Up Names").font(.title3).bold()
             Text(page == .pack
                  ? "New names go into the .pgdata files you write; the source files are not changed. Factory wavetables keep their names."
                  : "New names apply to the converted files (and inside 3rd Wave tables). Source files and factory names stay as they are.")
@@ -80,6 +80,7 @@ struct NameCleanupSheet: View {
                 Text("Keep these spellings:")
                 TextField("LFO, MIDI, LoFi…", text: $keepText)
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Spellings to keep")
                     .onChange(of: keepText) { t in
                         rules.fixedSpellings = t.split(whereSeparator: { $0 == "," || $0 == " " }).map(String.init)
                     }
@@ -89,7 +90,7 @@ struct NameCleanupSheet: View {
 
             Table(rows) {
                 TableColumn("") { (r: Row) in
-                    Toggle("", isOn: Binding(
+                    Toggle("Rename \(r.current)", isOn: Binding(
                         get: { !excluded.contains(r.id) },
                         set: { if $0 { excluded.remove(r.id) } else { excluded.insert(r.id) } }
                     ))
@@ -103,8 +104,9 @@ struct NameCleanupSheet: View {
                     .width(min: 90, ideal: 100)
                 TableColumn("Current") { (r: Row) in Text(r.current).lineLimit(1).foregroundStyle(.secondary).help(r.current) }
                     .width(min: 140, ideal: 200)
-                TableColumn("New name") { (r: Row) in
-                    TextField("", text: Binding(get: { proposed(r) }, set: { edited[r.id] = $0 }))
+                TableColumn("New Name") { (r: Row) in
+                    TextField("New name", text: Binding(get: { proposed(r) }, set: { edited[r.id] = $0 }))
+                        .labelsHidden()
                         .textFieldStyle(.roundedBorder)
                         .help(proposed(r) + "\nEdit to change the proposed name")
                 }
@@ -115,7 +117,6 @@ struct NameCleanupSheet: View {
                 }
                     .width(min: 100, ideal: 140)
             }
-            .visibleScrollers()
             .frame(minHeight: 300)
 
             HStack {
@@ -183,7 +184,7 @@ struct NameLengthNote: View {
             case let .replacedWithQuestionMark(chars):
                 let list = chars.map { "\u{201C}\($0)\u{201D}" }
                 Label("\(list.joined(separator: " ")) → ?", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
-                    .help("The 3rd Wave's name fields cannot hold \(chars.count == 1 ? "this character" : "these characters"), so \(chars.count == 1 ? "it is" : "they are") written as \"?\": \(list.joined(separator: ", ")). Replace \(chars.count == 1 ? "it" : "them") with plain equivalents (e.g., a hyphen for a dash, straight quotes) to keep the name as you typed it.")
+                    .help("The 3rd Wave's name fields cannot hold \(chars.count == 1 ? "this character" : "these characters"), so \(chars.count == 1 ? "it is" : "they are") written as \u{201C}?\u{201D}: \(list.joined(separator: ", ")). Replace \(chars.count == 1 ? "it" : "them") with plain equivalents (e.g., a hyphen for a dash, straight quotes) to keep the name as you typed it.")
             case .controlCharactersReplaced:
                 Label("Line breaks → spaces", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
                     .help("Line breaks and other control characters in the name are written as spaces.")
