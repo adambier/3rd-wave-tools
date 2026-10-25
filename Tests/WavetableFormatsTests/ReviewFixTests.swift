@@ -10,12 +10,14 @@ final class ReviewFixTests: XCTestCase {
     private func wav16(_ samples: Int, loop: (Int, Int)? = nil) -> Data {
         func u32(_ v: Int) -> [UInt8] { (0..<4).map { UInt8(truncatingIfNeeded: v >> (8 * $0)) } }
         func u16(_ v: Int) -> [UInt8] { (0..<2).map { UInt8(truncatingIfNeeded: v >> (8 * $0)) } }
-        var fmt = u16(1) + u16(1) + u32(48_000) + u32(96_000) + u16(2) + u16(16)
+        var fmt: [UInt8] = u16(1) + u16(1) + u32(48_000)
+        fmt += u32(96_000) + u16(2) + u16(16)
         fmt = Array("fmt ".utf8) + u32(fmt.count) + fmt
         var body = fmt
         if let (s, e) = loop {
             var smpl = [UInt8](repeating: 0, count: 28) + u32(1) + u32(0)
-            smpl += u32(0) + u32(0) + u32(s) + u32(e) + u32(0) + u32(0)
+            smpl += u32(0) + u32(0) + u32(s)
+            smpl += u32(e) + u32(0) + u32(0)
             body += Array("smpl".utf8) + u32(smpl.count) + smpl
         }
         let audio = (0..<samples).flatMap { i in u16(Int(sin(Double(i) * 0.05) * 12_000)) }

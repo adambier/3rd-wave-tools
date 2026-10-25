@@ -106,8 +106,8 @@ struct LogBar: View {
                 }
                 Spacer()
                 Label(state.section == .convert
-                        ? "Drop wavetable files (.wav, .wt, .pgdata) or folders onto the page above to add them"
-                        : "Drop .pro, .wt, .bin, or .pgdata files onto the page above to add them", systemImage: "arrow.down.doc")
+                        ? "Drop .wav, .wt, or .pgdata files or folders onto the page above to add them"
+                        : "Drop .pro, .wt, .bin, or .pgdata files or folders onto the page above to add them", systemImage: "arrow.down.doc")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             .padding(.horizontal, 10).padding(.vertical, 6)

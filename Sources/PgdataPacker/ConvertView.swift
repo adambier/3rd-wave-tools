@@ -25,7 +25,7 @@ struct ConvertView: View {
             Divider()
             if state.convertPlan.items.isEmpty {
                 EmptyHint(title: "Drop wavetables here",
-                          detail: "Add wavetable files or folders: WAV wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files. Folders are searched, and files without wavetables are passed over. Convert converts existing wavetables between formats; it does not make wavetables from other audio, which is what the 3rd Wave's Wave Maker does.")
+                          detail: "Add WAV wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table then shows its frames, its frame size, and how that was decided. Convert converts existing wavetables between formats; it does not make wavetables from other audio.")
             } else {
                 HSplitView {
                     ConvertTablesPane(selection: $selection)
@@ -87,7 +87,7 @@ struct ConvertTablesPane: View {
         let plan = st.convertPlan
         VStack(alignment: .leading, spacing: 4) {
             Text("Wavetables found").font(.headline).padding(.horizontal, 12).padding(.top, 8)
-            Text("Converts existing wavetables between formats; it does not make wavetables from other audio (that is the 3rd Wave's Wave Maker). Identical tables are listed once.")
+            Text("Identical tables are listed once, and factory tables are marked.")
                 .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12)
             // Most important first: whether it is converted, what it is, and its size.
             Table(plan.items, selection: $selection) {

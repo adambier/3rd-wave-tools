@@ -18,8 +18,8 @@ struct PackView: View {
             controls
             Divider()
             if state.programs.isEmpty && state.contentFiles.isEmpty {
-                EmptyHint(title: "Drop programs and their wavetables or samples here",
-                          detail: "Add .pro files and the .wt and .bin files they use (folders work too). Each program then shows what its oscillators play and which files will be embedded.")
+                EmptyHint(title: "Drop programs and their wavetables or multisamples here",
+                          detail: "Add .pro files and the .wt and .bin files they use; folders work too. Each program then shows what its oscillators play and which files will be embedded.")
             } else {
                 HSplitView {
                     programList.frame(minWidth: 220, idealWidth: 260, maxWidth: 440)

@@ -189,7 +189,9 @@ final class ReadingTests: XCTestCase {
     func testDamagedWAVThrows() {
         // RIFF/WAVE with no data chunk, and with a format chunk that gives no channels.
         var noData = Data("RIFF".utf8) + le32(4 + 24) + Data("WAVE".utf8)
-        noData += Data("fmt ".utf8) + le32(16) + le16(3) + le16(1) + le32(48_000) + le32(192_000) + le16(4) + le16(32)
+        noData += Data("fmt ".utf8) + le32(16)
+        noData += le16(3) + le16(1) + le32(48_000)
+        noData += le32(192_000) + le16(4) + le16(32)
         XCTAssertThrowsError(try WavetableReader.read(noData, fileName: "a.wav"))
         var noChannels = wavFile([ramp(2048)])
         noChannels[22] = 0; noChannels[23] = 0

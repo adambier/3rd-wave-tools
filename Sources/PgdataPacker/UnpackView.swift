@@ -35,7 +35,7 @@ struct UnpackView: View {
             Divider()
             if state.unpacks.isEmpty {
                 EmptyHint(title: "Drop .pgdata files here",
-                          detail: "Each is split into its program (.pro), its embedded wavetables (.wt) and its multisamples (.bin, named with their S slot).")
+                          detail: "Add unified program (.pgdata) files; folders work too. Each is then split into its program (.pro), its embedded wavetables (.wt), and its multisamples (.bin, named with their S slot).")
             } else {
                 HSplitView {
                     List(selection: $selection) {
