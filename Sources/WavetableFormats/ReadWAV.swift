@@ -84,19 +84,19 @@ extension WavetableReader {
             if size >= 2, count >= size {
                 sizes.append(SizeClaim(size: size, basis: basis, subject: subject, evidence: evidence))
             } else if size < 2 {
-                rejected.append("\(subject) says \(grouped(size)) samples per frame, which is not a usable size; it is ignored.")
+                rejected.append("\(subject) says \(grouped(size)) \(size == 1 ? "sample" : "samples") per frame, which is not a usable size")
             } else {
-                rejected.append("\(subject) says \(grouped(size)) samples per frame, but the file holds only "
-                                + "\(grouped(count)) samples, less than one frame; it is ignored.")
+                rejected.append("\(subject) says \(grouped(size)) samples per frame, and the file holds only "
+                                + "\(grouped(count)) \(count == 1 ? "sample" : "samples"), less than one frame")
             }
         }
 
         // 1. clm (Serum): "<!>2048 10000000 wavetable ...": any frame size, and the interpolation digit.
         if let clm = wav.chunks["clm "] {
             let parsed = parseCLM(clm)
-            let subject = "the tag inside the file (clm chunk)"
-            if let n = parsed.size { offer(n, basis: "tag inside the file (clm chunk)", subject: subject) }
-            else { notes.append("The file's wavetable tag (clm chunk) doesn't give a readable frame size; it is ignored.") }
+            let subject = "the Serum-style tag inside the file (clm chunk)"
+            if let n = parsed.size { offer(n, basis: "Serum-style tag inside the file (clm chunk)", subject: subject) }
+            else { notes.append("The file's wavetable tag (clm chunk) does not give a readable frame size; it is ignored.") }
             if let i = parsed.interpolation { interps.append(InterpolationClaim(value: i, subject: subject)) }
         }
         // 2. srge (Surge): int32 version, int32 frame size.
@@ -123,7 +123,7 @@ extension WavetableReader {
         // 4. Tonverk file-name tag.
         if let t = tag {
             let subject = "the file name (\(t.text))"
-            offer(t.size, basis: "Tonverk file name (\(t.text))", subject: subject, evidence: .fileName)
+            offer(t.size, basis: "Tonverk tag in the file name (\(t.text))", subject: subject, evidence: .fileName)
             if t.stepped { interps.append(InterpolationClaim(value: .none, subject: subject)) }
         }
         // 5. Serum sidecar text.
@@ -142,13 +142,13 @@ extension WavetableReader {
         // samples, so these two count only for powers of two up to 4,096 (Surge's limit) that give
         // at least two frames; a single looped cycle is a sample, not a wavetable.
         if let cue = wav.chunks["cue "], let d = cueSpacing(cue), isMarkerFrameSize(d, count: count) {
-            offer(d, basis: "cue markers", subject: "the cue markers", evidence: .markers)
+            offer(d, basis: "cue markers, evenly spaced (which ordinary samples can have too)", subject: "the cue markers", evidence: .markers)
         }
         // 7. A single smpl loop from sample 0 (the loop over the first frame).
         if let smpl = wav.chunks["smpl"], let loop = singleLoop(smpl), loop.start == 0 {
             // The loop end is inclusive, but some writers store it exclusively.
             if let n = [loop.end - loop.start + 1, loop.end - loop.start].first(where: { isMarkerFrameSize($0, count: count) }) {
-                offer(n, basis: "loop markers", subject: "the loop markers", evidence: .markers)
+                offer(n, basis: "loop markers over the first frame (which ordinary samples can have too)", subject: "the loop markers", evidence: .markers)
             }
         }
 
@@ -156,11 +156,11 @@ extension WavetableReader {
         var basis: String
         var candidates: [Int] = []
         var evidence = FrameSizeEvidence.none
-        notes += rejected.map(capitalized)
+        notes += rejected.map { capitalized($0) + "; it is ignored." }
         /// No wavetable: silently, unless the file is marked as one whose stated size does not fit.
         func none() throws -> [FoundTable] {
             if let reason = rejected.first {
-                throw WavetableError("\"\(fileName)\" is marked as a wavetable, but \(reason)")
+                throw WavetableError("\"\(fileName)\" is marked as a wavetable, but \(reason), so nothing can be read from it.")
             }
             return []
         }
@@ -194,7 +194,7 @@ extension WavetableReader {
             guard count / 2048 <= 256 else { return try none() }
             frameSize = 2048
             evidence = .length
-            basis = "file length (2,048 per frame, the usual size)"
+            basis = "file length only (2,048 per frame, the usual size; the file does not say)"
             candidates = fittingFrameSizes(count).filter { $0 != 2048 }
         } else {
             return try none()   // unreachable: the first branch takes every other length
@@ -347,13 +347,16 @@ extension WavetableReader {
     }
 
     /// A Tonverk tag at the end of a file stem: `_wt<N>`, case-insensitive, with an optional
-    /// trailing `r` for no interpolation.
+    /// trailing `r` for no interpolation. N must be one of the sizes Tonverk's manual lists (the
+    /// powers of two from 64 to 4,096): "KOMPLEXER_WT1" and "Pad_wt2" are names numbering their
+    /// tables, not tags (found in Serum libraries), and are left alone.
     fileprivate static func tonverkTag(in stem: String) -> (size: Int, stepped: Bool, text: String, nameBeforeTag: String)? {
         guard let r = stem.range(of: "_wt", options: [.backwards, .caseInsensitive]) else { return nil }
         let rest = stem[r.upperBound...]
         let digits = rest.prefix { $0.isASCII && $0.isNumber }
         let tail = rest.dropFirst(digits.count)
-        guard !digits.isEmpty, tail.isEmpty || tail == "r" || tail == "R", let n = Int(digits) else { return nil }
+        guard !digits.isEmpty, tail.isEmpty || tail == "r" || tail == "R", let n = Int(digits),
+              (64...4096).contains(n), n & (n - 1) == 0 else { return nil }
         let stepped = !tail.isEmpty
         return (n, stepped, "_wt\(digits)\(stepped ? "r" : "")", String(stem[..<r.lowerBound]))
     }

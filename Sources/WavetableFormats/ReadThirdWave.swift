@@ -60,7 +60,7 @@ extension WavetableReader {
         let samples = wt.frames.flatMap { $0 }
         return FoundTable(name: name, fileName: fileName, source: source, samples: samples,
                           frameSize: isP ? 128 : 1024,
-                          frameSizeBasis: isP ? "3rd Wave P table" : "3rd Wave U table",
+                          frameSizeBasis: isP ? "3rd Wave P table (always 64 frames of 128)" : "3rd Wave U table (always 64 frames of 1,024)",
                           thirdWaveFingerprint: wt.fingerprint,
                           notes: peakNote(wt.peak).map { [$0] } ?? [])
     }

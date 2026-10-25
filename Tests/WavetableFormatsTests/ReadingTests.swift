@@ -97,7 +97,7 @@ final class ReadingTests: XCTestCase {
         XCTAssertEqual(t.source, .thirdWaveWavetable(isP: true))
         XCTAssertEqual(t.name, "Fixture P Sine to Saw")
         XCTAssertEqual(t.frameSize, 128)
-        XCTAssertEqual(t.frameSizeBasis, "3rd Wave P table")
+        XCTAssertEqual(t.frameSizeBasis, "3rd Wave P table (always 64 frames of 128)")
         XCTAssertEqual(t.samples.count, 8192)
         XCTAssertEqual(t.samples, stride(from: 0, to: 16_384, by: 2).map { wt.values[$0] })
         XCTAssertEqual(t.thirdWaveFingerprint, wt.fingerprint)
@@ -110,7 +110,7 @@ final class ReadingTests: XCTestCase {
         let t = try XCTUnwrap(WavetableReader.read(data, fileName: "wavetable-u.wt").first)
         XCTAssertEqual(t.source, .thirdWaveWavetable(isP: false))
         XCTAssertEqual(t.frameSize, 1024)
-        XCTAssertEqual(t.frameSizeBasis, "3rd Wave U table")
+        XCTAssertEqual(t.frameSizeBasis, "3rd Wave U table (always 64 frames of 1,024)")
         XCTAssertEqual(t.samples, Array(wt.values.prefix(65_536)))
         XCTAssertEqual(t.thirdWaveFingerprint, wt.fingerprint)
         // A UTF-8 byte-order mark in front changes nothing.
@@ -218,7 +218,7 @@ final class ReadingTests: XCTestCase {
     func testCLM() throws {
         let t = try readOne(wavFile([ramp(4096)], chunks: [clm("<!>1024 00000000 wavetable (test)")]), "a.wav")
         XCTAssertEqual(t.frameSize, 1024)
-        XCTAssertEqual(t.frameSizeBasis, "tag inside the file (clm chunk)")
+        XCTAssertEqual(t.frameSizeBasis, "Serum-style tag inside the file (clm chunk)")
         XCTAssertEqual(t.interpolation, Interpolation.none)
         XCTAssertEqual(try readOne(wavFile([ramp(4096)], chunks: [clm("<!>2048 10000000")]), "b.wav").interpolation, .crossfade)
         XCTAssertEqual(try readOne(wavFile([ramp(4096)], chunks: [clm("<!>2048 40000000")]), "c.wav").interpolation, .spectral)
@@ -244,7 +244,7 @@ final class ReadingTests: XCTestCase {
         XCTAssertTrue(v.notes.contains { $0 == "2,047 samples after the last whole frame are left out (1 sample short of another frame)." }, "\(v.notes)")
         // Marked with a size the file cannot hold, and nothing else to go on: an error that says so.
         XCTAssertThrowsError(try WavetableReader.read(wavFile([ramp(1000)], chunks: [clm("<!>2048 00000000")]), fileName: "d.wav")) { e in
-            XCTAssertTrue("\(e)".contains("marked as a wavetable") && "\(e)".contains("1,000 samples"), "\(e)")
+            XCTAssertEqual("\(e)", "\"d.wav\" is marked as a wavetable, but the Serum-style tag inside the file (clm chunk) says 2,048 samples per frame, and the file holds only 1,000 samples, less than one frame, so nothing can be read from it.")
         }
     }
 
@@ -268,7 +268,7 @@ final class ReadingTests: XCTestCase {
     func testTonverkFileName() throws {
         let t = try readOne(wavFile([ramp(4096)]), "Strings_WT512r.wav")
         XCTAssertEqual(t.frameSize, 512)
-        XCTAssertEqual(t.frameSizeBasis, "Tonverk file name (_wt512r)")
+        XCTAssertEqual(t.frameSizeBasis, "Tonverk tag in the file name (_wt512r)")
         XCTAssertEqual(t.interpolation, Interpolation.none)
         XCTAssertEqual(t.name, "Strings")
         let plain = try readOne(wavFile([ramp(4096)]), "pad_wt256.wav")
@@ -278,12 +278,24 @@ final class ReadingTests: XCTestCase {
         let monster = try readOne(wavFile([ramp(8192)]), "Monster.wav")
         XCTAssertNil(monster.interpolation)
         XCTAssertEqual(monster.name, "Monster")
+        // Only Tonverk's sizes (powers of two from 64 to 4,096) make a tag: "KOMPLEXER_WT1" and
+        // "KOMPLEXER_WT2" (a Serum library's numbered tables) are names, read whole, with no note.
+        for name in ["KOMPLEXER_WT1", "KOMPLEXER_WT2", "Pad_wt32", "Pad_wt1000", "Pad_wt8192", "Pad_wt0"] {
+            let t = try readOne(wavFile([ramp(65_536)], chunks: [clm("<!>2048 00000000")]), name + ".WAV")
+            XCTAssertEqual(t.frameSize, 2048, name)
+            XCTAssertEqual(t.name, name, name)
+            XCTAssertEqual(t.notes, [], name)
+            XCTAssertEqual(try readOne(wavFile([ramp(65_536)]), name + ".wav").frameSizeEvidence, .length, name)
+        }
+        for n in [64, 128, 256, 512, 1024, 2048, 4096] {
+            XCTAssertEqual(try readOne(wavFile([ramp(8192)]), "a_wt\(n).wav").frameSize, n)
+        }
     }
 
     func testMetadataBeatsFileName() throws {
         let t = try readOne(wavFile([ramp(8192)], chunks: [clm("<!>2048 10000000")]), "keys_wt1024r.wav")
         XCTAssertEqual(t.frameSize, 2048)
-        XCTAssertEqual(t.frameSizeBasis, "tag inside the file (clm chunk)")
+        XCTAssertEqual(t.frameSizeBasis, "Serum-style tag inside the file (clm chunk)")
         XCTAssertEqual(t.interpolation, .crossfade)
         XCTAssertTrue(t.notes.contains { $0.contains("_wt1024r") && $0.contains("1,024") && $0.contains("(clm chunk) is used") },
                       "\(t.notes)")
@@ -306,7 +318,7 @@ final class ReadingTests: XCTestCase {
     func testCuePoints() throws {
         let t = try readOne(wavFile([ramp(4096)], chunks: [cue([0, 1024, 2048, 3072])]), "a.wav")
         XCTAssertEqual(t.frameSize, 1024)
-        XCTAssertEqual(t.frameSizeBasis, "cue markers")
+        XCTAssertEqual(t.frameSizeBasis, "cue markers, evenly spaced (which ordinary samples can have too)")
         XCTAssertEqual(t.frameSizeEvidence, .markers)
         // Unevenly spaced points say nothing.
         XCTAssertEqual(try readOne(wavFile([ramp(4096)], chunks: [cue([0, 1000, 3072])]), "b.wav").frameSize, 2048)
@@ -323,7 +335,7 @@ final class ReadingTests: XCTestCase {
     func testSmplLoop() throws {
         let t = try readOne(wavFile([ramp(4096)], chunks: [smpl(loops: [(0, 511)])]), "a.wav")
         XCTAssertEqual(t.frameSize, 512)
-        XCTAssertEqual(t.frameSizeBasis, "loop markers")
+        XCTAssertEqual(t.frameSizeBasis, "loop markers over the first frame (which ordinary samples can have too)")
         // An exclusive end is accepted too.
         XCTAssertEqual(try readOne(wavFile([ramp(4096)], chunks: [smpl(loops: [(0, 256)])]), "b.wav").frameSize, 256)
         // Two loops: not used.
@@ -350,7 +362,7 @@ final class ReadingTests: XCTestCase {
         // length is not a multiple of it. Surge loads the whole frames and ignores the rest.
         let t = try readOne(wavFile([ramp(142 * 4096 + 3795)], format: .float32, chunks: [smpl(loops: [(0, 4095)])]), "No Coast 1.wav")
         XCTAssertEqual(t.frameSize, 4096)
-        XCTAssertEqual(t.frameSizeBasis, "loop markers")
+        XCTAssertEqual(t.frameSizeBasis, "loop markers over the first frame (which ordinary samples can have too)")
         XCTAssertEqual(t.samples.count, 142 * 4096)
         XCTAssertTrue(t.notes.contains { $0 == "3,795 samples after the last whole frame are left out (301 samples short of another frame)." }, "\(t.notes)")
     }
@@ -359,7 +371,7 @@ final class ReadingTests: XCTestCase {
         let n = 8192
         // Each step adds a higher-precedence source; each wins over everything below it.
         var chunks: [(String, [UInt8])] = [smpl(loops: [(0, 63)])]
-        XCTAssertEqual(try readOne(wavFile([ramp(n)], chunks: chunks), "a.wav").frameSizeBasis, "loop markers")
+        XCTAssertEqual(try readOne(wavFile([ramp(n)], chunks: chunks), "a.wav").frameSizeBasis, "loop markers over the first frame (which ordinary samples can have too)")
         chunks.append(cue([0, 128, 256, 384]))
         XCTAssertEqual(try readOne(wavFile([ramp(n)], chunks: chunks), "a.wav").frameSize, 128)
         XCTAssertEqual(try readOne(wavFile([ramp(n)], chunks: chunks), "a.wav", sidecar: "[256]").frameSize, 256)
@@ -371,7 +383,7 @@ final class ReadingTests: XCTestCase {
         chunks.append(clm("<!>4096 00000000"))
         let t = try readOne(wavFile([ramp(n)], chunks: chunks), "a_wt512.wav", sidecar: "[256]")
         XCTAssertEqual(t.frameSize, 4096)
-        XCTAssertEqual(t.frameSizeBasis, "tag inside the file (clm chunk)")
+        XCTAssertEqual(t.frameSizeBasis, "Serum-style tag inside the file (clm chunk)")
         XCTAssertEqual(t.notes.filter { $0.contains("(clm chunk) is used") }.count, 6, "\(t.notes)")
     }
 
@@ -391,7 +403,7 @@ final class ReadingTests: XCTestCase {
 
         let s = try readOne(wavFile([ramp(3 * 2048)]), "s.wav")
         XCTAssertEqual(s.frameSize, 2048)
-        XCTAssertEqual(s.frameSizeBasis, "file length (2,048 per frame, the usual size)")
+        XCTAssertEqual(s.frameSizeBasis, "file length only (2,048 per frame, the usual size; the file does not say)")
         XCTAssertEqual(s.frameSizeEvidence, .length)
         XCTAssertEqual(s.candidateFrameSizes, [64, 128, 256, 512, 1024])
 
