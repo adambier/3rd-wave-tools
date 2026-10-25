@@ -79,6 +79,7 @@ Add the library to a Swift package with the product `WavetableFormats` of
 ### Writing
 
 - ``WavetableWriter``
+- ``WritePlan``
 - ``OutputPreset``
 - ``OutputOptions``
 - ``OutputFile``

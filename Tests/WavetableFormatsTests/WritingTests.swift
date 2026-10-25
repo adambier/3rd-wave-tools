@@ -344,6 +344,140 @@ final class WritingTests: XCTestCase {
             XCTAssertFalse(out.data.isEmpty)
         }
     }
+
+    // MARK: The plan
+
+    func testPlanFields() {
+        let big = WavetableWriter.plan(frameSize: 2048, frameCount: 256, peak: 1.5, interpolation: nil, preset: .thirdWaveU)
+        XCTAssertEqual(big.frameSizeOut, 1024)
+        XCTAssertEqual(big.frameSizeGrows, false)
+        XCTAssertEqual(big.frameCountOut, 64)
+        XCTAssertEqual(big.tableFrameCount, 64)
+        XCTAssertEqual(big.frameCountGrows, false)
+        XCTAssertEqual(big.countPolicy, .pickEvenly)
+        XCTAssertTrue(big.scalesToFit)
+        XCTAssertEqual(big.scaling, .certain)
+        XCTAssertTrue(big.scaledToFit)
+        XCTAssertFalse(big.mayScaleToFit)
+        XCTAssertFalse(big.peakKept)
+        XCTAssertNil(big.interpolationRecorded)
+        XCTAssertEqual(big.fileExtension, "wt")
+
+        let grows = WavetableWriter.plan(frameSize: 128, frameCount: 64, peak: 0.9, interpolation: .spectral, preset: .thirdWaveU)
+        XCTAssertEqual(grows.scaling, .possible)
+        XCTAssertEqual(grows.frameSizeGrows, true)
+        XCTAssertNil(grows.frameCountGrows)
+        XCTAssertFalse(grows.changesCount)
+
+        let kept = WavetableWriter.plan(frameSize: 2048, frameCount: 8, peak: 1.2, interpolation: nil, preset: .wav2048)
+        XCTAssertEqual(kept.scaling, .none)
+        XCTAssertFalse(kept.scalesToFit)
+        XCTAssertTrue(kept.peakKept)
+        XCTAssertEqual(kept.interpolationRecorded, .crossfade)
+        XCTAssertFalse(kept.resizes)
+        XCTAssertNil(kept.frameSizeGrows)
+
+        let tonverk = WavetableWriter.plan(frameSize: 600, frameCount: 100, peak: 0.5, interpolation: .spectral, preset: .tonverk,
+                                           options: OutputOptions(frameCountPolicy: .interpolate))
+        XCTAssertEqual(tonverk.frameSizeOut, 2048)
+        XCTAssertEqual(tonverk.frameCountOut, 64)
+        XCTAssertEqual(tonverk.interpolationRecorded, .crossfade, "a Tonverk name can say only stepped or smooth")
+        XCTAssertEqual(tonverk.countPolicy, .interpolate)
+        XCTAssertEqual(tonverk.fileExtension, "wav")
+
+        let ppg = WavetableWriter.plan(frameSize: 1024, frameCount: 64, peak: 0.5, interpolation: nil, preset: .thirdWaveP,
+                                       options: OutputOptions(appendPPGStandardWaves: true))
+        XCTAssertTrue(ppg.addsPPGWaves)
+        XCTAssertEqual(ppg.frameCountOut, 64)
+        XCTAssertEqual(ppg.tableFrameCount, 60)
+        XCTAssertTrue(ppg.changesCount)
+        XCTAssertEqual(ppg.frameCountGrows, false)
+        XCTAssertFalse(WavetableWriter.plan(frameSize: 1024, frameCount: 64, peak: 0.5, interpolation: nil, preset: .thirdWaveU,
+                                            options: OutputOptions(appendPPGStandardWaves: true)).addsPPGWaves, "P tables only")
+
+        XCTAssertEqual(WavetableWriter.frameCount(for: .surge, source: 600), 512)
+        XCTAssertEqual(WavetableWriter.frameCount(for: .phasePlant, source: 8), 256)
+        XCTAssertEqual(WavetableWriter.frameCount(for: .miniFreak, source: 8), 8)
+        XCTAssertEqual(WavetableWriter.interpolationRecorded(for: .surge, source: .spectral), nil)
+        XCTAssertEqual(WavetableWriter.interpolationRecorded(for: .wav2048, source: .spectral), .spectral)
+        XCTAssertEqual(WavetableWriter.interpolationRecorded(for: .wav2048, source: .spectral, options: OutputOptions(interpolation: Interpolation.none)),
+                       Interpolation.none)
+        XCTAssertEqual(OutputPreset.allCases.filter(\.scalesToFit), [.thirdWaveU, .thirdWaveP, .waveEdit])
+    }
+
+    /// The writer does what its plan says, for every preset and several shapes of table, with
+    /// the default options and with every option changed; the plan's "may be turned down" is
+    /// the one thing left open.
+    func testWriterFollowsItsPlan() throws {
+        let shapes: [(frames: Int, size: Int, peak: Float, interpolation: Interpolation?)] = [
+            (64, 1024, 0.8, nil), (3, 2048, 1.5, .spectral), (300, 4, 0.5, Interpolation.none), (8, 600, 0.9, .crossfade), (64, 128, 1, nil),
+        ]
+        let changed = OutputOptions(frameCountPolicy: .interpolate, interpolation: .spectral, appendPPGStandardWaves: true)
+        for p in OutputPreset.allCases {
+            for (i, s) in shapes.enumerated() {
+                for options in [i % 2 == 0 ? OutputOptions() : changed, p == .thirdWaveP && i % 2 == 0 ? changed : nil].compactMap({ $0 }) {
+                    let t = table(frames: s.frames, size: s.size, peak: s.peak, interpolation: s.interpolation)
+                    let plan = WavetableWriter.plan(for: t, preset: p, options: options)
+                    let out = try write(t, p, options)
+                    let label = "\(p) \(s) \(options.frameCountPolicy)"
+                    XCTAssertEqual(plan.preset, p)
+                    XCTAssertEqual(plan.frameSizeIn, s.size); XCTAssertEqual(plan.frameCountIn, s.frames)
+                    XCTAssertEqual(plan.peak, s.peak, accuracy: 1e-6)
+                    XCTAssertTrue(out.fileName.hasSuffix("." + plan.fileExtension), label)
+
+                    // The written size and the metadata.
+                    var count: Int, size: Int
+                    switch p {
+                    case .thirdWaveU, .thirdWaveP:
+                        let wt = try WavetableFile(data: out.data)
+                        count = wt.frames.count; size = wt.frames.first?.count ?? 0
+                    case .surge:
+                        let b = [UInt8](out.data)
+                        size = Int(Self.le32(b, 4)); count = Self.le16(b, 8)
+                    case .wav2048, .miniFreak, .phasePlant, .tonverk, .waveEdit:
+                        let w = parseWAV(out.data)
+                        size = plan.frameSizeOut; count = w.samples.count / size
+                        XCTAssertEqual(w.samples.count % size, 0, label)
+                        if let recorded = plan.interpolationRecorded, p != .tonverk {
+                            let digit: Character = recorded == Interpolation.none ? "0" : recorded == .crossfade ? "1" : "2"
+                            XCTAssertEqual(w.clmText?.dropFirst(8).first, digit, label)
+                        } else {
+                            XCTAssertNil(w.clmText, label)
+                        }
+                        if p == .tonverk {
+                            let tag = "_wt\(plan.frameSizeOut)" + (plan.interpolationRecorded == Interpolation.none ? "r" : "")
+                            XCTAssertTrue(out.fileName.hasSuffix(tag + ".wav"), label)
+                        }
+                    }
+                    XCTAssertEqual(count, plan.frameCountOut, label)
+                    XCTAssertEqual(size, plan.frameSizeOut, label)
+
+                    // The notes say what the plan said. The level after resizing is the writer's
+                    // to judge: growing the frame size can lift a peak of 1 a little above it,
+                    // so a destination that keeps the peak may then note it, and one that turns
+                    // the table down may do so (`Scaling.possible`).
+                    func said(_ text: String) -> Bool { out.notes.contains { $0.contains(text) } }
+                    XCTAssertEqual(said("Resized from"), plan.resizes, label)
+                    XCTAssertEqual(said("Frame count changed from"), plan.changesCount, label)
+                    XCTAssertEqual(said("standard waves"), plan.addsPPGWaves, label)
+                    if plan.peakKept {
+                        XCTAssertTrue(said("kept; the synth may clip it"), label)
+                    } else if plan.scalesToFit || plan.frameSizeGrows != true {
+                        XCTAssertFalse(said("kept; the synth may clip it"), label)
+                    }
+                    switch plan.scaling {
+                    case .certain: XCTAssertTrue(said("Turned down to fit"), label)
+                    case .none: XCTAssertFalse(said("Turned down to fit"), label)
+                    case .possible: break   // settled by the resized peak
+                    }
+                    if plan.changesCount {
+                        let how = plan.countPolicy == .interpolate ? "crossfading" : (plan.frameCountGrows == true ? "repeating" : "keeping evenly spaced")
+                        XCTAssertTrue(said(how), label)
+                    }
+                }
+            }
+        }
+    }
 }
 
 final class TonverkNameTagTests: XCTestCase {

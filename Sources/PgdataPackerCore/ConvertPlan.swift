@@ -246,48 +246,10 @@ public struct ConvertPlan: Equatable {
         public var all: [String] { warnings + information }
     }
 
-    /// What converting an item is expected to produce, from the preset's facts and the options;
-    /// the writer's own notes, after converting, say what was done.
-    public struct ExpectedResult: Equatable {
-        /// Samples per frame in the source.
-        public var frameSizeIn: Int
-        /// Samples per frame written.
-        public var frameSizeOut: Int
-        /// Frames in the source.
-        public var frameCountIn: Int
-        /// Frames written (with the PPG waves, the 60 the table goes into plus the 4 waves).
-        public var frameCountOut: Int
-        /// How the frame count is changed, when it is.
-        public var countPolicy: FrameCountPolicy
-        /// Whether the PPG's four standard waves are added at 60–63.
-        public var addsPPGWaves: Bool
-        /// The source's peak; above 1, the writer turns the table down for destinations that
-        /// cannot hold it (`scaledToFit`).
-        public var peak: Float
-        /// Whether the table is turned down to fit (3rd Wave and 16-bit destinations).
-        public var scaledToFit: Bool
-        /// The interpolation as the file will record it; nil when the format cannot
-        /// record it.
-        public var interpolationRecorded: Interpolation?
-
-        /// Whether the frame size changes.
-        public var resizes: Bool { frameSizeIn != frameSizeOut }
-        /// Whether the frame size grows (nil when it does not change).
-        public var frameSizeGrows: Bool? { resizes ? frameSizeOut > frameSizeIn : nil }
-        /// The frames the table itself goes into (60 with the PPG waves, else `frameCountOut`).
-        public var tableFrameCount: Int { addsPPGWaves ? frameCountOut - 4 : frameCountOut }
-        /// Whether the table's frame count changes.
-        public var changesCount: Bool { tableFrameCount != frameCountIn }
-        /// Whether the table gets more frames (nil when the count does not change).
-        public var frameCountGrows: Bool? { changesCount ? tableFrameCount > frameCountIn : nil }
-        /// Whether the source's peak is above 1 but kept (32-bit destinations).
-        public var peakKept: Bool { peak > 1 && !scaledToFit }
-        /// Whether the table may be turned down even though its own peak is within ±1: growing
-        /// the frame size can raise the peak a little between the original samples, and the
-        /// writer then turns the table down for a destination that cannot hold more than ±1.
-        /// Only converting settles it; the report says what was done.
-        public var mayScaleToFit: Bool
-    }
+    /// What converting an item is expected to produce: the writer's own plan
+    /// (`WavetableWriter.plan`), which the writer then follows, so the page and the conversion
+    /// cannot disagree. The writer's notes, after converting, say what was done.
+    public typealias ExpectedResult = WritePlan
 
     /// Content identity: frame size, sample count, and an FNV-1a hash of the samples' bits.
     struct ContentKey: Hashable {
@@ -621,43 +583,33 @@ public struct ConvertPlan: Equatable {
         WavetableWriter.frameSize(for: preset, source: source, options: options)
     }
 
-    /// The frame count the destination writes for a source frame count.
+    /// The frame count the destination writes for a source frame count (the writer's own rule;
+    /// with the PPG waves the table itself goes into 60, which `expected(for:)` accounts for).
     public func destinationFrameCount(source: Int) -> Int {
-        preset.requiredFrameCount ?? min(source, preset.maxFrameCount)
+        WavetableWriter.frameCount(for: preset, source: source)
     }
 
     /// Whether the destination turns a table over full scale down to fit (the 3rd Wave's tables
     /// stay within ±1; 16-bit samples cannot go beyond it).
-    public var destinationScalesToFit: Bool { preset.isThirdWave || preset == .waveEdit }
+    public var destinationScalesToFit: Bool { preset.scalesToFit }
 
     /// The interpolation as the destination's file will record it: the option, else
     /// the source's, else crossfade; nil when the format cannot record it. A Tonverk name
     /// can say only stepped or smooth, so spectral is recorded as crossfade there.
     public func interpolationRecorded(for item: Item) -> Interpolation? {
-        guard preset.recordsInterpolation else { return nil }
-        let asked = options.interpolation ?? item.table.interpolation ?? .crossfade
-        return preset == .tonverk && asked == .spectral ? .crossfade : asked
+        WavetableWriter.interpolationRecorded(for: preset, source: item.table.interpolation, options: options)
     }
 
-    /// What converting an item is expected to produce, from the preset's facts and the options;
-    /// nil when the item cannot convert (no frame size, or samples that do not divide).
+    /// What converting an item is expected to produce (the writer's plan for it); nil when the
+    /// item cannot convert (no frame size, or samples that do not divide).
     public func expected(for item: Item) -> ExpectedResult? { expected(for: item, frameSize: item.frameSize) }
 
     /// `expected(for:)` as if the item had the frame size `frameSize` (one of the sizes the file
     /// allows), for the size chooser; nil when that size does not divide the samples.
     public func expected(for item: Item, frameSize: Int?) -> ExpectedResult? {
         guard let size = frameSize, size > 0, !item.table.samples.isEmpty, item.table.samples.count % size == 0 else { return nil }
-        let count = item.table.samples.count / size
-        let ppg = preset == .thirdWaveP && options.appendPPGStandardWaves
-        // With the PPG waves, the table itself goes into 60 frames and the four waves follow.
-        let outCount = ppg ? 64 : destinationFrameCount(source: count)
-        return ExpectedResult(frameSizeIn: size, frameSizeOut: destinationFrameSize(source: size),
-                              frameCountIn: count, frameCountOut: outCount,
-                              countPolicy: options.frameCountPolicy, addsPPGWaves: ppg,
-                              peak: item.peak, scaledToFit: item.peak > 1 && destinationScalesToFit,
-                              interpolationRecorded: interpolationRecorded(for: item),
-                              mayScaleToFit: item.peak <= 1 && destinationScalesToFit
-                                  && destinationFrameSize(source: size) > size)
+        return WavetableWriter.plan(frameSize: size, frameCount: item.table.samples.count / size, peak: item.peak,
+                                    interpolation: item.table.interpolation, preset: preset, options: options)
     }
 
     /// `expected(for:)` as one line (e.g., "64 × 1,024; resized from 2,048 samples per frame;

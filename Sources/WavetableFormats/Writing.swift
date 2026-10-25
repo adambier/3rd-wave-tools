@@ -8,8 +8,9 @@ public enum WavetableWriter {
     /// Converts `table` to `preset`'s format: frame size, frame count, sample format, metadata,
     /// and file name.
     ///
-    /// The result's `notes` say every change made (frame size resampled, frame count changed and
-    /// how, scaled, name shortened or adjusted). Frame sizes change by band-limited resampling
+    /// What is done is what ``plan(for:preset:options:)`` says for the table. The result's
+    /// `notes` say every change made (frame size resampled, frame count changed and how, scaled,
+    /// name shortened or adjusted). Frame sizes change by band-limited resampling
     /// (``Resampling/resizeCycle(_:to:)``); frame counts by `options.frameCountPolicy`
     /// (``Resampling/changeFrameCount(_:to:policy:)``). WAVs are written at 48 kHz, except
     /// WaveEdit's 44.1 kHz. The interpolation recorded, where the format can record one, is
@@ -38,84 +39,109 @@ public enum WavetableWriter {
         }
     }
 
-    /// One conversion: the frames as they change, and the notes saying how.
+    /// What converting `table` for `preset` will do (``plan(frameSize:frameCount:peak:interpolation:preset:options:)``
+    /// from the table's own frame size, frame count, peak, and interpolation).
+    public static func plan(for table: Wavetable, preset: OutputPreset, options: OutputOptions = OutputOptions()) -> WritePlan {
+        plan(frameSize: table.frameSize, frameCount: table.frameCount, peak: table.peak, interpolation: table.interpolation,
+             preset: preset, options: options)
+    }
+
+    /// What converting a table of `frameCount` frames of `frameSize` samples, peaking at `peak`
+    /// and asking for `interpolation` (nil when its file does not say), will do for `preset` with
+    /// `options`: the frame size and count written, how the count changes, whether the PPG waves
+    /// are added, whether the table is turned down, the interpolation recorded, and the file
+    /// extension. ``write(_:preset:options:)`` follows the same plan, so a tool can show it before
+    /// converting; only whether a table within ±1 is turned down after its frame size grows
+    /// (``WritePlan/Scaling/possible``) waits for the conversion itself.
+    public static func plan(frameSize: Int, frameCount: Int, peak: Float, interpolation: Interpolation?,
+                            preset: OutputPreset, options: OutputOptions = OutputOptions()) -> WritePlan {
+        let sizeOut = self.frameSize(for: preset, source: frameSize, options: options)
+        let ppg = preset == .thirdWaveP && options.appendPPGStandardWaves
+        // With the PPG waves, the table itself goes into 60 frames and the four waves follow.
+        let tableCount = ppg ? 60 : self.frameCount(for: preset, source: frameCount)
+        let scaling: WritePlan.Scaling
+        if !preset.scalesToFit { scaling = .none }
+        else if peak > 1 { scaling = .certain }
+        else { scaling = sizeOut > frameSize ? .possible : .none }
+        return WritePlan(preset: preset, frameSizeIn: frameSize, frameSizeOut: sizeOut,
+                         frameCountIn: frameCount, frameCountOut: tableCount + (ppg ? 4 : 0),
+                         countPolicy: options.frameCountPolicy, addsPPGWaves: ppg,
+                         peak: peak, scalesToFit: preset.scalesToFit, scaling: scaling,
+                         interpolationRecorded: interpolationRecorded(for: preset, source: interpolation, options: options),
+                         fileExtension: preset.fileExtension)
+    }
+
+    /// The interpolation `preset`'s file records for a table whose own is `source` (nil when its
+    /// file does not say): `options.interpolation`, else `source`, else crossfade; nil when the
+    /// format cannot record one. A Tonverk name can say only stepped or smooth, so spectral is
+    /// recorded as crossfade there.
+    public static func interpolationRecorded(for preset: OutputPreset, source: Interpolation?,
+                                             options: OutputOptions = OutputOptions()) -> Interpolation? {
+        guard preset.recordsInterpolation else { return nil }
+        let asked = options.interpolation ?? source ?? .crossfade
+        return preset == .tonverk && asked == .spectral ? .crossfade : asked
+    }
+
+    /// One conversion: the frames as they change, and the notes saying how. Every step follows
+    /// `plan`, so what the writer does is what ``WavetableWriter/plan(for:preset:options:)`` said.
     private struct Job {
         let table: Wavetable
         let preset: OutputPreset
         let options: OutputOptions
+        let plan: WritePlan
         var frames: [[Float]]
         var notes: [String] = []
 
         init(table: Wavetable, preset: OutputPreset, options: OutputOptions) {
             self.table = table; self.preset = preset; self.options = options; frames = table.frames
+            plan = WavetableWriter.plan(for: table, preset: preset, options: options)
         }
 
+        /// The interpolation asked for (the option, else the table's, else crossfade), which the
+        /// notes speak of; `plan.interpolationRecorded` is what the file gets.
         var interpolation: Interpolation { options.interpolation ?? table.interpolation ?? .crossfade }
 
         mutating func run() throws -> OutputFile {
+            if preset == .tonverk, let asked = options.tonverkFrameSize, !WavetableWriter.tonverkFrameSizes.contains(asked) {
+                throw WavetableError("Tonverk takes frames of 64, 128, 256, 512, 1,024, 2,048, or 4,096 samples, not \(grouped(asked)).")
+            }
+            // The shared steps, in the plan's order: the frame count and size, the level, the
+            // PPG waves; then what each destination says and writes.
+            reshape()
+            if preset == .miniFreak, plan.frameCountIn < 64 {
+                let n = plan.frameCountIn
+                notes.append("\(n) frame\(n == 1 ? "" : "s"), fewer than the 64 a MiniFreak stores; left as it is, since how MiniFreak V treats fewer than 64 is not documented.")
+            }
+            if plan.scalesToFit { scaleToFit() } else { notePeakKept() }
+            if plan.addsPPGWaves {
+                frames += PPGStandardWaves.frames
+                notes.append("The PPG's four standard waves (triangle, narrow pulse, square, and sawtooth) were added at positions 60–63.")
+            }
             switch preset {
-            case .thirdWaveU: return try thirdWaveU()
-            case .thirdWaveP: return try thirdWaveP()
-            case .wav2048: return wav2048()
-            case .miniFreak: return miniFreak()
-            case .tonverk: return try tonverk()
-            case .phasePlant: return phasePlant()
-            case .surge: return surge()
-            case .waveEdit: return waveEdit()
+            case .thirdWaveU:
+                noteUnrecordedInterpolation()
+                return try thirdWaveFile(kind: .u, chain: Resampling.thirdWaveMipmapChain(frames))
+            case .thirdWaveP:
+                noteUnrecordedInterpolation()
+                return try thirdWaveFile(kind: .p, chain: nil)   // WavetableFile computes the differences
+            case .wav2048, .miniFreak, .phasePlant:
+                return serumStyleWAV()
+            case .tonverk:
+                return tonverk()
+            case .surge:
+                noteUnrecordedInterpolation()
+                return OutputFile(fileName: stem() + "." + plan.fileExtension, data: WavetableWriter.Bytes.surge(frames: frames), notes: notes)
+            case .waveEdit:
+                noteUnrecordedInterpolation()
+                let data = WavetableWriter.Bytes.wav(samples: frames.flatMap { $0 }, sampleRate: 44_100, format: .pcm16, clm: nil)
+                return OutputFile(fileName: stem() + "." + plan.fileExtension, data: data, notes: notes)
             }
         }
 
         // MARK: Destinations
 
-        mutating func thirdWaveU() throws -> OutputFile {
-            reshape(size: 1024, count: 64, exact: true, reason: "a 3rd Wave U table has exactly 64")
-            scaleToFit(reason: "the 3rd Wave's own tables stay within ±1")
-            noteUnrecordedInterpolation()
-            return try thirdWaveFile(kind: .u, chain: Resampling.thirdWaveMipmapChain(frames))
-        }
-
-        mutating func thirdWaveP() throws -> OutputFile {
-            if options.appendPPGStandardWaves {
-                reshape(size: 128, count: 60, exact: true,
-                        reason: "the PPG's standard waves take the last 4 of 64")
-                scaleToFit(reason: "the 3rd Wave's own tables stay within ±1")
-                frames += PPGStandardWaves.frames
-                notes.append("The PPG's four standard waves (triangle, narrow pulse, square, and sawtooth) were added at positions 60–63.")
-            } else {
-                reshape(size: 128, count: 64, exact: true, reason: "a 3rd Wave P table has exactly 64")
-                scaleToFit(reason: "the 3rd Wave's own tables stay within ±1")
-            }
-            noteUnrecordedInterpolation()
-            return try thirdWaveFile(kind: .p, chain: nil)   // WavetableFile computes the differences
-        }
-
-        mutating func wav2048() -> OutputFile {
-            reshape(size: 2048, count: 256, exact: false, reason: "Serum and Pigments take at most 256")
-            return serumStyleWAV()
-        }
-
-        mutating func miniFreak() -> OutputFile {
-            let n = frames.count
-            reshape(size: 2048, count: 64, exact: false, reason: "a MiniFreak stores 64")
-            if n < 64 {
-                notes.append("\(n) frame\(n == 1 ? "" : "s"), fewer than the 64 a MiniFreak stores; left as it is, since how MiniFreak V treats fewer than 64 is not documented.")
-            }
-            return serumStyleWAV()
-        }
-
-        mutating func phasePlant() -> OutputFile {
-            reshape(size: 2048, count: 256, exact: true, reason: "Phase Plant's documentation asks for exactly 256")
-            return serumStyleWAV()
-        }
-
-        mutating func tonverk() throws -> OutputFile {
-            if let asked = options.tonverkFrameSize, !WavetableWriter.tonverkFrameSizes.contains(asked) {
-                throw WavetableError("Tonverk takes frames of 64, 128, 256, 512, 1,024, 2,048, or 4,096 samples, not \(grouped(asked)).")
-            }
-            let size = WavetableWriter.frameSize(for: .tonverk, source: table.frameSize, options: options)
-            reshape(size: size, count: 64, exact: false, reason: "Tonverk takes at most 64")
-            notePeakKept()
-            let stepped = interpolation == .none
+        mutating func tonverk() -> OutputFile {
+            let stepped = plan.interpolationRecorded == Interpolation.none
             if interpolation == .spectral {
                 notes.append("A Tonverk file name can say only stepped or smooth, so the spectral morph asked for is marked smooth.")
             }
@@ -123,39 +149,20 @@ public enum WavetableWriter {
             let named = WavetableWriter.Names.fileStem(table.name)
             notes += named.notes
             let untagged = WavetableWriter.Names.removeTonverkTag(named.stem)
-            let tag = "_wt\(size)" + (stepped ? "r" : "")
+            let tag = "_wt\(plan.frameSizeOut)" + (stepped ? "r" : "")
             if let old = untagged.removed {
                 notes.append("The name's own Tonverk tag “\(old)” was replaced by “\(tag)”.")
             }
             let data = WavetableWriter.Bytes.wav(samples: frames.flatMap { $0 }, sampleRate: 48_000, format: .float32, clm: nil)
-            return OutputFile(fileName: untagged.stem + tag + ".wav", data: data, notes: notes)
+            return OutputFile(fileName: untagged.stem + tag + "." + plan.fileExtension, data: data, notes: notes)
         }
-
-        mutating func surge() -> OutputFile {
-            let n = table.frameSize
-            let size = WavetableWriter.frameSize(for: .surge, source: n)
-            reshape(size: size, count: 512, exact: false, reason: "Surge takes at most 512")
-            notePeakKept()
-            noteUnrecordedInterpolation()
-            return OutputFile(fileName: stem() + ".wt", data: WavetableWriter.Bytes.surge(frames: frames), notes: notes)
-        }
-
-        mutating func waveEdit() -> OutputFile {
-            reshape(size: 256, count: 64, exact: true, reason: "a WaveEdit bank has exactly 64")
-            scaleToFit(reason: "16-bit samples cannot go beyond full scale")
-            noteUnrecordedInterpolation()
-            let data = WavetableWriter.Bytes.wav(samples: frames.flatMap { $0 }, sampleRate: 44_100, format: .pcm16, clm: nil)
-            return OutputFile(fileName: stem() + ".wav", data: data, notes: notes)
-        }
-
-        // MARK: Shared steps
 
         mutating func serumStyleWAV() -> OutputFile {
-            notePeakKept()
             noteDefaultInterpolation()
-            let clm = WavetableWriter.Bytes.clmText(frameSize: 2048, interpolation: interpolation)
+            // These presets record the interpolation, so the plan always has one.
+            let clm = WavetableWriter.Bytes.clmText(frameSize: plan.frameSizeOut, interpolation: plan.interpolationRecorded ?? .crossfade)
             let data = WavetableWriter.Bytes.wav(samples: frames.flatMap { $0 }, sampleRate: 48_000, format: .float32, clm: clm)
-            return OutputFile(fileName: stem() + ".wav", data: data, notes: notes)
+            return OutputFile(fileName: stem() + "." + plan.fileExtension, data: data, notes: notes)
         }
 
         /// The frames (already 64 of the kind's size) as a `.wt`, laid out by PgdataFormats.
@@ -163,8 +170,10 @@ public enum WavetableWriter {
             let named = WavetableWriter.Names.thirdWave(table.name)
             notes += named.notes
             let data = try WavetableFile(kind: kind, name: named.name, frames: frames, mipmapChain: chain).serialized()
-            return OutputFile(fileName: stem() + ".wt", folder: "WAVES", data: data, notes: notes)
+            return OutputFile(fileName: stem() + "." + plan.fileExtension, folder: "WAVES", data: data, notes: notes)
         }
+
+        // MARK: Shared steps
 
         mutating func stem() -> String {
             let named = WavetableWriter.Names.fileStem(table.name)
@@ -172,13 +181,28 @@ public enum WavetableWriter {
             return named.stem
         }
 
-        /// Brings the frames to `size` samples and to `count` frames (exactly, or at most when
-        /// `exact` is false), noting each change. `reason` completes "… frames" for the note.
-        mutating func reshape(size: Int, count: Int, exact: Bool, reason: String) {
+        /// Why the destination's frame count is what it is, completing "… frames" in the note.
+        var countReason: String {
+            switch preset {
+            case .thirdWaveU: return "a 3rd Wave U table has exactly 64"
+            case .thirdWaveP: return plan.addsPPGWaves ? "the PPG's standard waves take the last 4 of 64" : "a 3rd Wave P table has exactly 64"
+            case .wav2048: return "Serum and Pigments take at most 256"
+            case .miniFreak: return "a MiniFreak stores 64"
+            case .phasePlant: return "Phase Plant's documentation asks for exactly 256"
+            case .tonverk: return "Tonverk takes at most 64"
+            case .surge: return "Surge takes at most 512"
+            case .waveEdit: return "a WaveEdit bank has exactly 64"
+            }
+        }
+
+        /// Brings the frames to the plan's frame size and to the frames the table itself goes
+        /// into (`plan.tableFrameCount`), noting each change.
+        mutating func reshape() {
             let n = frames.count
-            let target = exact ? count : Swift.min(n, count)
+            let target = plan.tableFrameCount
+            let size = plan.frameSizeOut
             // Fewer frames first (less to resample), more frames after.
-            if target < n { changeCount(to: target, reason: reason) }
+            if target < n { changeCount(to: target, reason: countReason) }
             let from = frames.first?.count ?? 0
             if from != size {
                 frames = frames.map { Resampling.resizeCycle($0, to: size) }
@@ -188,7 +212,7 @@ public enum WavetableWriter {
                     notes.append("Resized from \(grouped(from)) to \(grouped(size)) samples per frame; the \(ordinal(size / 2 + 1)) harmonic and above are dropped, as \(grouped(size)) samples can't hold them.")
                 }
             }
-            if target > n { changeCount(to: target, reason: reason) }
+            if target > n { changeCount(to: target, reason: countReason) }
         }
 
         mutating func changeCount(to m: Int, reason: String) {
@@ -203,12 +227,15 @@ public enum WavetableWriter {
             notes.append("Frame count changed from \(grouped(n)) to \(grouped(m)) (\(reason) frames), \(how).")
         }
 
-        /// Scales the frames down so the peak is 1 when it is above 1.
-        mutating func scaleToFit(reason: String) {
+        /// For a destination that cannot hold samples beyond ±1 (`plan.scalesToFit`): scales the
+        /// frames down so the peak is 1 when, after resizing, it is above 1. This is the one
+        /// decision the plan cannot make beforehand (``WritePlan/Scaling/possible``).
+        mutating func scaleToFit() {
             let peak = currentPeak
             guard peak > 1 else { return }
             let g = 1 / peak
             frames = frames.map { $0.map { $0 * g } }
+            let reason = preset.isThirdWave ? "the 3rd Wave's own tables stay within ±1" : "16-bit samples cannot go beyond full scale"
             notes.append("Turned down to fit (peak was \(decimal(Double(peak), 2)), \(decimal(20 * log10(Double(g)), 1)) dB); plays a little quieter: \(reason).")
         }
 
@@ -240,6 +267,14 @@ public enum WavetableWriter {
 
     /// Whether Surge accepts `n` samples per frame in a `.wt`: a power of two from 2 to 4,096.
     public static func isSurgeFrameSize(_ n: Int) -> Bool { n >= 2 && n <= 4096 && (n & (n - 1)) == 0 }
+
+    /// The frame count `preset` writes for a table of `source` frames: the preset's required
+    /// count, else the source's up to its most (``OutputPreset/requiredFrameCount``,
+    /// ``OutputPreset/maxFrameCount``). With the PPG waves, the table itself goes into 60 frames
+    /// instead; see ``plan(frameSize:frameCount:peak:interpolation:preset:options:)``.
+    public static func frameCount(for preset: OutputPreset, source: Int) -> Int {
+        preset.requiredFrameCount ?? Swift.min(source, preset.maxFrameCount)
+    }
 
     /// The frame size `preset` writes for a table of `source` samples per frame with `options`:
     /// the preset's fixed size; for Tonverk the requested size, else the source's when Tonverk
@@ -276,6 +311,69 @@ public enum WavetableWriter {
         }
         return grouped(n) + suffix
     }
+}
+
+/// What converting a table for a destination will do, from the table's frame size, frame count,
+/// peak, and interpolation alone (``WavetableWriter/plan(for:preset:options:)``). The writer
+/// follows it step by step, so a tool can show it before converting; the writer's own notes,
+/// afterwards, say what was done.
+public struct WritePlan: Equatable, Sendable {
+    /// Whether the table is turned down to fit the destination.
+    public enum Scaling: Equatable, Sendable {
+        /// Not turned down: the destination keeps samples beyond ±1 as they are, or the peak is
+        /// within ±1 and the frame size does not grow.
+        case none
+        /// The peak is within ±1, but the frame size grows, which can raise the peak a little
+        /// between the original samples; the writer then turns the table down for a destination
+        /// that cannot hold more than ±1. Only converting settles it.
+        case possible
+        /// The peak is above 1 and the destination cannot hold it: turned down.
+        case certain
+    }
+
+    /// The destination.
+    public var preset: OutputPreset
+    /// Samples per frame in the source.
+    public var frameSizeIn: Int
+    /// Samples per frame written.
+    public var frameSizeOut: Int
+    /// Frames in the source.
+    public var frameCountIn: Int
+    /// Frames written (with the PPG waves, the 60 the table goes into plus the 4 waves).
+    public var frameCountOut: Int
+    /// How the frame count is changed, when it is.
+    public var countPolicy: FrameCountPolicy
+    /// Whether the PPG's four standard waves are added at 60–63.
+    public var addsPPGWaves: Bool
+    /// The source's peak.
+    public var peak: Float
+    /// Whether the destination turns a table over full scale down to fit
+    /// (``OutputPreset/scalesToFit``).
+    public var scalesToFit: Bool
+    /// Whether this table is turned down.
+    public var scaling: Scaling
+    /// The interpolation as the file will record it; nil when the format cannot record it.
+    public var interpolationRecorded: Interpolation?
+    /// The extension of the file written, without the dot.
+    public var fileExtension: String
+
+    /// Whether the frame size changes.
+    public var resizes: Bool { frameSizeIn != frameSizeOut }
+    /// Whether the frame size grows (nil when it does not change).
+    public var frameSizeGrows: Bool? { resizes ? frameSizeOut > frameSizeIn : nil }
+    /// The frames the table itself goes into (60 with the PPG waves, else `frameCountOut`).
+    public var tableFrameCount: Int { addsPPGWaves ? frameCountOut - 4 : frameCountOut }
+    /// Whether the table's frame count changes.
+    public var changesCount: Bool { tableFrameCount != frameCountIn }
+    /// Whether the table gets more frames (nil when the count does not change).
+    public var frameCountGrows: Bool? { changesCount ? tableFrameCount > frameCountIn : nil }
+    /// Whether the table is turned down to fit (`scaling` is `.certain`).
+    public var scaledToFit: Bool { scaling == .certain }
+    /// Whether the table may be turned down even though its own peak is within ±1 (`scaling`
+    /// is `.possible`).
+    public var mayScaleToFit: Bool { scaling == .possible }
+    /// Whether the source's peak is above 1 but kept (32-bit destinations).
+    public var peakKept: Bool { peak > 1 && !scalesToFit }
 }
 
 public extension OutputPreset {
@@ -371,6 +469,11 @@ public extension OutputPreset {
 
     /// Whether the preset writes a 3rd Wave `.wt` (output that can go to the Pack page).
     var isThirdWave: Bool { self == .thirdWaveU || self == .thirdWaveP }
+
+    /// Whether the preset turns a table over full scale down to fit: the 3rd Wave's own tables
+    /// stay within ±1, and 16-bit samples cannot go beyond it. The 32-bit float destinations
+    /// keep the peak as it is.
+    var scalesToFit: Bool { isThirdWave || self == .waveEdit }
 
     /// The extension of the files the preset writes, without the dot: "wt" or "wav".
     var fileExtension: String {
