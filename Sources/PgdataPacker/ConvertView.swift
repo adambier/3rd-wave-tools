@@ -228,7 +228,13 @@ struct ConvertTable: View {
             // widths fit the headers and the longest cells ("256 × 2,048  from markers" with its
             // chevron; "256 → 64 frames, picked evenly, turned down" on two lines).
             TableColumn("Input (frames × samples)") { (item: ConvertPlan.Item) in ConvertFrameSizeCell(state: st, item: item, selection: $selection) }
-                .width(min: 210, ideal: 250)
+                .width(min: 230, ideal: 260)
+            // The interpolation the table came with ("Not stated" for most WAVs); what the
+            // destination's file records is the Options box's affair.
+            TableColumn("Interpolation") { (item: ConvertPlan.Item) in
+                ConvertInterpolationCell(interpolation: item.table.interpolation, included: plan.isSelected(item))
+            }
+                .width(min: 100, ideal: 120)
             TableColumn("Output (frames × samples)") { (item: ConvertPlan.Item) in
                 ConvertOutputCell(expected: plan.expected(for: item), summary: plan.expectedResult(for: item), included: plan.isSelected(item))
             }
@@ -253,6 +259,21 @@ struct ConvertCheckCell: View {
             .labelsHidden()
             .help(item.factorySlot != nil && state.convertPlan.preset.isThirdWave
                   ? "Your 3rd Wave is expected to have this factory table (U48–U55 since the 2025 update, which Groove Synthesis offers as a download), so it starts unchecked" : "")
+    }
+}
+
+/// The interpolation the table's file states: "None (stepped)", "Crossfade", "Spectral", or, in
+/// secondary type, "Not stated".
+struct ConvertInterpolationCell: View {
+    let interpolation: Interpolation?
+    let included: Bool
+    var body: some View {
+        Text(Interpolation.displayName(interpolation))
+            .lineLimit(1)
+            .foregroundStyle(interpolation == nil || !included ? Color.secondary : Color.primary)
+            .help(interpolation == nil
+                  ? "The file does not say how to move between frames; most synths set this on the oscillator, and a destination whose file records it saves crossfade unless the Options say otherwise."
+                  : "How the file asks a synth to move between frames: none (it steps from frame to frame), crossfade (it blends neighbours), or spectral (it blends their harmonics).")
     }
 }
 
@@ -291,8 +312,9 @@ struct ConvertNameCell: View {
                 ConvertBadge(text: origin, tip: item.location.url.path)
             }
             if let slot = item.factorySlot {
-                ConvertBadge(text: "Factory",
-                             tip: "Same as factory \(slot.label)\(item.factoryName.map { " " + $0 } ?? "")")
+                // The slot in the badge, so the row says which factory table this is.
+                ConvertBadge(text: "Factory \(slot.label)",
+                             tip: "Same as factory \(slot.label)\(item.factoryName.map { " " + $0 } ?? ""): your 3rd Wave is expected to have it")
             }
             if !item.alsoIn.isEmpty {
                 Label("×\(item.alsoIn.count + 1)", systemImage: "doc.on.doc")
@@ -435,6 +457,8 @@ struct ConvertFramesBySize: View {
     static let buttonInset: CGFloat = 7
 
     var body: some View {
+        // Never shortened to "2…": the numbers take the width they need, and when a cell is too
+        // narrow it is the word after them that gives way.
         HStack(spacing: 4) {
             Text("\(count)").fontWeight(countWeight)
                 .frame(minWidth: Self.countWidth, alignment: .trailing)
@@ -443,6 +467,8 @@ struct ConvertFramesBySize: View {
         }
         .monospacedDigit()
         .lineLimit(1)
+        .fixedSize()
+        .layoutPriority(1)
     }
 }
 
@@ -474,12 +500,18 @@ struct ConvertSizePopover: View {
                 .font(.caption)
                 .fixedSize(horizontal: false, vertical: true)
             // Three buttons to a row, each wide enough for its result on two lines; a length
-            // that allows more sizes (up to six) gets a second row rather than narrower buttons.
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 144, maximum: 150), spacing: 8, alignment: .top)],
-                      alignment: .leading, spacing: 8) {
-                ForEach(item.frameSizeChoices, id: \.self) { (size: Int) in
-                    ConvertSizeButton(state: state, item: item, size: size,
-                                      likely: FrameSizeFit.likelySize(item.frameSizeFit) == size)
+            // that allows more sizes gets more rows rather than narrower buttons. Plain stacks,
+            // not a LazyVGrid: in a popover's VStack the lazy grid took all the height and left
+            // every sentence around it one truncated line.
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(stride(from: 0, to: item.frameSizeChoices.count, by: 3)), id: \.self) { (start: Int) in
+                    HStack(alignment: .top, spacing: 8) {
+                        ForEach(item.frameSizeChoices[start..<min(start + 3, item.frameSizeChoices.count)], id: \.self) { (size: Int) in
+                            ConvertSizeButton(state: state, item: item, size: size,
+                                              likely: FrameSizeFit.likelySize(item.frameSizeFit) == size)
+                                .frame(width: ConvertSizeButton.width)
+                        }
+                    }
                 }
             }
             if let fitLine {
@@ -501,6 +533,9 @@ struct ConvertSizeButton: View {
     let size: Int
     var likely: Bool = false
 
+    /// The button's width: three to a row in the chooser (see `ConvertSizePopover`).
+    static let width: CGFloat = 146
+
     /// "→ 64 × 1,024, 4 → 64 frames, repeated": what the destination writes for this size.
     private var becomes: String {
         let plan = state.convertPlan
@@ -517,7 +552,10 @@ struct ConvertSizeButton: View {
         let frames = item.table.samples.count / max(size, 1)
         Button { state.convertPlan.chooseFrameSize(item.id, size) } label: {
             VStack(spacing: 3) {
-                WaveThumbnail(samples: Array(item.table.samples.prefix(size)), tint: chosen ? Color.accentColor : Color.primary)
+                // The first wave cut at this size, as wide as the button: the right size shows one
+                // complete cycle; too large repeats it, too small cuts it off.
+                WaveThumbnail(samples: Array(item.table.samples.prefix(size)), tint: chosen ? Color.accentColor : Color.primary,
+                              width: Self.width - 16, height: 36)
                 Text("\(frames) × \(ConvertPlan.formatCount(size))")
                     .font(.caption).monospacedDigit().lineLimit(1)
                     .foregroundStyle(chosen ? Color.accentColor : Color.primary)
@@ -532,7 +570,7 @@ struct ConvertSizeButton: View {
                 }
             }
             .padding(6)
-            .frame(maxWidth: .infinity)   // the grid's column (see ConvertSizePopover)
+            .frame(maxWidth: .infinity)   // the width the chooser gives the button
             .background(RoundedRectangle(cornerRadius: 6).fill(chosen ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.08)))
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(chosen ? Color.accentColor : Color.clear, lineWidth: 1))
         }

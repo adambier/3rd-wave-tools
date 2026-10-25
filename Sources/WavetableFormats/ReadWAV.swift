@@ -469,8 +469,10 @@ extension WavetableReader {
         (2...4096).contains(n) && n & (n - 1) == 0 && count / n >= 2
     }
 
-    /// Powers of two from 64 to 4,096 that divide `count` into 2 to 256 frames.
-    fileprivate static func fittingFrameSizes(_ count: Int) -> [Int] {
+    /// The frame sizes a sample count allows: powers of two from 64 to 4,096 that divide
+    /// `count` into 2 to 256 frames. The reader offers these for a file whose size rests on its
+    /// length alone; a tool can offer them too where a stated size is to be overridden.
+    public static func fittingFrameSizes(_ count: Int) -> [Int] {
         (6...12).map { 1 << $0 }.filter { count % $0 == 0 && (2...256).contains(count / $0) }
     }
 

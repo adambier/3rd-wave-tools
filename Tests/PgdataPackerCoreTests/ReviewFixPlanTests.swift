@@ -42,13 +42,24 @@ final class ReviewFixPlanTests: XCTestCase {
         XCTAssertNil(plan.items[0].chosenFrameSize)
     }
 
-    func testMetadataSizeIsNotOfferedForChange() {
-        let t = FoundTable(name: "T", fileName: "t.wav", source: .wav, samples: Array(repeating: 0, count: 4096),
+    /// A stated size can be overridden with another the length allows (a wrong tag happens);
+    /// the file's own size comes first and stays "in the file" until another is chosen.
+    func testMetadataSizeCanBeOverriddenWithinWhatFits() {
+        let t = FoundTable(name: "T", fileName: "t.wav", source: .wav, samples: Array(repeating: 0, count: 8192),
                            frameSize: 2048, frameSizeBasis: "clm chunk")
         var plan = ConvertPlan()
         _ = plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/t.wav"), table: t)])
-        XCTAssertEqual(plan.items[0].frameSizeChoices, [])
-        plan.chooseFrameSize(plan.items[0].id, 1024)
+        XCTAssertEqual(plan.items[0].frameSizeChoices, [2048, 64, 128, 256, 512, 1024, 4096])
+        XCTAssertEqual(plan.items[0].sizeQualifier, "in the file")
+        plan.chooseFrameSize(plan.items[0].id, 1000)   // not offered
         XCTAssertEqual(plan.items[0].frameSize, 2048)
+        plan.chooseFrameSize(plan.items[0].id, 1024)
+        XCTAssertEqual(plan.items[0].frameSize, 1024)
+        XCTAssertEqual(plan.items[0].sizeQualifier, "set manually")
+        // A 3rd Wave table's format fixes its size: no choice to make, so the cell is plain text.
+        let u = FoundTable(name: "U", fileName: "u.wt", source: .thirdWaveWavetable(isP: false),
+                           samples: Array(repeating: 0, count: 65_536), frameSize: 1024, frameSizeBasis: "3rd Wave U table")
+        _ = plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/u.wt"), table: u)])
+        XCTAssertEqual(plan.items[1].frameSizeChoices, [])
     }
 }

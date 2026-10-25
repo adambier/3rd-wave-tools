@@ -95,10 +95,18 @@ public struct ConvertPlan: Equatable {
         /// The frame size used: the user's choice, or else the file's.
         public var frameSize: Int? { chosenFrameSize ?? table.frameSize }
         /// The sizes the user can choose from: the file's own (when it gives one) and the other
-        /// sizes its length allows. Empty when the file settles the size by metadata or name.
+        /// sizes its length allows (`WavetableReader.fittingFrameSizes`), for a WAV or FLAC
+        /// even when the file states its size (a wrong tag can be overridden; the stated size
+        /// is marked "in the file"). Empty for a 3rd Wave or Surge table, whose format fixes
+        /// the size, and when nothing else fits.
         public var frameSizeChoices: [Int] {
-            guard !table.candidateFrameSizes.isEmpty else { return [] }
-            return (table.frameSize.map { [$0] } ?? []) + table.candidateFrameSizes.filter { $0 != table.frameSize }
+            let own = table.frameSize.map { [$0] } ?? []
+            var others = table.candidateFrameSizes
+            if others.isEmpty, table.frameSize != nil, table.source == .wav || table.source == .flac {
+                others = WavetableReader.fittingFrameSizes(table.samples.count)
+            }
+            let choices = own + others.filter { $0 != table.frameSize }
+            return choices.count > 1 || table.frameSize == nil ? choices : []
         }
         /// Whether the file leaves the frame size open, so the user must choose one.
         public var needsFrameSize: Bool { table.frameSize == nil }
@@ -492,7 +500,8 @@ public struct ConvertPlan: Equatable {
         }
         if item.peak > 1 {
             warnings.insert("Peak \(Wavetable.peakText(item.peak)) is over full scale (±1); "
-                + (destinationScalesToFit ? "the table is turned down to fit." : "it is kept as it is, so the synth may clip it."), at: 0)
+                + (destinationScalesToFit ? "the table is turned down to fit, so it plays a little quieter."
+                                          : "it is kept as it is, so unless the synth turns the table down, it may clip the loudest parts, which adds a hard, buzzy edge."), at: 0)
         }
         if let slot = item.factorySlot {
             let label = "factory " + slot.label + (item.factoryName.map { " " + $0 } ?? "")
@@ -826,16 +835,21 @@ public struct ConvertPlan: Equatable {
     public var thirdWaveCapacityNote: String? { thirdWaveCapacityNote(for: preset) }
 
     /// For a 3rd Wave destination: a warning when more of the user's own tables are to be
-    /// converted than a 3rd Wave holds at a time (U56–U63, P36–P47; factory tables, which it
-    /// already has, do not count); nil otherwise, and for other destinations. The 3rd Wave
-    /// itself, with no slot free, offers to overwrite its last tables.
+    /// converted than the slots its factory tables leave free (U56–U63, P36–P47; factory
+    /// tables, which it already has, do not count), since the 3rd Wave will then offer to
+    /// overwrite; nil otherwise, and for other destinations. The note states the facts: how
+    /// many tables a 3rd Wave holds (64 U, 48 P), how many of them are Groove Synthesis's
+    /// (U00–U55, P00–P35), and that with no slot free it offers to overwrite its last slots
+    /// (observed for one table, which went to U63; see section 7 of FORMATS.md).
     public func thirdWaveCapacityNote(for preset: OutputPreset) -> String? {
         guard preset.isThirdWave else { return nil }
         let own = selectedItems.filter { canConvert($0) && $0.factorySlot == nil }.count
         let isP = preset == .thirdWaveP
-        let slots = isP ? SourceRef.pCount - SourceRef.factoryPCount : SourceRef.uCount - SourceRef.factoryUCount
-        guard own > slots else { return nil }
-        return "\(own) \(isP ? "P" : "U") tables to convert; a 3rd Wave holds \(slots) of your own at a time. With none free, it offers to overwrite its last ones."
+        let total = isP ? SourceRef.pCount : SourceRef.uCount
+        let factory = isP ? SourceRef.factoryPCount : SourceRef.factoryUCount
+        guard own > total - factory else { return nil }
+        let kind = isP ? "P" : "U"
+        return "\(own) \(kind) tables to convert. A 3rd Wave holds \(total) \(kind) tables, \(factory) of them Groove Synthesis's (\(kind)00–\(kind)\(factory - 1)); with no slot free, it offers to overwrite its last slots, \(kind)\(total - 1) first."
     }
 
     /// What the Changes column says for an item: short words for each change the destination
@@ -861,7 +875,7 @@ public struct ConvertPlan: Equatable {
             changes.append("name changed")
         }
         var warnings: [String] = []
-        if e.peakKept { warnings.append("peak \(Wavetable.peakText(e.peak)), over full scale") }
+        if e.peakKept { warnings.append("peak \(Wavetable.peakText(e.peak)), may clip") }
         for note in item.table.readNotes where Self.isWarning(note.kind) {
             if let word = Self.shortWarning(note.kind), !warnings.contains(word) { warnings.append(word) }
         }

@@ -115,7 +115,7 @@ extension WavetableReader {
     /// and 16-bit files cannot hold more, so converting to those turns the table down.
     static func peakNote(_ peak: Float) -> ReadNote? {
         guard peak > 1 else { return nil }
-        return ReadNote(.peak(peak), "Peak \(Wavetable.peakText(peak)): over full scale (±1). Converting to a 3rd Wave table or a 16-bit file turns it down to fit.")
+        return ReadNote(.peak(peak), "Peak \(Wavetable.peakText(peak)): over full scale (±1). A synth that does not turn such a table down may clip its loudest parts, which adds a hard, buzzy edge. Converting to a 3rd Wave table or a 16-bit file turns it down to fit.")
     }
 
     /// A note for a table of more than 256 frames, or nil.

@@ -111,7 +111,7 @@ final class ConvertReportTests: XCTestCase {
         plan.add((0..<9).map(table), factory: FactoryLibrary())
         let names = plan.items.map(\.name)
         let c = conversion(names, notes: names.map { _ in ["Resized from 128 to 1,024 samples per frame."] })
-        let note = "9 U tables to convert; a 3rd Wave holds 8 of your own at a time. With none free, it offers to overwrite its last ones."
+        let note = "9 U tables to convert. A 3rd Wave holds 64 U tables, 56 of them Groove Synthesis's (U00–U55); with no slot free, it offers to overwrite its last slots, U63 first."
         let r = make(plan, c, written(names.map { "WAVES/\($0).wt" }))
         XCTAssertEqual(plan.thirdWaveCapacityNote, note)
         XCTAssertTrue(r.message.hasSuffix("What converting did:\n• All 9 tables\tResized from 128 to 1,024 samples per frame.\n\n" + note), r.message)

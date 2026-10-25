@@ -207,12 +207,14 @@ struct ConvertOverviewPair: View {
                                 caption: "Source · \(source.frameCount) × \(ConvertPlan.formatCount(source.frameSize))",
                                 interpolation: item.table.interpolation,
                                 unstatedLegend: "interpolation not stated",
+                                tint: WavetableStackCanvas.sourceColor,
                                 sweep: $sweep)
                 if let result, let first = result.first {
                     ConvertOverview(frames: result,
                                     caption: "\(plan.preset.shortTitle) · \(result.count) × \(ConvertPlan.formatCount(first.count))",
                                     interpolation: resultInterpolation,
                                     unstatedLegend: "interpolation not stored in the file",
+                                    tint: WavetableStackCanvas.resultColor,
                                     sweep: $sweep)
                 }
                 ConvertSweepView(source: source.frames, sourceInterpolation: item.table.interpolation,
@@ -235,11 +237,14 @@ struct ConvertOverview: View {
     let interpolation: Interpolation?
     /// The words after "Stored frames" when `interpolation` is nil.
     let unstatedLegend: String
+    /// The table's colour: the source's (`WavetableStackCanvas.sourceColor`) or the result's
+    /// (`resultColor`), the same in the cycle picture beside them.
+    let tint: Color
     @Binding var sweep: Double?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            WavetableStackCanvas(frames: frames, interpolation: interpolation, highlight: sweep)
+            WavetableStackCanvas(frames: frames, interpolation: interpolation, tint: tint, highlight: sweep)
                 .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
                 .overlay(
                     GeometryReader { (geo: GeometryProxy) in
@@ -257,7 +262,7 @@ struct ConvertOverview: View {
                 )
             Text(caption).font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 .fixedSize(horizontal: false, vertical: true)
-            ConvertOverviewLegend(interpolation: interpolation, unstated: unstatedLegend)
+            ConvertOverviewLegend(interpolation: interpolation, unstated: unstatedLegend, tint: tint)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
@@ -290,11 +295,11 @@ struct ConvertSweepView: View {
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 2) {
                 if let sourcePoint {
-                    ConvertSwatch(color: WavetableStackCanvas.storedColor,
+                    ConvertSwatch(color: WavetableStackCanvas.sourceColor,
                                   text: "Source: " + WavetableSketch.sweepWords(sourcePoint, of: source.count, interpolation: sourceInterpolation))
                 }
                 if let resultPoint, let result {
-                    ConvertSwatch(color: SweepCycleCanvas.resultColor,
+                    ConvertSwatch(color: WavetableStackCanvas.resultColor,
                                   text: resultTitle + ": " + WavetableSketch.sweepWords(resultPoint, of: result.count, interpolation: resultInterpolation))
                 }
             }
@@ -304,13 +309,11 @@ struct ConvertSweepView: View {
     }
 }
 
-/// Two cycles over each other, to one scale: the source's and, when there is one, the result's.
+/// Two cycles over each other, to one scale: the source's and, when there is one, the result's,
+/// in the colours of their stacks (`WavetableStackCanvas.sourceColor`, `resultColor`).
 struct SweepCycleCanvas: View {
     let source: [Float]
     let result: [Float]?
-
-    /// The colour of the result's cycle (the source's is `WavetableStackCanvas.storedColor`).
-    static let resultColor = Color.accentColor
 
     var body: some View {
         Canvas { (context: inout GraphicsContext, size: CGSize) in
@@ -323,11 +326,11 @@ struct SweepCycleCanvas: View {
             context.stroke(axis, with: .color(Color.secondary.opacity(0.3)), lineWidth: 0.5)
             if source.count > 1 {
                 context.stroke(WavetableStackCanvas.path(source, x0: 0, base: base, width: size.width, amplitude: amplitude),
-                               with: .color(WavetableStackCanvas.storedColor.opacity(result == nil ? 1 : 0.6)), lineWidth: 1.2)
+                               with: .color(WavetableStackCanvas.sourceColor.opacity(result == nil ? 1 : 0.6)), lineWidth: 1.2)
             }
             if let result, result.count > 1 {
                 context.stroke(WavetableStackCanvas.path(result, x0: 0, base: base, width: size.width, amplitude: amplitude),
-                               with: .color(SweepCycleCanvas.resultColor), lineWidth: 1.2)
+                               with: .color(WavetableStackCanvas.resultColor), lineWidth: 1.2)
             }
         }
     }
@@ -338,6 +341,7 @@ struct SweepCycleCanvas: View {
 struct ConvertOverviewLegend: View {
     let interpolation: Interpolation?
     let unstated: String
+    let tint: Color
 
     private var storedWords: String {
         guard let mode = interpolation else { return "Stored frames · " + unstated }
@@ -346,9 +350,9 @@ struct ConvertOverviewLegend: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ConvertSwatch(color: WavetableStackCanvas.storedColor, text: storedWords)
+            ConvertSwatch(color: tint, text: storedWords)
             if interpolation == .crossfade {
-                ConvertSwatch(color: WavetableStackCanvas.crossfadeColor, text: "Crossfades")
+                ConvertSwatch(color: WavetableStackCanvas.crossfadeColor(tint), text: "Crossfades")
             } else if interpolation == .spectral {
                 ConvertSwatch(color: WavetableStackCanvas.spectralColor, text: "Spectral blends (approx.)")
             }
@@ -380,18 +384,22 @@ struct ConvertSwatch: View {
 struct WavetableStackCanvas: View {
     let frames: [[Float]]
     let interpolation: Interpolation?
+    /// The colour of the stored frames: the table's own, so the source and the result keep
+    /// their colours across the pictures (`sourceColor`, `resultColor`).
+    var tint: Color = WavetableStackCanvas.sourceColor
     var highlight: Double? = nil
 
-    /// The colour of the highlighted cycle: one the page uses for nothing else (orange is for
-    /// warnings, the accent colour for crossfades, purple for spectral blends).
-    static let highlightColor = Color.pink
-
-    /// The colour of stored frames.
-    static let storedColor = Color.primary
-    /// The colour of crossfade in-betweens.
-    static let crossfadeColor = Color.accentColor
-    /// The colour of spectral in-betweens.
+    /// The source's colour, in its stack and in the cycle picture.
+    static let sourceColor = Color.primary
+    /// The result's colour, in its stack and in the cycle picture.
+    static let resultColor = Color.accentColor
+    /// The colour of crossfade in-betweens: the table's own, fainter.
+    static func crossfadeColor(_ tint: Color) -> Color { tint.opacity(0.55) }
+    /// The colour of spectral in-betweens, whichever table they belong to.
     static let spectralColor = Color.purple
+    /// The colour of the highlighted cycle: one the page uses for nothing else (orange is for
+    /// warnings, purple for spectral blends, the accent colour for the result).
+    static let highlightColor = Color.pink
 
     /// A line to draw: its depth in frames from the front, its values, and whether it is an
     /// in-between.
@@ -411,7 +419,7 @@ struct WavetableStackCanvas: View {
             let depthY = size.height * (showsBetweens ? 0.36 : 0.5)
             let waveWidth = size.width - depthX
             let amplitude = (size.height - depthY) / 2 - 1
-            let betweenColor = interpolation == .spectral ? WavetableStackCanvas.spectralColor : WavetableStackCanvas.crossfadeColor
+            let betweenColor = interpolation == .spectral ? WavetableStackCanvas.spectralColor : WavetableStackCanvas.crossfadeColor(tint)
             for line in lines {
                 let t: CGFloat = last > 0 ? CGFloat(line.position / last) : 0
                 let x0 = depthX * t
@@ -421,7 +429,7 @@ struct WavetableStackCanvas: View {
                 if line.between {
                     context.stroke(path, with: .color(betweenColor.opacity(0.6 * fade)), lineWidth: 0.6)
                 } else {
-                    context.stroke(path, with: .color(WavetableStackCanvas.storedColor.opacity(fade)), lineWidth: showsBetweens ? 1 : 1.2)
+                    context.stroke(path, with: .color(tint.opacity(fade)), lineWidth: showsBetweens ? 1 : 1.2)
                 }
             }
             // The cycle at the pointer, over everything, at its depth in the stack. Taken from

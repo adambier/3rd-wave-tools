@@ -289,16 +289,21 @@ Then choose a destination:
 | Surge XT | a Surge `.wt` |
 | WaveEdit, E370 | a 16-bit WAV of 64 frames of 256 |
 
-The chosen destination says why it is separate, and a destination whose sources leave something
-open says what that is; the book icon beside each row opens its sources, and a green seal in its
-place marks a destination that has been tested in its synth (none yet). The destination and its
-options apply to every table marked to convert. The preview below the table is read-only and
-shows one table: the source and the result stacked frame by frame (with the interpolation drawn
-between frames where a file records one), its file, its frame size and what that rests on, and
-what converting changes. Names are edited in the table, and a frame size the file leaves open is
-chosen from the Input column, where each size the file allows is drawn so the one that cuts the
-wave in the right place is visible, and the size the samples suggest is marked "likely" (a hint,
-never applied by itself). When a destination needs a different number of frames, **Options**
+The chosen destination says why it is separate and, in orange, what is open about it: that
+converting to it has not yet been tested (none has), and anything its sources leave open that
+the tables to convert bring about; the book icon beside each row (under the heading **Sources**)
+opens its sources, and a green seal in its place marks a destination that has been tested. The
+destination and its options apply to every table marked to convert. Each row's Input column says
+where its frame size comes from (in the file, in the name, from markers, guessed, or set
+manually), and the Interpolation column what its file says about moving between frames. The
+preview below the table is read-only and shows one table: the source and the result stacked frame
+by frame (with the interpolation drawn between frames where a file records one), its file, its
+frame size and what that rests on, and what converting changes; moving the pointer across a
+picture sweeps through the table and draws the cycle at that point large, source and result
+together. Names are edited in the table, and a frame size is chosen from the Input column: for a
+WAV or FLAC, every size the file's length allows is drawn so the one that cuts the wave in the
+right place is visible, the file's own first, and the size the samples suggest is marked "likely"
+(a hint, never applied by itself). When a destination needs a different number of frames, **Options**
 lets you choose how to get there: **Keep Original Frames** (evenly spaced frames, the first and
 last among them, adding no new waves) or **Crossfade New Frames** (each new frame is a crossfade
 of its neighbours). It also sets the interpolation saved in the file where the format records
@@ -312,8 +317,9 @@ The page converts existing wavetables; it does not make wavetables from other au
 what the 3rd Wave's **Wave Maker** does. Wave Maker also imports a Serum wavetable directly; this
 page adds other formats and frame sizes, many tables at once, and Send to Pack. To load the `.wt`
 files it writes, copy the `WAVES` folder onto the 3rd Wave's USB drive and use Global → **Bulk
-wavetable import**; a 3rd Wave has 8 slots for your own U tables (U56–U63) and 12 for P tables
-(P36–P47), and the page warns when more are to be converted.
+wavetable import**. A 3rd Wave holds 64 U tables and 48 P tables; its factory tables fill U00–U55
+and P00–P35, leaving U56–U63 and P36–P47, and the page warns when more tables are to be converted
+than those slots hold, since the 3rd Wave then offers to overwrite its last slots.
 [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes what each destination expects, with sources.
 
 ## On the 3rd Wave

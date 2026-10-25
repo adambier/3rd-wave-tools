@@ -243,7 +243,7 @@ public enum WavetableWriter {
         mutating func notePeakKept() {
             let peak = currentPeak
             guard peak > 1 else { return }
-            notes.append("Peak \(Wavetable.peakText(peak)) kept; the synth may clip it.")
+            notes.append("Peak \(Wavetable.peakText(peak)) kept, over full scale (±1): unless the synth turns the table down, it may clip the loudest parts, which adds a hard, buzzy edge.")
         }
 
         /// For destinations that record the interpolation: says when crossfade (or

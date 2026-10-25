@@ -54,7 +54,7 @@ struct ConvertDestinationPane: View {
             if plan.preset.isThirdWave {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("To load .wt files: copy the WAVES folder onto the 3rd Wave's USB drive, then Global → Bulk wavetable import. A 3rd Wave has 8 slots for your own U tables (U56–U63) and 12 for P tables (P36–P47).")
+                    Text("To load .wt files: copy the WAVES folder onto the 3rd Wave's USB drive, then Global → Bulk wavetable import. A 3rd Wave holds 64 U tables and 48 P tables; its factory tables fill U00–U55 and P00–P35, leaving U56–U63 and P36–P47.")
                     Text("Send to Pack also adds the .wt files to the Pack page.")
                 }
                 .font(.caption).foregroundStyle(.secondary)
@@ -262,6 +262,7 @@ struct ConvertOptionsBox: View {
                 .padding(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .padding(.top, 10)   // set apart from the destination list
         }
     }
 }
@@ -306,7 +307,7 @@ struct ConvertInterpolationOption: View {
     private var tonverk: Bool { state.convertPlan.preset == .tonverk }
 
     private var tip: String {
-        tonverk ? "Tonverk reads it from the file name: a trailing r means stepped, otherwise smooth. Other synths set interpolation on the oscillator."
+        tonverk ? "Tonverk reads it from the file name: a trailing \u{201C}r\u{201D} means stepped, otherwise smooth. Other synths set interpolation on the oscillator."
                 : "Serum and Vital read it from the WAV; Tonverk reads it from the file name. Other synths set interpolation on the oscillator."
     }
 
@@ -340,7 +341,7 @@ struct ConvertInterpolationOption: View {
             .labelsHidden()
             .frame(maxWidth: 260)
             .help(tip)
-            Text(tonverk ? "\u{201C}Existing\u{201D} is the interpolation the tables already have; a file that doesn't say counts as smooth. None (stepped) adds r to the file name."
+            Text(tonverk ? "\u{201C}Existing\u{201D} is the interpolation the tables already have; a file that doesn't say counts as smooth. None (stepped) adds \u{201C}r\u{201D} to the file name."
                          : "\u{201C}Existing\u{201D} is the interpolation the tables already have; a file that doesn't say counts as crossfade.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -368,6 +369,7 @@ struct ConvertInterpolationOption: View {
 /// marks the one every table to convert has ("2,048 — existing"), which stands for no override;
 /// when they differ, or a table has a size Tonverk doesn't take, a first item keeps each table's
 /// own ("Each table's own — existing: 1,024 and 2,048"). From `ConvertPlan.existingFrameSizes()`.
+/// The file name each table gets is shown in the preview, not here: it is one table's.
 struct ConvertTonverkSizeOption: View {
     @ObservedObject var state: AppState
 
@@ -387,11 +389,7 @@ struct ConvertTonverkSizeOption: View {
             }
             .labelsHidden()
             .frame(maxWidth: 260)
-            .help("\u{201C}Existing\u{201D} is the frame size the tables already have; Tonverk takes 64 to 4,096 (powers of two), and a table of another size is written at 2,048. Any other choice resamples every table to that size.")
-            Text(exampleLine)
-                .font(.caption).foregroundStyle(.secondary)
-                .lineLimit(1).truncationMode(.middle)
-                .help("Tonverk reads the frame size from the _wt tag at the end of the file name, and plays the table stepped when the name ends in r.")
+            .help("\u{201C}Existing\u{201D} is the frame size the tables already have; Tonverk takes 64 to 4,096 (powers of two), and a table of another size is written at 2,048. Any other choice resamples every table to that size. The size goes into the file name as a _wt tag (the preview shows each table's); a trailing \u{201C}r\u{201D} marks a stepped table.")
         }
     }
 
@@ -407,17 +405,6 @@ struct ConvertTonverkSizeOption: View {
                 state.convertPlan.options.tonverkFrameSize = value == state.convertPlan.sharedTonverkFrameSize ? nil : value
             }
         )
-    }
-
-    /// "Saved in the file name: Bass Bridge_wt2048.wav", from the first table to convert with
-    /// the current choices (the writer's preview, cached), or a general example.
-    private var exampleLine: String {
-        let plan = state.convertPlan
-        guard let first = plan.selectedItems.first(where: plan.canConvert),
-              let file = state.convertPreviews.preview(first, in: plan) else {
-            return "Saved in the file name (e.g., Name_wt2048.wav; Name_wt2048r.wav when stepped)."
-        }
-        return "Saved in the file name: \(file.fileName)"
     }
 }
 

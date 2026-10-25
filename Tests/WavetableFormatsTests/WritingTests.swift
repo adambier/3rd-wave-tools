@@ -207,7 +207,7 @@ final class WritingTests: XCTestCase {
         XCTAssertGreaterThan(w.samples.map(abs).max()!, 1.2)
         notes(out, contain: "Frame count changed from 300 to 256")
         notes(out, contain: "crossfading")
-        notes(out, contain: "Peak 1.25 kept; the synth may clip it")
+        notes(out, contain: "Peak 1.25 kept, over full scale")
     }
 
     /// One rule for the peak in every note: two decimals, or enough of them that a peak just
@@ -220,7 +220,7 @@ final class WritingTests: XCTestCase {
         XCTAssertEqual(Wavetable.peakText(1.00001), "just over 1")
         XCTAssertEqual(Wavetable.peakText(8), "8.00")
         let barely = try write(table(frames: 4, size: 2048, peak: 1.0003), .wav2048)
-        notes(barely, contain: "Peak 1.0003 kept; the synth may clip it")
+        notes(barely, contain: "Peak 1.0003 kept, over full scale")
         let turned = try write(table(frames: 4, size: 1024, peak: 1.0003), .thirdWaveU)
         notes(turned, contain: "peak was 1.0003")
     }
@@ -503,9 +503,9 @@ final class WritingTests: XCTestCase {
                     XCTAssertEqual(said("Frame count changed from"), plan.changesCount, label)
                     XCTAssertEqual(said("standard waves"), plan.addsPPGWaves, label)
                     if plan.peakKept {
-                        XCTAssertTrue(said("kept; the synth may clip it"), label)
+                        XCTAssertTrue(said("kept, over full scale"), label)
                     } else if plan.scalesToFit || plan.frameSizeGrows != true {
-                        XCTAssertFalse(said("kept; the synth may clip it"), label)
+                        XCTAssertFalse(said("kept, over full scale"), label)
                     }
                     switch plan.scaling {
                     case .certain: XCTAssertTrue(said("Turned down to fit"), label)
