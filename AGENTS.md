@@ -18,11 +18,105 @@ this file; `docs/FORMATS.md` and `docs/WAVETABLES.md` remain the authorities on 
 | Library platforms | macOS, Linux, Windows (CI tests all three on every push and pull request) |
 | Hardware checked | 3rd Wave 8M and 24M, OS 2.0d (see README and FORMATS.md for what was checked where) |
 
-## 2. Repository map
+## 2. Building your own tool for the 3rd Wave
+
+This repository exists as much to help other tools get built as to ship pgdata Packer. Two ways in:
+
+**A. In Swift, on the libraries.** Add the package and take the product for the job:
+
+```swift
+dependencies: [
+    // Use the latest tag; `PgdataFormats` is stable from v1.0.5 on, `WavetableFormats` arrives with 1.1.
+    .package(url: "https://github.com/adambier/3rd-wave-tools", from: "1.0.5"),
+],
+targets: [
+    .target(name: "MyTool", dependencies: [
+        .product(name: "PgdataFormats", package: "3rd-wave-tools"),      // the 3rd Wave's files
+        .product(name: "WavetableFormats", package: "3rd-wave-tools"),   // other synths' wavetables
+        .product(name: "PgdataPackerCore", package: "3rd-wave-tools"),   // only to behave exactly like pgdata Packer
+    ]),
+]
+```
+
+| Product | Take it for | Stability |
+|---|---|---|
+| `PgdataFormats` | Reading, writing, packing, unpacking, and converting the 3rd Wave's files; recognising factory tables | Versioned with the app; kept stable from `v1.0.5` on |
+| `WavetableFormats` | Finding wavetables in WAV, FLAC, Surge `.wt`, and 3rd Wave files; resizing; writing for other synths | Provisional in 1.1 (new; may change until a 1.1.x release after more testing) |
+| `PgdataPackerCore` | Pack, unpack, and convert plans, output names, Clean Up Names, report text | May change between versions |
+
+Three common jobs, in full (the DocC pages have more: `Sources/*/*.docc/`):
+
+```swift
+import Foundation
+import PgdataFormats
+import WavetableFormats
+
+// 1. Read a program and list what each oscillator plays.
+let program = try ProgramFile(data: Data(contentsOf: proURL))
+for (k, source) in program.sources.enumerated() { print("part \(k / 3 + 1) osc \(k % 3 + 1): \(source.label)") }
+
+// 2. Pack it with one embedded table; everything else listed by slot, for the receiving 3rd Wave to supply.
+var content: [SourceRef: SourceContent] = [:]
+for source in program.distinctSources where !source.isBuiltIn { content[source] = .reference }
+content[.u(56)] = .wavetable(try WavetableFile(data: Data(contentsOf: wtURL)))
+try Packer.pack(program, content: content).serialized().write(to: pgdataURL)
+
+// 3. Convert a Serum-style WAV to a 3rd Wave U table.
+for found in try WavetableReader.read(url: wavURL) {
+    guard let table = found.wavetable() else { continue }   // nil: the frame size is open; ask the user (found.candidateFrameSizes)
+    let out = try WavetableWriter.write(table, preset: .thirdWaveU)
+    try out.data.write(to: wavesFolder.appendingPathComponent(out.fileName))
+    out.notes.forEach { print($0) }   // every change made: resized, frames reduced, turned down
+}
+```
+
+**B. In any other language, from the reference.** `docs/FORMATS.md` is written for implementers;
+`fixtures/` is the conformance test. The facts a reader or writer cannot get wrong, each with its
+section:
+
+| Fact | Where |
+|---|---|
+| `.pro`: text, one value per line; tag `W3_PROG_3`…`_5`; name; four sizes; the layout of parts, floats, globals, event records | FORMATS.md §3.1–3.3 |
+| Oscillator source ids and their slot ranges (P, U, analog, S) | FORMATS.md §2 |
+| `.pgdata`: `W3_UNIPROG_1`, the source table (type codes 0 P, 1 U, 2 analog, 4 multisample), embedded data as 32-byte NUL-padded name + float32 LE values, then the program as 32-bit words; no format tag | FORMATS.md §4 |
+| `.wt`: `PNAME`/`UNAME`, name line, one float per line; P = 64 × 128 stored as (sample, difference-to-next) pairs = 16,384 values; U = 64 × 1,024 then the mipmap chain = 131,072 values | FORMATS.md §5.1 |
+| `.bin`: `W3_MSAMPLE_<v>`, versions 1, 4, 5; up to eight int16 samples with key ranges and loops | FORMATS.md §5.2 |
+| Older program layouts and how the 3rd Wave converts them on import | FORMATS.md §6 and appendix |
+| Name fields: 31 single-byte characters plus NUL; what the app does with names that do not fit | FORMATS.md §8; README "Names" |
+
+Conformance: your reader must produce, from each file in `fixtures/`, the values in its `<file>.json`
+(`fixtures/README.md` says what each covers); your writer should reproduce the fixtures byte for
+byte from those values. Then run `swift run tw3pg roundtrip <your files>` (or your own equivalent)
+over real exports: every unmodified file must come back identical.
+
+**C. What the 3rd Wave does with your files** (FORMATS.md §7–8; read these before shipping anything the
+3rd Wave will import):
+
+- It matches wavetables and multisamples **by content**, not name: an identical table already loaded
+  is reused and the file's name ignored; the slot in a file is only a label, and new content goes
+  into a free slot (U56–U63, P36–P47 for tables), with an offer to overwrite the last ones when none
+  is free.
+- Imports come from the USB drive (volume `THIRDWAVE`): `PROGRAMS` for `.pro` and `.pgdata`, `WAVES`
+  for `.wt`, `AUDIO` for `.bin` and `.wav`. **Import unified program data file** takes files without
+  asking; **Bulk program import** and **Bulk wavetable import** process files in plain character order
+  (`B05P100` sorts between `B05P10` and `B05P11`: number with three digits).
+- A `.pgdata` carries no format tag, and the 3rd Wave's `.pgdata` import does not fully convert
+  older programs; convert them first (`ProgramConverter`, FORMATS.md §6).
+- Export quirks observed on the 3rd Wave (FORMATS.md §7, §9): exporting while the drive is mounted
+  on a computer has written empty files; **Export Wavetable** names files by a counter, not by slot.
+- This project is file-based. For live communication with the 3rd Wave (dumps, hash lookups), see
+  Groove Synthesis's *3rd Wave MIDI CC + SysEx Spec*; nothing here implements it.
+
+**Tools wanted** (open an issue to say what you are building): a cross-platform command-line tool
+for pack, unpack, and convert (the libraries are ready; `tw3pg` is a developer harness, not it); a
+Windows or Linux front end on `PgdataPackerCore`; a librarian; tests of the wavetable destinations
+in their synths (`OutputPreset.testedIn`).
+
+## 3. Repository map
 
 | Path | Contents |
 |---|---|
-| `Package.swift` | Targets and products (section 3); test targets opt-in on macOS |
+| `Package.swift` | Targets and products (section 4); test targets opt-in on macOS |
 | `Sources/PgdataFormats/` | Library: the 3rd Wave's four formats, pack/unpack, program conversion, factory table catalog; Foundation only |
 | `Sources/WavetableFormats/` | Library: other synths' wavetable formats; reading, resizing, writing; Foundation and PgdataFormats only |
 | `Sources/PgdataPackerCore/` | Library: the app's decisions without UI (pack, unpack, and convert plans, file names, Clean Up Names) |
@@ -48,7 +142,7 @@ Ignored (never commit): `.build/`, `build/`, `*.app`, `*.zip`, `site/`, `Package
 `hw-tests/` (the owner's private hardware-test files and release notes; only `make-app.sh --appcast`
 reads it, and only when present).
 
-## 3. Targets and dependencies
+## 4. Targets and dependencies
 
 ```
 PgdataFormats        (library)     depends on: Foundation
@@ -69,7 +163,7 @@ Environment switches read by `Package.swift` and the tests:
 | `PGDATA_DOCS=1` | Add the `swift-docc-plugin` dependency, for building documentation |
 | `PGDATA_REGENERATE_FIXTURES=1` | With `swift test --filter FixtureTests`: rewrite `fixtures/` from the libraries |
 
-## 4. Two ways the code is compiled (both must keep working)
+## 5. Two ways the code is compiled (both must keep working)
 
 1. **SwiftPM** (`swift build`, `swift test`, `swift run tw3pg`): each folder is its own module.
 2. **`make-app.sh`** (the shipped app): `swiftc` compiles `Sources/PgdataFormats/*.swift`,
@@ -89,7 +183,7 @@ Consequences:
   `#if canImport(Sparkle)`. A plain `swift build` or an Xcode build of the app compiles without
   Sparkle and has no "Check for Updates…" (`make-app.sh --spm` passes the framework flags itself).
 
-## 5. Rules (do / don't)
+## 6. Rules (do / don't)
 
 Do:
 
@@ -108,9 +202,9 @@ Do:
 - For a new wavetable destination, set `OutputPreset.basis` to its sources and leave `testedIn`
   empty until someone has tested it in that synth (`docs/WAVETABLES.md` carries the sources).
 - Keep `fixtures/` synthetic (made by the libraries, no one else's sounds) and regenerate them with
-  the command in section 8 after a deliberate change to what the libraries write.
-- Follow the house style (section 9) in README, docs, DocC pages, and app text.
-- Run the tests (section 8) before proposing a change; keep the three CI jobs green.
+  the command in section 9 after a deliberate change to what the libraries write.
+- Follow the house style (section 10) in README, docs, DocC pages, and app text.
+- Run the tests (section 9) before proposing a change; keep the three CI jobs green.
 
 Don't:
 
@@ -132,7 +226,7 @@ Don't:
   (`make-app.sh --sign/--notarize/--appcast`), and its identities and keys are not in this document.
 - Don't write "Third Wave", "the synth", or claims the evidence does not support.
 
-## 6. Key types
+## 7. Key types
 
 PgdataFormats (`Sources/PgdataFormats/`):
 
@@ -154,9 +248,9 @@ WavetableFormats (`Sources/WavetableFormats/`):
 
 | Type | File | Role |
 |---|---|---|
-| `Wavetable`, `Interpolation`, `SourceFormat`, `FrameSizeEvidence`, `FoundTable`, `OutputPreset`, `FrameCountPolicy`, `OutputOptions`, `OutputFile`, `WavetableError` | `Wavetable.swift` | Shared value types |
+| `Wavetable`, `Interpolation`, `SourceFormat`, `FrameSizeEvidence`, `FrameSizeSource`, `FoundTable`, `ReadNote`, `OutputPreset`, `FrameCountPolicy`, `OutputOptions`, `OutputFile`, `WavetableError` (with `Kind`) | `Wavetable.swift` | Shared value types; `ReadNote.kind` is the structured form of a reader's note, `notes` its text |
 | `WavetableReader` | `Reading.swift` + `ReadWAV.swift`, `ReadFLAC.swift`, `ReadSurge.swift`, `ReadThirdWave.swift` | `read(url:)`, `read(_:fileName:sidecarText:)`: detection by content, not extension |
-| `WavetableWriter` | `Writing.swift` + `WriteWAV.swift`, `WriteNames.swift` | `write(_:preset:options:) -> OutputFile`; per-preset facts (`frameSize`, `maxFrameCount`, `basis`, `caveat`, `testedIn`) as `OutputPreset` extensions |
+| `WavetableWriter`, `WritePlan` | `Writing.swift` + `WriteWAV.swift`, `WriteNames.swift` | `write(_:preset:options:) -> OutputFile`; `plan(...) -> WritePlan`, the one statement of what a conversion will do (the writer and the app's preview both derive from it); per-preset facts (`frameSize`, `maxFrameCount`, `basis`, `caveat`, `testedIn`) as `OutputPreset` extensions |
 | `OutputPreset.recordsInterpolation`, `Interpolation.displayName` | `PresetInfo.swift` | Whether a format records the interpolation; the words for an interpolation (used in the writer's notes) |
 | `Resampling` | `Resampling.swift`, `FFT.swift` | `resizeCycle`, `changeFrameCount`, `thirdWaveMipmapChain` |
 | `PPGStandardWaves` | `PPGWaves.swift` | The four waves P tables carry at positions 60–63 |
@@ -178,7 +272,7 @@ App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle
 `ConvertDestination.swift`, `ConvertDetail.swift`, `RepointSheet.swift`, `NameCleanupSheet.swift`,
 `Panels.swift` (AppKit open/save panels), `VisibleScrollers.swift`.
 
-## 7. Where to look (task to files)
+## 8. Where to look (task to files)
 
 | Task | Start here | Then |
 |---|---|---|
@@ -201,7 +295,7 @@ App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle
 | Developer checks against real files | `Sources/tw3pg/main.swift` | README "Verification" |
 | Format documentation | `docs/FORMATS.md`, `docs/WAVETABLES.md`, `Sources/*/*.docc/` | `fixtures/README.md` |
 
-## 8. How to verify
+## 9. How to verify
 
 Library tests (XCTest, one test target per library; tests use `@testable import`):
 
@@ -237,7 +331,7 @@ Other checks:
 
 No tests cover the SwiftUI views; a UI change is verified by building and using the app on a Mac.
 
-## 9. House style for text (README, docs, DocC, app strings)
+## 10. House style for text (README, docs, DocC, app strings)
 
 - "3rd Wave", never "Third Wave"; "Groove Synthesis" in full; "the 3rd Wave" or "your 3rd Wave",
   not "the synth".
@@ -260,7 +354,7 @@ No tests cover the SwiftUI views; a UI change is verified by building and using 
   the rules above; fix, and report any change of meaning. Tests assert some strings
   (`ConvertPlanTests`, `ConvertReportTests`, `WorkbenchTests`, `ReadingTests`): keep them in step.
 
-## 10. Recipes
+## 11. Recipes
 
 **Add a reader for another wavetable file format** (`WavetableFormats`): add a `SourceFormat` case
 in `Wavetable.swift`; add a `Read<Format>.swift` file with a `static func` on `WavetableReader` that
@@ -287,7 +381,7 @@ in `Sources/PgdataPacker/`. State lives in `AppState`; the plan is recomputed fr
 
 **Change the UI**: edit `Sources/PgdataPacker/*.swift` only; keep imports behind `#if canImport`;
 no new top-level names that collide with the libraries; build with `./make-app.sh debug` on a Mac.
-Wording follows section 9. Reports go through `AlertPresenter.show` in `ContentView.swift`, which
+Wording follows section 10. Reports go through `AlertPresenter.show` in `ContentView.swift`, which
 adds the copy icon beside the title; use it rather than a new alert.
 
 **Record a format finding**: change the code and `docs/FORMATS.md` together; add a footnote giving
@@ -300,7 +394,7 @@ opens the README at the running version's tag. The build number is the commit co
 tag is never moved. Signing, notarization, and the Sparkle appcast are the owner's steps and need
 credentials that are not in the repository.
 
-## 11. Known limits and open questions
+## 12. Known limits and open questions
 
 - Most of a program's roughly 1,450 values have no identified meaning (fewer than 60 do); the
   libraries copy them through. Editing a program's sound settings is not supported (FORMATS.md
@@ -318,8 +412,10 @@ credentials that are not in the repository.
 - `fixtures/` exercise structure, not sound, and have not been loaded on a 3rd Wave.
 - The app is macOS-only; CI compiles it but has no tests for it. A Linux or Windows front end would
   build on `PgdataPackerCore`, whose API may change between versions more than `PgdataFormats`'s.
+- `WavetableFormats` is provisional in 1.1: its API may change until a 1.1.x release, once its
+  destinations have been tested in their synths.
 
-## 12. Glossary
+## 13. Glossary
 
 | Term | Meaning here |
 |---|---|

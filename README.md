@@ -382,6 +382,8 @@ in any language. Everything here is open source under the MIT licence.
   [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes the formats, with sources, and the
   library's documentation is at
   [adambier.github.io/3rd-wave-tools](https://adambier.github.io/3rd-wave-tools/documentation/wavetableformats/).
+  It is new in 1.1 and provisional: its API may change until a 1.1.x release, once its
+  destinations have been tested in their synths.
 - **The app's logic, for other platforms.** `PgdataPackerCore`, the package's third library,
   holds pgdata Packer's own decisions without its user interface: pack, unpack, and convert plans,
   factory table handling, file names, and Clean Up Names. A command-line tool, or an app for Windows or
