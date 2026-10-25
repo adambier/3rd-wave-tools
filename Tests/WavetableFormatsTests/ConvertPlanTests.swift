@@ -133,13 +133,13 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertFalse(plan.isSelected(factory))
         XCTAssertTrue(plan.isSelected(plan.items[1]))
         XCTAssertTrue(plan.isSelected(plan.items[2]))
-        XCTAssertTrue(plan.notes(for: factory).contains { $0.contains("every 3rd Wave has it") })
+        XCTAssertTrue(plan.notes(for: factory).contains { $0.contains("expected to have, so it starts unchecked") })
         XCTAssertEqual(plan.selectedItems.map(\.name), ["Mine", "Pad"])
 
         // Another destination: ticked, flagged without the 3rd Wave note.
         plan.preset = .wav2048
         XCTAssertTrue(plan.isSelected(plan.items[0]))
-        XCTAssertFalse(plan.notes(for: plan.items[0]).contains { $0.contains("every 3rd Wave has it") })
+        XCTAssertFalse(plan.notes(for: plan.items[0]).contains { $0.contains("starts unchecked") })
         XCTAssertTrue(plan.notes(for: plan.items[0]).contains { $0.contains("U07") })
 
         // The user's tick wins over the default either way.
@@ -546,7 +546,7 @@ final class ConvertReportTests: XCTestCase {
         var plan = ConvertPlan(preset: .phasePlant)
         XCTAssertEqual(plan.reportTitle(converted: 74, folderName: "output"), "Converted 74 tables for Phase Plant into “output”.")
         plan.preset = .thirdWaveU
-        XCTAssertEqual(plan.reportTitle(converted: 1, folderName: "out"), "Converted 1 table to 3rd Wave U tables into “out”.")
+        XCTAssertEqual(plan.reportTitle(converted: 1, folderName: "out"), "Converted 1 table to a 3rd Wave U table into “out”.")
         for p in OutputPreset.allCases {
             XCTAssertFalse(p.title.contains("("), "\(p): the title carries no parenthetical; the notes say the sizes")
         }
@@ -849,9 +849,9 @@ final class ConvertOptionsTextTests: XCTestCase {
         var p = plan([table("Up", frames: 8, peak: 0.5), table("Down", frames: 256, peak: 0.4), table("Fits", frames: 64, peak: 0.3)], preset: .thirdWaveU)
         XCTAssertEqual(p.frameCountChanges.gain, 1)
         XCTAssertEqual(p.frameCountChanges.lose, 1)
-        XCTAssertEqual(p.frameCountCaption, "Affects 2 tables: 1 gain frames (repeated), 1 lose frames (picked evenly).")
+        XCTAssertEqual(p.frameCountCaption, "Affects 2 tables: 1 gains frames (repeated), 1 loses frames (picked evenly).")
         p.options.frameCountPolicy = .interpolate
-        XCTAssertEqual(p.frameCountCaption, "Affects 2 tables: 1 gain frames (crossfaded), 1 lose frames (crossfaded).")
+        XCTAssertEqual(p.frameCountCaption, "Affects 2 tables: 1 gains frames (crossfaded), 1 loses frames (crossfaded).")
         p.preset = .wav2048
         XCTAssertEqual(p.frameCountCaption, "Every table already fits.")
         p.preset = .phasePlant   // 256 already fits; the other two gain frames

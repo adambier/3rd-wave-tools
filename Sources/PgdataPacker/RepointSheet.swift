@@ -6,7 +6,7 @@ import PgdataFormats
 import PgdataPackerCore
 #endif
 
-/// "Point to another slot…": choose oscillators of one program and the slot they should use.
+/// "Change what oscillators play": choose oscillators of one program and the slot they should use.
 /// Opened from a source row (oscillators using that source pre-ticked) or from an unused content
 /// file (its slot pre-selected; the program is chosen here). Only the .pgdata changes.
 struct RepointSheet: View {

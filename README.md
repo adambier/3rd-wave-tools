@@ -14,7 +14,7 @@ checked on an 8M and a 24M, both running OS 2.0d. The Formats and Tests sections
 confirmed on the 3rd Wave and what is inferred.
 
 **Building something for the 3rd Wave?** The file formats are (unofficially) documented as far as
-they're understood, and the library behind this app, test files, and a developer tool are free to
+they're understood, and the libraries behind this app, test files, and a developer tool are free to
 use under the MIT licence: see [For developers](#for-developers).
 
 ![The Pack page: the programs added on the left; for the selected program, what each oscillator source will play and whether it is embedded; below, the wavetables and multisamples added and the slots they go to](docs/pack-window.png)
@@ -267,8 +267,10 @@ files without wavetables are passed over. Each table is listed once, with any id
 noted beside it, and with its frames, its frame size, and how the frame size was decided: from
 metadata in the file, a `_wt<N>` tag in its name, a Serum `.txt` file beside it, or its length.
 When nothing settles the size, the table waits for you to choose from the sizes its length
-allows; when only the length suggested a size, the list says so and lets you choose another. Groove Synthesis's factory tables are marked, and for a 3rd Wave
-destination they start unchecked, since every 3rd Wave already has them.
+allows; when only the length suggested a size, the list says so and lets you choose another.
+Groove Synthesis's factory tables are marked, and for a 3rd Wave destination they start
+unchecked, since the app assumes your 3rd Wave already has them (see
+[Factory wavetables](#factory-wavetables)).
 
 Then choose a destination:
 
@@ -283,22 +285,24 @@ Then choose a destination:
 | Surge XT | a Surge `.wt` |
 | WaveEdit, E370 | a 16-bit WAV of 64 frames of 256 |
 
-Each destination's row says why it is separate and, where its sources leave something open, what
-that is; its book icon opens its sources, and a green seal marks a destination that has been
-tested in its synth (none yet). The destination and its options apply to every table marked to
-convert. The preview below the table is read-only and shows one table: the source and the result
-stacked frame by frame (with the interpolation drawn between frames where a file records one),
-its file, its frame size and what that rests on, and what converting changes. Names are edited
-in the table, and a frame size the file leaves open is chosen from the Input column, where each
-size the file allows is drawn so the one that cuts the wave in the right place is visible. When
-a destination needs a different number of frames, **Options** lets you choose how to get there:
-**Keep Original Frames** (evenly spaced frames, the first and last among them, adding no new
-waves) or **Crossfade New Frames** (each new frame is a crossfade of its neighbours). It also sets the
-interpolation saved in the file where the format records one, Tonverk's frame size, and the PPG waves for
-P tables. **Clean Up Names…** works as on the Pack page. **Convert…** writes the files into a folder you choose (3rd
-Wave tables into a `WAVES` folder inside it) and reports everything it changed; it never replaces
-an existing file. For a 3rd Wave destination, **Send to Pack…** does the same and then adds the
-`.wt` files to the Pack page, to embed in programs.
+The chosen destination says why it is separate, and a destination whose sources leave something
+open says what that is; the book icon beside each row opens its sources, and a green seal in its
+place marks a destination that has been tested in its synth (none yet). The destination and its
+options apply to every table marked to convert. The preview below the table is read-only and
+shows one table: the source and the result stacked frame by frame (with the interpolation drawn
+between frames where a file records one), its file, its frame size and what that rests on, and
+what converting changes. Names are edited in the table, and a frame size the file leaves open is
+chosen from the Input column, where each size the file allows is drawn so the one that cuts the
+wave in the right place is visible, and the size the samples suggest is marked "likely" (a hint,
+never applied by itself). When a destination needs a different number of frames, **Options**
+lets you choose how to get there: **Keep Original Frames** (evenly spaced frames, the first and
+last among them, adding no new waves) or **Crossfade New Frames** (each new frame is a crossfade
+of its neighbours). It also sets the interpolation saved in the file where the format records
+one, Tonverk's frame size, and the PPG waves for P tables. **Clean Up Names…** works as on the
+Pack page. **Convert…** writes the files into a folder you choose (3rd Wave tables into a `WAVES`
+folder inside it) and reports everything it changed; it never replaces an existing file. For a
+3rd Wave destination, **Send to Pack…** does the same and then adds the `.wt` files to the Pack
+page, to embed in programs.
 
 The page converts existing wavetables; it does not make wavetables from other audio, which is
 what the 3rd Wave's **Wave Maker** does. Wave Maker also imports a Serum wavetable directly; this
@@ -367,7 +371,7 @@ in any language. Everything here is open source under the MIT licence.
   [adambier.github.io/3rd-wave-tools](https://adambier.github.io/3rd-wave-tools/documentation/pgdataformats/).
   The library is versioned with the app (tags `v1.0.5` and on).
 - **Other synths' wavetable formats.** `WavetableFormats`, the package's second library, finds
-  wavetables in files (WAV with its metadata chunks, Surge `.wt`, and the 3rd Wave's `.wt` and
+  wavetables in files (WAV and FLAC with their metadata, Surge `.wt`, and the 3rd Wave's `.wt` and
   `.pgdata`), resizes them, and writes them for the destinations the Wavetables page offers. Like
   `PgdataFormats`, on which it builds, it depends only on Foundation and is tested on macOS, Linux,
   and Windows.
@@ -380,8 +384,8 @@ in any language. Everything here is open source under the MIT licence.
   Linux, can use it to behave exactly like pgdata Packer. Its API may change between versions more
   than `PgdataFormats`'s.
 - **A command-line tool.** `tw3pg` (in `Sources/tw3pg`) inspects files, checks that they round
-  trip, unpacks and repacks `.pgdata` files, and converts older programs:
-  `swift run tw3pg inspect <file>`.
+  trip, unpacks and repacks `.pgdata` files, converts older programs, and lists what the
+  Wavetables page would find in a folder of wavetable files: `swift run tw3pg inspect <file>`.
 - **Contributions.** Corrections to the format reference are the most valuable contribution,
   whether from tests on a 3rd Wave or from knowing better; so are bug reports with the files that
   show them, and word of tools built on this. [`CONTRIBUTING.md`](CONTRIBUTING.md) explains how.
@@ -460,7 +464,7 @@ Sources/PgdataFormats/      the library (the package's PgdataFormats product): f
 Sources/WavetableFormats/   other synths' wavetable formats (the package's WavetableFormats
                             product): finding tables in files, resizing, writing; Foundation only
   Wavetable.swift             the shared types: tables, presets, options
-  Read*.swift, Reading.swift  detection and readers (WAV, Surge .wt, 3rd Wave .wt and .pgdata)
+  Read*.swift, Reading.swift  detection and readers (WAV, FLAC, Surge .wt, 3rd Wave .wt and .pgdata)
   Write*.swift, Writing.swift writers for each destination
   Resampling.swift, FFT.swift frame size and frame count changes, the 3rd Wave's mipmap chain
   WavetableFormats.docc/      the library's documentation pages
@@ -469,8 +473,9 @@ Sources/PgdataPackerCore/   the app's own decision logic, no UI (the package's P
                             Clean Up Names
 Sources/PgdataPacker/       the app (SwiftUI)
 Sources/tw3pg/              developer tool: inspect, roundtrip, unpack, repack, compare, wtcheck,
-                            factory-catalog, pack, convert, convertcheck, and the 3rd Wave-test builders
-Tests/                      unit tests for both libraries and the plans (./run-tests.sh)
+                            wtscan, wtdump, factory-catalog, pack, convert, convertcheck, and the
+                            3rd Wave-test builders
+Tests/                      unit tests for the three libraries (./run-tests.sh)
 fixtures/                   test files with what each parses to, for other implementers
 Resources/                  app icon, drawn by tools/make-icon.py (needs cairosvg and Pillow)
 docs/                       FORMATS.md (format reference), WAVETABLES.md (other synths' wavetable

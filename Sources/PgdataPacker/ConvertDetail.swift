@@ -66,7 +66,7 @@ struct ConvertPreviewPlaceholder: View {
     }
 }
 
-/// For several selected tables: how many can't convert yet and how many change on the way.
+/// For several selected tables: how many can't be converted yet and how many change on the way.
 struct ConvertSeveralSummary: View {
     let plan: ConvertPlan
     let items: [ConvertPlan.Item]
@@ -78,7 +78,7 @@ struct ConvertSeveralSummary: View {
             return e.resizes || e.changesCount || e.scaledToFit
         }.count
         if blocked > 0 {
-            Label("\(blocked) can't convert yet (see the Input column)", systemImage: "exclamationmark.octagon.fill")
+            Label("\(blocked) can't be converted yet (see the Input column)", systemImage: "exclamationmark.octagon.fill")
                 .foregroundStyle(.red)
         }
         Text(ConvertSeveralSummary.changeSentence(changed: changed, of: items.count))
@@ -193,10 +193,10 @@ struct ConvertOverviewPair: View {
                     ConvertOverview(frames: result,
                                     caption: "\(plan.preset.shortTitle) · \(result.count) × \(ConvertPlan.formatCount(first.count))",
                                     interpolation: plan.interpolationRecorded(for: item),
-                                    unstatedLegend: "interpolation set on the synth")
+                                    unstatedLegend: "interpolation not stored in the file")
                 }
             }
-            .help("The table's frames, front (first) to back (last): the source as read, and what the destination gets, read back from the file this page would write. Solid lines are stored frames (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation, since Serum's and Vital's exact morphs aren't published.")
+            .help("The table's frames, front (first) to back (last): the source as read, and what the destination gets, read back from the file this page would write. Solid lines are stored frames (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum's or Vital's own morphs.")
         }
     }
 }

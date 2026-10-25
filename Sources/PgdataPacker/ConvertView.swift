@@ -27,7 +27,7 @@ struct ConvertView: View {
             Divider()
             if state.convertPlan.items.isEmpty {
                 EmptyHint(title: "Drop wavetables here",
-                          detail: "Add WAV and FLAC wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table then shows its frames, its frame size, and what converting changes. This page converts existing wavetables between formats; it does not make wavetables from other audio.")
+                          detail: "Add WAV and FLAC wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table is then listed with its size (frames × samples per frame) and what converting changes, and previewed below. This page converts existing wavetables between formats; it does not make wavetables from other audio.")
             } else {
                 HSplitView {
                     VSplitView {
@@ -88,7 +88,7 @@ struct ConvertTablesPane: View {
     @EnvironmentObject var state: AppState
     @Binding var selection: Set<UUID>
 
-    /// The rows shown: every table, or only those that cannot convert yet.
+    /// The rows shown: every table, or only those that can't be converted yet.
     private var shown: [ConvertPlan.Item] {
         let plan = state.convertPlan
         guard state.convertOnlyAttention, plan.blockedCount > 0 else { return plan.items }
@@ -116,16 +116,18 @@ struct ConvertSummaryStrip: View {
         HStack(spacing: 12) {
             Text("\(total) table\(total == 1 ? "" : "s") · \(marked) to convert")
                 .monospacedDigit()
-            ConvertBlockedCount(count: plan.needsFrameSizeCount, what: "a frame size", plural: "frame sizes")
-            ConvertBlockedCount(count: plan.cannotSplitCount, what: "splitting", plural: "splitting")
+            ConvertBlockedCount(count: plan.needsFrameSizeCount, one: "needs a frame size", many: "need frame sizes",
+                                help: "Tables marked to convert whose file doesn't say how long each wave is: choose a size in the Input column")
+            ConvertBlockedCount(count: plan.cannotSplitCount, one: "can't be split", many: "can't be split",
+                                help: "Tables marked to convert whose samples don't divide into frames of the size given")
             Spacer()
             // A Table header takes no tooltip on macOS 13, so the columns' unit is said here.
             Text("Sizes are frames × samples per frame.").font(.caption).foregroundStyle(.secondary)
-            Toggle("Only tables that can't convert yet", isOn: $state.convertOnlyAttention)
+            Toggle("Only tables that can't be converted yet", isOn: $state.convertOnlyAttention)
                 .toggleStyle(.checkbox).font(.caption)
                 .disabled(plan.blockedCount == 0)
                 .help(plan.blockedCount == 0
-                      ? "Every table marked to convert can convert"
+                      ? "Every table marked to convert can be converted"
                       : "Show only the tables marked to convert that still need a frame size, or whose samples don't divide into frames")
         }
         .frame(height: 28)
@@ -133,20 +135,19 @@ struct ConvertSummaryStrip: View {
     }
 }
 
-/// "1 needs a frame size" in red, or nothing when the count is 0.
+/// "1 needs a frame size" or "3 can't be split" in red, or nothing when the count is 0. `one` and
+/// `many` complete the count for one table and for several.
 struct ConvertBlockedCount: View {
     let count: Int
-    let what: String
-    let plural: String
+    let one: String
+    let many: String
+    let help: String
 
     var body: some View {
         if count > 0 {
-            let text = count == 1 ? "1 needs \(what)" : "\(count) need \(plural)"
-            Label(text, systemImage: "exclamationmark.octagon.fill")
+            Label("\(count) \(count == 1 ? one : many)", systemImage: "exclamationmark.octagon.fill")
                 .foregroundStyle(.red)
-                .help(what == "splitting"
-                      ? "Tables marked to convert whose samples don't divide into frames of the size given"
-                      : "Tables marked to convert whose file doesn't say how long each wave is: choose a size in the Input column")
+                .help(help)
         }
     }
 }
@@ -195,12 +196,12 @@ struct ConvertCheckCell: View {
                                  set: { state.convertPlan.setSelected(item.id, $0) }))
             .labelsHidden()
             .help(item.factorySlot != nil && state.convertPlan.preset.isThirdWave
-                  ? "Your 3rd Wave has this factory table (U48–U55 since the 2025 update, which 24K and 24M owners download), so it starts unchecked" : "")
+                  ? "Your 3rd Wave is expected to have this factory table (U48–U55 since the 2025 update, which Groove Synthesis offers as a download), so it starts unchecked" : "")
     }
 }
 
-/// Red when the table can't convert yet, a grey check when it is ready, nothing when it is not
-/// marked to convert.
+/// Red when the table can't be converted yet, a grey check when it is ready, nothing when it is
+/// not marked to convert.
 struct ConvertStatusCell: View {
     let status: ConvertPlan.Status
     let tip: String
@@ -445,7 +446,7 @@ struct ConvertSizeButton: View {
 }
 
 /// What the destination writes: "64 × 1,024", the numbers that change in semibold; "—" when
-/// the table cannot convert.
+/// the table can't be converted.
 struct ConvertOutputCell: View {
     let expected: ConvertPlan.ExpectedResult?
     let summary: String

@@ -151,7 +151,7 @@ struct PackSummaryLine: View {
             Text(shown == total ? "\(total) program\(total == 1 ? "" : "s")" : "\(shown) of \(total) programs shown")
                 .monospacedDigit()
             if blocked > 0 {
-                Label("\(blocked) can't pack yet", systemImage: "exclamationmark.octagon.fill")
+                Label("\(blocked) can't be packed yet", systemImage: "exclamationmark.octagon.fill")
                     .foregroundStyle(.red)
                     .help("Programs that need a file that isn't here; select one to see which slot")
             }
@@ -469,7 +469,7 @@ struct UsageCell: View {
     private func short(_ note: String) -> String {
         if note.hasPrefix("Identical to factory") { return "Same as the factory table; not embedded" }
         if note.hasPrefix("Not used: another choice") { return "Not used: the slot plays something else" }
-        if note.hasPrefix("Not used: the added programs") { return "Not used: the programs are from after 2025" }
+        if note.hasPrefix("Not used: the added programs") { return "Not used: the programs are from after the 2025 update" }
         return "Not used"
     }
 

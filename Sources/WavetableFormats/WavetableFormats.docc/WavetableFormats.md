@@ -18,9 +18,9 @@ not make wavetables from other audio.
   picking frames evenly or by crossfading, and builds the mipmap chain a 3rd Wave U table
   carries.
 - ``WavetableWriter`` writes a ``Wavetable`` for an ``OutputPreset``: the 3rd Wave's U and P
-  tables, Serum-style WAV files for Serum, Vital, Pigments, and MiniFreak V, Elektron Tonverk,
-  Phase Plant, Surge XT, and WaveEdit. Every change it makes is listed in the
-  ``OutputFile/notes``.
+  tables; Serum-style WAV files for Serum, Vital, Pigments, MiniFreak V, and Phase Plant; WAV
+  files for Elektron Tonverk and WaveEdit; and Surge XT's `.wt`. Every change it makes is listed
+  in the ``OutputFile/notes``.
 
 Each preset states what its behaviour rests on (``OutputPreset/basis``) and where it has been
 tested (``OutputPreset/testedIn``); a preset not yet tested in its destination says so. The

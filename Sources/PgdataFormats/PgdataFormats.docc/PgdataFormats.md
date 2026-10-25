@@ -5,7 +5,7 @@ and unified programs.
 
 ## Overview
 
-PgdataFormats is the library behind pgdata Packer, offered for anyone building their own tools
+PgdataFormats is the format library behind pgdata Packer, offered for anyone building their own tools
 for the 3rd Wave, such as librarians, converters, or scripts. It reads and writes the 3rd Wave's
 four file formats byte for byte, and implements the parts of the 3rd Wave's own behaviour that
 such a tool needs to reproduce:

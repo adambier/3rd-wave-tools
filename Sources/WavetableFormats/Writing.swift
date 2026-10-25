@@ -124,7 +124,7 @@ public enum WavetableWriter {
             notePeakKept()
             let stepped = interpolation == .none
             if interpolation == .spectral {
-                notes.append("Tonverk has no spectral morph, so the file is marked smooth.")
+                notes.append("A Tonverk file name can say only stepped or smooth, so the spectral morph asked for is marked smooth.")
             }
             noteDefaultInterpolation(as: "marked as smooth")
             let named = WavetableWriter.Names.fileStem(table.name)
@@ -192,7 +192,7 @@ public enum WavetableWriter {
                 if size > from {
                     notes.append("Resized from \(grouped(from)) to \(grouped(size)) samples per frame; the waveform is unchanged (band-limited, no harmonics added).")
                 } else {
-                    notes.append("Resized from \(grouped(from)) to \(grouped(size)) samples per frame; the \(ordinal((size - 1) / 2 + 1)) harmonic and above are dropped, as \(grouped(size)) samples can't hold them.")
+                    notes.append("Resized from \(grouped(from)) to \(grouped(size)) samples per frame; the \(ordinal(size / 2 + 1)) harmonic and above are dropped, as \(grouped(size)) samples can't hold them.")
                 }
             }
             if target > n { changeCount(to: target, reason: reason) }
@@ -237,7 +237,8 @@ public enum WavetableWriter {
         /// the source or the options asked for one.
         mutating func noteUnrecordedInterpolation() {
             if let asked = options.interpolation ?? table.interpolation {
-                notes.append("This format doesn't store the interpolation (\(asked.displayName.lowercased()) asked for); the synth sets how frames blend.")
+                let who = preset.isThirdWave ? "the 3rd Wave" : "the synth"
+                notes.append("This format doesn't store the interpolation (\(asked.displayName.lowercased()) asked for); \(who) sets how frames blend.")
             }
         }
 
@@ -367,7 +368,7 @@ public extension OutputPreset {
         }
     }
 
-    /// Whether the preset writes a 3rd Wave `.wt` (output that can go to the Pack tab).
+    /// Whether the preset writes a 3rd Wave `.wt` (output that can go to the Pack page).
     var isThirdWave: Bool { self == .thirdWaveU || self == .thirdWaveP }
 
     /// The extension of the files the preset writes, without the dot: "wt" or "wav".

@@ -11,7 +11,7 @@ import WavetableFormats
 // flagged, frame sizes the files leave open), what each conversion is expected to produce, and how
 // the converted files are named and written.
 //
-// Convert converts existing wavetables between formats. It does not make wavetables from other
+// The page converts existing wavetables between formats. It does not make wavetables from other
 // audio: that is the 3rd Wave's Wave Maker.
 
 /// The wavetables added to the Wavetables page, the destination chosen for them, and the conversion.
@@ -186,7 +186,7 @@ public struct ConvertPlan: Equatable {
         }
     }
 
-    /// What an item's frame size rests on, as the Size from column shows it.
+    /// What an item's frame size rests on, as the Input column's qualifier and tooltip show it.
     public enum SizeSource: String, Equatable, CaseIterable {
         /// Stated in the file's contents (a `clm ` chunk, a Surge header, a 3rd Wave layout).
         case inFile
@@ -528,7 +528,7 @@ public struct ConvertPlan: Equatable {
         if let slot = item.factorySlot {
             let label = "factory " + slot.label + (item.factoryName.map { " " + $0 } ?? "")
             information.append(preset.isThirdWave
-                ? "Same as \(label); every 3rd Wave has it, so it starts unchecked."
+                ? "Same as \(label), which your 3rd Wave is expected to have, so it starts unchecked."
                 : "Same as \(label).")
         }
         return ItemNotes(warnings: warnings, information: information)
@@ -573,8 +573,8 @@ public struct ConvertPlan: Equatable {
         }
     }
 
-    /// Whether an item marked to convert cannot convert yet (the filter above the table).
-    /// Guessed frame sizes and warnings do not count: they convert.
+    /// Whether an item marked to convert can't be converted yet (the filter above the table).
+    /// Guessed frame sizes and warnings do not count: those items are converted.
     public func needsAttention(_ item: Item) -> Bool { status(item).isBlocked }
 
     /// The items marked to convert that cannot convert yet (see `needsAttention`).
@@ -610,7 +610,7 @@ public struct ConvertPlan: Equatable {
     /// The report's first line: "Converted 74 tables for Phase Plant into “output”." (the
     /// destination's own notes say the sizes, so the title does not).
     public func reportTitle(converted n: Int, folderName: String) -> String {
-        let to = preset.isThirdWave ? "to \(preset.title)s" : "for \(preset.title)"
+        let to = preset.isThirdWave ? (n == 1 ? "to a \(preset.title)" : "to \(preset.title)s") : "for \(preset.title)"
         return "Converted \(n) table\(n == 1 ? "" : "s") \(to) into \u{201C}\(folderName)\u{201D}."
     }
 
@@ -713,8 +713,8 @@ public struct ConvertPlan: Equatable {
         let total = c.gain + c.lose
         guard total > 0 else { return "Every table already fits." }
         var parts: [String] = []
-        if c.gain > 0 { parts.append("\(c.gain) gain frames (\(Self.methodWord(options.frameCountPolicy, grows: true)))") }
-        if c.lose > 0 { parts.append("\(c.lose) lose frames (\(Self.methodWord(options.frameCountPolicy, grows: false)))") }
+        if c.gain > 0 { parts.append("\(c.gain) gain\(c.gain == 1 ? "s" : "") frames (\(Self.methodWord(options.frameCountPolicy, grows: true)))") }
+        if c.lose > 0 { parts.append("\(c.lose) lose\(c.lose == 1 ? "s" : "") frames (\(Self.methodWord(options.frameCountPolicy, grows: false)))") }
         return "Affects \(total) table\(total == 1 ? "" : "s"): " + parts.joined(separator: ", ") + "."
     }
 
@@ -732,7 +732,7 @@ public struct ConvertPlan: Equatable {
     }
 
     /// What the Changes column says for an item: short words for each change the destination
-    /// makes ("resized", "64 → 256 frames", "turned down", "+ PPG waves", "name shortened"), and
+    /// makes ("resized", "64 → 256 frames", "turned down", "+ PPG waves", "name changed"), and
     /// short orange words for the warnings ("peak 1.14", "extra samples dropped"). Both empty
     /// when nothing changes but the format; nil when the item cannot convert.
     public func changeWords(for item: Item) -> (changes: [String], warnings: [String])? {
@@ -912,7 +912,7 @@ public struct ConvertPlan: Equatable {
         return report
     }
 
-    /// The files to hand to the Pack tab after writing: the 3rd Wave `.wt` files, for a 3rd Wave
+    /// The files to hand to the Pack page after writing: the 3rd Wave `.wt` files, for a 3rd Wave
     /// destination; none otherwise.
     public static func filesForPack(_ written: [URL], preset: OutputPreset) -> [URL] {
         preset.isThirdWave ? written.filter { $0.pathExtension.lowercased() == "wt" } : []
@@ -985,12 +985,12 @@ public struct ConvertPlan: Equatable {
         }
     }
 
-    /// The kind of source, in a few words ("Serum WAV", "U56 in Set.pgdata", "3rd Wave U .wt").
+    /// The kind of source, in a few words ("WAV", "U56 in Set.pgdata", "3rd Wave U .wt").
     static func sourceDescription(_ t: FoundTable) -> String {
         switch t.source {
         case .thirdWaveWavetable(let isP): return "3rd Wave \(isP ? "P" : "U") .wt"
         case .unifiedProgram(let slot, _): return "\(slot) in \(t.fileName)"
-        case .wav: return "WAV"   // one label: how the frame size was decided has its own column
+        case .wav: return "WAV"   // one label: how the frame size was decided is shown with the Input column
         case .flac: return "FLAC"
         case .surgeWavetable: return "Surge .wt"
         }

@@ -6,11 +6,11 @@ the format reference counts as much as code.
 ## What helps most
 
 - **Corrections and additions to [`docs/FORMATS.md`](docs/FORMATS.md)** and, for other synths'
-  wavetables, [`docs/WAVETABLES.md`](docs/WAVETABLES.md), including a test of a Convert
-  destination in the synth it is for. If something there is
+  wavetables, [`docs/WAVETABLES.md`](docs/WAVETABLES.md), including a test of one of the
+  Wavetables page's destinations in the synth it is for. If something there is
   wrong, incomplete, or still listed as unknown, and you know better, please say so, whether you
   found out on a 3rd Wave or another synth, from its maker's documents, or from files.
-- **Bug reports** for the app, the library, or `tw3pg`, with the files that show the problem if
+- **Bug reports** for the app, the libraries, or `tw3pg`, with the files that show the problem if
   you can share them.
 - **Word of what you build.** If you write a tool that reads or writes the 3rd Wave's files, open
   an issue to say so; it may be worth linking from the README.

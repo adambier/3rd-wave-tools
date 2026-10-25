@@ -67,7 +67,8 @@ struct ConvertDestinationPane: View {
     static func scope(_ marked: Int) -> String {
         switch marked {
         case 0: return "No tables are marked to convert yet."
-        case 1: return "For the 1 table to convert."
+        case 1: return "For the one table to convert."
+        case 2: return "For both tables to convert."
         default: return "For all \(marked) tables to convert."
         }
     }
@@ -237,7 +238,7 @@ struct ConvertInterpolationOption: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Interpolation saved in file")
+            Text("Interpolation saved in the file")
             if tonverk {
                 // Tonverk's name says stepped or smooth, nothing else: a spectral choice shows
                 // as Smooth, which is what the writer records for it.

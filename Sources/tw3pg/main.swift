@@ -3,7 +3,7 @@ import PgdataFormats
 import PgdataPackerCore
 import WavetableFormats
 
-// Developer harness for the format library. Not the user-facing tool (that is the app).
+// Developer harness for the package's libraries. Not the user-facing tool (that is the app).
 //
 //   tw3pg inspect <file>...
 //   tw3pg roundtrip <dir>...            parse + rewrite every file, report any byte difference
@@ -85,7 +85,7 @@ func need(_ n: Int, _ rest: [String], _ usage: String) {
     if rest.count < n { print("usage: tw3pg " + usage); exit(2) }
 }
 guard let cmd = args.first else {
-    print("usage: tw3pg inspect|roundtrip|unpack|repack|compare|factory-catalog|pack|convert|convertcheck|wtcheck|maketests|maketest5|maketest6 ...")
+    print("usage: tw3pg inspect|roundtrip|unpack|repack|compare|factory-catalog|pack|convert|convertcheck|wtcheck|wtscan|wtdump|maketests|maketest5|maketest6 ...")
     exit(2)
 }
 let rest = Array(args.dropFirst())

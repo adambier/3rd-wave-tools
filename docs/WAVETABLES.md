@@ -6,9 +6,9 @@ and U tables, and the tables a `.pgdata` embeds) are in [FORMATS.md](FORMATS.md)
 
 Each statement names its source: the company's manual, or its own source code. Where a
 statement is an inference, it says so. Nothing here has been tested with this project's files
-unless it says so. The app labels each destination the same way: its sources are in the tooltip
-of its row, a green seal marks one that has been tested, and where the sources leave something
-open (the questions at the end), the row says so in the open.
+unless it says so. The app labels each destination the same way: the book icon beside its row
+opens its sources, a green seal in its place marks one that has been tested, and where the
+sources leave something open (the questions at the end), the row says so in the open.
 Corrections and test results are welcome; see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 This project is not affiliated with Groove Synthesis or with any maker named here; their product
@@ -149,8 +149,8 @@ decisive either: a size twice too large shows the cycle repeated, and one too sm
 of it, both of them smooth. A bank of unrelated waves (a WaveEdit bank, say) fits no size, and
 the chooser says so. The mark is a hint, never applied by itself.
 
-**Single-cycle files are not listed.** A WAV holding one wave (for example, the Adventure Kid
-single cycles of 600 samples, looped over the whole file) is a building block for a wavetable
+**Single-cycle files are not listed.** A WAV holding one wave (for example, a single-cycle
+library's 600-sample waves, each looped over the whole file) is a building block for a wavetable
 rather than a wavetable, and making tables from such waves is what the 3rd Wave's Wave Maker
 and other synths' editors do. A short file is listed when its metadata says it holds several
 frames.

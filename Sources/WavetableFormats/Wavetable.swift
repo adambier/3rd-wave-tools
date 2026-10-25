@@ -136,7 +136,7 @@ public enum OutputPreset: String, Equatable, Sendable, CaseIterable {
     /// Vital, Pigments, and others).
     case wav2048
     /// A 32-bit float WAV of 64 frames of 2,048 samples with a `clm ` chunk, for MiniFreak V to
-    /// import and send to a MiniFreak (which stores 64 frames; Convert reduces larger tables
+    /// import and send to a MiniFreak (which stores 64 frames; the writer reduces larger tables
     /// itself rather than leave it to MiniFreak V).
     case miniFreak
     /// A WAV for Elektron Tonverk, its frame size and interpolation in the file name.

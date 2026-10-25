@@ -155,7 +155,7 @@ application.mainMenu = buildMainMenu(appDelegate: appDelegate)
 
 let appState = AppState()
 
-// Wide enough for the sidebar, the program list and every column of the Pack tables, but never
+// Wide enough for the program list and every column of the Pack and Wavetables tables, but never
 // larger than the screen.
 let visible = NSScreen.main?.visibleFrame.size ?? NSSize(width: 1512, height: 900)
 let defaultSize = NSSize(width: min(1560, visible.width - 24), height: min(900, visible.height - 40))

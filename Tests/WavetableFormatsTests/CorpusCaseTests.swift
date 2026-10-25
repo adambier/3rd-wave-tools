@@ -24,7 +24,7 @@ final class CorpusCaseTests: XCTestCase {
         XCTAssertEqual(t.notes, [])
         // Some of Hive's float files peak well over full scale (one at 8.0): noted, not an error.
         let loud = try one(corpusWAV([saw(6 * 2048).map { $0 * 8 }], format: .float32, rate: 44_100, chunks: [uh]), "Glass to Brass.wav")
-        XCTAssertEqual(loud.notes, ["Peak 8.00: over full scale (±1). Converting to a 3rd Wave table or a 16-bit file scales it down to fit."])
+        XCTAssertEqual(loud.notes, ["Peak 8.00: over full scale (±1). Converting to a 3rd Wave table or a 16-bit file turns it down to fit."])
     }
 
     // MARK: - Serum-style packs (Starsky's Analog Collection, Oxenholme's JunVerk, the RMR packs)

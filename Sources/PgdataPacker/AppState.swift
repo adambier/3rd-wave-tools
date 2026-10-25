@@ -50,8 +50,8 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Opens the "Point to another slot" sheet: from a source row (itemID + from), or from a
-    /// content file ("Use in a program…", fileID; the program is then chosen in the sheet).
+    /// Opens the "Change what oscillators play" sheet: from a source row (itemID + from), or from a
+    /// content file ("Point a program here…", fileID; the program is then chosen in the sheet).
     struct RepointRequest: Identifiable {
         let id = UUID()
         var itemID: UUID?
@@ -96,7 +96,7 @@ final class AppState: ObservableObject {
     @Published var unpacks: [UnpackItem] = []
     @Published var selectedUnpack: UUID?
 
-    // Convert
+    // Wavetables
     /// The wavetables added to the Wavetables page, the destination, and its options. The
     /// destination and the frame-count choice are remembered between sessions.
     @Published var convertPlan = ConvertPlan() { didSet { saveSettings() } }
@@ -599,7 +599,7 @@ final class AppState: ObservableObject {
         alertMessage = msg
     }
 
-    // MARK: Convert
+    // MARK: Wavetables
 
     /// Adds the wavetables in files and folders to the Wavetables page. Folders are searched; files
     /// that cannot hold a wavetable, or hold none, are passed over. Read on a background queue
@@ -629,7 +629,10 @@ final class AppState: ObservableObject {
         func count(_ n: Int, _ word: String) -> String { "\(n) \(word)\(n == 1 ? "" : "s")" }
         if s.added > 0 {
             var msg = "Added \(count(s.added, "wavetable"))"
-            if s.duplicates > 0 { msg += " (and \(s.duplicates) identical cop\(s.duplicates == 1 ? "y" : "ies"), shown with the table they match)" }
+            if s.duplicates > 0 {
+                msg += s.duplicates == 1 ? " (and 1 identical copy, shown with the table it matches)"
+                                         : " (and \(s.duplicates) identical copies, shown with the tables they match)"
+            }
             note(msg + ".")
         } else if c.problems.isEmpty {
             // Nothing happened; say why, so a drop that does nothing is not a mystery.
@@ -672,8 +675,8 @@ final class AppState: ObservableObject {
             return
         }
         guard marked.contains(where: plan.canConvert) else {
-            alertMessage = (marked.count == 1 ? "The table marked to convert can't convert yet: its file doesn't say how long each wave is."
-                                              : "None of the tables marked to convert can convert yet: their files don't say how long each wave is.")
+            alertMessage = (marked.count == 1 ? "The table marked to convert can't be converted yet: its file doesn't say how long each wave is."
+                                              : "None of the tables marked to convert can be converted yet: their files don't say how long each wave is.")
                 + "\n\nChoose a frame size in the Input column first."
             return
         }

@@ -369,9 +369,8 @@ public struct PackPlan {
         return out
     }
 
-    /// U48–U55: user slots until Groove Synthesis added them to the factory set in 2025 (files dated
-    /// April 2025, shipped with OS 1.9).
-    /// U48–U55, the slots that became factory slots in 2025 (see `SourceRef.is2025FactorySlot`).
+    /// U48–U55, user slots until Groove Synthesis added them to the factory set in 2025 (files dated
+    /// April 2025, shipped with OS 1.9); see `SourceRef.is2025FactorySlot`.
     public static func is2025FactorySlot(_ ref: SourceRef) -> Bool { ref.is2025FactorySlot }
     /// See `ProgramFile.floatBlockCountSince2025`.
     public static let currentFloatBlockCount = ProgramFile.floatBlockCountSince2025

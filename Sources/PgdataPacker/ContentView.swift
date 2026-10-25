@@ -15,7 +15,7 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Three pages, chosen with a segmented control rather than a sidebar, which would take
-            // width the Pack and Convert tables need.
+            // width the Pack and Wavetables tables need.
             HStack {
                 Spacer()
                 Picker("", selection: $state.section) {
