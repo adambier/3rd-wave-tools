@@ -600,6 +600,102 @@ public struct ConvertPlan: Equatable {
         WavetableWriter.interpolationRecorded(for: preset, source: item.table.interpolation, options: options)
     }
 
+    // MARK: Existing choices (the Options pickers)
+
+    // The Interpolation and Tonverk frame size pickers list every value the destination can take
+    // and mark the one the tables to convert already have: "Crossfade (existing)" when they all
+    // agree (that item stands for no override, `options.interpolation == nil`), or a first item
+    // "Each table's own (existing: 3 stepped, 2 crossfade)" when they differ. Tables that
+    // cannot convert yet are left out of the counts.
+
+    /// The interpolation each table to convert would be saved with when none is chosen
+    /// (`options.interpolation` nil): the table's own, or crossfade when its file doesn't say
+    /// (the writer's default); for Tonverk, whose name can say only stepped or smooth, spectral
+    /// counts as crossfade. Keyed by interpolation, with the number of tables. Empty when the
+    /// destination's files record no interpolation, or no table to convert can convert yet.
+    public func existingInterpolations() -> [Interpolation: Int] {
+        guard preset.recordsInterpolation else { return [:] }
+        var unchosen = options
+        unchosen.interpolation = nil
+        var counts: [Interpolation: Int] = [:]
+        for item in selectedItems where canConvert(item) {
+            if let i = WavetableWriter.interpolationRecorded(for: preset, source: item.table.interpolation, options: unchosen) {
+                counts[i, default: 0] += 1
+            }
+        }
+        return counts
+    }
+
+    /// The one interpolation every table to convert would be saved with (see
+    /// `existingInterpolations`); nil when they differ or there is none.
+    public var sharedExistingInterpolation: Interpolation? { Self.shared(existingInterpolations()) }
+
+    /// The Interpolation picker's first item when the tables to convert differ, or there are
+    /// none: "Each table's own (existing: 3 stepped, 2 crossfade)" (for Tonverk, "smooth" for
+    /// crossfade). Nil when they all agree: that value's own item is then marked existing.
+    public var eachTablesOwnInterpolationLabel: String? {
+        let counts = existingInterpolations()
+        if counts.count == 1 { return nil }
+        if counts.isEmpty { return "Each table's own" }
+        let parts = [Interpolation.none, .crossfade, .spectral].compactMap { (i: Interpolation) -> String? in
+            counts[i].map { "\($0) \(existingWord(i))" }
+        }
+        return "Each table's own (existing: " + parts.joined(separator: ", ") + ")"
+    }
+
+    /// The word for an interpolation in the existing counts: "stepped", "crossfade", or
+    /// "spectral"; for Tonverk, "smooth" for crossfade (what its file name says).
+    func existingWord(_ i: Interpolation) -> String {
+        switch i {
+        case Interpolation.none: return "stepped"
+        case .crossfade: return preset == .tonverk ? "smooth" : "crossfade"
+        case .spectral: return "spectral"
+        }
+    }
+
+    /// The frame sizes of the tables to convert, with the number of tables of each (for the
+    /// Tonverk frame size picker). Tables that cannot convert yet are left out.
+    public func existingFrameSizes() -> [Int: Int] {
+        var counts: [Int: Int] = [:]
+        for item in selectedItems where canConvert(item) {
+            if let n = item.frameSize { counts[n, default: 0] += 1 }
+        }
+        return counts
+    }
+
+    /// The one frame size every table to convert has, when Tonverk takes it (powers of two from
+    /// 64 to 4,096, `WavetableWriter.tonverkFrameSizes`); nil otherwise.
+    public var sharedTonverkFrameSize: Int? {
+        guard let n = Self.shared(existingFrameSizes()), WavetableWriter.tonverkFrameSizes.contains(n) else { return nil }
+        return n
+    }
+
+    /// The Tonverk frame size picker's first item when the tables to convert differ in frame
+    /// size, have one Tonverk doesn't take, or there are none: "Each table's own (existing:
+    /// 1,024 and 2,048)", and for sizes Tonverk doesn't take, what the writer does with them
+    /// ("2,048 for 3 tables of 600, which Tonverk doesn't take"). Nil when every table has one
+    /// size Tonverk takes: that size's own item is then marked existing.
+    public var eachTablesOwnFrameSizeLabel: String? {
+        let counts = existingFrameSizes()
+        if sharedTonverkFrameSize != nil { return nil }
+        if counts.isEmpty { return "Each table's own" }
+        let sizes = counts.keys.sorted()
+        let taken = sizes.filter { WavetableWriter.tonverkFrameSizes.contains($0) }
+        let notTaken = sizes.filter { !WavetableWriter.tonverkFrameSizes.contains($0) }
+        var parts: [String] = []
+        if !taken.isEmpty { parts.append(Self.listPhrase(taken.map(Self.formatCount))) }
+        if !notTaken.isEmpty {
+            let n = notTaken.reduce(0) { $0 + (counts[$1] ?? 0) }
+            parts.append("2,048 for \(n) table\(n == 1 ? "" : "s") of \(Self.listPhrase(notTaken.map(Self.formatCount))), which Tonverk doesn't take")
+        }
+        return "Each table's own (existing: " + parts.joined(separator: "; ") + ")"
+    }
+
+    /// The one key of a count, when there is exactly one.
+    static func shared<Value>(_ counts: [Value: Int]) -> Value? {
+        counts.count == 1 ? counts.keys.first : nil
+    }
+
     /// What converting an item is expected to produce (the writer's plan for it); nil when the
     /// item cannot convert (no frame size, or samples that do not divide).
     public func expected(for item: Item) -> ExpectedResult? { expected(for: item, frameSize: item.frameSize) }

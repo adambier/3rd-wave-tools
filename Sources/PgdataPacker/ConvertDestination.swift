@@ -225,7 +225,11 @@ struct ConvertFrameCountOption: View {
     }
 }
 
-/// The interpolation the file records, for destinations whose files can.
+/// The interpolation the file records, for destinations whose files can. The menu lists the
+/// values the destination can record and marks the one the tables to convert already have
+/// ("Crossfade (existing)"), which stands for no override; when they differ, a first item
+/// keeps each table's own ("Each table's own (existing: 3 stepped, 2 crossfade)"). The counts
+/// come from `ConvertPlan.existingInterpolations()`.
 struct ConvertInterpolationOption: View {
     @ObservedObject var state: AppState
 
@@ -236,68 +240,106 @@ struct ConvertInterpolationOption: View {
                 : "Serum and Vital read it from the WAV; Tonverk reads it from the file name. Other synths set interpolation on the oscillator."
     }
 
+    /// The values the destination can record. Tonverk's name says stepped or smooth, nothing
+    /// else (a spectral table is marked smooth, which is what the writer records for it).
+    private var choices: [Interpolation] {
+        tonverk ? [Interpolation.none, .crossfade] : [Interpolation.none, .crossfade, .spectral]
+    }
+
+    /// The menu's words for a value.
+    private func label(_ value: Interpolation) -> String {
+        switch value {
+        case Interpolation.none: return "None (Stepped)"
+        case .crossfade: return tonverk ? "Smooth" : "Crossfade"
+        case .spectral: return "Spectral"
+        }
+    }
+
     var body: some View {
+        let plan = state.convertPlan
+        let shared = plan.sharedExistingInterpolation
         VStack(alignment: .leading, spacing: 4) {
             Text("Interpolation saved in the file")
-            if tonverk {
-                // Tonverk's name says stepped or smooth, nothing else: a spectral choice shows
-                // as Smooth, which is what the writer records for it.
-                Picker("", selection: tonverkSelection) {
-                    Text("Same as Source").tag(Optional<Interpolation>.none)
-                    Text("None (Stepped)").tag(Optional<Interpolation>.some(Interpolation.none))
-                    Text("Smooth").tag(Optional<Interpolation>.some(Interpolation.crossfade))
+            Picker("", selection: selection) {
+                if let own = plan.eachTablesOwnInterpolationLabel {
+                    Text(own).tag(Optional<Interpolation>.none)
                 }
-                .labelsHidden()
-                .frame(maxWidth: 200)
-                .help(tip)
-            } else {
-                Picker("", selection: $state.convertPlan.options.interpolation) {
-                    Text("Same as Source").tag(Optional<Interpolation>.none)
-                    Text("None (Stepped)").tag(Optional<Interpolation>.some(Interpolation.none))
-                    Text("Crossfade").tag(Optional<Interpolation>.some(Interpolation.crossfade))
-                    Text("Spectral").tag(Optional<Interpolation>.some(Interpolation.spectral))
+                ForEach(choices, id: \.self) { (value: Interpolation) in
+                    // The value the tables already have stands for no override (nil).
+                    Text(label(value) + (value == shared ? " (existing)" : ""))
+                        .tag(value == shared ? Optional<Interpolation>.none : Optional<Interpolation>.some(value))
                 }
-                .labelsHidden()
-                .frame(maxWidth: 200)
-                .help(tip)
             }
-            Text(tonverk ? "Same as Source writes smooth when the source doesn't say. None (Stepped) adds r to the file name."
-                         : "Same as Source saves crossfade when the source doesn't say.")
+            .labelsHidden()
+            .frame(maxWidth: 260)
+            .help(tip)
+            Text(tonverk ? "\u{201C}Existing\u{201D} is the interpolation the tables to convert already have; a file that doesn't say counts as smooth. None (Stepped) adds r to the file name."
+                         : "\u{201C}Existing\u{201D} is the interpolation the tables to convert already have; a file that doesn't say counts as crossfade.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    /// The Tonverk menu's selection: a spectral choice reads as Smooth (the writer records it
-    /// so), and choosing Smooth stores crossfade.
-    private var tonverkSelection: Binding<Interpolation?> {
+    /// The menu's selection: nil (no override) for the item marked existing, which the option
+    /// also maps to when it equals the value every table has (set before the tables agreed);
+    /// for Tonverk, a spectral choice reads as Smooth and choosing Smooth stores crossfade.
+    private var selection: Binding<Interpolation?> {
         Binding(
-            get: { state.convertPlan.options.interpolation == .spectral ? Interpolation.crossfade : state.convertPlan.options.interpolation },
-            set: { (value: Interpolation?) in state.convertPlan.options.interpolation = value }
+            get: {
+                var value = state.convertPlan.options.interpolation
+                if tonverk, value == .spectral { value = .crossfade }
+                return value == state.convertPlan.sharedExistingInterpolation ? nil : value
+            },
+            set: { (value: Interpolation?) in
+                state.convertPlan.options.interpolation = value == state.convertPlan.sharedExistingInterpolation ? nil : value
+            }
         )
     }
 }
 
-/// Tonverk's frame size, written into the file name.
+/// Tonverk's frame size, written into the file name. The menu lists the sizes Tonverk takes and
+/// marks the one every table to convert has ("2,048 (existing)"), which stands for no override;
+/// when they differ, or a table has a size Tonverk doesn't take, a first item keeps each table's
+/// own ("Each table's own (existing: 1,024 and 2,048)"). From `ConvertPlan.existingFrameSizes()`.
 struct ConvertTonverkSizeOption: View {
     @ObservedObject var state: AppState
 
     var body: some View {
+        let plan = state.convertPlan
+        let shared = plan.sharedTonverkFrameSize
         VStack(alignment: .leading, spacing: 4) {
             Text("Tonverk frame size")
-            Picker("", selection: $state.convertPlan.options.tonverkFrameSize) {
-                Text("Same as Source").tag(Optional<Int>.none)
-                ForEach([64, 128, 256, 512, 1024, 2048, 4096], id: \.self) { (n: Int) in
-                    Text(ConvertPlan.formatCount(n)).tag(Optional<Int>.some(n))
+            Picker("", selection: selection) {
+                if let own = plan.eachTablesOwnFrameSizeLabel {
+                    Text(own).tag(Optional<Int>.none)
+                }
+                ForEach(WavetableWriter.tonverkFrameSizes, id: \.self) { (n: Int) in
+                    Text(ConvertPlan.formatCount(n) + (n == shared ? " (existing)" : ""))
+                        .tag(n == shared ? Optional<Int>.none : Optional<Int>.some(n))
                 }
             }
             .labelsHidden()
-            .help("Same as Source keeps the source's frame size when Tonverk takes it (64 to 4,096, powers of two) and writes 2,048 otherwise.")
+            .frame(maxWidth: 260)
+            .help("\u{201C}Existing\u{201D} is the frame size the tables to convert already have; Tonverk takes 64 to 4,096 (powers of two), and a table of another size is written at 2,048. Any other choice resamples every table to that size.")
             Text(exampleLine)
                 .font(.caption).foregroundStyle(.secondary)
                 .lineLimit(1).truncationMode(.middle)
                 .help("Tonverk reads the frame size from the _wt tag at the end of the file name, and plays the table stepped when the name ends in r.")
         }
+    }
+
+    /// The menu's selection: nil (no override) for the size marked existing, which the option
+    /// also maps to when it equals the size every table has.
+    private var selection: Binding<Int?> {
+        Binding(
+            get: {
+                let value = state.convertPlan.options.tonverkFrameSize
+                return value == state.convertPlan.sharedTonverkFrameSize ? nil : value
+            },
+            set: { (value: Int?) in
+                state.convertPlan.options.tonverkFrameSize = value == state.convertPlan.sharedTonverkFrameSize ? nil : value
+            }
+        )
     }
 
     /// "Saved in the file name: Bass Bridge_wt2048.wav", from the first table to convert with

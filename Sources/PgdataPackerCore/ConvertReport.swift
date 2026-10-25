@@ -33,12 +33,18 @@ public struct ConvertReport: Equatable {
     public var title: String
     /// The alert's text (see `ReportText` for its form): the title, then, each only when it has
     /// something to say, the tables not converted, the files not written, the files written under
-    /// a new name, what converting did (each note once, with the tables it applies to), the
-    /// 3rd Wave capacity note, and the sentence about the .wt files added to the Pack page.
+    /// a new name, the files written (the first `namesShown`, with the subfolder once in the
+    /// heading: "Written to WAVES:"), what converting did (each note once, with the tables it
+    /// applies to), the 3rd Wave capacity note, and the sentence about the .wt files added to the
+    /// Pack page.
     public var message: String
-    /// The log's text: the message with the folder's path, then every table's own notes under
-    /// "By table:" when there are any.
+    /// The log's text: the message with the folder's path after the title and every file written
+    /// listed, then every table's own notes under "By table:" when there are any.
     public var log: String
+
+    /// How many written files the alert lists by name; the rest are counted ("…and 62 more") and
+    /// listed in the log.
+    public static let namesShown = 12
 
     /// Assembles the report.
     /// - Parameters:
@@ -50,31 +56,55 @@ public struct ConvertReport: Equatable {
     public init(plan: ConvertPlan, conversion: ConvertPlan.Conversion, written: ConvertPlan.WriteReport,
                 folder: URL, packFiles: [URL]) {
         title = plan.reportTitle(converted: written.written.count, folderName: folder.lastPathComponent)
-        var msg = title
+        var before = title
         // Each section: a heading line ending in ":" and one item per line (see ReportText).
-        if !conversion.errors.isEmpty { msg += "\n\nNot converted:\n" + conversion.errors.map { ReportText.item(splitting: $0) }.joined(separator: "\n") }
-        if !written.failed.isEmpty { msg += "\n\nNot written:\n" + written.failed.map { ReportText.item(splitting: $0) }.joined(separator: "\n") }
+        if !conversion.errors.isEmpty { before += "\n\nNot converted:\n" + conversion.errors.map { ReportText.item(splitting: $0) }.joined(separator: "\n") }
+        if !written.failed.isEmpty { before += "\n\nNot written:\n" + written.failed.map { ReportText.item(splitting: $0) }.joined(separator: "\n") }
         if !written.renamed.isEmpty {
-            msg += "\n\nAlready in the folder, so written under a new name (nothing was replaced):\n"
+            before += "\n\nAlready in the folder, so written under a new name (nothing was replaced):\n"
                 + written.renamed.map { ReportText.item($0) }.joined(separator: "\n")
         }
+        // The files written, by name, so the names can be checked against the tables; the
+        // subfolder every file went into (WAVES, for the 3rd Wave) is said once, in the heading.
+        let names = written.written.map { ReportText.item($0.lastPathComponent) }
+        var writtenShort = "", writtenFull = ""
+        if !names.isEmpty {
+            let heading = "\n\n" + Self.writtenHeading(written.written, folder: folder) + "\n"
+            writtenFull = heading + names.joined(separator: "\n")
+            writtenShort = names.count <= Self.namesShown ? writtenFull
+                : heading + names.prefix(Self.namesShown).joined(separator: "\n") + "\n…and \(names.count - Self.namesShown) more (see the log)."
+        }
+        var after = ""
         // Each distinct note once: "All 74 tables", "12 tables", or the one table it applies to.
         // The log, below, has every table's own lines.
         let grouped = ConvertPlan.groupedNotes(conversion.reports)
         if !grouped.isEmpty {
-            msg += "\n\nWhat converting did:\n" + grouped.map { ReportText.item($0.label, $0.text) }.joined(separator: "\n")
+            after += "\n\nWhat converting did:\n" + grouped.map { ReportText.item($0.label, $0.text) }.joined(separator: "\n")
         }
         if let capacity = plan.thirdWaveCapacityNote {
-            msg += "\n\n" + capacity
+            after += "\n\n" + capacity
         }
         if !packFiles.isEmpty {
-            msg += "\n\n" + (packFiles.count == 1 ? "The .wt file is" : "The \(packFiles.count) .wt files are") + " added to the Pack page."
+            after += "\n\n" + (packFiles.count == 1 ? "The .wt file is" : "The \(packFiles.count) .wt files are") + " added to the Pack page."
         }
-        message = msg
-        var logged = msg + " (\(folder.path))"
+        message = before + writtenShort + after
+        // The log names the folder in full, on the title's line, and lists every file written.
+        var logged = title + " (\(folder.path))" + String(before.dropFirst(title.count)) + writtenFull + after
         if !conversion.notes.isEmpty {
             logged += "\n\nBy table:\n" + conversion.notes.map { ReportText.item(splitting: $0) }.joined(separator: "\n")
         }
         log = logged
+    }
+
+    /// "Written to WAVES:" when every file went into the same subfolder of `folder`; "Written:"
+    /// when they went into `folder` itself (or into different subfolders).
+    static func writtenHeading(_ written: [URL], folder: URL) -> String {
+        let base = folder.standardizedFileURL.path
+        let subfolders = Set(written.map { (url: URL) -> String in
+            let parent = url.deletingLastPathComponent().standardizedFileURL.path
+            return parent == base ? "" : url.deletingLastPathComponent().lastPathComponent
+        })
+        guard subfolders.count == 1, let sub = subfolders.first, !sub.isEmpty else { return "Written:" }
+        return "Written to \(sub):"
     }
 }

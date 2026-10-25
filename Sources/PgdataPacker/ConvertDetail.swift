@@ -33,9 +33,15 @@ struct ConvertDetailPane: View {
         let chosen = self.chosen
         Group {
             if chosen.count == 1 {
-                ConvertItemPreview(state: state, item: chosen[0])
-                    .padding(12)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                // The preview lays itself out in the pane's width (the pictures and the facts
+                // column share it; see ConvertItemPreview) and scrolls when the pane is too short
+                // for it, so nothing is cut off at any size of the window or the split.
+                ScrollView {
+                    ConvertItemPreview(state: state, item: chosen[0])
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+                .visibleScrollers()
             } else {
                 ConvertPreviewPlaceholder(items: chosen)
             }
@@ -119,20 +125,17 @@ struct ConvertItemPreview: View {
                 Spacer()
                 Button("Show in Finder") { Panels.reveal(item.location.url) }.buttonStyle(.link)
             }
-            // The pictures take the width and height that are left; the facts sit in a fixed
-            // column that scrolls when the pane is short.
+            // The facts column takes up to 340 points and gives way down to 200 in a narrow
+            // pane; the pictures take the width that is left, however little, and their text
+            // wraps. The pane scrolls (see ConvertDetailPane) when the two are taller than it.
             HStack(alignment: .top, spacing: 20) {
                 ConvertOverviewPair(state: state, item: item)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                ScrollView {
-                    ConvertPreviewFacts(state: state, item: item)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                }
-                .visibleScrollers()
-                .frame(width: 300)
+                    .frame(minWidth: 120, maxWidth: .infinity, alignment: .topLeading)
+                ConvertPreviewFacts(state: state, item: item)
+                    .frame(minWidth: 200, idealWidth: 300, maxWidth: 340, alignment: .topLeading)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 
@@ -175,7 +178,7 @@ struct ConvertPreviewFacts: View {
 /// The table's frames stacked front to back, as the synths draw them: the source as read, with
 /// its own interpolation, and beside it what the destination gets (the preview read back from
 /// the bytes the writer made), with the interpolation the file records. The two pictures share
-/// the width and take the height they are given.
+/// the width they are given, however narrow, and have a set height (see `ConvertOverview`).
 struct ConvertOverviewPair: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
@@ -202,6 +205,8 @@ struct ConvertOverviewPair: View {
 }
 
 /// One stacked-frames picture, its caption, and a legend with colour swatches for its lines.
+/// The picture is 130 points high (the pane scrolls when that is too much) and as wide as it
+/// is given; the caption and legend wrap rather than being cut off.
 struct ConvertOverview: View {
     let frames: [[Float]]
     let caption: String
@@ -213,16 +218,17 @@ struct ConvertOverview: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             WavetableStackCanvas(frames: frames, interpolation: interpolation)
-                .frame(maxWidth: .infinity, minHeight: 80, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
             Text(caption).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                .fixedSize(horizontal: false, vertical: true)
             ConvertOverviewLegend(interpolation: interpolation, unstated: unstatedLegend)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 
-/// The legend under a picture: a swatch and a word for the stored frames, and another for the
-/// in-betweens when there are any.
+/// The legend under a picture, one line per kind of line: a swatch and a word for the stored
+/// frames, and another for the in-betweens when there are any.
 struct ConvertOverviewLegend: View {
     let interpolation: Interpolation?
     let unstated: String
@@ -233,7 +239,7 @@ struct ConvertOverviewLegend: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 2) {
             ConvertSwatch(color: WavetableStackCanvas.storedColor, text: storedWords)
             if interpolation == .crossfade {
                 ConvertSwatch(color: WavetableStackCanvas.crossfadeColor, text: "Crossfades")
@@ -245,14 +251,14 @@ struct ConvertOverviewLegend: View {
     }
 }
 
-/// A short line of colour and a word.
+/// A short line of colour and a few words, which wrap in a narrow pane.
 struct ConvertSwatch: View {
     let color: Color
     let text: String
     var body: some View {
         HStack(spacing: 4) {
             RoundedRectangle(cornerRadius: 1.5).fill(color).frame(width: 14, height: 3)
-            Text(text).lineLimit(1)
+            Text(text).fixedSize(horizontal: false, vertical: true)
         }
     }
 }

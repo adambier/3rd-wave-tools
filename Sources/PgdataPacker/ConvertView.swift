@@ -34,7 +34,7 @@ struct ConvertView: View {
                         ConvertTablesPane(selection: $selection)
                             .frame(minWidth: 520, maxWidth: .infinity, minHeight: 200, maxHeight: .infinity)
                         ConvertDetailPane(selection: selection)
-                            .frame(maxWidth: .infinity, minHeight: 170, idealHeight: 300, maxHeight: .infinity)
+                            .frame(maxWidth: .infinity, minHeight: 170, idealHeight: 320, maxHeight: .infinity)
                     }
                     ConvertDestinationPane()
                         .frame(minWidth: 260, idealWidth: 300, maxWidth: 380, maxHeight: .infinity)
@@ -121,9 +121,7 @@ struct ConvertSummaryStrip: View {
             ConvertBlockedCount(count: plan.cannotSplitCount, one: "can't be split", many: "can't be split",
                                 help: "Tables marked to convert whose samples don't divide into frames of the size given")
             Spacer()
-            // A Table header takes no tooltip on macOS 13, so the columns' unit is said here.
-            Text("Sizes are frames × samples per frame.").font(.caption).foregroundStyle(.secondary)
-            Toggle("Only tables that can't be converted yet", isOn: $state.convertOnlyAttention)
+            Toggle("Show only tables that can't be converted yet", isOn: $state.convertOnlyAttention)
                 .toggleStyle(.checkbox).font(.caption)
                 .disabled(plan.blockedCount == 0)
                 .help(plan.blockedCount == 0
@@ -168,20 +166,22 @@ struct ConvertTable: View {
             TableColumn("") { (item: ConvertPlan.Item) in ConvertStatusCell(status: plan.status(item), tip: plan.statusDescription(item)) }
                 .width(22)
             TableColumn("Name") { (item: ConvertPlan.Item) in ConvertNameCell(state: st, item: item, selection: $selection) }
-                .width(min: 140, ideal: 280)
-            // Input and Output are both frames × samples per frame (the cells say so on hover;
-            // a Table header takes no tooltip on macOS 13).
-            TableColumn("Input") { (item: ConvertPlan.Item) in ConvertFrameSizeCell(state: st, item: item, selection: $selection) }
-                .width(min: 130, ideal: 170)
-            TableColumn("Output") { (item: ConvertPlan.Item) in
+                .width(min: 140, ideal: 260)
+            // Input and Output are both frames × samples per frame: the headers say the unit (a
+            // Table header takes no tooltip on macOS 13), the cells spell it out on hover. The
+            // widths fit the headers and the longest cells ("256 × 2,048  set manually" with its
+            // chevron; "256 → 64 frames, picked evenly, turned down" on two lines).
+            TableColumn("Input (frames × samples)") { (item: ConvertPlan.Item) in ConvertFrameSizeCell(state: st, item: item, selection: $selection) }
+                .width(min: 200, ideal: 240)
+            TableColumn("Output (frames × samples)") { (item: ConvertPlan.Item) in
                 ConvertOutputCell(expected: plan.expected(for: item), summary: plan.expectedResult(for: item), included: plan.isSelected(item))
             }
-                .width(min: 100, ideal: 140)
+                .width(min: 170, ideal: 190)
             TableColumn("Changes") { (item: ConvertPlan.Item) in
                 ConvertChangesCell(words: plan.changeWords(for: item), summary: plan.expectedResult(for: item),
                                    notes: plan.itemNotes(for: item), included: plan.isSelected(item))
             }
-                .width(min: 160, ideal: 270)
+                .width(min: 200, ideal: 330)
         }
         .visibleScrollers()
         .onDeleteCommand { state.removeConvertItems(selection); selection = [] }
@@ -381,7 +381,10 @@ struct ConvertSizePopover: View {
             Text(item.basisDescription)
                 .font(.caption)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(alignment: .top, spacing: 8) {
+            // Three buttons to a row, each wide enough for its result on two lines; a length
+            // that allows more sizes (up to six) gets a second row rather than narrower buttons.
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 144, maximum: 150), spacing: 8, alignment: .top)],
+                      alignment: .leading, spacing: 8) {
                 ForEach(item.frameSizeChoices, id: \.self) { (size: Int) in
                     ConvertSizeButton(state: state, item: item, size: size,
                                       likely: FrameSizeFit.likelySize(item.frameSizeFit) == size)
@@ -424,8 +427,10 @@ struct ConvertSizeButton: View {
             VStack(spacing: 3) {
                 WaveThumbnail(samples: Array(item.table.samples.prefix(size)), tint: chosen ? Color.accentColor : Color.primary)
                 Text("\(frames) × \(ConvertPlan.formatCount(size))")
-                    .font(.caption).monospacedDigit()
+                    .font(.caption).monospacedDigit().lineLimit(1)
                     .foregroundStyle(chosen ? Color.accentColor : Color.primary)
+                // The result wraps under the size rather than being cut off: "→ 64 × 1,024,"
+                // then "4 → 64 frames, repeated".
                 Text(becomes)
                     .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -435,7 +440,7 @@ struct ConvertSizeButton: View {
                 }
             }
             .padding(6)
-            .frame(maxWidth: 150)
+            .frame(maxWidth: .infinity)   // the grid's column (see ConvertSizePopover)
             .background(RoundedRectangle(cornerRadius: 6).fill(chosen ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.08)))
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(chosen ? Color.accentColor : Color.clear, lineWidth: 1))
         }
@@ -474,7 +479,8 @@ struct ConvertOutputCell: View {
 }
 
 /// What converting changes, in a few words each ("resized, 64 → 256 frames"), then the
-/// warnings in orange ("peak 1.14"); "—" when only the format changes. The whole story on hover.
+/// warnings in orange ("peak 1.14"), on up to two lines; "—" when only the format changes. The
+/// whole story on hover.
 struct ConvertChangesCell: View {
     let words: (changes: [String], warnings: [String])?
     let summary: String
@@ -492,7 +498,7 @@ struct ConvertChangesCell: View {
             if words.changes.isEmpty && words.warnings.isEmpty {
                 Text("—").foregroundStyle(.secondary).help("Nothing changes but the format.\n" + tip)
             } else {
-                line(words).lineLimit(1).help(tip)
+                line(words).lineLimit(2).help(tip)
             }
         } else {
             Text("—").foregroundStyle(.secondary).help(tip)

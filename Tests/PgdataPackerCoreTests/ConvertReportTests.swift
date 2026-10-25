@@ -34,8 +34,8 @@ final class ConvertReportTests: XCTestCase {
     func testTitleCountsTheFilesWritten() {
         let one = make(ConvertPlan(preset: .thirdWaveU), conversion(["A"]), written(["WAVES/A.wt"]))
         XCTAssertEqual(one.title, "Converted 1 table to a 3rd Wave U table into “output”.")
-        XCTAssertEqual(one.message, one.title, "nothing else to say")
-        XCTAssertEqual(one.log, one.title + " (/Users/me/Desktop/output)")
+        XCTAssertEqual(one.message, one.title + "\n\nWritten to WAVES:\n• A.wt", "nothing else to say")
+        XCTAssertEqual(one.log, one.title + " (/Users/me/Desktop/output)\n\nWritten to WAVES:\n• A.wt")
         let three = make(ConvertPlan(preset: .phasePlant), conversion(["A", "B", "C"]), written(["A.wav", "B.wav", "C.wav"]))
         XCTAssertEqual(three.title, "Converted 3 tables for Phase Plant into “output”.")
         XCTAssertTrue(three.message.hasPrefix(three.title))
@@ -44,11 +44,37 @@ final class ConvertReportTests: XCTestCase {
         XCTAssertTrue(two.title.hasPrefix("Converted 2 tables for "), two.title)
     }
 
+    func testWrittenFilesAreListedByNameWithTheSubfolderInTheHeading() {
+        // Into the folder itself: "Written:"; into WAVES: "Written to WAVES:", said once.
+        let wav = make(ConvertPlan(preset: .wav2048), conversion(["A", "B"]), written(["A.wav", "B.wav"]))
+        XCTAssertEqual(wav.message, wav.title + "\n\nWritten:\n• A.wav\n• B.wav")
+        let wt = make(ConvertPlan(preset: .thirdWaveU), conversion(["A", "B"]), written(["WAVES/A.wt", "WAVES/B.wt"]))
+        XCTAssertEqual(wt.message, wt.title + "\n\nWritten to WAVES:\n• A.wt\n• B.wt")
+        XCTAssertEqual(wt.log, wt.title + " (/Users/me/Desktop/output)\n\nWritten to WAVES:\n• A.wt\n• B.wt")
+        // Nothing written: no section.
+        let none = make(ConvertPlan(preset: .wav2048), conversion([], errors: ["A: choose a frame size first"]), written([]))
+        XCTAssertFalse(none.message.contains("Written"), none.message)
+        // More than `namesShown`: the alert names the first 12 and counts the rest; the log has every one.
+        let names = (1...15).map { "T\($0)" }
+        let many = make(ConvertPlan(preset: .wav2048), conversion(names), written(names.map { $0 + ".wav" }))
+        let shown = names.prefix(12).map { "• \($0).wav" }.joined(separator: "\n")
+        XCTAssertEqual(many.message, many.title + "\n\nWritten:\n" + shown + "\n…and 3 more (see the log).")
+        XCTAssertTrue(many.log.hasSuffix("\n\nWritten:\n" + names.map { "• \($0).wav" }.joined(separator: "\n")), many.log)
+        XCTAssertFalse(many.log.contains("more (see the log)"))
+        // The names are item lines, so the alert sets them in semibold; a file renamed on the
+        // way is listed under its new name.
+        let renamed = make(ConvertPlan(preset: .wav2048), conversion(["Pad"]), written(["Pad 2.wav"], renamed: ["Pad.wav → Pad 2.wav"]))
+        XCTAssertTrue(renamed.message.hasSuffix("\n\nWritten:\n• Pad 2.wav"), renamed.message)
+        XCTAssertEqual(ConvertReport.writtenHeading([], folder: folder), "Written:")
+    }
+
     func testGroupedNotesAreOneSectionAndTheLogHasEveryTable() {
         let c = conversion(["A", "B"], notes: [["same", "only A"], ["same", "only B"]])
         let r = make(ConvertPlan(preset: .wav2048), c, written(["A.wav", "B.wav"]))
-        XCTAssertEqual(r.message, r.title + "\n\nWhat converting did:\n• Both tables\tsame\n• A\tonly A\n• B\tonly B")
-        XCTAssertEqual(r.log, r.message + " (/Users/me/Desktop/output)\n\nBy table:\n• A\tsame\n• A\tonly A\n• B\tsame\n• B\tonly B")
+        let writtenSection = "\n\nWritten:\n• A.wav\n• B.wav"
+        XCTAssertEqual(r.message, r.title + writtenSection + "\n\nWhat converting did:\n• Both tables\tsame\n• A\tonly A\n• B\tonly B")
+        XCTAssertEqual(r.log, r.title + " (/Users/me/Desktop/output)" + r.message.dropFirst(r.title.count)
+            + "\n\nBy table:\n• A\tsame\n• A\tonly A\n• B\tsame\n• B\tonly B")
         // One table: its notes under its name; the log still lists them by table.
         let single = make(ConvertPlan(preset: .wav2048), conversion(["Only"], notes: [["Resized from 1,024 to 2,048 samples per frame."]]), written(["Only.wav"]))
         XCTAssertTrue(single.message.hasSuffix("What converting did:\n• Only\tResized from 1,024 to 2,048 samples per frame."), single.message)
@@ -68,7 +94,8 @@ final class ConvertReportTests: XCTestCase {
         XCTAssertEqual(r.message, r.title
             + "\n\nNot converted:\n• Broken\tThe table is empty.\n• Edit\tchoose a frame size first"
             + "\n\nNot written:\n• /Users/me/Desktop/output/WAVES/Lead.wt\tYou don’t have permission to save the file."
-            + "\n\nAlready in the folder, so written under a new name (nothing was replaced):\n• WAVES/Pad.wt → WAVES/Pad 2.wt")
+            + "\n\nAlready in the folder, so written under a new name (nothing was replaced):\n• WAVES/Pad.wt → WAVES/Pad 2.wt"
+            + "\n\nWritten to WAVES:\n• Pad 2.wt\n• Lead.wt")
         XCTAssertEqual(ReportText.plain(r.message).components(separatedBy: "\n")[3], "• Broken — The table is empty.")
     }
 
@@ -88,7 +115,8 @@ final class ConvertReportTests: XCTestCase {
         let r = make(plan, c, written(names.map { "WAVES/\($0).wt" }))
         XCTAssertEqual(plan.thirdWaveCapacityNote, note)
         XCTAssertTrue(r.message.hasSuffix("What converting did:\n• All 9 tables\tResized from 128 to 1,024 samples per frame.\n\n" + note), r.message)
-        XCTAssertTrue(r.log.contains(note + " (/Users/me/Desktop/output)\n\nBy table:\n"), r.log)
+        XCTAssertTrue(r.log.hasPrefix(r.title + " (/Users/me/Desktop/output)\n\nWritten to WAVES:\n• T0.wt\n"), r.log)
+        XCTAssertTrue(r.log.contains(note + "\n\nBy table:\n"), r.log)
         // Eight fit: no note, and the pack sentence follows the notes directly.
         plan.setSelected(plan.items[0].id, false)
         XCTAssertNil(plan.thirdWaveCapacityNote)
@@ -102,11 +130,12 @@ final class ConvertReportTests: XCTestCase {
         let w = written(["WAVES/A.wt", "WAVES/B.wt"])
         let none = make(ConvertPlan(preset: .thirdWaveU), c, w)
         XCTAssertFalse(none.message.contains("Pack page"))
+        let writtenSection = "\n\nWritten to WAVES:\n• A.wt\n• B.wt"
         let one = make(ConvertPlan(preset: .thirdWaveU), c, w, pack: [w.written[0]])
-        XCTAssertEqual(one.message, one.title + "\n\nThe .wt file is added to the Pack page.")
-        XCTAssertEqual(one.log, one.message + " (/Users/me/Desktop/output)")
+        XCTAssertEqual(one.message, one.title + writtenSection + "\n\nThe .wt file is added to the Pack page.")
+        XCTAssertEqual(one.log, one.title + " (/Users/me/Desktop/output)" + writtenSection + "\n\nThe .wt file is added to the Pack page.")
         let two = make(ConvertPlan(preset: .thirdWaveU), c, w, pack: w.written)
-        XCTAssertEqual(two.message, two.title + "\n\nThe 2 .wt files are added to the Pack page.")
+        XCTAssertEqual(two.message, two.title + writtenSection + "\n\nThe 2 .wt files are added to the Pack page.")
     }
 
     func testReportTextLines() {

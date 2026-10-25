@@ -100,7 +100,7 @@ final class AppState: ObservableObject {
     /// The wavetables added to the Wavetables page, the destination, and its options. The
     /// destination and the frame-count choice are remembered between sessions.
     @Published var convertPlan = ConvertPlan() { didSet { saveSettings() } }
-    /// Show only the Wavetables page's tables that need a look (blocked, guessed frame size, or a warning).
+    /// Show only the Wavetables page's tables that can't be converted yet (`ConvertPlan.needsAttention`).
     @Published var convertOnlyAttention = false
     /// The writer's results for the tables the Wavetables page previews, kept between passes.
     let convertPreviews = ConvertPreviewCache()

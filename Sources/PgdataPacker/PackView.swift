@@ -93,7 +93,7 @@ struct PackView: View {
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
-            Toggle("Only programs needing attention", isOn: $state.onlyAttention)
+            Toggle("Show only programs needing attention", isOn: $state.onlyAttention)
                 .toggleStyle(.checkbox).font(.caption)
                 .padding(.horizontal, 10).padding(.bottom, 4)
                 .help("Programs that can't be packed yet, or that carry a warning")
