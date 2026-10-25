@@ -24,7 +24,7 @@ uses internally and what most other synths assume when a file says nothing else.
 |---|---|---|---|
 | `clm ` chunk | ASCII `<!>2048 F0000000 …`: the frame size, then flags; the first flag digit F is the interpolation (below) | Serum, Vital, Surge, Convert | Serum (the first 10 bytes); Vital (the flag only); Surge (2,048 only)[^surge-code][^vital] |
 | `srge` chunk | int32 version, int32 frame size | Surge | Surge[^surge-code] |
-| `uhWT` chunk | frames of 2,048 | u-he synths | Surge[^surge-code] |
+| `uhWT` chunk | a frame size field (2,048 throughout Hive's library; the layout is an inference from those files), which Surge reads as 2,048 | u-he synths | Surge, Convert[^surge-code] |
 | `_wt<N>` at the end of the file name | the frame size N (64–4,096, a power of two); a trailing `r` means no interpolation | Convert (for Tonverk) | Tonverk[^tonverk] |
 | a `.txt` file beside the WAV | line 1 `[N]`, the samples per frame; optional line 2 `[interp]` or `[no interp]` | people, by hand | Serum (`<name>.txt`, then `FolderInfo.txt`)[^serum] |
 | nothing | the reader's own assumption, usually 2,048 | many | Pigments slices every 2,048 samples[^pigments] |
@@ -99,27 +99,40 @@ content, not by name.[^surge-code]
 When it reads a WAV, Convert takes the first of these that applies, and shows which one it
 used:
 
-1. a `clm ` chunk whose size divides the file;
+1. a `clm ` chunk;
 2. an `srge` chunk;
-3. a `uhWT` chunk (2,048);
-4. a `_wt<N>` tag at the end of the file name;
+3. a `uhWT` chunk: the frame size in its third 32-bit field when that is a power of two, as
+   Hive's library has it (u-he does not document the chunk; an inference from 76 files), else
+   2,048, which is all Surge reads from it;
+4. a `_wt<N>` tag at the end of the file name, for the sizes Tonverk lists (the powers of two
+   from 64 to 4,096; "KOMPLEXER_WT2" numbers a table and is left alone);
 5. a Serum `.txt` file beside it;
 6. evenly spaced `cue ` points;
-7. a single `smpl` loop whose length divides the file;
+7. a single `smpl` loop starting at sample 0 (the loop over the first frame);
 8. the length, for a mono file: multiples of 2,048 as 2,048 per frame, up to 256 frames, except
    8,192 and 16,384 samples (below).
 
-Cue points and loops count only for frame sizes up to 4,096, since ordinary samples have them
-too. When two of these disagree, Convert notes both. When rules 1–5 give a
-size and the samples run past the last whole frame (as in some editors' files), the extra samples
-are left out, with a note. When only the length suggested a size, the
-other sizes the length allows can be chosen instead. When nothing settles the size, Convert lists
-the sizes the length allows and waits for you to choose: a file of 8,192 samples is 64 × 128 for
-the 3rd Wave's Wave Maker (a PPG table) but 4 × 2,048 for Serum, Pigments, or Tonverk (whose
-factory library has one), and one of 16,384 is 64 × 256 for WaveEdit but 8 × 2,048 for Serum. A WAV with none of the metadata above is
-listed only when it is mono and its length is a multiple of 2,048 (up to 256 frames); anything
-else is taken to be ordinary audio. Some audio still fits that rule by chance (a sample library's
-mono loops, say), and is listed with "file length" as the reason.
+Rules 1–5 are written for the purpose and are trusted as long as one whole frame fits; when the
+samples run past the last whole frame (as in some editors' files, and in Surge's own library),
+the extra samples are left out, with a note. Cue points and loops (rules 6 and 7) mark ordinary
+samples too, so they count only for powers of two up to 4,096 that give at least two frames: a
+single looped cycle is a sample. When two of these disagree, Convert notes both. When only the
+length suggested a size, the other sizes the length allows can be chosen instead. When nothing
+settles the size, Convert lists the sizes the length allows and waits for you to choose: a file
+of 8,192 samples is 64 × 128 for the 3rd Wave's Wave Maker (a PPG table) but 4 × 2,048 for Serum,
+Pigments, or Tonverk (whose factory library has one), and one of 16,384 is 64 × 256 for WaveEdit
+but 8 × 2,048 for Serum. A WAV with none of the metadata above is listed only when it is mono, its
+length is a multiple of 2,048 (up to 256 frames), and its name does not end in a note name
+("Pad-000-036-c2", "Saw C3"), which is how the notes of a multisampled instrument are named;
+anything else is taken to be ordinary audio. Some audio still fits that rule by chance (a sample
+library's mono loops, say), and is listed with "file length only" as the reason.
+
+These rules were checked against about 20,000 files from the libraries of Hive, Surge XT,
+Tonverk, and several Serum packs: every table those libraries hold was listed with the size its
+maker gives it (or, for two Tonverk files of 8,192 and 16,384 samples, with the choice left
+open), and the samples beside them (multisampled notes, single cycles, looped notes, drums) were
+not. Phase Plant's factory tables are FLAC files and DUNE 3's `.wt` files are in a format of
+their own; Convert reads neither.
 
 ## 4. Changing frame size and frame count
 
