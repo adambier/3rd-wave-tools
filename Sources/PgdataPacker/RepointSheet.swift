@@ -66,7 +66,7 @@ struct RepointSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Change what oscillators play").font(.title3).bold()
-            Text("Tick the oscillators to change, then select what they should play.")
+            Text("Check the oscillators to change, then select what they should play.")
                 .foregroundStyle(.secondary)
             if request.itemID == nil {
                 Picker("Program", selection: $itemID) {

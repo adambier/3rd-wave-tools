@@ -145,7 +145,7 @@ two parts when it imports it.
 #### Changing what oscillators play
 
 **Play something else…** in the Plays menu (or **Choose what to play…**, the first choice when a
-wavetable is missing) opens a sheet. Tick the oscillators to change, then pick what they should
+wavetable is missing) opens a sheet. Check the oscillators to change, then pick what they should
 play:
 
 - a file you added (listed first). When the program needs a slot that has nothing yet (e.g., U57),
@@ -188,7 +188,7 @@ Within title case:
   Amps"), and the parts of a hyphenated word are cased separately (e.g., "LO-FI PAD" → "Lo-Fi
   Pad").
 
-Every proposal is shown, can be edited, and can be unticked. New names go into the `.pgdata` and
+Every proposal is shown, can be edited, and can be unchecked. New names go into the `.pgdata` and
 its file name. Source files are not changed, and unpacking keeps names as they are.
 
 ![Clean Up Names: options at the top, and each current name with its proposed new name](docs/clean-up-names.png)
@@ -248,7 +248,7 @@ files to see everything they will produce in one list, with the program each fil
 
 ![The Unpack page with five .pgdata files selected: the multisamples to import first, the factory slots their programs play from your 3rd Wave, and each file they will produce with its program, file name, and contents](docs/unpack-window.png)
 
-Untick anything you don't want, or rename it, before **Unpack Selected…** or **Unpack All…**.
+Uncheck anything you don't want, or rename it, before **Unpack Selected…** or **Unpack All…**.
 Wavetables identical to the factory table in their slot are skipped by default (**Skip factory
 wavetables**): the 3rd Wave's own
 export embeds factory tables too, and a repack lists them anyway. Unpacked names are kept as they
@@ -268,7 +268,7 @@ noted beside it, and with its frames, its frame size, and how the frame size was
 metadata in the file, a `_wt<N>` tag in its name, a Serum `.txt` file beside it, or its length.
 When nothing settles the size, the table waits for you to choose from the sizes its length
 allows; when only the length suggested a size, the list says so and lets you choose another. Groove Synthesis's factory tables are marked, and for a 3rd Wave
-destination they start unticked, since every 3rd Wave already has them.
+destination they start unchecked, since every 3rd Wave already has them.
 
 Then choose a destination:
 
@@ -284,13 +284,16 @@ Then choose a destination:
 | WaveEdit, E370 | a 16-bit WAV of 64 frames of 256 |
 
 Each destination's row says why it is separate and, where its sources leave something open, what
-that is; its sources are in the row's tooltip, and a green seal marks a destination that has been
-tested in its synth (none yet). The pane below the table shows how the selected table will be
-converted: its frame size and where that came from, with a picture of the first wave at each
-size the file allows, the source and the result stacked frame by frame, and what converting
-changes. When a destination needs a different number of frames, **Options** lets you choose how
-to get there: **Keep original frames** (evenly spaced frames, the first and last among them,
-adding no new waves) or **Blend new frames** (crossfades neighbouring frames). It also sets the
+that is; its book icon opens its sources, and a green seal marks a destination that has been
+tested in its synth (none yet). The destination and its options apply to every table marked to
+convert. The preview below the table is read-only and shows one table: the source and the result
+stacked frame by frame (with the interpolation drawn between frames where a file records one),
+its file, its frame size and what that rests on, and what converting changes. Names are edited
+in the table, and a frame size the file leaves open is chosen from the Size column, where each
+size the file allows is drawn so the one that cuts the wave in the right place is visible. When
+a destination needs a different number of frames, **Options** lets you choose how to get there:
+**Keep Original Frames** (evenly spaced frames, the first and last among them, adding no new
+waves) or **Crossfade New Frames** (each new frame is a crossfade of its neighbours). It also sets the
 interpolation saved in the file where the format records one, Tonverk's frame size, and the PPG waves for
 P tables. **Clean Up Names…** works as on the Pack page. **Convert…** writes the files into a folder you choose (3rd
 Wave tables into a `WAVES` folder inside it) and reports everything it changed; it never replaces

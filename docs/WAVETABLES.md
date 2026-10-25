@@ -181,9 +181,11 @@ float files and scales the table down for the 3rd Wave and for 16-bit files, say
 
 When a destination needs a different number of frames, you choose how:
 
-- **Keep original frames** uses evenly spaced frames, the first and last among them. It adds no
+- **Keep Original Frames** uses evenly spaced frames, the first and last among them. It adds no
   new waves. Bringing a table *up* to more frames this way repeats frames.
-- **Blend new frames** crossfades neighbouring frames to make the new ones.
+- **Crossfade New Frames** makes each new frame by crossfading its two neighbours, once, when
+  converting. This is separate from the interpolation a file records, which is how the synth
+  moves between frames as it plays.
 
 The report after converting says what was done to each table.
 

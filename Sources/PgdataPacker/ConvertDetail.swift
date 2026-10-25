@@ -10,83 +10,157 @@ import WavetableFormats
 import PgdataPackerCore
 #endif
 
-/// Below the Convert table: how the selected table will be converted. With one table selected,
-/// its name (editable), its frame size and where that came from (with a picture of the first
-/// wave at each size the file allows), its interpolation, and what converting does.
+/// Below the Convert table: a read-only preview of the selected table, on the under-page
+/// background so it reads as output rather than as a place to edit. The source and the result
+/// are drawn frame by frame on the left; on the right, where the table came from, its frame size
+/// and interpolation, and what converting it does. Names and frame sizes are edited in the table
+/// above; the destination and its options, on the right, apply to every table to convert.
 struct ConvertDetailPane: View {
     @EnvironmentObject var state: AppState
     let selection: Set<UUID>
 
-    /// The selected rows the table shows (a row the attention filter hides stays selected out
-    /// of sight, as in Pack).
+    /// The selected rows the table shows (a row the filter hides stays selected out of sight,
+    /// as in Pack).
     private var chosen: [ConvertPlan.Item] {
         let plan = state.convertPlan
+        let filtering = state.convertOnlyAttention && plan.blockedCount > 0
         return plan.items.filter { (item: ConvertPlan.Item) -> Bool in
-            selection.contains(item.id) && (!state.convertOnlyAttention || plan.needsAttention(item))
+            selection.contains(item.id) && (!filtering || plan.needsAttention(item))
         }
     }
 
     var body: some View {
         let chosen = self.chosen
         Group {
-            if chosen.isEmpty {
-                Text("Select a table to see how it will be converted.")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if chosen.count == 1 {
+            if chosen.count == 1 {
                 ScrollView {
-                    ConvertItemDetail(state: state, item: chosen[0])
+                    ConvertItemPreview(state: state, item: chosen[0])
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
                 .visibleScrollers()
             } else {
-                ConvertSeveralDetail(items: chosen)
+                ConvertPreviewPlaceholder(items: chosen)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(nsColor: .underPageBackgroundColor))
     }
 }
 
-/// "n tables selected", with how many are blocked and how many change on the way.
-struct ConvertSeveralDetail: View {
+/// With no table or several selected: what to do, and for several, how many are blocked and how
+/// many change on the way.
+struct ConvertPreviewPlaceholder: View {
     @EnvironmentObject var state: AppState
     let items: [ConvertPlan.Item]
 
     var body: some View {
         let plan = state.convertPlan
-        let blocked = items.filter { plan.status($0).isBlocked }.count
-        let changed = items.filter { (item: ConvertPlan.Item) -> Bool in
-            guard let e = plan.expected(for: item) else { return false }
-            return e.resizes || e.changesCount || e.scaledToFit
-        }.count
         VStack(alignment: .leading, spacing: 6) {
-            Text("\(items.count) tables selected").font(.title2)
-            if blocked > 0 {
-                Label("\(blocked) can't convert yet (see the Size column)", systemImage: "exclamationmark.octagon.fill")
-                    .foregroundStyle(.red)
-            }
-            Text("\(changed) change\(changed == 1 ? "s" : "") in frame size, frame count, or level on the way; the rest change format only.")
+            ConvertPreviewHeading(title: items.isEmpty ? "No table selected" : "\(items.count) tables selected")
+            Text(items.isEmpty ? "Select a table to preview it." : "Select a single table to preview it.")
                 .foregroundStyle(.secondary)
+            if items.count > 1 {
+                ConvertSeveralSummary(plan: plan, items: items)
+            }
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
-/// One table: its name, its frame size, its interpolation, and what converting does.
-struct ConvertItemDetail: View {
+/// For several selected tables: how many can't convert yet and how many change on the way.
+struct ConvertSeveralSummary: View {
+    let plan: ConvertPlan
+    let items: [ConvertPlan.Item]
+
+    var body: some View {
+        let blocked = items.filter { plan.status($0).isBlocked }.count
+        let changed = items.filter { (item: ConvertPlan.Item) -> Bool in
+            guard let e = plan.expected(for: item) else { return false }
+            return e.resizes || e.changesCount || e.scaledToFit
+        }.count
+        if blocked > 0 {
+            Label("\(blocked) can't convert yet (see the Size column)", systemImage: "exclamationmark.octagon.fill")
+                .foregroundStyle(.red)
+        }
+        Text(ConvertSeveralSummary.changeSentence(changed: changed, of: items.count))
+            .foregroundStyle(.secondary)
+    }
+
+    /// "12 of them change frame size, frame count, or volume; the rest change format only."
+    static func changeSentence(changed: Int, of total: Int) -> String {
+        if changed == 0 { return "None of them changes frame size, frame count, or volume; all change format only." }
+        if changed == total { return "All of them change frame size, frame count, or volume." }
+        return "\(changed) of them change\(changed == 1 ? "s" : "") frame size, frame count, or volume; the rest change format only."
+    }
+}
+
+/// "Preview" in secondary type, then the title.
+struct ConvertPreviewHeading: View {
+    let title: String
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("Preview").font(.caption).foregroundStyle(.secondary)
+            Text(title).font(.headline).lineLimit(1)
+        }
+    }
+}
+
+/// One table: its name, then the pictures on the left and the facts on the right.
+struct ConvertItemPreview: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ConvertDetailHeader(state: state, item: item)
-            ConvertFrameSizeSection(state: state, item: item)
-            ConvertOverviewPair(state: state, item: item)
-            ConvertBetweenFramesLine(item: item)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                ConvertPreviewHeading(title: item.name)
+                if item.newName != nil {
+                    Text("was \u{201C}\(item.table.name)\u{201D}").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer()
+                Button("Show in Finder") { Panels.reveal(item.location.url) }.buttonStyle(.link)
+            }
+            HStack(alignment: .top, spacing: 20) {
+                ConvertOverviewPair(state: state, item: item)
+                ConvertPreviewFacts(state: state, item: item)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+        }
+    }
+}
+
+/// The facts about one table: its file and format, its frame size and what that rests on, its
+/// interpolation, and what converting does.
+struct ConvertPreviewFacts: View {
+    @ObservedObject var state: AppState
+    let item: ConvertPlan.Item
+
+    private var frameSizeLine: String {
+        guard let n = item.frameSize else { return "Frame size: not stated. Choose one in the Size column." }
+        let size = "Frame size: \(ConvertPlan.formatCount(n)) samples"
+        return item.sizeQualifier.map { size + " (\($0))." } ?? size + "."
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("\(item.sourceDescription) · \(item.location.url.path)")
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                .help(([item.location.url.path] + item.alsoIn.map { "Also: " + $0.url.path }).joined(separator: "\n"))
+            Text(frameSizeLine)
+                .foregroundStyle(item.frameSize == nil ? Color.red : Color.primary)
+            Text(item.basisDescription)
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 6) {
+                Text("Interpolation:").foregroundStyle(.secondary)
+                Text(item.interpolationDescription)
+            }
+            .help("How a synth moves from one frame to the next as the table is swept: none (it steps from frame to frame), crossfade (it blends neighbours), or spectral (it blends their harmonics). Some files say which; most synths set it on the oscillator instead.")
             ConvertWhatHappens(state: state, item: item)
         }
+        .textSelection(.enabled)
     }
 }
 
@@ -140,7 +214,7 @@ struct ConvertOverview: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             WavetableStackCanvas(frames: frames, tint: tint, interpolation: interpolation)
-                .frame(maxWidth: 360, minHeight: 100, maxHeight: 100)
+                .frame(minWidth: 160, maxWidth: 300, minHeight: 100, maxHeight: 100)
             Text(caption).font(.caption).foregroundStyle(.secondary).monospacedDigit()
             Text(legend).font(.caption).foregroundStyle(.secondary)
         }
@@ -212,125 +286,6 @@ struct WavetableStackCanvas: View {
     }
 }
 
-/// The name as an editable field, Show in Finder, and where the identical copies are.
-struct ConvertDetailHeader: View {
-    @ObservedObject var state: AppState
-    let item: ConvertPlan.Item
-
-    var body: some View {
-        let st = state
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            TextField("Table name", text: Binding(
-                get: { item.name },
-                set: { (new: String) in st.convertPlan.rename(item.id, to: new) }
-            ))
-            .textFieldStyle(.roundedBorder)
-            .font(.title2)
-            .frame(maxWidth: 380)
-            .help("The name the converted file gets (and, for a 3rd Wave table, the name inside it); the source file is not changed.")
-            if item.newName != nil {
-                Text("was \(item.table.name)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                Button { st.convertPlan.rename(item.id, to: nil) } label: { Image(systemName: "arrow.uturn.backward") }
-                    .buttonStyle(.borderless).help("Restore the name from the file")
-            }
-            if !item.alsoIn.isEmpty {
-                Text("Also in: " + item.alsoIn.map(\.label).joined(separator: ", "))
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    .help(item.alsoIn.map { $0.url.path }.joined(separator: "\n"))
-            }
-            Spacer()
-            Button("Show in Finder") { Panels.reveal(item.location.url) }.buttonStyle(.link)
-        }
-    }
-}
-
-/// "Frame size: 2,048 samples, guessed from the file's length", the explanation when that is a
-/// guess or still open, and one button per size the file allows, each with a picture of the
-/// first wave cut at that size.
-struct ConvertFrameSizeSection: View {
-    @ObservedObject var state: AppState
-    let item: ConvertPlan.Item
-
-    private var line: String {
-        guard let n = item.frameSize else { return "Frame size: not stated. Choose one:" }
-        let size = ConvertPlan.formatCount(n) + " samples"
-        switch item.sizeSource {
-        case .inFile, .fileName, .sidecar: return "Frame size: \(size) — \(item.table.frameSizeBasis)."
-        case .markers: return "Frame size: \(size) — \(item.table.frameSizeBasis); less certain."
-        case .guessed: return "Frame size: \(size), guessed from the file's length."
-        case .yourChoice: return "Frame size: \(size), your choice."
-        case .notStated: return "Frame size: \(size)."
-        }
-    }
-
-    private var needsExplaining: Bool { item.needsFrameSize || item.isGuessed || item.chosenFrameSize != nil }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(line)
-                .foregroundStyle(item.frameSize == nil ? Color.red : Color.primary)
-                .fixedSize(horizontal: false, vertical: true)
-            if needsExplaining {
-                Text("A wavetable file is one long run of samples; the frame size says where each wave starts and ends. If it's wrong, every wave is cut in the wrong place. The size that draws one smooth cycle is the right one.")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            ConvertSizeChoices(state: state, item: item)
-        }
-    }
-}
-
-/// The sizes the file allows as buttons with thumbnails (the current one highlighted); with the
-/// size settled, one thumbnail of the first wave.
-struct ConvertSizeChoices: View {
-    @ObservedObject var state: AppState
-    let item: ConvertPlan.Item
-
-    var body: some View {
-        let choices = item.frameSizeChoices
-        if choices.isEmpty {
-            if let n = item.frameSize, n > 0 {
-                HStack(spacing: 6) {
-                    WaveThumbnail(samples: Array(item.table.samples.prefix(n)), tint: .primary)
-                    Text("first wave").font(.caption).foregroundStyle(.secondary)
-                }
-            }
-        } else {
-            HStack(spacing: 8) {
-                ForEach(choices, id: \.self) { (size: Int) in
-                    ConvertSizeButton(state: state, item: item, size: size)
-                }
-            }
-        }
-    }
-}
-
-/// One size: the first wave cut at that size, and "64 × 128" under it.
-struct ConvertSizeButton: View {
-    @ObservedObject var state: AppState
-    let item: ConvertPlan.Item
-    let size: Int
-
-    var body: some View {
-        let chosen = item.frameSize == size
-        let frames = item.table.samples.count / max(size, 1)
-        Button { state.convertPlan.chooseFrameSize(item.id, size) } label: {
-            VStack(spacing: 3) {
-                WaveThumbnail(samples: Array(item.table.samples.prefix(size)), tint: chosen ? Color.accentColor : Color.primary)
-                Text("\(frames) × \(ConvertPlan.formatCount(size))")
-                    .font(.caption).monospacedDigit()
-                    .foregroundStyle(chosen ? Color.accentColor : Color.primary)
-            }
-            .padding(6)
-            .background(RoundedRectangle(cornerRadius: 6).fill(chosen ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.08)))
-            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(chosen ? Color.accentColor : Color.clear, lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-        .help(chosen ? "The frame size used: \(frames) frames of \(ConvertPlan.formatCount(size)) samples"
-                     : "Use \(ConvertPlan.formatCount(size)) samples per frame (\(frames) frames)")
-    }
-}
-
 /// A small picture of one cycle (about 60 × 24 points), drawn from its samples.
 struct WaveThumbnail: View {
     let samples: [Float]
@@ -363,18 +318,6 @@ struct WaveThumbnail: View {
     }
 }
 
-/// "Interpolation: Crossfade", with what interpolation is on hover.
-struct ConvertBetweenFramesLine: View {
-    let item: ConvertPlan.Item
-    var body: some View {
-        HStack(spacing: 6) {
-            Text("Interpolation:").foregroundStyle(.secondary)
-            Text(item.interpolationDescription)
-        }
-        .help("How a synth moves from one frame to the next as the table is swept: none (it steps from frame to frame), crossfade (it blends neighbours), or spectral (it blends their harmonics). Some files say which; most synths set it on the oscillator instead.")
-    }
-}
-
 /// What converting the table does, from the writer's own notes for it.
 struct ConvertWhatHappens: View {
     @ObservedObject var state: AppState
@@ -383,7 +326,6 @@ struct ConvertWhatHappens: View {
     var body: some View {
         let plan = state.convertPlan
         VStack(alignment: .leading, spacing: 4) {
-            Text("What converting does").font(.headline)
             if plan.canConvert(item) {
                 if let file = state.convertPreviews.preview(item, in: plan) {
                     ConvertNoteList(file: file)
@@ -397,6 +339,7 @@ struct ConvertWhatHappens: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .padding(.top, 4)
     }
 }
 
@@ -405,19 +348,18 @@ struct ConvertNoteList: View {
     let file: OutputFile
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Writes \u{201C}\(file.fileName)\u{201D}" + (file.folder.map { " in \($0)" } ?? ""))
-                .foregroundStyle(.secondary)
+            Text("Output: \u{201C}\(file.fileName)\u{201D}" + (file.folder.map { " in \($0)" } ?? ""))
             if file.notes.isEmpty {
-                Text("Nothing changes but the format.")
+                Text("Nothing changes but the format.").foregroundStyle(.secondary)
             } else {
                 ForEach(0..<file.notes.count, id: \.self) { (i: Int) in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text("•")
                         Text(file.notes[i]).fixedSize(horizontal: false, vertical: true)
                     }
+                    .foregroundStyle(.secondary)
                 }
             }
         }
-        .textSelection(.enabled)
     }
 }

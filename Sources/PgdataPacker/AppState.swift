@@ -559,7 +559,7 @@ final class AppState: ObservableObject {
         guard n > 0 else { return }
         let what = "\(n) .pgdata file\(n == 1 ? "" : "s")"
         guard Panels.confirm(title: "Remove everything from the Unpack page?",
-                             message: "This removes \(what) from the list, with any ticks and names you changed. The files themselves are not touched.",
+                             message: "This removes \(what) from the list, with the files you unchecked and the names you changed. The files themselves are not touched.",
                              ok: "Remove All") else { return }
         unpacks = []; selectedUnpack = nil
         note("Removed \(what) from the Unpack page.")
@@ -569,7 +569,7 @@ final class AppState: ObservableObject {
         let items = unpacks.filter { ids.contains($0.id) }
         guard !items.isEmpty else { return }
         guard items.contains(where: { $0.plan.items.contains(where: \.write) }) else {
-            alertMessage = "Nothing is ticked to write. Tick the files to unpack in the Write column."
+            alertMessage = "No files are checked to write. Check the files to unpack in the Write column."
             return
         }
         guard let folder = Panels.chooseFolder(prompt: "Unpack Here", message: "Choose where to put the unpacked files") else { return }
@@ -655,25 +655,25 @@ final class AppState: ObservableObject {
         guard n > 0 else { return }
         let what = "\(n) wavetable\(n == 1 ? "" : "s")"
         guard Panels.confirm(title: "Remove everything from the Convert page?",
-                             message: "This removes \(what) from the list, with any ticks and frame sizes you chose. The files themselves are not touched.",
+                             message: "This removes \(what) from the list, with the tables you marked to convert and the frame sizes you chose. The files themselves are not touched.",
                              ok: "Remove All") else { return }
         convertPlan.items = []
         convertPreviews.removeAll()
         note("Removed \(what) from the Convert page.")
     }
 
-    /// Converts the ticked tables for the chosen destination into a folder the user chooses. With
+    /// Converts the tables marked to convert for the chosen destination into a folder the user chooses. With
     /// `sendToPack` (3rd Wave destinations), the .wt files written are then added to the Pack page.
     func convertTables(sendToPack: Bool = false) {
         let plan = convertPlan
-        let ticked = plan.selectedItems
-        guard !ticked.isEmpty else {
-            alertMessage = "Nothing is ticked to convert. Tick the tables to convert in the Convert column."
+        let marked = plan.selectedItems
+        guard !marked.isEmpty else {
+            alertMessage = "No tables are marked to convert. Check the tables to convert in the Convert column."
             return
         }
-        guard ticked.contains(where: plan.canConvert) else {
-            alertMessage = (ticked.count == 1 ? "The ticked table can't be converted yet: its file doesn't say how long each wave is."
-                                              : "None of the ticked tables can be converted yet: their files don't say how long each wave is.")
+        guard marked.contains(where: plan.canConvert) else {
+            alertMessage = (marked.count == 1 ? "The table marked to convert can't convert yet: its file doesn't say how long each wave is."
+                                              : "None of the tables marked to convert can convert yet: their files don't say how long each wave is.")
                 + "\n\nChoose a frame size in the Size column first."
             return
         }

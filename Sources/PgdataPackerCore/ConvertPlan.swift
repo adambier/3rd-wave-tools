@@ -76,7 +76,7 @@ public struct ConvertPlan: Equatable {
         /// file leaves the size open (`table.frameSize` is nil), and possible when only its length
         /// suggested one.
         public var chosenFrameSize: Int?
-        /// The user's tick; nil follows the destination's default (see `ConvertPlan.isSelected`).
+        /// The user's checkbox; nil follows the destination's default (see `ConvertPlan.isSelected`).
         public var userSelection: Bool?
         /// A new name from Clean Up Names (nil: the name the file gives).
         public var newName: String?
@@ -113,9 +113,32 @@ public struct ConvertPlan: Equatable {
         /// Whether the frame size rests on the file's length alone (an assumption the user may
         /// want to change), with no choice made.
         public var isGuessed: Bool { chosenFrameSize == nil && !needsFrameSize && table.frameSizeEvidence == .length }
+        /// A word after the size when it is not stated in the file or its name: "guessed" (from
+        /// the length alone), "set manually" (the user chose it), or "markers" (cue or loop
+        /// markers); nil when the file, its name, or a .txt beside it states the size.
+        public var sizeQualifier: String? {
+            switch sizeSource {
+            case .guessed: return "guessed"
+            case .setManually: return "set manually"
+            case .markers: return "markers"
+            case .inFile, .fileName, .sidecar, .notStated: return nil
+            }
+        }
+        /// A short badge for where the table came from, when that matters: the slot and file for
+        /// a table inside a `.pgdata`, "3rd Wave U" or "3rd Wave P", "Surge .wt", or "FLAC"; nil
+        /// for a WAV, the usual case.
+        public var originBadge: String? {
+            switch table.source {
+            case .wav: return nil
+            case .flac: return "FLAC"
+            case .surgeWavetable: return "Surge .wt"
+            case .thirdWaveWavetable(let isP): return isP ? "3rd Wave P" : "3rd Wave U"
+            case .unifiedProgram(let slot, _): return "\(slot) in \(table.fileName)"
+            }
+        }
         /// What the frame size used rests on.
         public var sizeSource: SizeSource {
-            if chosenFrameSize != nil { return .yourChoice }
+            if chosenFrameSize != nil { return .setManually }
             if needsFrameSize { return .notStated }
             switch table.frameSizeEvidence {
             case .statedInFile: return .inFile
@@ -135,16 +158,16 @@ public struct ConvertPlan: Equatable {
             case .inFile, .fileName, .sidecar: return file + "."
             case .markers: return file + "; less certain than a frame size the file states."
             case .guessed:
-                return "Nothing in the file says, so the usual \(ConvertPlan.formatCount(table.frameSize ?? 2048)) is assumed. If it sounds wrong, pick another size."
+                return "Nothing in the file says, so the usual \(ConvertPlan.formatCount(table.frameSize ?? 2048)) is assumed. If it sounds wrong, choose another size in the Size column."
             case .notStated:
                 return "The file doesn't say how long each wave is."
                     + (table.candidateFrameSizes.isEmpty ? " Its length allows none of the usual sizes."
                                                           : " Its length allows " + ConvertPlan.candidateList(table) + ".")
-            case .yourChoice:
+            case .setManually:
                 if let suggested = table.frameSize {
-                    return "Your choice; the file's length suggested \(ConvertPlan.formatCount(suggested))."
+                    return "Set manually; the file's length suggested \(ConvertPlan.formatCount(suggested))."
                 }
-                return "Your choice; the file doesn't say."
+                return "Set manually; the file doesn't say."
             }
         }
         /// The interpolation the source asks for: None (stepped), Crossfade, Spectral, or Not stated.
@@ -175,9 +198,9 @@ public struct ConvertPlan: Equatable {
         /// Nothing says: the user must choose.
         case notStated
         /// The user chose a size.
-        case yourChoice
+        case setManually
 
-        /// A word or two for the column ("In file", "Guessed", "Your choice").
+        /// A word or two for the tooltips ("In file", "Guessed", "Set manually").
         public var label: String {
             switch self {
             case .inFile: return "In file"
@@ -186,23 +209,23 @@ public struct ConvertPlan: Equatable {
             case .markers: return "Markers"
             case .guessed: return "Guessed"
             case .notStated: return "Not stated"
-            case .yourChoice: return "Your choice"
+            case .setManually: return "Set manually"
             }
         }
     }
 
     /// Whether an item will convert, and if not, why.
     public enum Status: Equatable {
-        /// Ticked, with a frame size that divides the samples into frames.
+        /// Marked to convert, with a frame size that divides the samples into frames.
         case ready
-        /// Ticked, but the file leaves the frame size open and none has been chosen.
+        /// Marked to convert, but the file leaves the frame size open and none has been chosen.
         case needsFrameSize
-        /// Ticked, but the samples do not divide into frames of the size given.
+        /// Marked to convert, but the samples do not divide into frames of the size given.
         case cannotSplit
-        /// Not ticked: left out of the conversion.
-        case unticked
+        /// Not marked to convert: left out.
+        case excluded
 
-        /// Whether the item is ticked but cannot convert.
+        /// Whether the item is marked to convert but cannot.
         public var isBlocked: Bool { self == .needsFrameSize || self == .cannotSplit }
     }
 
@@ -452,20 +475,20 @@ public struct ConvertPlan: Equatable {
     /// Removes items from the list.
     public mutating func remove(_ ids: Set<UUID>) { items.removeAll { ids.contains($0.id) } }
 
-    /// Whether an item is ticked by default for the current destination: everything except the
+    /// Whether an item is marked to convert by default for the current destination: everything except the
     /// 3rd Wave's factory tables when the destination is the 3rd Wave, which already has them.
     public func defaultSelection(_ item: Item) -> Bool { !(preset.isThirdWave && item.factorySlot != nil) }
 
-    /// Whether an item is ticked: the user's choice, or the default.
+    /// Whether an item is marked to convert: the user's choice, or the default.
     public func isSelected(_ item: Item) -> Bool { item.userSelection ?? defaultSelection(item) }
 
-    /// Ticks or unticks an item.
+    /// Marks an item to convert, or clears the mark.
     public mutating func setSelected(_ id: UUID, _ on: Bool) {
         guard let i = items.firstIndex(where: { $0.id == id }) else { return }
         items[i].userSelection = on
     }
 
-    /// The ticked items, in list order.
+    /// The items marked to convert, in list order.
     public var selectedItems: [Item] { items.filter(isSelected) }
 
     /// Sets the frame size for an item, from its `frameSizeChoices`; nil, or the file's own size,
@@ -494,7 +517,7 @@ public struct ConvertPlan: Equatable {
         if let slot = item.factorySlot {
             let label = "factory " + slot.label + (item.factoryName.map { " " + $0 } ?? "")
             information.append(preset.isThirdWave
-                ? "Same as \(label); every 3rd Wave has it, so it starts unticked."
+                ? "Same as \(label); every 3rd Wave has it, so it starts unchecked."
                 : "Same as \(label).")
         }
         return ItemNotes(warnings: warnings, information: information)
@@ -508,7 +531,7 @@ public struct ConvertPlan: Equatable {
     /// Whether a reader's note is a warning: metadata that disagrees, samples left out, channels
     /// dropped, or a damaged file.
     static func isWarningNote(_ note: String) -> Bool {
-        for mark in ["is used.", "left out", "not used", "cut short", "only the left", "does not divide", "more than the"] {
+        for mark in ["is used.", "left out", "cut short", "only the left", "only the first", "ignored"] {
             if note.contains(mark) { return true }
         }
         return false
@@ -519,17 +542,17 @@ public struct ConvertPlan: Equatable {
 
     /// Whether an item converts, and if not, why.
     public func status(_ item: Item) -> Status {
-        guard isSelected(item) else { return .unticked }
+        guard isSelected(item) else { return .excluded }
         if item.frameSize == nil { return .needsFrameSize }
         return item.frameCount == nil ? .cannotSplit : .ready
     }
 
     /// The item's status as a sentence or two: what blocks it and what to do, or that it is
-    /// ready, or that it is not ticked.
+    /// ready, or that it is not marked to convert.
     public func statusDescription(_ item: Item) -> String {
         switch status(item) {
         case .ready: return "Ready to convert."
-        case .unticked: return "Not ticked: left out of the conversion."
+        case .excluded: return "Not marked to convert; left out."
         case .needsFrameSize:
             return "Choose a frame size: the file doesn't say how long each wave is."
                 + (item.table.candidateFrameSizes.isEmpty ? " Its length allows none of the usual sizes."
@@ -539,27 +562,23 @@ public struct ConvertPlan: Equatable {
         }
     }
 
-    /// Whether a ticked item needs a look: it is blocked, its frame size is guessed from the
-    /// file's length, or it carries a warning.
-    public func needsAttention(_ item: Item) -> Bool {
-        let s = status(item)
-        guard s != .unticked else { return false }
-        return s.isBlocked || item.isGuessed || !itemNotes(for: item).warnings.isEmpty
-    }
+    /// Whether an item marked to convert cannot convert yet (the filter above the table).
+    /// Guessed frame sizes and warnings do not count: they convert.
+    public func needsAttention(_ item: Item) -> Bool { status(item).isBlocked }
 
-    /// The ticked items that need a look (see `needsAttention`).
+    /// The items marked to convert that cannot convert yet (see `needsAttention`).
     public var attentionCount: Int { items.filter(needsAttention).count }
 
-    /// The ticked items that still need a frame size.
+    /// The items marked to convert that still need a frame size.
     public var needsFrameSizeCount: Int { items.filter { status($0) == .needsFrameSize }.count }
 
-    /// The ticked items whose samples do not divide into frames.
+    /// The items marked to convert whose samples do not divide into frames.
     public var cannotSplitCount: Int { items.filter { status($0) == .cannotSplit }.count }
 
-    /// The ticked items that cannot convert, for either reason.
+    /// The items marked to convert that cannot, for either reason.
     public var blockedCount: Int { items.filter { status($0).isBlocked }.count }
 
-    /// The ticked items whose frame count the destination changes.
+    /// The items marked to convert whose frame count the destination changes.
     public var frameCountChangeCount: Int {
         selectedItems.filter { expected(for: $0)?.changesCount == true }.count
     }
@@ -648,14 +667,48 @@ public struct ConvertPlan: Equatable {
         return parts.joined(separator: "; ")
     }
 
-    /// "keeping original frames" or "blending new frames".
+    /// "keeping original frames" or "crossfading new frames".
     public static func policyPhrase(_ policy: FrameCountPolicy) -> String {
-        policy == .pickEvenly ? "keeping original frames" : "blending new frames"
+        policy == .pickEvenly ? "keeping original frames" : "crossfading new frames"
+    }
+
+    /// What the Changes column says for an item: short words for each change the destination
+    /// makes ("resized", "64 → 256 frames", "turned down", "+ PPG waves", "name shortened"), and
+    /// short orange words for the warnings ("peak 1.14", "extra samples dropped"). Both empty
+    /// when nothing changes but the format; nil when the item cannot convert.
+    public func changeWords(for item: Item) -> (changes: [String], warnings: [String])? {
+        guard let e = expected(for: item) else { return nil }
+        var changes: [String] = []
+        if e.resizes { changes.append("resized") }
+        if e.changesCount { changes.append("\(Self.formatCount(e.frameCountIn)) → \(e.tableFrameCount) frames") }
+        if e.scaledToFit { changes.append("turned down") }
+        if e.addsPPGWaves { changes.append("+ PPG waves") }
+        if preset.isThirdWave, WavetableWriter.thirdWaveName(item.name).name != item.name.trimmingCharacters(in: .whitespaces) {
+            changes.append("name changed")
+        }
+        var warnings: [String] = []
+        if e.peakKept { warnings.append("peak \(Self.decimal(e.peak))") }
+        for note in item.table.notes where Self.isWarningNote(note) {
+            let word = Self.shortWarning(note)
+            if !warnings.contains(word) { warnings.append(word) }
+        }
+        return (changes, warnings)
+    }
+
+    /// A reader's warning in two or three words, for the Changes column.
+    static func shortWarning(_ note: String) -> String {
+        if note.contains("left out") { return "extra samples dropped" }
+        if note.contains("only the left") { return "left channel only" }
+        if note.contains("only the first") { return "first channel only" }
+        if note.contains("is used.") { return "tags disagree" }
+        if note.contains("cut short") { return "file cut short" }
+        if note.contains("ignored") { return "tag ignored" }
+        return "see note"
     }
 
     // MARK: Preview
 
-    /// Runs the writer for one item (the ticked state does not matter), so the detail pane can
+    /// Runs the writer for one item (whether it is marked to convert does not matter), so the preview can
     /// show what converting it does; nil when the item cannot convert or the writer fails.
     public func preview(_ item: Item,
                         write: (Wavetable, OutputPreset, OutputOptions) throws -> OutputFile = WavetableWriter.write)
@@ -682,7 +735,7 @@ public struct ConvertPlan: Equatable {
 
     // MARK: Converting
 
-    /// Converts the ticked items with `write` (each separately; a failure is collected, not
+    /// Converts the items marked to convert with `write` (each separately; a failure is collected, not
     /// thrown), and gives the files unique names. Items without a known frame size are reported
     /// and left out.
     public func convert(write: (Wavetable, OutputPreset, OutputOptions) throws -> OutputFile = WavetableWriter.write)

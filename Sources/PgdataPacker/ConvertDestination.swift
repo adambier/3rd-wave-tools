@@ -22,7 +22,11 @@ struct ConvertDestinationPane: View {
             // page's top out of view.
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Convert to").font(.headline)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Convert to").font(.headline)
+                        Text(ConvertDestinationPane.scope(plan.selectedItems.count))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     ForEach(OutputPreset.Group.allCases, id: \.self) { (group: OutputPreset.Group) in
                         ConvertPresetGroup(state: state, group: group)
                     }
@@ -43,6 +47,16 @@ struct ConvertDestinationPane: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12).padding(.vertical, 8)
             }
+        }
+    }
+
+    /// "For all 75 tables to convert": the destination and its options apply to every table
+    /// marked to convert, unlike the preview below the table.
+    static func scope(_ marked: Int) -> String {
+        switch marked {
+        case 0: return "No tables are marked to convert yet."
+        case 1: return "For the 1 table to convert."
+        default: return "For all \(marked) tables to convert."
         }
     }
 }
@@ -72,12 +86,12 @@ struct ConvertPresetRow: View {
 
     var body: some View {
         // The row chooses the destination; the sources icon beside it is its own button, so
-        // clicking it opens the sources rather than choosing the row.
+        // clicking it opens the sources rather than choosing the row. A tap gesture rather than
+        // a Button: a plain Button's label did not redraw its radio when the choice changed.
         HStack(alignment: .top, spacing: 4) {
-            Button(action: choose) {
-                ConvertPresetRowLabel(preset: preset, chosen: chosen)
-            }
-            .buttonStyle(.plain)
+            ConvertPresetRowLabel(preset: preset, chosen: chosen)
+                .onTapGesture { choose() }
+                .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : [.isButton])
             ConvertSourcesButton(preset: preset)
         }
         .padding(6)
@@ -92,9 +106,12 @@ struct ConvertPresetRowLabel: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: chosen ? "largecircle.fill.circle" : "circle")
-                .foregroundStyle(chosen ? Color.accentColor : Color.secondary)
-                .padding(.top, 1)
+            // Two views rather than one image whose name changes, so the radio always redraws.
+            if chosen {
+                Image(systemName: "largecircle.fill.circle").foregroundStyle(Color.accentColor).padding(.top, 1)
+            } else {
+                Image(systemName: "circle").foregroundStyle(Color.secondary).padding(.top, 1)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(preset.shortTitle)
                 Text(preset.specLine).font(.caption).foregroundStyle(.secondary).monospacedDigit()
@@ -174,7 +191,7 @@ struct ConvertOptionsBox: View {
     }
 }
 
-/// Keep original frames or blend new ones, when the destination needs a different count.
+/// Keep original frames or crossfade new ones, when the destination needs a different count.
 struct ConvertFrameCountOption: View {
     @ObservedObject var state: AppState
 
@@ -183,12 +200,12 @@ struct ConvertFrameCountOption: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("If the destination needs more or fewer frames")
             Picker("", selection: $state.convertPlan.options.frameCountPolicy) {
-                Text("Keep original frames").tag(FrameCountPolicy.pickEvenly)
-                Text("Blend new frames").tag(FrameCountPolicy.interpolate)
+                Text("Keep Original Frames").tag(FrameCountPolicy.pickEvenly)
+                Text("Crossfade New Frames").tag(FrameCountPolicy.interpolate)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .help("Keep original frames: uses evenly spaced frames, including the first and last; adds no new waves (adding frames repeats some).\nBlend new frames: crossfades neighbouring frames to make the new ones.")
+            .help("Keep original frames: uses evenly spaced frames, including the first and last; adds no new waves (adding frames repeats some).\nCrossfade new frames: makes each new frame by crossfading its two neighbours. This happens once, when converting; it is separate from the interpolation saved in the file, which is how the synth moves between frames as it plays.")
             Text(affected == 0 ? "Every table already fits." : "Affects \(affected) table\(affected == 1 ? "" : "s").")
                 .font(.caption).foregroundStyle(.secondary)
         }
@@ -204,8 +221,8 @@ struct ConvertInterpolationOption: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Interpolation saved in file")
             Picker("", selection: $state.convertPlan.options.interpolation) {
-                Text("Same as source").tag(Optional<Interpolation>.none)
-                Text("None (stepped)").tag(Optional<Interpolation>.some(Interpolation.none))
+                Text("Same as Source").tag(Optional<Interpolation>.none)
+                Text("None (Stepped)").tag(Optional<Interpolation>.some(Interpolation.none))
                 Text("Crossfade").tag(Optional<Interpolation>.some(Interpolation.crossfade))
                 Text("Spectral").tag(Optional<Interpolation>.some(Interpolation.spectral))
             }
@@ -214,7 +231,8 @@ struct ConvertInterpolationOption: View {
             .help(tonverk
                   ? "Tonverk reads it from the file name (a trailing r means none); it has no spectral mode, so Spectral is written as smooth. Other synths set interpolation on the oscillator."
                   : "Serum and Vital read it from the WAV; Tonverk reads it from the file name. Other synths set interpolation on the oscillator.")
-            Text("Same as source saves crossfade when the source doesn't say.")
+            Text(tonverk ? "Same as source saves smooth when the source doesn't say. None (stepped) adds r to the file name."
+                         : "Same as source saves crossfade when the source doesn't say.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -229,15 +247,29 @@ struct ConvertTonverkSizeOption: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Tonverk frame size")
             Picker("", selection: $state.convertPlan.options.tonverkFrameSize) {
-                Text("Same as source (2,048 if Tonverk can't use it)").tag(Optional<Int>.none)
+                Text("Same as Source").tag(Optional<Int>.none)
                 ForEach([64, 128, 256, 512, 1024, 2048, 4096], id: \.self) { (n: Int) in
                     Text(ConvertPlan.formatCount(n)).tag(Optional<Int>.some(n))
                 }
             }
             .labelsHidden()
-            Text("Saved in the file name (e.g., _wt1024).")
+            .help("Same as Source keeps the source's frame size when Tonverk takes it (64 to 4,096, powers of two) and writes 2,048 otherwise.")
+            Text(exampleLine)
                 .font(.caption).foregroundStyle(.secondary)
+                .lineLimit(1).truncationMode(.middle)
+                .help("Tonverk reads the frame size from the _wt tag at the end of the file name, and plays the table stepped when the name ends in r.")
         }
+    }
+
+    /// "Saved in the file name: Bass Bridge_wt2048.wav", from the first table to convert with
+    /// the current choices (the writer's preview, cached), or a general example.
+    private var exampleLine: String {
+        let plan = state.convertPlan
+        guard let first = plan.selectedItems.first(where: plan.canConvert),
+              let file = state.convertPreviews.preview(first, in: plan) else {
+            return "Saved in the file name (e.g., Name_wt2048.wav; Name_wt2048r.wav when stepped)."
+        }
+        return "Saved in the file name: \(file.fileName)"
     }
 }
 

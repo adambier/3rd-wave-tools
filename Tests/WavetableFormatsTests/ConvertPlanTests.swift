@@ -129,7 +129,7 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertNil(plan.items[1].factorySlot)
         XCTAssertNil(plan.items[2].factorySlot)   // not a 3rd Wave source: no fingerprint, never flagged
 
-        // A 3rd Wave destination: the factory table starts unticked, with a note saying why.
+        // A 3rd Wave destination: the factory table starts unchecked, with a note saying why.
         XCTAssertFalse(plan.isSelected(factory))
         XCTAssertTrue(plan.isSelected(plan.items[1]))
         XCTAssertTrue(plan.isSelected(plan.items[2]))
@@ -189,8 +189,8 @@ final class ConvertPlanTests: XCTestCase {
         item = plan.items[0]
         XCTAssertEqual(item.frameSize, 256)
         XCTAssertEqual(item.sizeDescription, "64 × 256")
-        XCTAssertTrue(item.basisDescription.hasPrefix("Your choice"))
-        XCTAssertEqual(item.sizeSource, .yourChoice)
+        XCTAssertTrue(item.basisDescription.hasPrefix("Set manually"))
+        XCTAssertEqual(item.sizeSource, .setManually)
         XCTAssertEqual(plan.status(item), .ready)
         XCTAssertEqual(plan.expectedResult(for: item), "64 × 1,024; resized from 256 samples per frame")
         c = plan.convert(write: Self.fakeWriter)
@@ -216,7 +216,7 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertEqual(plan.expectedResult(for: few), "64 × 1,024; resized from 2,048 samples per frame; 8 frames → 64, keeping original frames")
         XCTAssertEqual(plan.expectedResult(for: u), "64 × 1,024")
         plan.options.frameCountPolicy = .interpolate
-        XCTAssertTrue(plan.expectedResult(for: big).hasSuffix("256 frames → 64, blending new frames"))
+        XCTAssertTrue(plan.expectedResult(for: big).hasSuffix("256 frames → 64, crossfading new frames"))
 
         plan.preset = .wav2048
         XCTAssertEqual(plan.expectedResult(for: few), "8 × 2,048")
@@ -224,13 +224,13 @@ final class ConvertPlanTests: XCTestCase {
 
         plan.preset = .tonverk
         XCTAssertEqual(plan.expectedResult(for: u), "64 × 1,024")    // Tonverk takes 1,024: kept
-        XCTAssertEqual(plan.expectedResult(for: big), "64 × 2,048; 256 frames → 64, blending new frames")
+        XCTAssertEqual(plan.expectedResult(for: big), "64 × 2,048; 256 frames → 64, crossfading new frames")
         plan.options.tonverkFrameSize = 512
         XCTAssertEqual(plan.expectedResult(for: few), "8 × 512; resized from 2,048 samples per frame")
 
         plan.preset = .thirdWaveP
         plan.options.appendPPGStandardWaves = true
-        XCTAssertEqual(plan.expectedResult(for: u), "64 × 128; resized from 1,024 samples per frame; 64 frames → 60, blending new frames; the PPG's four standard waves at 60–63")
+        XCTAssertEqual(plan.expectedResult(for: u), "64 × 128; resized from 1,024 samples per frame; 64 frames → 60, crossfading new frames; the PPG's four standard waves at 60–63")
     }
 
     // MARK: Converting and writing
@@ -350,28 +350,35 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(ready.sizeSource, .inFile)
         XCTAssertEqual(ready.basisDescription, "Clm chunk.")   // the reader's own phrase, capitalised
 
+        // Only blockers count: a guessed size and a warning convert, so they need no attention.
         XCTAssertFalse(p.needsAttention(ready))
         XCTAssertTrue(p.needsAttention(open))
         XCTAssertTrue(p.needsAttention(odd))
-        XCTAssertTrue(p.needsAttention(guess))
-        XCTAssertTrue(p.needsAttention(loud))
-        XCTAssertEqual(p.attentionCount, 4)
+        XCTAssertFalse(p.needsAttention(guess))
+        XCTAssertFalse(p.needsAttention(loud))
+        XCTAssertEqual(p.attentionCount, 2)
+        XCTAssertEqual(guess.sizeQualifier, "guessed")
+        XCTAssertNil(ready.sizeQualifier)
+        XCTAssertNil(open.sizeQualifier)
+        XCTAssertNil(ready.originBadge)
         XCTAssertEqual(p.needsFrameSizeCount, 1)
         XCTAssertEqual(p.cannotSplitCount, 1)
         XCTAssertEqual(p.blockedCount, 2)
 
         // Unticked tables need no attention and are not blocked.
         p.setSelected(open.id, false)
-        XCTAssertEqual(p.status(p.items[1]), .unticked)
+        XCTAssertEqual(p.status(p.items[1]), .excluded)
         XCTAssertFalse(p.needsAttention(p.items[1]))
         XCTAssertEqual(p.blockedCount, 1)
-        XCTAssertEqual(p.attentionCount, 3)
+        XCTAssertEqual(p.attentionCount, 1)
+        XCTAssertEqual(p.statusDescription(p.items[1]), "Not marked to convert; left out.")
 
         // Choosing a size for a guessed table makes it the user's choice.
         p.chooseFrameSize(guess.id, 1024)
-        XCTAssertEqual(p.items[3].sizeSource, .yourChoice)
+        XCTAssertEqual(p.items[3].sizeSource, .setManually)
         XCTAssertFalse(p.items[3].isGuessed)
-        XCTAssertEqual(p.items[3].basisDescription, "Your choice; the file's length suggested 2,048.")
+        XCTAssertEqual(p.items[3].basisDescription, "Set manually; the file's length suggested 2,048.")
+        XCTAssertEqual(p.items[3].sizeQualifier, "set manually")
         XCTAssertFalse(p.needsAttention(p.items[3]))
     }
 
@@ -686,5 +693,63 @@ final class WavetableSketchInterpolationTests: XCTestCase {
         XCTAssertEqual(plan.interpolationRecorded(for: plan.items[0]), .spectral)
         plan.preset = .surge
         XCTAssertNil(plan.interpolationRecorded(for: plan.items[0]))
+    }
+}
+
+
+/// The words the Changes column and the Name badges use.
+final class ConvertChangeWordsTests: XCTestCase {
+    private func found(_ t: FoundTable) -> ConvertPlan.Found {
+        ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/" + t.fileName), table: t)
+    }
+
+    func testChangeWords() {
+        let wave = (0..<2048).map { Float(sin(Double($0) * 2 * .pi / 2048)) }
+        let big = FoundTable(name: "Big", fileName: "Big.wav", source: .wav, samples: Array((0..<256).map { _ in wave }.joined()).map { $0 * 1.3 },
+                             frameSize: 2048, frameSizeBasis: "clm chunk",
+                             notes: ["12 samples after the last whole frame are left out.", "Stereo file: only the left channel is used."])
+        let fits = FoundTable(name: "Fits", fileName: "Fits.wt", source: .thirdWaveWavetable(isP: false),
+                              samples: Array((0..<64).map { _ in Array(wave.prefix(1024)) }.joined()).map { $0 * 0.5 },
+                              frameSize: 1024, frameSizeBasis: "3rd Wave U table")
+        var plan = ConvertPlan(preset: .thirdWaveU)
+        plan.add([found(big), found(fits)], factory: FactoryLibrary())
+        let b = plan.changeWords(for: plan.items[0])
+        XCTAssertEqual(b?.changes, ["resized", "256 → 64 frames", "turned down"])
+        XCTAssertEqual(b?.warnings, ["extra samples dropped", "left channel only"])
+        let f = plan.changeWords(for: plan.items[1])
+        XCTAssertEqual(f?.changes, [])
+        XCTAssertEqual(f?.warnings, [])
+        XCTAssertEqual(plan.items[1].originBadge, "3rd Wave U")
+
+        plan.preset = .wav2048   // the peak is kept, so it is a warning rather than a change
+        let kept = plan.changeWords(for: plan.items[0])
+        XCTAssertEqual(kept?.changes, [])
+        XCTAssertEqual(kept?.warnings, ["peak 1.30", "extra samples dropped", "left channel only"])
+
+        plan.preset = .thirdWaveP
+        plan.options.appendPPGStandardWaves = true
+        plan.rename(plan.items[1].id, to: String(repeating: "x", count: 40))
+        XCTAssertEqual(plan.changeWords(for: plan.items[1])?.changes, ["resized", "64 → 60 frames", "+ PPG waves", "name changed"])
+
+        let open = FoundTable(name: "Open", fileName: "Open.wav", source: .wav, samples: Array(wave.prefix(16_384 / 2)) + Array(wave.prefix(16_384 / 2)),
+                              frameSize: nil, frameSizeBasis: "not stated", candidateFrameSizes: [256, 2048])
+        plan.add([found(open)], factory: FactoryLibrary())
+        XCTAssertNil(plan.changeWords(for: plan.items[2]))
+        XCTAssertEqual(ConvertPlan.shortWarning("The clm says 2,048, but the .txt says 1,024; the clm is used."), "tags disagree")
+        XCTAssertEqual(ConvertPlan.shortWarning("Something else entirely."), "see note")
+    }
+
+    func testOriginBadges() {
+        let wave = (0..<128).map { Float(sin(Double($0) * 2 * .pi / 128)) * 0.5 }
+        let tables: [FoundTable] = [
+            FoundTable(name: "a", fileName: "a.wav", source: .wav, samples: wave, frameSize: 128, frameSizeBasis: "clm chunk"),
+            FoundTable(name: "b", fileName: "b.flac", source: .flac, samples: wave.map { $0 * 0.9 }, frameSize: 128, frameSizeBasis: "clm chunk"),
+            FoundTable(name: "c", fileName: "c.wt", source: .surgeWavetable, samples: wave.map { $0 * 0.8 }, frameSize: 128, frameSizeBasis: "Surge .wt header"),
+            FoundTable(name: "d", fileName: "d.wt", source: .thirdWaveWavetable(isP: true), samples: wave.map { $0 * 0.7 }, frameSize: 128, frameSizeBasis: "3rd Wave P table"),
+            FoundTable(name: "f", fileName: "Set.pgdata", source: .unifiedProgram(slot: "U56", isP: false), samples: wave.map { $0 * 0.5 }, frameSize: 128, frameSizeBasis: "3rd Wave U table"),
+        ]
+        var plan = ConvertPlan()
+        plan.add(tables.map(found), factory: FactoryLibrary())
+        XCTAssertEqual(plan.items.map(\.originBadge), [nil, "FLAC", "Surge .wt", "3rd Wave P", "U56 in Set.pgdata"])
     }
 }

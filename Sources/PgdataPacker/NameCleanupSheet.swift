@@ -7,7 +7,7 @@ import PgdataPackerCore
 #endif
 
 /// "Clean Up Names…": proposes tidier names (never for factory wavetables). Every change is shown
-/// and can be edited or unticked; the source files are not changed. On the Pack page it covers the
+/// and can be edited or unchecked; the source files are not changed. On the Pack page it covers the
 /// programs and the added wavetables and multisamples, and the names are applied when packing; on
 /// the Convert page it covers the tables listed there, and the names are applied when converting.
 struct NameCleanupSheet: View {

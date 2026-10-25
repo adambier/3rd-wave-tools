@@ -40,7 +40,7 @@ final class ReviewFixTests: XCTestCase {
         plan.chooseFrameSize(id, 1024)
         XCTAssertEqual(plan.items[0].frameSize, 1024)
         XCTAssertEqual(plan.items[0].frameCount, 64)
-        XCTAssertTrue(plan.items[0].basisDescription.hasPrefix("Your choice"))
+        XCTAssertTrue(plan.items[0].basisDescription.hasPrefix("Set manually"))
         plan.chooseFrameSize(id, 2048)   // back to the file's own
         XCTAssertNil(plan.items[0].chosenFrameSize)
     }
