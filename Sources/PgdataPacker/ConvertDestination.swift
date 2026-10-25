@@ -36,8 +36,12 @@ struct ConvertDestinationPane: View {
                             .padding(.top, 2)
                         }
                     }
+                    // The chosen destination goes down as a value, so the groups and rows are
+                    // laid out again whenever it changes. (With the rows reading it from the
+                    // state object themselves, the radio and highlight stayed on the destination
+                    // chosen at launch while the rest of the pane followed the new one.)
                     ForEach(OutputPreset.Group.allCases, id: \.self) { (group: OutputPreset.Group) in
-                        ConvertPresetGroup(state: state, group: group)
+                        ConvertPresetGroup(group: group, chosen: plan.preset) { state.convertPlan.preset = $0 }
                     }
                     Text(ConvertPlan.testingFootnote)
                         .font(.caption).foregroundStyle(.secondary)
@@ -74,17 +78,21 @@ struct ConvertDestinationPane: View {
     }
 }
 
-/// A group heading and its destinations.
+/// A group heading and its destinations. A function of its inputs: the destination chosen
+/// comes in as a value and a choice goes out through `choose`.
 struct ConvertPresetGroup: View {
-    @ObservedObject var state: AppState
     let group: OutputPreset.Group
+    let chosen: OutputPreset
+    let choose: (OutputPreset) -> Void
 
     var body: some View {
-        let st = state
         VStack(alignment: .leading, spacing: 2) {
             Text(group.title).font(.caption).foregroundStyle(.secondary).padding(.top, 2)
             ForEach(group.presets, id: \.self) { (p: OutputPreset) in
-                ConvertPresetRow(preset: p, chosen: p == st.convertPlan.preset) { st.convertPlan.preset = p }
+                ConvertPresetRow(preset: p, chosen: p == chosen) { choose(p) }
+                    // A new identity when the row's state changes, so the radio, the highlight,
+                    // and the line that only the chosen row shows are all drawn afresh.
+                    .id("\(p.rawValue)-\(p == chosen)")
             }
         }
     }

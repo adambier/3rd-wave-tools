@@ -26,6 +26,16 @@ public struct Wavetable: Equatable, Sendable {
     public var frameCount: Int { frames.count }
     /// The largest absolute sample.
     public var peak: Float { frames.reduce(0) { m, f in f.reduce(m) { max($0, abs($1)) } } }
+
+    /// A peak as the reader's, the writer's, and the app's notes show it: two decimals ("1.14"),
+    /// or enough to show that a peak just over full scale is over it ("1.0003"; "just over 1"
+    /// when four decimals still read 1.0000), so a note never says "peak 1.00, over full scale".
+    public static func peakText(_ peak: Float) -> String {
+        let shown = String(format: "%.2f", Double(peak))
+        guard shown == "1.00", peak > 1 else { return shown }
+        let finer = String(format: "%.4f", Double(peak))
+        return finer == "1.0000" ? "just over 1" : finer
+    }
 }
 
 /// How a synth moves between neighbouring frames, as some file formats can record it.

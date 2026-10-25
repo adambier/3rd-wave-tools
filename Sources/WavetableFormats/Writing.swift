@@ -237,13 +237,13 @@ public enum WavetableWriter {
             let g = 1 / peak
             frames = frames.map { $0.map { $0 * g } }
             let reason = preset.isThirdWave ? "the 3rd Wave's own tables stay within ±1" : "16-bit samples cannot go beyond full scale"
-            notes.append("Turned down to fit (peak was \(decimal(Double(peak), 2)), \(decimal(20 * log10(Double(g)), 1)) dB); plays a little quieter: \(reason).")
+            notes.append("Turned down to fit (peak was \(Wavetable.peakText(peak)), \(decimal(20 * log10(Double(g)), 1)) dB); plays a little quieter: \(reason).")
         }
 
         mutating func notePeakKept() {
             let peak = currentPeak
             guard peak > 1 else { return }
-            notes.append("Peak \(decimal(Double(peak), 2)) kept; the synth may clip it.")
+            notes.append("Peak \(Wavetable.peakText(peak)) kept; the synth may clip it.")
         }
 
         /// For destinations that record the interpolation: says when crossfade (or

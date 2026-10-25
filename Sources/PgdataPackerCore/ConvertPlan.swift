@@ -485,7 +485,7 @@ public struct ConvertPlan: Equatable {
             if Self.isWarning(note.kind) { warnings.append(note.text) } else { information.append(note.text) }
         }
         if item.peak > 1 {
-            warnings.insert("Peak \(Self.decimal(item.peak)) is over full scale (±1); "
+            warnings.insert("Peak \(Wavetable.peakText(item.peak)) is over full scale (±1); "
                 + (destinationScalesToFit ? "the table is turned down to fit." : "it is kept as it is, so the synth may clip it."), at: 0)
         }
         if let slot = item.factorySlot {
@@ -720,7 +720,7 @@ public struct ConvertPlan: Equatable {
         if e.changesCount {
             parts.append("\(Self.formatCount(e.frameCountIn)) frame\(e.frameCountIn == 1 ? "" : "s") → \(e.tableFrameCount), " + Self.methodWord(e.countPolicy, grows: e.frameCountGrows == true))
         }
-        if e.scaledToFit { parts.append("turned down to fit (peak \(Self.decimal(e.peak)))") }
+        if e.scaledToFit { parts.append("turned down to fit (peak \(Wavetable.peakText(e.peak)))") }
         else if e.mayScaleToFit { parts.append("may be turned down a little to fit after resizing") }
         if e.addsPPGWaves { parts.append("the PPG's four standard waves at 60–63") }
         return parts.joined(separator: "; ")
@@ -794,7 +794,7 @@ public struct ConvertPlan: Equatable {
             changes.append("name changed")
         }
         var warnings: [String] = []
-        if e.peakKept { warnings.append("peak \(Self.decimal(e.peak)), over full scale") }
+        if e.peakKept { warnings.append("peak \(Wavetable.peakText(e.peak)), over full scale") }
         for note in item.table.readNotes where Self.isWarning(note.kind) {
             if let word = Self.shortWarning(note.kind), !warnings.contains(word) { warnings.append(word) }
         }
@@ -974,9 +974,6 @@ public struct ConvertPlan: Equatable {
     /// A count with thousands separators, independent of the locale ("1,024"); the same formatting
     /// as the library's notes (`WavetableReader.grouped`).
     public static func formatCount(_ n: Int) -> String { WavetableReader.grouped(n) }
-
-    /// A peak with two decimals ("1.23"), independent of the locale.
-    static func decimal(_ v: Float) -> String { String(format: "%.2f", Double(v)) }
 
     /// The phrase with its first letter in capitals, when it starts with an ordinary word ("cue
     /// markers" to "Cue markers"); a name such as "u-he" or "clm" alone is left as it is.

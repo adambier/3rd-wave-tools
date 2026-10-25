@@ -128,11 +128,18 @@ struct ConvertItemPreview: View {
             // The facts column takes up to 340 points and gives way down to 200 in a narrow
             // pane; the pictures take the width that is left, however little, and their text
             // wraps. The pane scrolls (see ConvertDetailPane) when the two are taller than it.
-            HStack(alignment: .top, spacing: 20) {
-                ConvertOverviewPair(state: state, item: item)
-                    .frame(minWidth: 120, maxWidth: .infinity, alignment: .topLeading)
+            // A table that can't be drawn yet (no frame size) has no pictures, and its facts,
+            // which then say what to do, take the whole width.
+            if item.table.wavetable(frameSize: item.frameSize) != nil {
+                HStack(alignment: .top, spacing: 20) {
+                    ConvertOverviewPair(state: state, item: item)
+                        .frame(minWidth: 120, maxWidth: .infinity, alignment: .topLeading)
+                    ConvertPreviewFacts(state: state, item: item)
+                        .frame(minWidth: 200, idealWidth: 300, maxWidth: 340, alignment: .topLeading)
+                }
+            } else {
                 ConvertPreviewFacts(state: state, item: item)
-                    .frame(minWidth: 200, idealWidth: 300, maxWidth: 340, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -389,6 +396,10 @@ struct ConvertWhatHappens: View {
                     Label("The table can't be converted; the report after converting says why.", systemImage: "xmark.octagon")
                         .foregroundStyle(.red)
                 }
+            } else if plan.status(item) == .needsFrameSize {
+                // The facts above already say, in red, that the size is not stated and where to
+                // choose one, and what the file's length allows; here only what that means.
+                Text("Output: none until a frame size is chosen.").foregroundStyle(.secondary)
             } else {
                 Label(plan.statusDescription(item), systemImage: "exclamationmark.octagon.fill")
                     .foregroundStyle(.red)
