@@ -382,6 +382,10 @@ in any language. Everything here is open source under the MIT licence.
 - **A command-line tool.** `tw3pg` (in `Sources/tw3pg`) inspects files, checks that they round
   trip, unpacks and repacks `.pgdata` files, and converts older programs:
   `swift run tw3pg inspect <file>`.
+- **Using an AI coding tool?** Give it [`AGENTS.md`](AGENTS.md): a terse map of the code, the
+  rules it must keep (byte-exact round trips, Foundation-only libraries, the single-module app
+  build), where each kind of change goes, and how to verify it. Claude Code reads it through
+  `CLAUDE.md`; other tools read `AGENTS.md` directly or can be pointed at it.
 - **Contributions.** Corrections to the format reference are the most valuable contribution,
   whether from tests on a 3rd Wave or from knowing better; so are bug reports with the files that
   show them, and word of tools built on this. [`CONTRIBUTING.md`](CONTRIBUTING.md) explains how.
