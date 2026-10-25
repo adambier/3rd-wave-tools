@@ -42,24 +42,36 @@ final class ReviewFixPlanTests: XCTestCase {
         XCTAssertNil(plan.items[0].chosenFrameSize)
     }
 
-    /// A stated size can be overridden with another the length allows (a wrong tag happens);
-    /// the file's own size comes first and stays "in the file" until another is chosen.
-    func testMetadataSizeCanBeOverriddenWithinWhatFits() {
-        let t = FoundTable(name: "T", fileName: "t.wav", source: .wav, samples: Array(repeating: 0, count: 8192),
-                           frameSize: 2048, frameSizeBasis: "clm chunk")
+    /// A size the file's contents state is not offered for change; one the app estimated (a
+    /// tag in the file name, markers, a .txt, the length) is the default of a choice among the
+    /// sizes the length allows; a 3rd Wave table's format fixes its size.
+    func testOnlyEstimatedSizesAreOfferedForChange() {
         var plan = ConvertPlan()
-        _ = plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/t.wav"), table: t)])
-        XCTAssertEqual(plan.items[0].frameSizeChoices, [2048, 64, 128, 256, 512, 1024, 4096])
+        let stated = FoundTable(name: "T", fileName: "t.wav", source: .wav, samples: Array(repeating: 0, count: 8192),
+                                frameSize: 2048, frameSizeBasis: "clm chunk")
+        _ = plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/t.wav"), table: stated)])
+        XCTAssertFalse(plan.items[0].sizeIsEstimate)
+        XCTAssertEqual(plan.items[0].frameSizeChoices, [])
         XCTAssertEqual(plan.items[0].sizeQualifier, "in the file")
-        plan.chooseFrameSize(plan.items[0].id, 1000)   // not offered
-        XCTAssertEqual(plan.items[0].frameSize, 2048)
         plan.chooseFrameSize(plan.items[0].id, 1024)
-        XCTAssertEqual(plan.items[0].frameSize, 1024)
-        XCTAssertEqual(plan.items[0].sizeQualifier, "set manually")
-        // A 3rd Wave table's format fixes its size: no choice to make, so the cell is plain text.
+        XCTAssertEqual(plan.items[0].frameSize, 2048, "not offered, so not taken")
+
+        let tagged = FoundTable(name: "Pad_wt1024", fileName: "Pad_wt1024.wav", source: .wav, samples: Array(repeating: 0, count: 8192),
+                                frameSize: 1024, frameSizeBasis: "Tonverk tag in the file name", frameSizeEvidence: .fileName)
+        _ = plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Pad_wt1024.wav"), table: tagged)])
+        XCTAssertTrue(plan.items[1].sizeIsEstimate)
+        XCTAssertEqual(plan.items[1].frameSizeChoices, [1024, 64, 128, 256, 512, 2048, 4096])
+        XCTAssertEqual(plan.items[1].frameSize, 1024, "the estimate is the default")
+        XCTAssertEqual(plan.items[1].sizeQualifier, "in the name")
+        plan.chooseFrameSize(plan.items[1].id, 2048)
+        XCTAssertEqual(plan.items[1].frameSize, 2048)
+        XCTAssertEqual(plan.items[1].sizeQualifier, "set manually")
+        plan.chooseFrameSize(plan.items[1].id, 1024)   // back to the tag's
+        XCTAssertNil(plan.items[1].chosenFrameSize)
+
         let u = FoundTable(name: "U", fileName: "u.wt", source: .thirdWaveWavetable(isP: false),
                            samples: Array(repeating: 0, count: 65_536), frameSize: 1024, frameSizeBasis: "3rd Wave U table")
         _ = plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/u.wt"), table: u)])
-        XCTAssertEqual(plan.items[1].frameSizeChoices, [])
+        XCTAssertEqual(plan.items[2].frameSizeChoices, [])
     }
 }

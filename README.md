@@ -300,10 +300,12 @@ preview below the table is read-only and shows one table: the source and the res
 by frame (with the interpolation drawn between frames where a file records one), its file, its
 frame size and what that rests on, and what converting changes; moving the pointer across a
 picture sweeps through the table and draws the cycle at that point large, source and result
-together. Names are edited in the table, and a frame size is chosen from the Input column: for a
-WAV or FLAC, every size the file's length allows is drawn so the one that cuts the wave in the
-right place is visible, the file's own first, and the size the samples suggest is marked "likely"
-(a hint, never applied by itself). When a destination needs a different number of frames, **Options**
+together. Names are edited in the table. A frame size the file's contents state (a chunk, a
+header, or a format that fixes it) is taken as it is; one the page estimated (from a tag in the
+file name, a `.txt` beside the file, markers, or the length alone) is the default of a choice in
+the Input column, where every size the length allows is drawn so the one that cuts the wave in
+the right place is visible, and the size the samples suggest is marked "likely" (a hint, never
+applied by itself); a size nothing settles must be chosen there. When a destination needs a different number of frames, **Options**
 lets you choose how to get there: **Keep Original Frames** (evenly spaced frames, the first and
 last among them, adding no new waves) or **Crossfade New Frames** (each new frame is a crossfade
 of its neighbours). It also sets the interpolation saved in the file where the format records

@@ -94,19 +94,27 @@ public struct ConvertPlan: Equatable {
         public var name: String { newName ?? table.name }
         /// The frame size used: the user's choice, or else the file's.
         public var frameSize: Int? { chosenFrameSize ?? table.frameSize }
-        /// The sizes the user can choose from: the file's own (when it gives one) and the other
-        /// sizes its length allows (`WavetableReader.fittingFrameSizes`), for a WAV or FLAC
-        /// even when the file states its size (a wrong tag can be overridden; the stated size
-        /// is marked "in the file"). Empty for a 3rd Wave or Surge table, whose format fixes
-        /// the size, and when nothing else fits.
+        /// The sizes the user can choose from, when the size is open or an estimate
+        /// (`sizeIsEstimate`): the file's own first, then the other sizes its length allows
+        /// (`WavetableReader.fittingFrameSizes`). Empty when the file's contents state the
+        /// size (a chunk or header, or a format that fixes it): there is nothing to choose.
         public var frameSizeChoices: [Int] {
             let own = table.frameSize.map { [$0] } ?? []
             var others = table.candidateFrameSizes
-            if others.isEmpty, table.frameSize != nil, table.source == .wav || table.source == .flac {
+            if others.isEmpty, table.frameSize != nil, sizeIsEstimate {
                 others = WavetableReader.fittingFrameSizes(table.samples.count)
             }
             let choices = own + others.filter { $0 != table.frameSize }
             return choices.count > 1 || table.frameSize == nil ? choices : []
+        }
+        /// Whether the size is the app's estimate rather than something the file's contents
+        /// state: from a tag in the file name (files get renamed), a .txt beside the file,
+        /// markers, or the length alone. An estimate is offered as the default of a choice.
+        public var sizeIsEstimate: Bool {
+            switch table.frameSizeEvidence {
+            case .fileName, .sidecar, .markers, .length: return true
+            case .statedInFile, .none: return false
+            }
         }
         /// Whether the file leaves the frame size open, so the user must choose one.
         public var needsFrameSize: Bool { table.frameSize == nil }
