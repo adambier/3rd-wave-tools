@@ -11,18 +11,18 @@ extension WavetableReader {
     static func readSurge(_ b: [UInt8], fileName: String) throws -> [FoundTable] {
         let what = "\"\(fileName)\" begins like a Surge wavetable (vawt), but"
         guard b.count >= 12 else {
-            throw WavetableError("\(what) it ends after \(b.count) bytes, inside its 12-byte header; it is damaged or cut short.")
+            throw WavetableError(.damaged, "\(what) it ends after \(b.count) bytes, inside its 12-byte header; it is damaged or cut short.")
         }
         let size = Int(le32(b, 4)), count = Int(le16(b, 8)), flags = le16(b, 10)
         if flags & 0x01 != 0 { return [] }   // a sample, not a wavetable
         guard (2...65_536).contains(size) else {
-            throw WavetableError("\(what) its header says \(grouped(size)) samples per frame, which is not a usable size; it is damaged.")
+            throw WavetableError(.damaged, "\(what) its header says \(grouped(size)) samples per frame, which is not a usable size; it is damaged.")
         }
-        guard count >= 1 else { throw WavetableError("\(what) its header says it has no frames; it is damaged.") }
+        guard count >= 1 else { throw WavetableError(.damaged, "\(what) its header says it has no frames; it is damaged.") }
         let isInt16 = flags & 0x04 != 0
         let need = size * count * (isInt16 ? 2 : 4)
         guard b.count - 12 >= need else {
-            throw WavetableError("\(what) its header promises \(grouped(count)) frames of \(grouped(size)) samples "
+            throw WavetableError(.damaged, "\(what) its header promises \(grouped(count)) frames of \(grouped(size)) samples "
                                  + "(\(grouped(need)) bytes), and the file holds only \(grouped(b.count - 12)) bytes "
                                  + "after the header; it has been cut short.")
         }
@@ -34,7 +34,7 @@ extension WavetableReader {
             for i in samples.indices {
                 let v = Float(bitPattern: le32(b, 12 + 4 * i))
                 guard v.isFinite else {
-                    throw WavetableError("\(what) sample \(grouped(i)) is not a number; it is damaged.")
+                    throw WavetableError(.damaged, "\(what) sample \(grouped(i)) is not a number; it is damaged.")
                 }
                 samples[i] = v
             }

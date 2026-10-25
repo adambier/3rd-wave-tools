@@ -120,7 +120,7 @@ enum FLACDecoder {
     static func decode(_ bytes: [UInt8], fileName: String) throws -> Decoded {
         let what = "\"\(fileName)\" is a FLAC file, but"
         guard bytes.count >= 4, bytes[0] == 0x66, bytes[1] == 0x4C, bytes[2] == 0x61, bytes[3] == 0x43 else {
-            throw WavetableError("\"\(fileName)\" is not a FLAC file.")
+            throw WavetableError(.damaged, "\"\(fileName)\" is not a FLAC file.")
         }
         // Metadata blocks.
         var off = 4
@@ -129,22 +129,22 @@ enum FLACDecoder {
         var comments: [(key: String, value: String)] = []
         var last = false
         while !last {
-            guard off + 4 <= bytes.count else { throw WavetableError("\(what) it ends inside its header; it is cut short.") }
+            guard off + 4 <= bytes.count else { throw WavetableError(.damaged, "\(what) it ends inside its header; it is cut short.") }
             let header = bytes[off]
             last = header & 0x80 != 0
             let type = Int(header & 0x7F)
             let length = Int(bytes[off + 1]) << 16 | Int(bytes[off + 2]) << 8 | Int(bytes[off + 3])
             let body = off + 4
             guard body + length <= bytes.count else {
-                throw WavetableError("\(what) a header block (type \(type)) runs past the end of the file; it is cut short.")
+                throw WavetableError(.damaged, "\(what) a header block (type \(type)) runs past the end of the file; it is cut short.")
             }
-            if type == 127 { throw WavetableError("\(what) a header block has the invalid type 127; it is damaged.") }
+            if type == 127 { throw WavetableError(.damaged, "\(what) a header block has the invalid type 127; it is damaged.") }
             if info == nil, type != 0 {
-                throw WavetableError("\(what) it does not begin with its stream description (STREAMINFO); it is damaged.")
+                throw WavetableError(.damaged, "\(what) it does not begin with its stream description (STREAMINFO); it is damaged.")
             }
             switch type {
             case 0:
-                guard length >= 34 else { throw WavetableError("\(what) its stream description (STREAMINFO) is too short; it is damaged.") }
+                guard length >= 34 else { throw WavetableError(.damaged, "\(what) its stream description (STREAMINFO) is too short; it is damaged.") }
                 let s = Array(bytes[body..<(body + 34)])
                 var x: UInt64 = 0
                 for k in 10..<18 { x = x << 8 | UInt64(s[k]) }
@@ -155,12 +155,12 @@ enum FLACDecoder {
                                    bitsPerSample: Int((x >> 36) & 31) + 1, totalSamples: Int(x & ((1 << 36) - 1)),
                                    md5: Array(s[18..<34]))
                 guard (4...32).contains(i.bitsPerSample) else {
-                    throw WavetableError("\(what) its stream description says \(i.bitsPerSample)-bit samples, outside FLAC's 4 to 32; it is damaged.")
+                    throw WavetableError(.damaged, "\(what) its stream description says \(i.bitsPerSample)-bit samples, outside FLAC's 4 to 32; it is damaged.")
                 }
-                guard i.maxBlockSize >= 1 else { throw WavetableError("\(what) its stream description gives no block size; it is damaged.") }
+                guard i.maxBlockSize >= 1 else { throw WavetableError(.damaged, "\(what) its stream description gives no block size; it is damaged.") }
                 info = i
             case 2:
-                guard length >= 4 else { throw WavetableError("\(what) an application block is shorter than its 4-byte id; it is damaged.") }
+                guard length >= 4 else { throw WavetableError(.damaged, "\(what) an application block is shorter than its 4-byte id; it is damaged.") }
                 applications.append((Array(bytes[body..<(body + 4)]), Array(bytes[(body + 4)..<(body + length)])))
             case 4:
                 comments += vorbisComments(bytes, body..<(body + length))
@@ -168,7 +168,7 @@ enum FLACDecoder {
             }
             off = body + length
         }
-        guard let streamInfo = info else { throw WavetableError("\(what) it has no stream description (STREAMINFO); it is damaged.") }
+        guard let streamInfo = info else { throw WavetableError(.damaged, "\(what) it has no stream description (STREAMINFO); it is damaged.") }
 
         // Frames.
         var out: [Float] = []
@@ -188,12 +188,12 @@ enum FLACDecoder {
                 if streamInfo.totalSamples > 0, decoded >= streamInfo.totalSamples { break }   // trailing bytes (a tag, say)
                 let n: Int
                 do { n = try frame.decodeFrame(&reader) } catch is Bits.CutShort {
-                    throw WavetableError("\(what) it ends in the middle of frame \(frames); it is cut short or damaged.")
+                    throw WavetableError(.damaged, "\(what) it ends in the middle of frame \(frames); it is cut short or damaged.")
                 }
                 frames += 1
                 decoded += n
                 if streamInfo.totalSamples > 0, decoded > streamInfo.totalSamples {
-                    throw WavetableError("\(what) it holds more samples than its stream description promises (\(WavetableReader.grouped(streamInfo.totalSamples))); it is damaged.")
+                    throw WavetableError(.damaged, "\(what) it holds more samples than its stream description promises (\(WavetableReader.grouped(streamInfo.totalSamples))); it is damaged.")
                 }
                 let scale = Float(1) / Float(1 << (streamInfo.bitsPerSample - 1))
                 let ch = frame.buffers.channels[0]
@@ -202,12 +202,12 @@ enum FLACDecoder {
             }
             stats = frame.stats
         }
-        guard frames > 0 else { throw WavetableError("\(what) it holds no audio frames; it is damaged or cut short.") }
+        guard frames > 0 else { throw WavetableError(.damaged, "\(what) it holds no audio frames; it is damaged or cut short.") }
         if streamInfo.totalSamples > 0, decoded < streamInfo.totalSamples {
-            throw WavetableError("\(what) it ends after \(WavetableReader.grouped(decoded)) of the \(WavetableReader.grouped(streamInfo.totalSamples)) samples its stream description promises; it is cut short.")
+            throw WavetableError(.damaged, "\(what) it ends after \(WavetableReader.grouped(decoded)) of the \(WavetableReader.grouped(streamInfo.totalSamples)) samples its stream description promises; it is cut short.")
         }
         if wantMD5, md5.finish() != streamInfo.md5 {
-            throw WavetableError("\(what) its audio does not match the MD5 signature in its stream description; it is damaged.")
+            throw WavetableError(.damaged, "\(what) its audio does not match the MD5 signature in its stream description; it is damaged.")
         }
         return Decoded(info: streamInfo, firstChannel: out, applications: applications, comments: comments, frames: frames,
                        stats: stats)
@@ -354,7 +354,7 @@ enum FLACDecoder {
         }
 
         private func damaged(_ reason: String) -> WavetableError {
-            WavetableError("\(what) frame \(frameNumber) \(reason); it is damaged.")
+            WavetableError(.damaged, "\(what) frame \(frameNumber) \(reason); it is damaged.")
         }
 
         /// Decodes the next frame into `channels` and returns its block size.

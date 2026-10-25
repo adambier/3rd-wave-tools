@@ -29,15 +29,17 @@ public enum WavetableReader {
     /// WAV or FLAC file, if one exists.
     ///
     /// - Throws: ``WavetableError`` when the file is recognisably a wavetable format (a Surge
-    ///   `.wt`, a 3rd Wave `.wt` or `.pgdata`, a WAV, or a FLAC file) but is damaged, or is a WAV
-    ///   marked as a wavetable in a sample format this reader does not decode.
+    ///   `.wt`, a 3rd Wave `.wt` or `.pgdata`, a WAV, or a FLAC file) but is damaged
+    ///   (``WavetableError/Kind/damaged``), is a WAV in a form this reader does not decode
+    ///   (``WavetableError/Kind/unsupported``), or is marked as a wavetable whose stated frame
+    ///   size cannot be used (``WavetableError/Kind/notAWavetable``).
     public static func read(_ data: Data, fileName: String, sidecarText: String? = nil) throws -> [FoundTable] {
         let bytes = [UInt8](data)
         if hasPrefix(bytes, "vawt") { return try readSurge(bytes, fileName: fileName) }
         if isRIFFWave(bytes) { return try readWAV(bytes, fileName: fileName, sidecarText: sidecarText) }
         if hasPrefix(bytes, "fLaC") { return try readFLAC(bytes, fileName: fileName, sidecarText: sidecarText) }
         if hasPrefix(bytes, "RIFX"), bytes.count >= 12, hasPrefix(Array(bytes[8..<12]), "WAVE") {
-            throw WavetableError("\"\(fileName)\" is a WAV stored in big-endian byte order (RIFX), which this reader does not read. Save it as a standard WAV and try again.")
+            throw WavetableError(.unsupported, "\"\(fileName)\" is a WAV stored in big-endian byte order (RIFX), which this reader does not read. Save it as a standard WAV and try again.")
         }
         if hasPrefix(bytes, UnifiedProgram.magicText) { return try readUnifiedProgram(bytes, fileName: fileName) }
         if let text = thirdWaveText(bytes) { return try readThirdWaveText(text, fileName: fileName) }
@@ -47,12 +49,12 @@ public enum WavetableReader {
     /// Reads a file, and for a WAV or FLAC file also its Serum-style sidecar (`<name>.txt`, or
     /// `FolderInfo.txt` in the same folder) when present.
     ///
-    /// - Throws: ``WavetableError`` when the file cannot be read, or for the reasons
-    ///   ``read(_:fileName:sidecarText:)`` gives.
+    /// - Throws: ``WavetableError`` when the file cannot be read (``WavetableError/Kind/ioFailure``),
+    ///   or for the reasons ``read(_:fileName:sidecarText:)`` gives.
     public static func read(url: URL) throws -> [FoundTable] {
         let data: Data
         do { data = try Data(contentsOf: url) } catch {
-            throw WavetableError("\"\(url.lastPathComponent)\" could not be read: \(error.localizedDescription)")
+            throw WavetableError(.ioFailure, "\"\(url.lastPathComponent)\" could not be read: \(error.localizedDescription)")
         }
         var sidecar: String?
         if data.count >= 12, isRIFFWave([UInt8](data.prefix(12))) || hasPrefix([UInt8](data.prefix(4)), "fLaC") {

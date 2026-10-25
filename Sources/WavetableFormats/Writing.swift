@@ -16,8 +16,9 @@ public enum WavetableWriter {
     /// WaveEdit's 44.1 kHz. The interpolation recorded, where the format can record one, is
     /// `options.interpolation`, else the table's, else crossfade.
     ///
-    /// - Throws: ``WavetableError`` when the table is empty, its frames differ in length, a sample
-    ///   is not a finite number, or `options.tonverkFrameSize` is not one Tonverk accepts.
+    /// - Throws: ``WavetableError`` of kind ``WavetableError/Kind/cannotConvert`` when the table
+    ///   is empty, its frames differ in length, a sample is not a finite number, or
+    ///   `options.tonverkFrameSize` is not one Tonverk accepts.
     public static func write(_ table: Wavetable, preset: OutputPreset, options: OutputOptions = OutputOptions()) throws -> OutputFile {
         try validate(table)
         var job = Job(table: table, preset: preset, options: options)
@@ -29,13 +30,13 @@ public enum WavetableWriter {
 
     static func validate(_ table: Wavetable) throws {
         guard let first = table.frames.first, !first.isEmpty else {
-            throw WavetableError("“\(table.name)” has no samples to convert.")
+            throw WavetableError(.cannotConvert, "“\(table.name)” has no samples to convert.")
         }
         guard table.frames.allSatisfy({ $0.count == first.count }) else {
-            throw WavetableError("The frames of “\(table.name)” are not all the same length, so it cannot be converted.")
+            throw WavetableError(.cannotConvert, "The frames of “\(table.name)” are not all the same length, so it cannot be converted.")
         }
         guard table.frames.allSatisfy({ $0.allSatisfy(\.isFinite) }) else {
-            throw WavetableError("“\(table.name)” contains values that are not numbers (infinite or NaN), so it cannot be converted.")
+            throw WavetableError(.cannotConvert, "“\(table.name)” contains values that are not numbers (infinite or NaN), so it cannot be converted.")
         }
     }
 
@@ -103,7 +104,7 @@ public enum WavetableWriter {
 
         mutating func run() throws -> OutputFile {
             if preset == .tonverk, let asked = options.tonverkFrameSize, !WavetableWriter.tonverkFrameSizes.contains(asked) {
-                throw WavetableError("Tonverk takes frames of 64, 128, 256, 512, 1,024, 2,048, or 4,096 samples, not \(grouped(asked)).")
+                throw WavetableError(.cannotConvert, "Tonverk takes frames of 64, 128, 256, 512, 1,024, 2,048, or 4,096 samples, not \(grouped(asked)).")
             }
             // The shared steps, in the plan's order: the frame count and size, the level, the
             // PPG waves; then what each destination says and writes.

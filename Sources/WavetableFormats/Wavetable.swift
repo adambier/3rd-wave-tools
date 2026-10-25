@@ -289,10 +289,38 @@ public struct OutputFile: Equatable, Sendable {
     }
 }
 
-/// Why a file could not be read or a table could not be converted, as a sentence for the user.
+/// Why a file could not be read or a table could not be converted: what went wrong (`kind`), and
+/// the reason as a sentence for the user (`description`).
 public struct WavetableError: Error, Equatable, CustomStringConvertible, Sendable {
+    /// What went wrong.
+    public enum Kind: Equatable, Sendable {
+        /// A file of a known format that is cut short, inconsistent with itself, or fails a
+        /// check (a WAV without its format chunk, a FLAC frame with a wrong checksum, a Surge
+        /// header promising more data than the file holds, a 3rd Wave file that will not parse).
+        case damaged
+        /// A file of a known format in a form this library does not read: a big-endian (RIFX)
+        /// WAV, or a WAV marked as a wavetable whose samples are compressed or of an unhandled
+        /// sample format.
+        case unsupported
+        /// A file marked as a wavetable (a `clm `, `srge`, or `uhWT` chunk, a Tonverk tag) whose
+        /// stated frame size cannot be used, with nothing else to go on.
+        case notAWavetable
+        /// A table that cannot be written for the destination: empty, with frames of unequal
+        /// length, with values that are not finite, or with an option the destination does not
+        /// take.
+        case cannotConvert
+        /// The file could not be read from disk.
+        case ioFailure
+    }
+
+    /// What went wrong.
+    public var kind: Kind
     /// The reason, as a sentence.
     public var description: String
-    /// Creates an error with its reason.
-    public init(_ description: String) { self.description = description }
+
+    /// Creates an error of `kind` with its reason.
+    public init(_ kind: Kind, _ description: String) { self.kind = kind; self.description = description }
+
+    /// Creates an error with its reason, of kind `.damaged` (the readers' usual complaint).
+    public init(_ description: String) { self.init(.damaged, description) }
 }

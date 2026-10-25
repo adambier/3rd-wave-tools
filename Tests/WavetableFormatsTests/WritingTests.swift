@@ -312,11 +312,16 @@ final class WritingTests: XCTestCase {
     }
 
     func testValidation() {
-        XCTAssertThrowsError(try write(Wavetable(name: "Empty", frames: []), .wav2048))
-        XCTAssertThrowsError(try write(Wavetable(name: "Empty frame", frames: [[]]), .wav2048))
-        XCTAssertThrowsError(try write(Wavetable(name: "Ragged", frames: [[0, 0], [0]]), .wav2048))
+        func kind(_ error: Error) -> WavetableError.Kind? { (error as? WavetableError)?.kind }
+        XCTAssertThrowsError(try write(Wavetable(name: "Empty", frames: []), .wav2048)) { XCTAssertEqual(kind($0), .cannotConvert) }
+        XCTAssertThrowsError(try write(Wavetable(name: "Empty frame", frames: [[]]), .wav2048)) { XCTAssertEqual(kind($0), .cannotConvert) }
+        XCTAssertThrowsError(try write(Wavetable(name: "Ragged", frames: [[0, 0], [0]]), .wav2048)) { XCTAssertEqual(kind($0), .cannotConvert) }
         XCTAssertThrowsError(try write(Wavetable(name: "NaN", frames: [[0, .nan]]), .wav2048)) { error in
             XCTAssertTrue((error as? WavetableError)?.description.contains("not numbers") == true)
+            XCTAssertEqual(kind(error), .cannotConvert)
+        }
+        XCTAssertThrowsError(try write(table(frames: 4, size: 2048), .tonverk, OutputOptions(tonverkFrameSize: 100))) {
+            XCTAssertEqual(kind($0), .cannotConvert)
         }
     }
 

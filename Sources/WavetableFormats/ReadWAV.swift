@@ -62,7 +62,7 @@ extension WavetableReader {
         case let .unsupported(reason, chunks):
             // Marked as a wavetable: say why it cannot be read. Otherwise it is just audio.
             if ["clm ", "srge", "uhWT"].contains(where: { chunks[$0] != nil }) || tag != nil {
-                throw WavetableError("\"\(fileName)\" is marked as a wavetable, but \(reason)")
+                throw WavetableError(.unsupported, "\"\(fileName)\" is marked as a wavetable, but \(reason)")
             }
             return []
         case let .audio(w): wav = w
@@ -194,7 +194,7 @@ extension WavetableReader {
         /// No wavetable: silently, unless the file is marked as one whose stated size does not fit.
         func none() throws -> [FoundTable] {
             if let reason = rejected.first?.reason {
-                throw WavetableError("\"\(fileName)\" is marked as a wavetable, but \(reason), so nothing can be read from it.")
+                throw WavetableError(.notAWavetable, "\"\(fileName)\" is marked as a wavetable, but \(reason), so nothing can be read from it.")
             }
             return []
         }
@@ -304,22 +304,22 @@ extension WavetableReader {
             off = next
         }
         guard let fmt = chunks["fmt "], fmt.count >= 16 else {
-            throw WavetableError("\(damaged) it has no readable format description (fmt chunk), which every WAV needs; it is damaged.")
+            throw WavetableError(.damaged, "\(damaged) it has no readable format description (fmt chunk), which every WAV needs; it is damaged.")
         }
-        guard let data = dataRange else { throw WavetableError("\(damaged) it has no audio data (data chunk); it is damaged.") }
+        guard let data = dataRange else { throw WavetableError(.damaged, "\(damaged) it has no audio data (data chunk); it is damaged.") }
         var tag = Int(le16(fmt, 0))
         let channels = Int(le16(fmt, 2)), blockAlign = Int(le16(fmt, 12)), bits = Int(le16(fmt, 14))
         if tag == 0xFFFE {   // WAVE_FORMAT_EXTENSIBLE: the real format is the subformat GUID's first two bytes
             guard fmt.count >= 26 else {
-                throw WavetableError("\(damaged) its format description (an extensible fmt chunk) is cut short; it is damaged.")
+                throw WavetableError(.damaged, "\(damaged) its format description (an extensible fmt chunk) is cut short; it is damaged.")
             }
             tag = Int(le16(fmt, 24))
         }
-        guard channels > 0 else { throw WavetableError("\(damaged) its format description says it has no channels; it is damaged.") }
+        guard channels > 0 else { throw WavetableError(.damaged, "\(damaged) its format description says it has no channels; it is damaged.") }
         var bytesPerSample = (bits + 7) / 8
         if blockAlign >= channels, blockAlign % channels == 0 { bytesPerSample = blockAlign / channels }
         guard bytesPerSample > 0 else {
-            throw WavetableError("\(damaged) its format description gives no sample size; it is damaged.")
+            throw WavetableError(.damaged, "\(damaged) its format description gives no sample size; it is damaged.")
         }
         let isInt = tag == 1 && (1...4).contains(bytesPerSample)
         let isFloat = tag == 3 && (bytesPerSample == 4 || bytesPerSample == 8)
@@ -345,7 +345,7 @@ extension WavetableReader {
                     ? Float(bitPattern: le32(b, o))
                     : Float(Double(bitPattern: UInt64(le32(b, o)) | UInt64(le32(b, o + 4)) << 32))
                 guard v.isFinite else {
-                    throw WavetableError("\(damaged) sample \(grouped(i)) is not a number; it is damaged.")
+                    throw WavetableError(.damaged, "\(damaged) sample \(grouped(i)) is not a number; it is damaged.")
                 }
                 samples[i] = v
             } else if bytesPerSample == 1 {

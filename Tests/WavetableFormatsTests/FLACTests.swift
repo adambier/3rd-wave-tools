@@ -131,6 +131,7 @@ final class FLACTests: XCTestCase {
         XCTAssertEqual(none.firstChannel.count, 4096)
         XCTAssertThrowsError(try decode("hand_md5_wrong.flac")) { e in
             XCTAssertEqual("\(e)", "\"hand_md5_wrong.flac\" is a FLAC file, but its audio does not match the MD5 signature in its stream description; it is damaged.")
+            XCTAssertEqual((e as? WavetableError)?.kind, .damaged)
         }
     }
 
@@ -143,6 +144,7 @@ final class FLACTests: XCTestCase {
         // Cut off inside the last frame.
         XCTAssertThrowsError(try WavetableReader.read(good.prefix(good.count - 10), fileName: name)) { e in
             XCTAssertEqual("\(e)", "\"t.flac\" is a FLAC file, but it ends in the middle of frame \(lastFrame); it is cut short or damaged.")
+            XCTAssertEqual((e as? WavetableError)?.kind, .damaged)
         }
         // Cut off inside the metadata.
         XCTAssertThrowsError(try WavetableReader.read(good.prefix(20), fileName: name)) { e in

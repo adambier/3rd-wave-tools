@@ -518,6 +518,51 @@ final class ReadingTests: XCTestCase {
         XCTAssertEqual(try readOne(try fixture("unified.pgdata"), "unified.pgdata").frameSizeSource, .thirdWaveTable(isP: false))
     }
 
+    // MARK: - Error kinds
+
+    /// Each error says what went wrong beside its sentence: a damaged file, a form this reader
+    /// does not read, a file marked as a wavetable that holds none, or a file it could not open.
+    func testErrorKinds() throws {
+        func kind(_ body: () throws -> Any, _ label: String, file: StaticString = #filePath, line: UInt = #line) -> WavetableError.Kind? {
+            do { _ = try body() } catch let e as WavetableError { return e.kind } catch { XCTFail("\(label): \(error)", file: file, line: line) }
+            XCTFail("\(label): no error", file: file, line: line)
+            return nil
+        }
+        // Unsupported: a big-endian WAV, and a WAV marked as a wavetable in a compressed format.
+        XCTAssertEqual(kind({ try WavetableReader.read(Data("RIFX\u{0}\u{0}\u{0}\u{0}WAVE".utf8), fileName: "x.wav") }, "RIFX"), .unsupported)
+        var alaw = wavFile([ramp(2048)], format: .pcm16, chunks: [clm("<!>2048 00000000")])
+        alaw[20] = 6; alaw[21] = 0
+        XCTAssertEqual(kind({ try WavetableReader.read(alaw, fileName: "b.wav") }, "A-law"), .unsupported)
+        // Marked as a wavetable, but the stated frame size cannot be used.
+        XCTAssertEqual(kind({ try WavetableReader.read(wavFile([ramp(1000)], chunks: [clm("<!>2048 00000000")]), fileName: "d.wav") }, "clm too big"),
+                       .notAWavetable)
+        XCTAssertEqual(kind({ try WavetableReader.read(wavFile([ramp(1000)], chunks: [srge(1)]), fileName: "e.wav") }, "srge 1"), .notAWavetable)
+        // Damaged: a WAV without audio, a Surge file cut short, a 3rd Wave file that will not parse.
+        var noData = Data("RIFF".utf8) + le32(4 + 24) + Data("WAVE".utf8) + Data("fmt ".utf8) + le32(16)
+        noData += le16(3) + le16(1) + le32(48_000) + le32(192_000) + le16(4) + le16(32)
+        XCTAssertEqual(kind({ try WavetableReader.read(noData, fileName: "a.wav") }, "no data"), .damaged)
+        var noChannels = wavFile([ramp(2048)])
+        noChannels[22] = 0; noChannels[23] = 0
+        XCTAssertEqual(kind({ try WavetableReader.read(noChannels, fileName: "b.wav") }, "no channels"), .damaged)
+        var nan = wavFile([ramp(4096)], chunks: [clm("<!>2048 00000000")])
+        let dataStart = nan.count - 4096 * 4
+        nan[dataStart] = 0; nan[dataStart + 1] = 0; nan[dataStart + 2] = 0xC0; nan[dataStart + 3] = 0x7F
+        XCTAssertEqual(kind({ try WavetableReader.read(nan, fileName: "nan.wav") }, "NaN"), .damaged)
+        XCTAssertEqual(kind({ try WavetableReader.read(Data("vawt".utf8), fileName: "a.wt") }, "vawt alone"), .damaged)
+        var short = surgeFile(size: 64, frames: [ramp(64), ramp(64)])
+        short.removeLast(10)
+        XCTAssertEqual(kind({ try WavetableReader.read(short, fileName: "b.wt") }, "Surge cut short"), .damaged)
+        XCTAssertEqual(kind({ try WavetableReader.read(Data("PNAME\nShort\n0.5f\n".utf8), fileName: "p.wt") }, "short P table"), .damaged)
+        XCTAssertEqual(kind({ try WavetableReader.read(try self.fixture("unified.pgdata").prefix(5000), fileName: "cut.pgdata") }, "cut pgdata"), .damaged)
+        // A file that cannot be opened.
+        XCTAssertEqual(kind({ try WavetableReader.read(url: URL(fileURLWithPath: "/nonexistent/missing.wav")) }, "missing"), .ioFailure)
+        // The one-argument form, which other code may still use, is a damaged file.
+        XCTAssertEqual(WavetableError("x").kind, .damaged)
+        XCTAssertEqual(WavetableError(.ioFailure, "x"), WavetableError(.ioFailure, "x"))
+        XCTAssertNotEqual(WavetableError(.ioFailure, "x"), WavetableError("x"))
+        XCTAssertEqual("\(WavetableError(.unsupported, "Why."))", "Why.")
+    }
+
     // MARK: - Reading from a URL
 
     func testReadURLFindsSidecars() throws {
