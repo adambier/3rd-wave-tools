@@ -102,9 +102,13 @@ public enum OutputPreset: String, Equatable, Sendable, CaseIterable {
     case thirdWaveU
     /// A 3rd Wave P table `.wt`: 64 frames of 128 samples, each stored with its differences.
     case thirdWaveP
-    /// A 32-bit float WAV of 2,048-sample frames with a `clm ` chunk (Serum, Vital, Pigments,
-    /// MiniFreak V, and others).
+    /// A 32-bit float WAV of 2,048-sample frames with a `clm ` chunk, up to 256 frames (Serum,
+    /// Vital, Pigments, and others).
     case wav2048
+    /// A 32-bit float WAV of 64 frames of 2,048 samples with a `clm ` chunk, for MiniFreak V to
+    /// import and send to a MiniFreak (which stores 64 frames; Convert reduces larger tables
+    /// itself rather than leave it to MiniFreak V).
+    case miniFreak
     /// A WAV for Elektron Tonverk, its frame size and interpolation in the file name.
     case tonverk
     /// A WAV of exactly 256 frames of 2,048 samples (Phase Plant).
