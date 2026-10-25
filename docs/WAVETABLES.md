@@ -132,7 +132,13 @@ These rules were checked against about 20,000 files from the libraries of Hive, 
 Tonverk, and several Serum packs: every table those libraries hold was listed with the size its
 maker gives it (or, for two Tonverk files of 8,192 and 16,384 samples, with the choice left
 open), and the samples beside them (multisampled notes, single cycles, looped notes, drums) were
-not. DUNE 3's `.wt` files are in a format of their own; Convert does not read them.
+not. DUNE 3's `.wt` files, and Harmor's and Komplexer's, are in formats of their own; Convert
+does not read them.
+
+**Single-cycle files are not listed.** A WAV holding one wave (for example, the Adventure Kid
+single cycles of 600 samples, looped over the whole file) is a building block for a wavetable
+rather than a wavetable, and making tables from such waves is what the 3rd Wave's Wave Maker
+and other synths' editors do. A file holding several frames is listed even when it is short.
 
 ### FLAC files
 
