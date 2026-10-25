@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(PgdataFormats)
+import PgdataFormats
+#endif
 
 // Names for WavetableWriter: the 3rd Wave's display name and file names that are safe on macOS,
 // Windows, and exFAT.
@@ -10,7 +13,6 @@ extension WavetableWriter {
         static let thirdWaveNameLimit = 31
         /// The longest file-name stem written, in UTF-8 bytes (file systems allow 255, and a suffix
         /// such as `_wt4096r.wav` follows).
-        static let stemByteLimit = 200
 
         /// A name for a 3rd Wave `.wt` (its line 2): Latin-1 only, at most 31 characters, one line.
         /// A character outside Latin-1 loses its accents when that leaves a Latin-1 letter ("Ő" to
@@ -40,33 +42,10 @@ extension WavetableWriter {
             return (out, notes)
         }
 
-        /// A file-name stem safe on macOS, Windows, and exFAT: no `/ \ : * ? " < > |`, no control
-        /// characters, no leading dot, no trailing dot or space, not a reserved Windows device name,
-        /// and at most ``stemByteLimit`` UTF-8 bytes. Separators become hyphens and quotes and
-        /// angle brackets their nearest safe forms, so the name stays readable.
+        /// A file-name stem safe on macOS, Windows, and exFAT, kept readable (see
+        /// `SafeFileName.make`), with a note when the name had to change.
         static func fileStem(_ name: String) -> (stem: String, notes: [String]) {
-            var s = ""
-            for ch in name {
-                switch ch {
-                case "/", "\\", "|", ":": s += "-"
-                case "*", "?": continue
-                case "\"": s += "'"
-                case "<": s += "("
-                case ">": s += ")"
-                default: s.append(isControl(ch) ? " " : ch)
-                }
-            }
-            s = trimEnds(s)
-            while s.utf8.count > stemByteLimit { s.removeLast() }
-            s = trimEnds(s)
-            if s.isEmpty { s = "Untitled" }
-            // Windows reserves these device names with any extension ("NUL.txt" is NUL), so the
-            // underscore goes before the first dot.
-            let device = String(s.prefix { $0 != "." })
-            let reserved = ["CON", "PRN", "AUX", "NUL"] + (1...9).flatMap { ["COM\($0)", "LPT\($0)"] }
-            if reserved.contains(device.trimmingCharacters(in: .whitespaces).uppercased()) {
-                s = device + "_" + s.dropFirst(device.count)
-            }
+            let s = SafeFileName.make(name)
             var notes: [String] = []
             if s != name.trimmingCharacters(in: .whitespaces) {
                 notes.append("File name adjusted to be safe on macOS, Windows, and exFAT: “\(s)”.")

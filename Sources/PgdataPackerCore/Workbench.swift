@@ -457,15 +457,9 @@ public struct PackPlan {
 // MARK: - File names
 
 public enum OutputNames {
-    /// Removes characters that are not allowed in file names on macOS or on the 3rd Wave's USB
-    /// drive (a FAT volume, where `* ? " < > |` and a trailing dot are also illegal). [inferred: the
-    /// drive's file system has not been checked]
-    public static func sanitize(_ s: String) -> String {
-        let bad = CharacterSet(charactersIn: "/:\\\0*?\"<>|").union(.controlCharacters)
-        let t = s.unicodeScalars.map { bad.contains($0) ? "_" : String($0) }.joined()
-        let trimmed = t.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: ".")))
-        return trimmed.isEmpty ? "Untitled" : trimmed
-    }
+    /// Replaces characters that are not allowed in file names on macOS, Windows, or the 3rd Wave's
+    /// USB drive with underscores (see `SafeFileName.make`, which also trims and shortens).
+    public static func sanitize(_ s: String) -> String { SafeFileName.make(s, replacement: "_") }
 
     /// Groove Synthesis's convention: "S000_Amen Cuts.bin"; wavetables "U50_SM OB2.wt".
     public static func multisample(_ ref: SourceRef, _ m: Multisample) -> String {

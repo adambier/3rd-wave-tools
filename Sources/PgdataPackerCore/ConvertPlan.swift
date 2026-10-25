@@ -123,12 +123,10 @@ public struct ConvertPlan: Equatable {
         var count: Int
         var hash: UInt64
         init(_ t: FoundTable) {
-            var h: UInt64 = 0xcbf2_9ce4_8422_2325
-            for s in t.samples {
-                var b = s.bitPattern
-                for _ in 0..<4 { h = (h ^ UInt64(b & 0xff)) &* 0x0000_0100_0000_01b3; b >>= 8 }
-            }
-            frameSize = t.frameSize; count = t.samples.count; hash = h
+            var bytes: [UInt8] = []
+            bytes.reserveCapacity(t.samples.count * 4)
+            for s in t.samples { let b = s.bitPattern; for k in 0..<4 { bytes.append(UInt8(truncatingIfNeeded: b >> (8 * k))) } }
+            frameSize = t.frameSize; count = t.samples.count; hash = fnv1a64(bytes)
         }
     }
 
