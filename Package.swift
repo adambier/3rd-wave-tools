@@ -57,7 +57,7 @@ products.append(.executable(name: "PgdataPacker", targets: ["PgdataPacker"]))
 
 if includeTests {
     targets.append(.testTarget(name: "PgdataFormatsTests", dependencies: ["PgdataFormats", "PgdataPackerCore"]))
-    targets.append(.testTarget(name: "WavetableFormatsTests", dependencies: ["PgdataFormats", "WavetableFormats"]))
+    targets.append(.testTarget(name: "WavetableFormatsTests", dependencies: ["PgdataFormats", "WavetableFormats", "PgdataPackerCore"]))
 }
 
 let package = Package(

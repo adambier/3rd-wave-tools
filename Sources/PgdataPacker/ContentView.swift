@@ -14,8 +14,8 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Two pages, chosen with a segmented control rather than a sidebar, which would take
-            // width the Pack tables need.
+            // Three pages, chosen with a segmented control rather than a sidebar, which would take
+            // width the Pack and Convert tables need.
             HStack {
                 Spacer()
                 Picker("", selection: $state.section) {
@@ -25,7 +25,7 @@ struct ContentView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 220)
+                .frame(width: 330)
                 Spacer()
             }
             .padding(.vertical, 8)
@@ -34,6 +34,7 @@ struct ContentView: View {
                 switch state.section {
                 case .pack: PackView()
                 case .unpack: UnpackView()
+                case .convert: ConvertView()
                 }
             }
             // Each page fills the area and no more (a page that asked for its full content height
@@ -104,7 +105,9 @@ struct LogBar: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Label("Drop .pro, .wt, .bin, or .pgdata files onto the page above to add them", systemImage: "arrow.down.doc")
+                Label(state.section == .convert
+                        ? "Drop wavetable files (.wav, .wt, .pgdata) or folders onto the page above to add them"
+                        : "Drop .pro, .wt, .bin, or .pgdata files onto the page above to add them", systemImage: "arrow.down.doc")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
