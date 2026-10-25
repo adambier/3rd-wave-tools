@@ -168,6 +168,7 @@ PgdataPackerCore (`Sources/PgdataPackerCore/`):
 | `ContentFile`, `PackPlan`, `UnpackPlan`, `OutputNames`, `Oscillator`, `ProgramFile.repointed` | `Workbench.swift` | Pack and Unpack page decisions and output file names |
 | `ConvertPlan`, `ConvertPreviewCache` | `ConvertPlan.swift` | Wavetables page decisions: collecting files, collapsing duplicates, frame-size choice, expected results, reports |
 | `NameCleaner` | `NameCleaner.swift` | Clean Up Names proposals |
+| `ConvertReport`, `ReportText` | `ConvertReport.swift` | The Wavetables page's report after converting (alert title and text, log text); the item-line form every report uses |
 | `FrameSizeFit`, `WavetableSketch`, `CountWords` | own files | Frame-size heuristic ("likely", never applied alone), preview thumbnails, report phrasing |
 
 App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle, Help links),
@@ -193,7 +194,7 @@ App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle
 | Frame size decisions | `ReadWAV.swift`, `FrameSizeEvidence`, `FrameSizeFit.swift`; WAVETABLES.md section 3 | `ReadingTests`, `ReviewFixTests`, `FrameSizeFitTests`, `ReviewFixPlanTests` |
 | Pack page behaviour (what each source will be, status lines, slot estimate) | `PackPlan` in `Workbench.swift` | `WorkbenchTests`; then `PackView.swift`, `AppState.swift` |
 | Unpack page behaviour | `UnpackPlan` in `Workbench.swift` | `WorkbenchTests`; then `UnpackView.swift` |
-| Wavetables page behaviour | `ConvertPlan.swift` | `ConvertPlanTests`; then `ConvertView.swift`, `ConvertDetail.swift`, `ConvertDestination.swift` |
+| Wavetables page behaviour | `ConvertPlan.swift`, `ConvertReport.swift` | `ConvertPlanTests`, `ConvertReportTests`; then `ConvertView.swift`, `ConvertDetail.swift`, `ConvertDestination.swift` |
 | Clean Up Names | `NameCleaner.swift` | `WorkbenchTests`; `NameCleanupSheet.swift` |
 | Menus, About, Help links, updater | `main.swift` | `make-app.sh` (Info.plist keys) |
 | Developer checks against real files | `Sources/tw3pg/main.swift` | README "Verification" |
@@ -256,7 +257,7 @@ No tests cover the SwiftUI views; a UI change is verified by building and using 
   every user-facing string and document that changed for accuracy against the evidence, currency
   after renames (page, column, and feature names), agreement of tense, number, case, and mood, and
   the rules above; fix, and report any change of meaning. Tests assert some strings
-  (`ConvertPlanTests`, `WorkbenchTests`, `ReadingTests`): keep them in step.
+  (`ConvertPlanTests`, `ConvertReportTests`, `WorkbenchTests`, `ReadingTests`): keep them in step.
 
 ## 10. Recipes
 

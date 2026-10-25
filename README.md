@@ -474,7 +474,7 @@ Sources/WavetableFormats/   other synths' wavetable formats (the package's Wavet
   WavetableFormats.docc/      the library's documentation pages
 Sources/PgdataPackerCore/   the app's own decision logic, no UI (the package's PgdataPackerCore
                             product): pack, unpack, and convert plans, output file names,
-                            Clean Up Names
+                            Clean Up Names, the Wavetables page's report
 Sources/PgdataPacker/       the app (SwiftUI)
 Sources/tw3pg/              developer tool: inspect, roundtrip, unpack, repack, compare, wtcheck,
                             wtscan, wtdump, factory-catalog, pack, convert, convertcheck, and the
