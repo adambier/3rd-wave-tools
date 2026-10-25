@@ -28,8 +28,9 @@ this file; `docs/FORMATS.md` and `docs/WAVETABLES.md` remain the authorities on 
 | `Sources/PgdataPackerCore/` | Library: the app's decisions without UI (pack, unpack, and convert plans, file names, Clean Up Names) |
 | `Sources/PgdataPacker/` | The macOS app (SwiftUI, AppKit); declared in `Package.swift` only on macOS |
 | `Sources/tw3pg/main.swift` | Developer command-line tool: inspect, round-trip, pack, unpack, repack, compare, convert, checks, test-file builders |
-| `Tests/PgdataFormatsTests/` | Tests for PgdataFormats, and for PgdataPackerCore's `Workbench.swift` and `NameCleaner` (`WorkbenchTests`) |
-| `Tests/WavetableFormatsTests/` | Tests for WavetableFormats and `ConvertPlan`; `Resources/FLAC/` holds synthetic FLAC files read by path |
+| `Tests/PgdataFormatsTests/` | Tests for PgdataFormats (`FormatTests`, `RobustnessTests`, `ConverterTests`, `FactoryLibraryTests`, `FixtureTests`, …) |
+| `Tests/WavetableFormatsTests/` | Tests for WavetableFormats; `Resources/FLAC/` holds synthetic FLAC files read by path |
+| `Tests/PgdataPackerCoreTests/` | Tests for PgdataPackerCore: `WorkbenchTests`, `PlanRobustnessTests`, `ConvertPlanTests`, `ConvertReportTests`, `ReviewFixPlanTests`; `TestPrograms.swift` repeats the program builders of `FormatTests.swift` |
 | `fixtures/` | Seven synthetic files, one per format and layout, each with a `<file>.json` of what it parses to; `fixtures/README.md` |
 | `docs/FORMATS.md` | The 3rd Wave format reference (sections 1–10 and an appendix); every claim about the 3rd Wave lives here with its evidence in footnotes |
 | `docs/WAVETABLES.md` | Other synths' wavetable formats, with sources; the destinations the Wavetables page writes |
@@ -55,14 +56,16 @@ WavetableFormats     (library)     depends on: PgdataFormats
 PgdataPackerCore     (library)     depends on: PgdataFormats, WavetableFormats
 tw3pg                (executable)  depends on: all three libraries
 PgdataPacker         (executable)  depends on: all three libraries; macOS only (#if os(macOS) in Package.swift)
-PgdataFormatsTests, WavetableFormatsTests (test targets): depend on all three libraries
+PgdataFormatsTests   (test target) depends on: all three libraries (a few PackPlan checks sit in its program tests)
+WavetableFormatsTests (test target) depends on: PgdataFormats, WavetableFormats
+PgdataPackerCoreTests (test target) depends on: all three libraries
 ```
 
 Environment switches read by `Package.swift` and the tests:
 
 | Variable | Effect |
 |---|---|
-| `PGDATA_TESTS=1` | On macOS, include the test targets (needed because the Command Line Tools alone lack XCTest). Always included on Linux and Windows |
+| `PGDATA_TESTS=1` | On macOS, include the three test targets (needed because the Command Line Tools alone lack XCTest). Always included on Linux and Windows |
 | `PGDATA_DOCS=1` | Add the `swift-docc-plugin` dependency, for building documentation |
 | `PGDATA_REGENERATE_FIXTURES=1` | With `swift test --filter FixtureTests`: rewrite `fixtures/` from the libraries |
 
@@ -166,6 +169,7 @@ PgdataPackerCore (`Sources/PgdataPackerCore/`):
 | `ConvertPlan`, `ConvertPreviewCache` | `ConvertPlan.swift` | Wavetables page decisions: collecting files, collapsing duplicates, frame-size choice, expected results, reports |
 | `NameCleaner` | `NameCleaner.swift` | Clean Up Names proposals |
 | `OutputPreset` display extensions | `DestinationInfo.swift` | What the Wavetables page says about each destination: `Group` (with `title`, `presets`), `group`, `shortTitle`, `specLine`, `distinction` |
+| `ConvertReport`, `ReportText` | `ConvertReport.swift` | The Wavetables page's report after converting (alert title and text, log text); the item-line form every report uses |
 | `FrameSizeFit`, `WavetableSketch`, `CountWords` | own files | Frame-size heuristic ("likely", never applied alone), preview thumbnails, report phrasing |
 
 App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle, Help links),
@@ -184,14 +188,14 @@ App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle
 | `.wt` values, mipmap chain, P-table differences | `WavetableFile.swift`; FORMATS.md section 5.1 | `WavetableFramesTests`, `Resampling.thirdWaveMipmapChain` |
 | `.bin` fields and versions | `Multisample.swift`; FORMATS.md section 5.2 | `fixtures/multisample.bin*` |
 | Older-program conversion | `ProgramConverter.swift`; FORMATS.md section 6 and appendix | `ConverterTests`, `fixtures/program-2022-layout*`, `tw3pg convert`, `tw3pg convertcheck` |
-| Factory tables, U48–U55 history | `FactoryLibrary.swift`, `FactoryHistory.swift`, `FactoryCatalog.swift` (generated) | README "Factory wavetables" |
+| Factory tables, U48–U55 history | `FactoryLibrary.swift`, `FactoryHistory.swift`, `FactoryCatalog.swift` (generated) | `FactoryLibraryTests`; README "Factory wavetables" |
 | Names, 31-character limit, file names | `ByteIO.swift` (`NameField.fitted`, which `NameField.init`, `WriteNames.swift`, `PackPlan.nameWarnings`, and the app's `NameLengthNote` all apply), `SafeFileName.swift`, `ExportNames`, `OutputNames` | `NameFittingTests`, `SafeFileNameTests`, `WorkbenchTests` |
 | Read another wavetable format | `Reading.swift` dispatch, a new `Read<Format>.swift`, `SourceFormat` | `ReadingTests`, `CorpusCaseTests`, `RoundTripTests`; WAVETABLES.md |
 | Write for another synth | `OutputPreset` in `Wavetable.swift`, `Writing.swift`, `PresetInfo.swift`; `DestinationInfo.swift` in PgdataPackerCore | `WritingTests`, `RoundTripTests`; WAVETABLES.md section 2; README destination table |
-| Frame size decisions | `ReadWAV.swift`, `FrameSizeEvidence`, `FrameSizeFit.swift`; WAVETABLES.md section 3 | `ReadingTests`, `ReviewFixTests` |
+| Frame size decisions | `ReadWAV.swift`, `FrameSizeEvidence`, `FrameSizeFit.swift`; WAVETABLES.md section 3 | `ReadingTests`, `ReviewFixTests`, `FrameSizeFitTests`, `ReviewFixPlanTests` |
 | Pack page behaviour (what each source will be, status lines, slot estimate) | `PackPlan` in `Workbench.swift` | `WorkbenchTests`; then `PackView.swift`, `AppState.swift` |
 | Unpack page behaviour | `UnpackPlan` in `Workbench.swift` | `WorkbenchTests`; then `UnpackView.swift` |
-| Wavetables page behaviour | `ConvertPlan.swift` | `ConvertPlanTests`; then `ConvertView.swift`, `ConvertDetail.swift`, `ConvertDestination.swift` |
+| Wavetables page behaviour | `ConvertPlan.swift`, `ConvertReport.swift` | `ConvertPlanTests`, `ConvertReportTests`; then `ConvertView.swift`, `ConvertDetail.swift`, `ConvertDestination.swift` |
 | Clean Up Names | `NameCleaner.swift` | `WorkbenchTests`; `NameCleanupSheet.swift` |
 | Menus, About, Help links, updater | `main.swift` | `make-app.sh` (Info.plist keys) |
 | Developer checks against real files | `Sources/tw3pg/main.swift` | README "Verification" |
@@ -199,13 +203,14 @@ App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle
 
 ## 8. How to verify
 
-Library tests (XCTest; tests use `@testable import`):
+Library tests (XCTest, one test target per library; tests use `@testable import`):
 
 | Platform | Command |
 |---|---|
 | Linux, Windows | `swift test` |
 | macOS (full Xcode 15 or later) | `./run-tests.sh` or `PGDATA_TESTS=1 swift test` |
 | One test class | add `--filter <ClassName>` (e.g. `--filter FixtureTests`) |
+| One library's tests | add `--filter <TargetName>` (e.g. `--filter PgdataPackerCoreTests`) |
 
 Other checks:
 
@@ -253,7 +258,7 @@ No tests cover the SwiftUI views; a UI change is verified by building and using 
   every user-facing string and document that changed for accuracy against the evidence, currency
   after renames (page, column, and feature names), agreement of tense, number, case, and mood, and
   the rules above; fix, and report any change of meaning. Tests assert some strings
-  (`ConvertPlanTests`, `WorkbenchTests`, `ReadingTests`): keep them in step.
+  (`ConvertPlanTests`, `ConvertReportTests`, `WorkbenchTests`, `ReadingTests`): keep them in step.
 
 ## 10. Recipes
 

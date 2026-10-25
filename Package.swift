@@ -18,7 +18,7 @@ import Foundation
 //   PgdataPacker       the macOS app ("pgdata Packer") (SwiftUI); declared only when building on macOS
 //   tw3pg              developer harness used to verify the library against real files
 //
-// On a Mac the test target is opt-in (PGDATA_TESTS=1), as in ThirdWaveWT: with only the Command
+// On a Mac the test targets are opt-in (PGDATA_TESTS=1), as in ThirdWaveWT: with only the Command
 // Line Tools, SwiftPM fails while looking for XCTest even for a plain `swift build`.
 // The app does not need SwiftPM at all — see make-app.sh.
 
@@ -56,11 +56,14 @@ products.append(.executable(name: "PgdataPacker", targets: ["PgdataPacker"]))
 #endif
 
 if includeTests {
+    // One test target per library. PgdataFormatsTests still reaches PgdataPackerCore for a few
+    // PackPlan checks inside its program tests.
     targets.append(.testTarget(name: "PgdataFormatsTests", dependencies: ["PgdataFormats", "WavetableFormats", "PgdataPackerCore"]))
     // Resources/ holds the small synthetic FLAC files FLACTests reads by path (not as bundle
     // resources, which keeps the test build the same on Linux, macOS, and Windows).
-    targets.append(.testTarget(name: "WavetableFormatsTests", dependencies: ["PgdataFormats", "WavetableFormats", "PgdataPackerCore"],
+    targets.append(.testTarget(name: "WavetableFormatsTests", dependencies: ["PgdataFormats", "WavetableFormats"],
                                exclude: ["Resources"]))
+    targets.append(.testTarget(name: "PgdataPackerCoreTests", dependencies: ["PgdataFormats", "WavetableFormats", "PgdataPackerCore"]))
 }
 
 let package = Package(

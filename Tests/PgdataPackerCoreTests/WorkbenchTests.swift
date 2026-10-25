@@ -11,39 +11,36 @@ final class WorkbenchTests: XCTestCase {
     }
     override func tearDownWithError() throws { try? FileManager.default.removeItem(at: dir) }
 
+    /// Writes a .wt whose values are a ramp scaled by `seed` (so tables with different seeds have
+    /// different content and fingerprints), and returns its URL.
     func writeWT(_ name: String, kind: WavetableFile.Kind, seed: Float, file: String) throws -> URL {
-        let w = WavetableFile(kind: kind, name: name, values: (0..<kind.valueCount).map { Float($0 % 97) * seed / 97 })
-        let u = dir.appendingPathComponent(file); try w.serialized().write(to: u); return u
+        let u = dir.appendingPathComponent(file); try Self.wtData(name: name, kind: kind, seed: seed).write(to: u); return u
     }
 
-    func testFactoryLibraryReadsGrooveSynthesisNames() throws {
-        let f = dir.appendingPathComponent("factory"); try FileManager.default.createDirectory(at: f, withIntermediateDirectories: true)
-        let save = dir; dir = f
-        _ = try writeWT("Additive_Bell_17", kind: .u, seed: 0.1, file: "00-Additive_Bell_17.wt")
-        _ = try writeWT("Dub Grind", kind: .u, seed: 0.2, file: "50_Dub_Grind.wt")
-        _ = try writeWT("Wavetable P02", kind: .p, seed: 0.3, file: "02P.wt")
-        _ = try writeWT("VS00-63", kind: .p, seed: 0.4, file: "P34_VS_0-63.wt")
-        dir = save
-        let lib = FactoryLibrary(folders: [f])
-        XCTAssertEqual(Set(lib.tables.keys), [.u(0), .u(50), .p(2), .p(34)])
-        XCTAssertEqual(lib.name(.u(50)), "Dub Grind")
-        XCTAssertTrue(lib.problems.isEmpty, "\(lib.problems)")
-        XCTAssertFalse(lib.isComplete)
-        // One parent folder holding both downloads as subfolders is enough.
-        let parent = dir.appendingPathComponent("parent"); try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
-        try FileManager.default.copyItem(at: f, to: parent.appendingPathComponent("3rdWave56UWavetables"))
-        XCTAssertEqual(Set(FactoryLibrary(folders: [parent]).tables.keys), [.u(0), .u(50), .p(2), .p(34)])
+    /// The bytes `WavetableFile(kind:name:values:).serialized()` gives for a `writeWT` table: the
+    /// header, then the value lines, which are kept per kind and seed because serializing a
+    /// U table's 131,072 values is the slow part of these tests and the same tables recur.
+    private static var valueLines: [String: Data] = [:]
+    static func wtData(name: String, kind: WavetableFile.Kind, seed: Float) -> Data {
+        let key = "\(kind.rawValue) \(seed)"
+        let lines: Data
+        if let cached = valueLines[key] {
+            lines = cached
+        } else {
+            let header = Data((kind.rawValue + "\n\n").utf8)
+            lines = WavetableFile(kind: kind, name: "", values: rampValues(kind: kind, seed: seed)).serialized().dropFirst(header.count)
+            valueLines[key] = lines
+        }
+        return Data((kind.rawValue + "\n" + name + "\n").utf8) + lines
     }
 
-    func testBuiltInFactoryListIsComplete() {
-        let lib = FactoryLibrary.builtIn
-        XCTAssertTrue(lib.isComplete)
-        XCTAssertEqual(lib.tables.count, 92)
-        XCTAssertEqual(lib.name(.u(0)), "Additive_Bell_17")
-        XCTAssertEqual(lib.name(.u(48)), "FM_Crush")
-        XCTAssertEqual(lib.slot(withFingerprint: 0x9D778BEF7D5E8992), .u(7))   // Knob Grotto 6
-        XCTAssertEqual(Set(lib.tables.values.map(\.fingerprint)).count, 92)  // no two factory tables alike
+    /// The values of a `writeWT` table.
+    static func rampValues(kind: WavetableFile.Kind, seed: Float) -> [Float] {
+        (0..<kind.valueCount).map { Float($0 % 97) * seed / 97 }
     }
+
+    /// A U table named "NOSTALGIA" whose content does not matter, serialized once.
+    static let nostalgia: Data = WavetableFile(kind: .u, name: "NOSTALGIA", values: Array(repeating: 0.25, count: 131_072)).serialized()
 
     func testFactoryOnlyProgramNeedsNoUnifiedFile() {
         let pro = makeProgram(sources: [34, 2000, 1000, 41, 42, 42, 2, 35, 42, 41, 42, 42])
@@ -167,28 +164,6 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertEqual(PackPlan.make(program: old, files: [obx], factory: lib2).rows[0].choice, .reference)
     }
 
-    func testCorruptUnifiedProgramIsRejectedNotCrashed() throws {
-        let pro = makeProgram(sources: [34] + Array(repeating: 42, count: 11))
-        var g = try Packer.pack(pro, content: [.u(0): .reference])
-        var d = g.serialized()
-        // Patch the first program word (values per part) to -200.
-        let start = d.count - 4 * g.words.count
-        d.replaceSubrange(start..<start + 4, with: [0x38, 0xFF, 0xFF, 0xFF])
-        XCTAssertThrowsError(try UnifiedProgram(data: d))
-        // An oscillator index the file does not list: unpacks with a note, no crash.
-        g = try Packer.pack(pro, content: [.u(0): .reference])
-        let osc = g.oscillatorWordIndices[0]
-        var words = g.words; words[osc] = 7
-        d = g.serialized()
-        let s2 = d.count - 4 * g.words.count + 4 * osc
-        d.replaceSubrange(s2..<s2 + 4, with: [7, 0, 0, 0])
-        let u = try UnifiedProgram(data: d)
-        XCTAssertNil(u.oscillatorSources[0])
-        let up = Unpacker.unpack(u)
-        XCTAssertEqual(up.program.sources[0], .p(7))
-        XCTAssertTrue(up.notes.contains { $0.contains("reads as P07") })
-    }
-
     func testLongNamesAreWarnedAboutAndFactoryIdenticalFilesExplained() throws {
         let long = String(repeating: "x", count: 40)
         var pro = makeProgram(sources: [2050] + Array(repeating: 42, count: 11))
@@ -291,7 +266,7 @@ final class WorkbenchTests: XCTestCase {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let u = dir.appendingPathComponent("01.wt")
-        try WavetableFile(kind: .u, name: "NOSTALGIA", values: Array(repeating: 0.25, count: 131_072)).serialized().write(to: u)
+        try Self.nostalgia.write(to: u)
         var cf = try ContentFile.load(u); cf.slot = .u(56)
 
         let before = PackPlan.make(program: pro, files: [cf], factory: FactoryLibrary())
@@ -326,8 +301,8 @@ final class WorkbenchTests: XCTestCase {
     func testUnpackPlanNamesAndFactoryDuplicates() throws {
         let pro = makeProgram(sources: [4010, 2018, 42] + Array(repeating: 42, count: 9))
         let f = dir.appendingPathComponent("factory"); try FileManager.default.createDirectory(at: f, withIntermediateDirectories: true)
-        let wt = WavetableFile(kind: .u, name: "Science_Channel", values: (0..<131_072).map { Float($0 % 50) / 50 })
-        try wt.serialized().write(to: f.appendingPathComponent("25-Science_Channel.wt"))
+        let wt = WavetableFile(kind: .u, name: "Science_Channel", values: Self.rampValues(kind: .u, seed: 0.5))
+        try Self.wtData(name: "Science_Channel", kind: .u, seed: 0.5).write(to: f.appendingPathComponent("25-Science_Channel.wt"))
         let g = try Packer.pack(pro, content: [.s(10): .multisample(makeMultisample()), .u(25): .wavetable(wt)])
         let plan = UnpackPlan.make(g, factory: FactoryLibrary(folders: [f]), skipFactoryDuplicates: true)
         XCTAssertEqual(plan.items.map(\.fileName), ["Test Prog.pro", "U25_Science_Channel.wt", "S010_Test.bin"])
@@ -386,7 +361,7 @@ final class NameCleanerTests: XCTestCase {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let u = dir.appendingPathComponent("01.wt")
-        try WavetableFile(kind: .u, name: "NOSTALGIA", values: Array(repeating: 0.5, count: 131_072)).serialized().write(to: u)
+        try WorkbenchTests.nostalgia.write(to: u)
         var cf = try ContentFile.load(u); cf.slot = .u(56)
         var renamed = pro; renamed.name = "Nostalgia Res"
         let plan = PackPlan.make(program: renamed, files: [cf], factory: FactoryLibrary())

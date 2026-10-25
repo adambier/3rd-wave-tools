@@ -686,63 +686,17 @@ final class AppState: ObservableObject {
             message: toPack ? "Choose where to put the .wt files; they are then added to the Pack page"
                             : "Choose where to put the converted files") else { return }
         let conversion = plan.convert()
-        let report = ConvertPlan.write(conversion.files, into: folder)
-        let n = report.written.count
-        var msg = plan.reportTitle(converted: n, folderName: folder.lastPathComponent)
-        // Each section: a heading line ending in ":" and one item per line (see ReportText).
-        if !conversion.errors.isEmpty { msg += "\n\nNot converted:\n" + conversion.errors.map { ReportText.item(splitting: $0) }.joined(separator: "\n") }
-        if !report.failed.isEmpty { msg += "\n\nNot written:\n" + report.failed.map { ReportText.item(splitting: $0) }.joined(separator: "\n") }
-        if !report.renamed.isEmpty {
-            msg += "\n\nAlready in the folder, so written under a new name (nothing was replaced):\n"
-                + report.renamed.map { ReportText.item($0) }.joined(separator: "\n")
-        }
-        // Each distinct note once: "All 74 tables", "12 tables", or the one table it applies to.
-        // The log, below, has every table's own lines.
-        let grouped = ConvertPlan.groupedNotes(conversion.reports)
-        if !grouped.isEmpty {
-            msg += "\n\nWhat converting did:\n" + grouped.map { ReportText.item($0.label, $0.text) }.joined(separator: "\n")
-        }
-        if let capacity = plan.thirdWaveCapacityNote {
-            msg += "\n\n" + capacity
-        }
-        let packFiles = toPack ? ConvertPlan.filesForPack(report.written, preset: plan.preset) : []
-        if !packFiles.isEmpty {
-            msg += "\n\n" + (packFiles.count == 1 ? "The .wt file is" : "The \(packFiles.count) .wt files are") + " added to the Pack page."
-        }
-        var logged = msg + " (\(folder.path))"
-        let shared = grouped.filter { $0.names.count > 1 }
-        if !shared.isEmpty || !conversion.notes.isEmpty {
-            logged += "\n\nBy table:\n" + conversion.notes.map { ReportText.item(splitting: $0) }.joined(separator: "\n")
-        }
-        note(logged)
+        let written = ConvertPlan.write(conversion.files, into: folder)
+        let packFiles = toPack ? ConvertPlan.filesForPack(written.written, preset: plan.preset) : []
+        // The texts are assembled in PgdataPackerCore (ConvertReport); ReportText, which they and
+        // the Pack and Unpack reports use, lives there too.
+        let report = ConvertReport(plan: plan, conversion: conversion, written: written, folder: folder, packFiles: packFiles)
+        note(report.log)
         alertReveal = folder
-        alertMessage = msg
+        alertMessage = report.message
         if !packFiles.isEmpty {
             add(urls: packFiles)
             section = .pack
         }
-    }
-}
-
-/// The report texts shown in alerts and written to the log: paragraphs separated by a blank line;
-/// a paragraph whose first line ends in ":" is a heading for the item lines under it. An item line
-/// starts with "• " and may carry an explanation after a tab, which the alert shows in a lighter
-/// style and the log joins with a dash.
-enum ReportText {
-    static func item(_ name: String, _ detail: String? = nil) -> String {
-        "• " + name + (detail.map { "\t" + $0 } ?? "")
-    }
-    /// An item from a "name: explanation" line (a file name or table name, then what happened),
-    /// so the name is set apart in the alert. A line without ": " is the whole item.
-    static func item(splitting line: String) -> String {
-        guard let r = line.range(of: ": ") else { return item(line) }
-        return item(String(line[..<r.lowerBound]), String(line[r.upperBound...]))
-    }
-    static func plain(_ s: String) -> String { s.replacingOccurrences(of: "\t", with: " — ") }
-    /// "Not used: …" → "not used: …" for an explanation that follows a dash; a label such as "U50 …"
-    /// is left alone.
-    static func lowerFirst(_ s: String) -> String {
-        guard let a = s.first, a.isUppercase, s.dropFirst().first?.isLowercase == true else { return s }
-        return a.lowercased() + s.dropFirst()
     }
 }

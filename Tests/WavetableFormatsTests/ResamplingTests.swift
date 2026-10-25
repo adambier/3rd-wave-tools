@@ -212,12 +212,12 @@ final class ResamplingLargeOddSizeTests: XCTestCase {
             }
         }
         let start = Date()
-        for _ in 0..<64 {
+        for _ in 0..<8 {
             let out = Resampling.resizeCycle(cycle(9973), to: 2048)
             let want = cycle(2048)
             XCTAssertLessThan(zip(out, want).map { abs($0 - $1) }.max() ?? 1, 1e-5)
         }
-        XCTAssertLessThan(Date().timeIntervalSince(start), 20, "64 frames of 9,973 samples should resize in well under a second in a release build")
+        XCTAssertLessThan(Date().timeIntervalSince(start), 5, "8 frames of 9,973 samples should resize in well under a second in a release build")
     }
 }
 

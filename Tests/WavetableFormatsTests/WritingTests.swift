@@ -54,6 +54,11 @@ final class WritingTests: XCTestCase {
     /// `count` frames of `size` samples; frame f is a few harmonics scaled to `peak`.
     private func table(_ name: String = "Test Table", frames count: Int, size: Int, peak: Float = 0.8,
                        interpolation: Interpolation? = nil) -> Wavetable {
+        Self.table(name, frames: count, size: size, peak: peak, interpolation: interpolation)
+    }
+
+    private static func table(_ name: String = "Test Table", frames count: Int, size: Int, peak: Float = 0.8,
+                              interpolation: Interpolation? = nil) -> Wavetable {
         let frames: [[Float]] = (0..<count).map { f in
             let raw = (0..<size).map { i -> Float in
                 let x = 2 * Double.pi * Double(i) / Double(size)
@@ -63,6 +68,17 @@ final class WritingTests: XCTestCase {
             return raw.map { $0 / p * peak }
         }
         return Wavetable(name: name, frames: frames, interpolation: interpolation)
+    }
+
+    /// A 3rd Wave-sized table (64 frames of 1,024), and what each preset writes for it, made once:
+    /// writing a U table serializes 131,072 values, the slow part of these tests.
+    private static let standardTable = table(frames: 64, size: 1024)
+    private static var standardOutputs: [OutputPreset: OutputFile] = [:]
+    private func standardOutput(_ p: OutputPreset) throws -> OutputFile {
+        if let out = Self.standardOutputs[p] { return out }
+        let out = try WavetableWriter.write(Self.standardTable, preset: p)
+        Self.standardOutputs[p] = out
+        return out
     }
 
     private func write(_ t: Wavetable, _ p: OutputPreset, _ o: OutputOptions = OutputOptions()) throws -> OutputFile {
@@ -76,8 +92,8 @@ final class WritingTests: XCTestCase {
     // MARK: 3rd Wave U
 
     func testThirdWaveUNative() throws {
-        let t = table(frames: 64, size: 1024)
-        let out = try write(t, .thirdWaveU)
+        let t = Self.standardTable
+        let out = try standardOutput(.thirdWaveU)
         XCTAssertEqual(out.fileName, "Test Table.wt")
         XCTAssertEqual(out.folder, "WAVES")
         XCTAssertEqual(out.notes, [])
@@ -104,9 +120,9 @@ final class WritingTests: XCTestCase {
     func testThirdWaveNameSanitised() throws {
         let t = table("Łódź Ω strings that go on and on for ever", frames: 64, size: 1024)
         let out = try write(t, .thirdWaveU)
-        let wt = try WavetableFile(data: out.data)
-        XCTAssertEqual(wt.name, "?ódz ? strings that go on and o")
-        XCTAssertEqual(wt.name.count, 31)
+        let name = wtName(out.data)
+        XCTAssertEqual(name, "?ódz ? strings that go on and o")
+        XCTAssertEqual(name.count, 31)
         notes(out, contain: "outside Latin-1")
         notes(out, contain: "shortened")
         XCTAssertEqual(out.fileName, "Łódź Ω strings that go on and on for ever.wt", "the file name keeps the full name")
@@ -114,7 +130,14 @@ final class WritingTests: XCTestCase {
 
     func testThirdWaveNameOnOneLine() throws {
         let out = try write(table("Two\nLines", frames: 64, size: 1024), .thirdWaveU)
-        XCTAssertEqual(try WavetableFile(data: out.data).name, "Two Lines")
+        XCTAssertEqual(wtName(out.data), "Two Lines")
+    }
+
+    /// The name line of a .wt (its second line, Latin-1), read without parsing the 131,072 values
+    /// below it; `testThirdWaveUNative` parses a whole file.
+    private func wtName(_ data: Data) -> String {
+        let lines = data.split(separator: UInt8(ascii: "\n"), maxSplits: 2, omittingEmptySubsequences: false)
+        return lines.count > 1 ? String(lines[1].map { Character(Unicode.Scalar($0)) }) : ""
     }
 
     // MARK: 3rd Wave P
@@ -342,9 +365,8 @@ final class WritingTests: XCTestCase {
 
     /// Every preset's output size follows from its facts.
     func testEveryPresetWrites() throws {
-        let t = table(frames: 64, size: 1024)
         for p in OutputPreset.allCases {
-            let out = try write(t, p)
+            let out = try standardOutput(p)
             XCTAssertTrue(out.fileName.hasSuffix("." + p.fileExtension), "\(p)")
             XCTAssertFalse(out.data.isEmpty)
         }

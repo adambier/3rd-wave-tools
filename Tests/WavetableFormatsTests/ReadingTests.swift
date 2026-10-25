@@ -281,11 +281,11 @@ final class ReadingTests: XCTestCase {
         // Only Tonverk's sizes (powers of two from 64 to 4,096) make a tag: "KOMPLEXER_WT1" and
         // "KOMPLEXER_WT2" (a Serum library's numbered tables) are names, read whole, with no note.
         for name in ["KOMPLEXER_WT1", "KOMPLEXER_WT2", "Pad_wt32", "Pad_wt1000", "Pad_wt8192", "Pad_wt0"] {
-            let t = try readOne(wavFile([ramp(65_536)], chunks: [clm("<!>2048 00000000")]), name + ".WAV")
+            let t = try readOne(wavFile([ramp(4096)], chunks: [clm("<!>2048 00000000")]), name + ".WAV")
             XCTAssertEqual(t.frameSize, 2048, name)
             XCTAssertEqual(t.name, name, name)
             XCTAssertEqual(t.notes, [], name)
-            XCTAssertEqual(try readOne(wavFile([ramp(65_536)]), name + ".wav").frameSizeEvidence, .length, name)
+            XCTAssertEqual(try readOne(wavFile([ramp(4096)]), name + ".wav").frameSizeEvidence, .length, name)
         }
         for n in [64, 128, 256, 512, 1024, 2048, 4096] {
             XCTAssertEqual(try readOne(wavFile([ramp(8192)]), "a_wt\(n).wav").frameSize, n)
@@ -420,19 +420,20 @@ final class ReadingTests: XCTestCase {
     }
 
     func testNotesOfAMultisampledInstrumentAreNotWavetables() throws {
-        // With nothing but its length to go on, a file named like the note of a multisampled
+        // With nothing but its length to go on (a multiple of 2,048, or the 8,192 that would
+        // otherwise be offered as PPG or Serum frames), a file named like the note of a multisampled
         // instrument (Elektron's "Name-000-036-c2", "Saw C3", "SAW-C1") is a sample.
         for name in ["Spectral Undertones-000-012-c1.wav", "Saw C3.wav", "SAW-C1.wav", "Bass_F#-1.wav", "c3.wav", "Pad A#4.WAV"] {
-            XCTAssertEqual(try WavetableReader.read(wavFile([ramp(65_536)]), fileName: name), [], name)
+            XCTAssertEqual(try WavetableReader.read(wavFile([ramp(4096)]), fileName: name), [], name)
             XCTAssertEqual(try WavetableReader.read(wavFile([ramp(8192)]), fileName: name), [], name)
         }
         // The letter must stand on its own, and metadata still wins.
         for name in ["Bwt1.wav", "voc2.wav", "moog2.wav", "Loaf I.wav", "RD-BBD1.wav", "FM 2.wav"] {
-            XCTAssertEqual(try WavetableReader.read(wavFile([ramp(65_536)]), fileName: name).count, 1, name)
+            XCTAssertEqual(try WavetableReader.read(wavFile([ramp(4096)]), fileName: name).count, 1, name)
         }
-        XCTAssertEqual(try readOne(wavFile([ramp(65_536)], chunks: [clm("<!>2048 00000000")]), "Saw C3.wav").frameSize, 2048)
-        XCTAssertEqual(try readOne(wavFile([ramp(65_536)]), "Saw C3.wav", sidecar: "[1024]").frameSize, 1024)
-        XCTAssertEqual(try readOne(wavFile([ramp(65_536)]), "Saw C3_wt512.wav").frameSize, 512)
+        XCTAssertEqual(try readOne(wavFile([ramp(4096)], chunks: [clm("<!>2048 00000000")]), "Saw C3.wav").frameSize, 2048)
+        XCTAssertEqual(try readOne(wavFile([ramp(4096)]), "Saw C3.wav", sidecar: "[1024]").frameSize, 1024)
+        XCTAssertEqual(try readOne(wavFile([ramp(4096)]), "Saw C3_wt512.wav").frameSize, 512)
     }
 
     // MARK: - Notes
@@ -644,21 +645,27 @@ private func wavFile(_ channels: [[Float]], format: WAVSampleFormat = .float32, 
         fmt += le16(22) + le16(bytes * 8) + le32(0) + le16(tag)
         fmt += Data([0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71])
     }
-    var audio = Data()
+    // One sample at a time into a pre-sized byte array (appending to a Data per sample is what
+    // made the large tests slow).
+    var audio = [UInt8](repeating: 0, count: frames * nch * bytes)
+    var o = 0
+    let scale = Double(Int64(1) << (bytes * 8 - 1))
     for i in 0..<frames {
         for c in 0..<nch {
             let v = Double(channels[c][i])
             switch format {
-            case .pcm8: audio.append(UInt8(max(0, min(255, Int((v * 128).rounded()) + 128))))
+            case .pcm8: audio[o] = UInt8(max(0, min(255, Int((v * 128).rounded()) + 128)))
             case .pcm16, .pcm24, .pcm32:
-                let scale = Double(Int64(1) << (bytes * 8 - 1))
                 let x = Int64(max(-scale, min(scale - 1, (v * scale).rounded())))
-                for k in 0..<bytes { audio.append(UInt8(truncatingIfNeeded: x >> (8 * Int64(k)))) }
-            case .float32: audio += le32(Int(Float(v).bitPattern))
+                for k in 0..<bytes { audio[o + k] = UInt8(truncatingIfNeeded: x >> (8 * Int64(k))) }
+            case .float32:
+                let bits = Float(v).bitPattern
+                for k in 0..<4 { audio[o + k] = UInt8(truncatingIfNeeded: bits >> (8 * UInt32(k))) }
             case .float64:
                 let bits = v.bitPattern
-                audio += Data((0..<8).map { UInt8(truncatingIfNeeded: bits >> (8 * UInt64($0))) })
+                for k in 0..<8 { audio[o + k] = UInt8(truncatingIfNeeded: bits >> (8 * UInt64(k))) }
             }
+            o += bytes
         }
     }
     var body = Data("WAVE".utf8)
@@ -668,7 +675,7 @@ private func wavFile(_ channels: [[Float]], format: WAVSampleFormat = .float32, 
     }
     add("fmt ", fmt)
     for c in chunks { add(c.0, Data(c.1)) }
-    add("data", audio)
+    add("data", Data(audio))
     return Data("RIFF".utf8) + le32(body.count) + body
 }
 
