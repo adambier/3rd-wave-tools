@@ -223,11 +223,18 @@ final class ReadingTests: XCTestCase {
         XCTAssertEqual(try readOne(wavFile([ramp(3000)], chunks: [clm("<!>600 10000000")]), "d.wav").frameSize, 600)
     }
 
-    func testCLMThatDoesNotDivideFallsThrough() throws {
-        let t = try readOne(wavFile([ramp(8192)], chunks: [clm("<!>3000 20000000")]), "a.wav")
-        XCTAssertEqual(t.frameSize, 128)                       // the length rule
-        XCTAssertEqual(t.interpolation, .spectral)             // the digit still counts
-        XCTAssertTrue(t.notes.contains { $0.contains("3,000") && $0.contains("does not divide") }, "\(t.notes)")
+    func testCLMThatDoesNotDivideKeepsWholeFrames() throws {
+        // As in Serum tables from some editors: 24 frames of 2,048 and 32 samples more.
+        let t = try readOne(wavFile([ramp(24 * 2048 + 32)], chunks: [clm("<!>2048 20000000")]), "a.wav")
+        XCTAssertEqual(t.frameSize, 2048)
+        XCTAssertEqual(t.samples.count, 24 * 2048)
+        XCTAssertEqual(t.wavetable()?.frameCount, 24)
+        XCTAssertEqual(t.interpolation, .spectral)
+        XCTAssertTrue(t.notes.contains { $0.contains("32 samples after its last whole frame") }, "\(t.notes)")
+        // A clm size larger than the file is not used.
+        let u = try readOne(wavFile([ramp(8192)], chunks: [clm("<!>9000 20000000")]), "b.wav")
+        XCTAssertEqual(u.frameSize, 128)
+        XCTAssertTrue(u.notes.contains { $0.contains("9,000") }, "\(u.notes)")
     }
 
     func testSurgeChunks() throws {

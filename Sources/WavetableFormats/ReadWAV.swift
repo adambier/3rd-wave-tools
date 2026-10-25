@@ -68,8 +68,12 @@ extension WavetableReader {
         }
         var sizes: [SizeClaim] = []
         var interps: [InterpolationClaim] = []
-        func offer(_ size: Int, basis: String, subject: String) {
-            if size >= 2, count % size == 0 {
+        // Metadata written for the purpose (clm, srge, uhWT, a Tonverk tag, a Serum sidecar) is
+        // trusted even when the samples run a little past the last whole frame, as in files from
+        // some editors; the extra samples are then left out. Cue points and loops must divide
+        // the file exactly, since ordinary samples have them too.
+        func offer(_ size: Int, basis: String, subject: String, explicit: Bool = true) {
+            if size >= 2, count % size == 0 || (explicit && count >= size) {
                 sizes.append(SizeClaim(size: size, basis: basis, subject: subject))
             } else {
                 notes.append("\(capitalized(subject)) gives \(grouped(size)) samples per frame, which does not divide "
@@ -115,13 +119,13 @@ extension WavetableReader {
         // 6. cue points, evenly spaced. Cue points and loops also mark ordinary samples, so these
         // two count only for frame sizes a wavetable can have (at most 4,096, Surge's limit).
         if let cue = wav.chunks["cue "], let d = cueSpacing(cue), d <= 4096 {
-            offer(d, basis: "cue points", subject: "the cue points")
+            offer(d, basis: "cue points", subject: "the cue points", explicit: false)
         }
         // 7. A single smpl loop.
         if let smpl = wav.chunks["smpl"], let loop = singleLoop(smpl) {
             let inclusive = loop.end - loop.start + 1, exclusive = loop.end - loop.start
             let n = count % inclusive != 0 && exclusive >= 2 && count % exclusive == 0 ? exclusive : inclusive
-            if n <= 4096 { offer(n, basis: "smpl loop", subject: "the smpl loop") }
+            if n <= 4096 { offer(n, basis: "smpl loop", subject: "the smpl loop", explicit: false) }
         }
 
         var frameSize: Int?
@@ -162,11 +166,17 @@ extension WavetableReader {
             }
         }
 
+        var samples = wav.samples
+        if let n = frameSize, count % n != 0 {
+            let extra = count % n
+            samples.removeLast(extra)
+            notes.append("The file has \(grouped(extra)) sample\(extra == 1 ? "" : "s") after its last whole frame of \(grouped(n)); they are left out.")
+        }
         if let n = frameSize, let note = frameCountNote(count / n) { notes.append(note) }
         if let note = peakNote(wav.samples.reduce(0) { max($0, abs($1)) }) { notes.append(note) }
         var name = stem
         if let t = tag, !t.nameBeforeTag.isEmpty { name = t.nameBeforeTag }
-        return [FoundTable(name: name, fileName: fileName, source: .wav, samples: wav.samples, frameSize: frameSize,
+        return [FoundTable(name: name, fileName: fileName, source: .wav, samples: samples, frameSize: frameSize,
                            frameSizeBasis: basis, candidateFrameSizes: candidates, interpolation: interpolation,
                            notes: notes)]
     }
