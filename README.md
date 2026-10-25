@@ -194,9 +194,13 @@ its file name. Source files are not changed, and unpacking keeps names as they a
 ![Clean Up Names: options at the top, and each current name with its proposed new name](docs/clean-up-names.png)
 
 Name fields hold 31 characters, and the 3rd Wave displays all 31 for programs, wavetables, and
-multisamples. A longer name is flagged next to the name, in the program's notes, and in the report
-after packing, and is cut to 31. The fields hold single-byte characters only, so a name with an
-en dash, curly quotes, or an emoji is flagged as well: those characters are written as "?".
+multisamples. The fields hold single-byte (Latin-1) characters only. A name they cannot hold is
+changed the same way wherever the app writes one, here and in the 3rd Wave tables the Wavetables
+page writes: a line break becomes a space; a letter outside Latin-1 keeps its base letter and
+loses its accents (e.g., "Ő" becomes "O"); any other character outside Latin-1 (an en dash, curly
+quotes, an emoji) becomes "?"; and the name is then shortened to 31 characters. Every change is
+flagged next to the name, in the program's notes, and in the report after packing, with the name as
+it will be written.
 
 #### Writing
 

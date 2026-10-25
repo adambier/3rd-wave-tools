@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Packing
 
 /// What to put in the .pgdata for one source.
-public enum SourceContent: Equatable {
+public enum SourceContent: Equatable, Sendable {
     /// List the source but carry no data: the 3rd Wave uses whatever is in that slot.
     case reference
     /// Embed this wavetable. It must be of the slot's kind: a P table for a P slot, a U table for a
@@ -14,7 +14,7 @@ public enum SourceContent: Equatable {
 }
 
 /// An error building a `.pgdata` with ``Packer/pack(_:content:)``.
-public enum PackError: Error, CustomStringConvertible {
+public enum PackError: Error, CustomStringConvertible, Sendable {
     /// No content was given for these sources, which the program uses.
     case unresolved([SourceRef])
     /// The content given for this source does not suit its slot; the string says why.
@@ -117,7 +117,7 @@ public enum Packer {
 
 /// The contents of a unified program, as ``Unpacker/unpack(_:)`` returns them: the program and
 /// the wavetables and multisamples it embeds.
-public struct UnpackedProgram {
+public struct UnpackedProgram: Sendable {
     /// The program, with source ids in place of source-table indices, tagged `W3_PROG_5`.
     ///
     /// A program in an older layout is converted to the current one when the converter knows its

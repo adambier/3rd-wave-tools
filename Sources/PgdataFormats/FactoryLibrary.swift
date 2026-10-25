@@ -11,9 +11,9 @@ import Foundation
 ///
 /// Factory slots are P00–P35 and U00–U55 (section 2 of FORMATS.md). A program can list a factory
 /// table without its data, since every 3rd Wave is expected to have it loaded.
-public struct FactoryLibrary {
+public struct FactoryLibrary: Sendable {
     /// One factory wavetable: its display name and the fingerprint of its content.
-    public struct Table: Equatable {
+    public struct Table: Equatable, Sendable {
         /// The table's display name, as its `.wt` file gives it.
         public var name: String
         /// The table's content fingerprint, as ``WavetableFile/fingerprint`` computes it.

@@ -353,20 +353,25 @@ public struct PackPlan {
                         estimatedBytes: total)
     }
 
-    /// Why a name will not be stored as written: too long for the 3rd Wave's 31-byte fields, or
-    /// holding characters outside the single-byte range they use (stored as "?").
+    /// Why a name will not be stored as written, one sentence per change `NameField.fitted` makes
+    /// to it (the same rule `Packer.pack` applies): shortened to the 31 characters the 3rd Wave's
+    /// fields hold, control characters as spaces, or characters outside Latin-1 without their
+    /// accents or as "?". `what` names the subject: "The program name", or the file and its name.
     static func nameWarnings(_ name: String, what: String) -> [String] {
-        var out: [String] = []
-        let n = NameField.storedLength(name)
-        if n > NameCleaner.fieldLimit {
-            let cut = String(String.UnicodeScalarView(name.unicodeScalars.prefix(NameCleaner.fieldLimit)))
-            out.append("\(what) is \(n) characters; the 3rd Wave keeps \(NameCleaner.fieldLimit), so it is cut to \"\(cut)\".")
+        NameField.fitted(name).changes.map { change in
+            switch change {
+            case .controlCharactersReplaced:
+                return "\(what) has line breaks or other control characters; they are written as spaces."
+            case let .accentsRemoved(from, to):
+                let pairs = zip(from, to).map { "\u{201C}\($0)\u{201D} → \u{201C}\($1)\u{201D}" }.joined(separator: ", ")
+                return "\(what) has \(from.count == 1 ? "a letter" : "letters") the 3rd Wave's name fields cannot hold; \(from.count == 1 ? "it is" : "they are") written without accents: \(pairs)."
+            case let .replacedWithQuestionMark(chars):
+                let list = chars.map { "\u{201C}\($0)\u{201D}" }.joined(separator: ", ")
+                return "\(what) has \(chars.count == 1 ? "a character" : "characters") the 3rd Wave's name fields cannot hold (\(list)); \(chars.count == 1 ? "it is" : "they are") written as \"?\"."
+            case let .shortened(from, to):
+                return "\(what) is \(from) characters; the 3rd Wave's name fields hold \(NameField.displayLimit), so it is shortened to \"\(to)\"."
+            }
         }
-        let lost = NameField.unstorable(in: name)
-        if !lost.isEmpty {
-            out.append("\(what) has \(lost.count == 1 ? "a character" : "characters") the 3rd Wave's name fields cannot hold (\(lost.map { "\u{201C}\($0)\u{201D}" }.joined(separator: ", "))); \(lost.count == 1 ? "it is" : "they are") written as \"?\".")
-        }
-        return out
     }
 
     /// U48–U55, user slots until Groove Synthesis added them to the factory set in 2025 (files dated

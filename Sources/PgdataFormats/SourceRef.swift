@@ -15,7 +15,7 @@ import Foundation
 ///
 /// An id names a *slot*, not content: what plays depends on what is loaded in that slot.
 /// See section 2 of FORMATS.md.
-public enum SourceRef: Hashable, Comparable, CustomStringConvertible {
+public enum SourceRef: Hashable, Comparable, CustomStringConvertible, Sendable {
     /// P wavetable slot P*n*, *n* = 0–47.
     case p(Int)        // 0...47
     /// U wavetable slot U*n*, *n* = 0–63.

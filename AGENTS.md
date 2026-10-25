@@ -144,7 +144,7 @@ PgdataFormats (`Sources/PgdataFormats/`):
 | `ProgramConverter` | `ProgramConverter.swift` | Older layouts to `ProgramConverter.current` (181/137/182): `needsConversion`, `convert(_:for:format:)`, `Model` (`.eightM`, `.twentyFour`) |
 | `FactoryLibrary` | `FactoryLibrary.swift` | Factory tables by slot, name, and fingerprint; `.builtIn` from generated `FactoryCatalog` |
 | `ExportNames` | `FactoryHistory.swift` | The 3rd Wave's own export file names and `B05P06`-style locations; also `SourceRef.is2025FactorySlot`, `ProgramFile.predates2025FactoryTables` |
-| `NameField`, `FormatError`, `fnv1a64(_:)` | `ByteIO.swift` | 32-byte name fields, the library's error type, the fingerprint hash |
+| `NameField`, `FormatError`, `fnv1a64(_:)` | `ByteIO.swift` | 32-byte name fields and `NameField.fitted` (the one rule for a name the 3rd Wave keeps: `displayLimit` = 31, `Change`), the library's error type, the fingerprint hash |
 | `SafeFileName` | `SafeFileName.swift` | File names safe on macOS, Windows, and FAT/exFAT |
 
 WavetableFormats (`Sources/WavetableFormats/`):
@@ -154,7 +154,7 @@ WavetableFormats (`Sources/WavetableFormats/`):
 | `Wavetable`, `Interpolation`, `SourceFormat`, `FrameSizeEvidence`, `FoundTable`, `OutputPreset`, `FrameCountPolicy`, `OutputOptions`, `OutputFile`, `WavetableError` | `Wavetable.swift` | Shared value types |
 | `WavetableReader` | `Reading.swift` + `ReadWAV.swift`, `ReadFLAC.swift`, `ReadSurge.swift`, `ReadThirdWave.swift` | `read(url:)`, `read(_:fileName:sidecarText:)`: detection by content, not extension |
 | `WavetableWriter` | `Writing.swift` + `WriteWAV.swift`, `WriteNames.swift` | `write(_:preset:options:) -> OutputFile`; per-preset facts (`frameSize`, `maxFrameCount`, `basis`, `caveat`, `testedIn`) as `OutputPreset` extensions |
-| `OutputPreset` display extensions | `PresetInfo.swift` | `Group`, `shortTitle`, `specLine`, `distinction`, `recordsInterpolation` |
+| `OutputPreset.recordsInterpolation`, `Interpolation.displayName` | `PresetInfo.swift` | Whether a format records the interpolation; the words for an interpolation (used in the writer's notes) |
 | `Resampling` | `Resampling.swift`, `FFT.swift` | `resizeCycle`, `changeFrameCount`, `thirdWaveMipmapChain` |
 | `PPGStandardWaves` | `PPGWaves.swift` | The four waves P tables carry at positions 60–63 |
 
@@ -165,6 +165,7 @@ PgdataPackerCore (`Sources/PgdataPackerCore/`):
 | `ContentFile`, `PackPlan`, `UnpackPlan`, `OutputNames`, `Oscillator`, `ProgramFile.repointed` | `Workbench.swift` | Pack and Unpack page decisions and output file names |
 | `ConvertPlan`, `ConvertPreviewCache` | `ConvertPlan.swift` | Wavetables page decisions: collecting files, collapsing duplicates, frame-size choice, expected results, reports |
 | `NameCleaner` | `NameCleaner.swift` | Clean Up Names proposals |
+| `OutputPreset` display extensions | `DestinationInfo.swift` | What the Wavetables page says about each destination: `Group` (with `title`, `presets`), `group`, `shortTitle`, `specLine`, `distinction` |
 | `FrameSizeFit`, `WavetableSketch`, `CountWords` | own files | Frame-size heuristic ("likely", never applied alone), preview thumbnails, report phrasing |
 
 App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle, Help links),
@@ -184,9 +185,9 @@ App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle
 | `.bin` fields and versions | `Multisample.swift`; FORMATS.md section 5.2 | `fixtures/multisample.bin*` |
 | Older-program conversion | `ProgramConverter.swift`; FORMATS.md section 6 and appendix | `ConverterTests`, `fixtures/program-2022-layout*`, `tw3pg convert`, `tw3pg convertcheck` |
 | Factory tables, U48–U55 history | `FactoryLibrary.swift`, `FactoryHistory.swift`, `FactoryCatalog.swift` (generated) | README "Factory wavetables" |
-| Names, 31-character limit, file names | `ByteIO.swift` (`NameField`), `SafeFileName.swift`, `ExportNames`, `OutputNames`, `WriteNames.swift` | `SafeFileNameTests`, `WorkbenchTests` |
+| Names, 31-character limit, file names | `ByteIO.swift` (`NameField.fitted`, which `NameField.init`, `WriteNames.swift`, `PackPlan.nameWarnings`, and the app's `NameLengthNote` all apply), `SafeFileName.swift`, `ExportNames`, `OutputNames` | `NameFittingTests`, `SafeFileNameTests`, `WorkbenchTests` |
 | Read another wavetable format | `Reading.swift` dispatch, a new `Read<Format>.swift`, `SourceFormat` | `ReadingTests`, `CorpusCaseTests`, `RoundTripTests`; WAVETABLES.md |
-| Write for another synth | `OutputPreset` in `Wavetable.swift`, `Writing.swift`, `PresetInfo.swift` | `WritingTests`, `RoundTripTests`; WAVETABLES.md section 2; README destination table |
+| Write for another synth | `OutputPreset` in `Wavetable.swift`, `Writing.swift`, `PresetInfo.swift`; `DestinationInfo.swift` in PgdataPackerCore | `WritingTests`, `RoundTripTests`; WAVETABLES.md section 2; README destination table |
 | Frame size decisions | `ReadWAV.swift`, `FrameSizeEvidence`, `FrameSizeFit.swift`; WAVETABLES.md section 3 | `ReadingTests`, `ReviewFixTests` |
 | Pack page behaviour (what each source will be, status lines, slot estimate) | `PackPlan` in `Workbench.swift` | `WorkbenchTests`; then `PackView.swift`, `AppState.swift` |
 | Unpack page behaviour | `UnpackPlan` in `Workbench.swift` | `WorkbenchTests`; then `UnpackView.swift` |
@@ -268,7 +269,8 @@ and the DocC overview; update the README "Wavetables" paragraph.
 **Add a destination (writer preset)**: add an `OutputPreset` case; handle it in `Job.run()` and a
 new `mutating func` in `Writing.swift`; fill every `switch` in the `OutputPreset` extensions
 (`Writing.swift`: `title`, `basis`, `caveat`, `frameSize`, `maxFrameCount`, `requiredFrameCount`,
-`fileExtension`; `PresetInfo.swift`: `shortTitle`, `specLine`, `distinction`, `recordsInterpolation`);
+`fileExtension`; `PresetInfo.swift`: `recordsInterpolation`; PgdataPackerCore's
+`DestinationInfo.swift`: `shortTitle`, `specLine`, `distinction`, the page's wording);
 the app lists presets through `OutputPreset.Group.presets`, so no UI list needs editing; add
 `WritingTests` and `RoundTripTests` cases; add a row to `docs/WAVETABLES.md` section 2 with a
 footnoted source and to the README destination table; leave `testedIn` empty.

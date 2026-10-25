@@ -149,7 +149,8 @@ struct NameCleanupSheet: View {
                 // shortens one that is too long and says so in its report.
                 state.convertPlan.rename(r.id, to: proposed(r))
             } else {
-                let new = String(String.UnicodeScalarView(proposed(r).unicodeScalars.prefix(NameCleaner.fieldLimit)))
+                // Applied as the .pgdata will hold it, so the list shows what is packed.
+                let new = NameField.fitted(proposed(r)).text
                 if r.isProgram { state.setProgramName(r.id, new) } else { state.contentNames[r.id] = new }
             }
             n += 1
@@ -161,22 +162,32 @@ struct NameCleanupSheet: View {
     }
 }
 
-/// Flags a name the 3rd Wave will not store as written: too long for its 31-character fields (it
-/// displays all 31 for programs, wavetables, and multisamples [verified, T6]), or holding
-/// characters outside the single-byte range they use (an en dash, curly quotes, accents typed as
-/// separate marks), which are stored as "?".
+/// Flags a name the 3rd Wave will not store as written, one label per change `NameField.fitted`
+/// makes (the rule packing applies; see section 8 of FORMATS.md): too long for the 31-character
+/// fields, letters outside Latin-1 written without their accents, other characters outside
+/// Latin-1 written as "?", or control characters written as spaces. The tooltip says exactly
+/// what is written.
 struct NameLengthNote: View {
     let name: String
     var body: some View {
-        let n = NameField.storedLength(name)
-        let lost = NameField.unstorable(in: name)
-        if n > NameCleaner.fieldLimit {
-            Label("Too long: cut to \(NameCleaner.fieldLimit)", systemImage: "xmark.octagon").foregroundStyle(.red)
-                .help("Name fields on the 3rd Wave hold \(NameCleaner.fieldLimit) characters. This name is \(n); it will be cut to \"\(String(String.UnicodeScalarView(name.unicodeScalars.prefix(NameCleaner.fieldLimit))))\".")
-        }
-        if !lost.isEmpty {
-            Label("\(lost.map { "\u{201C}\($0)\u{201D}" }.joined(separator: " ")) → ?", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
-                .help("Name fields on the 3rd Wave hold single-byte characters only. \(lost.count == 1 ? "This character is" : "These characters are") written as \"?\": \(lost.map { "\u{201C}\($0)\u{201D}" }.joined(separator: ", ")). Replace \(lost.count == 1 ? "it" : "them") with plain equivalents (e.g., a hyphen for a dash, straight quotes) to keep the name as you typed it.")
+        let fit = NameField.fitted(name)
+        ForEach(Array(fit.changes.enumerated()), id: \.offset) { _, change in
+            switch change {
+            case let .shortened(from, to):
+                Label("Too long: shortened to \(NameField.displayLimit)", systemImage: "xmark.octagon").foregroundStyle(.red)
+                    .help("The 3rd Wave's name fields hold \(NameField.displayLimit) characters. This name is \(from); it is shortened to \u{201C}\(to)\u{201D}.")
+            case let .accentsRemoved(from, to):
+                let pairs = zip(from, to).map { "\u{201C}\($0)\u{201D} → \($1)" }
+                Label(pairs.joined(separator: " "), systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                    .help("The 3rd Wave's name fields cannot hold \(from.count == 1 ? "this letter" : "these letters"), so \(from.count == 1 ? "it is" : "they are") written without accents: \(pairs.joined(separator: ", ")). Edit the name to choose other letters.")
+            case let .replacedWithQuestionMark(chars):
+                let list = chars.map { "\u{201C}\($0)\u{201D}" }
+                Label("\(list.joined(separator: " ")) → ?", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                    .help("The 3rd Wave's name fields cannot hold \(chars.count == 1 ? "this character" : "these characters"), so \(chars.count == 1 ? "it is" : "they are") written as \"?\": \(list.joined(separator: ", ")). Replace \(chars.count == 1 ? "it" : "them") with plain equivalents (e.g., a hyphen for a dash, straight quotes) to keep the name as you typed it.")
+            case .controlCharactersReplaced:
+                Label("Line breaks → spaces", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                    .help("Line breaks and other control characters in the name are written as spaces.")
+            }
         }
     }
 }

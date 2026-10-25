@@ -14,9 +14,9 @@ import Foundation
 ///
 /// Read and rewritten byte for byte: Groove Synthesis's factory banks (38), its sample library
 /// (45), and 138 third-party files. See section 4 of FORMATS.md.
-public struct UnifiedProgram: Equatable {
+public struct UnifiedProgram: Equatable, Sendable {
     /// The data a source record carries.
-    public enum Payload: Equatable {
+    public enum Payload: Equatable, Sendable {
         /// No data: the source is listed only, and the 3rd Wave plays whatever is in that slot (or,
         /// for an analog wave, the built-in wave).
         case none
@@ -28,7 +28,7 @@ public struct UnifiedProgram: Equatable {
     }
 
     /// One entry of the source table, with its record.
-    public struct Source: Equatable {
+    public struct Source: Equatable, Sendable {
         /// The slot the entry names.
         public var ref: SourceRef
         /// The data the entry carries, if any.
