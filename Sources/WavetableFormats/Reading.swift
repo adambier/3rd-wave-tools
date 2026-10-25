@@ -111,17 +111,18 @@ extension WavetableReader {
 
     /// A note for samples beyond ±1, or nil when the peak is within it. The 3rd Wave's own tables
     /// and 16-bit files cannot hold more, so converting to those turns the table down.
-    static func peakNote(_ peak: Float) -> String? {
+    static func peakNote(_ peak: Float) -> ReadNote? {
         guard peak > 1 else { return nil }
         var shown = String(format: "%.2f", Double(peak))
         if shown == "1.00" { shown = String(format: "%.4f", Double(peak)) }
         if shown == "1.0000" { shown = "just over 1" }
-        return "Peak \(shown): over full scale (±1). Converting to a 3rd Wave table or a 16-bit file turns it down to fit."
+        return ReadNote(.peak(peak), "Peak \(shown): over full scale (±1). Converting to a 3rd Wave table or a 16-bit file turns it down to fit.")
     }
 
     /// A note for a table of more than 256 frames, or nil.
-    static func frameCountNote(_ frames: Int) -> String? {
+    static func frameCountNote(_ frames: Int) -> ReadNote? {
         guard frames > 256 else { return nil }
-        return "\(grouped(frames)) frames: Serum, Vital, and Pigments take at most 256, so converting for them drops frames (you choose how)."
+        return ReadNote(.highFrameCount(frames, limit: 256),
+                        "\(grouped(frames)) frames: Serum, Vital, and Pigments take at most 256, so converting for them drops frames (you choose how).")
     }
 }

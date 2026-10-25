@@ -445,10 +445,77 @@ final class ReadingTests: XCTestCase {
         // A peak that would print as 1.00 is shown with more digits, never as "1.00, over ±1".
         let barely = try readOne(wavFile([ramp(8192).map { $0 * 1.0003 }]), "barely.wav")
         XCTAssertTrue(barely.notes.contains { $0.hasPrefix("Peak 1.0003:") }, "\(barely.notes)")
-        XCTAssertTrue(WavetableReader.peakNote(1.00001)!.hasPrefix("Peak just over 1:"))
+        XCTAssertTrue(WavetableReader.peakNote(1.00001)!.text.hasPrefix("Peak just over 1:"))
+        XCTAssertEqual(WavetableReader.peakNote(1.00001)?.kind, .peak(1.00001))
         XCTAssertNil(WavetableReader.peakNote(1))
         let quiet = try readOne(wavFile([ramp(8192)]), "quiet.wav")
         XCTAssertEqual(quiet.notes, [])
+    }
+
+    /// Each note carries what it is about, beside its sentence, so tools need not parse the words.
+    func testNoteKinds() throws {
+        let many = try readOne(wavFile([ramp(300 * 64)], chunks: [clm("<!>64 00000000")]), "many.wav")
+        XCTAssertEqual(many.readNotes.map(\.kind), [.highFrameCount(300, limit: 256)])
+        XCTAssertEqual(try readOne(wavFile([ramp(8192).map { $0 * 1.5 }]), "loud.wav").readNotes.map(\.kind), [.peak(1.5)])
+
+        let stereo = try readOne(wavFile([ramp(8192), ramp(8192)], format: .pcm24, chunks: [clm("<!>2048 10000000")]), "st.wav")
+        XCTAssertEqual(stereo.readNotes.map(\.kind), [.channelsDropped(used: 1, of: 2)])
+        let six = try readOne(wavFile([[Float]](repeating: ramp(4096), count: 6), chunks: [clm("<!>2048 10000000")]), "six.wav")
+        XCTAssertEqual(six.readNotes.map(\.kind), [.channelsDropped(used: 1, of: 6)])
+
+        let beats = try readOne(wavFile([ramp(8192)], chunks: [clm("<!>2048 10000000")]), "keys_wt1024r.wav")
+        XCTAssertEqual(beats.readNotes.map(\.kind),
+                       [.sizeClaimsDisagree(chosen: .clmChunk, chosenSize: 2048, other: .tonverkFileName(tag: "_wt1024r"), otherSize: 1024),
+                        .interpolationClaimsDisagree(chosen: .clmChunk, chosenValue: .crossfade,
+                                                     other: .tonverkFileName(tag: "_wt1024r"), otherValue: Interpolation.none)])
+
+        let cut = try readOne(wavFile([ramp(24 * 2048 + 32)], chunks: [clm("<!>2048 20000000")]), "a.wav")
+        XCTAssertEqual(cut.readNotes.map(\.kind), [.samplesLeftOut(32, shortOfAnotherFrame: nil)])
+        let nearly = try readOne(wavFile([ramp(3 * 2048 + 2047)], chunks: [clm("<!>2048 00000000")]), "c.wav")
+        XCTAssertEqual(nearly.readNotes.map(\.kind), [.samplesLeftOut(2047, shortOfAnotherFrame: 1)])
+
+        let tooBig = try readOne(wavFile([ramp(4096)], chunks: [clm("<!>9000 20000000")]), "b.wav")
+        XCTAssertEqual(tooBig.readNotes.map(\.kind),
+                       [.sizeTagRejected(source: .clmChunk, size: 9000, reason: .fileShorterThanFrame(samples: 4096))])
+        XCTAssertEqual(try readOne(wavFile([ramp(4096)], chunks: [srge(1)]), "one.wav").readNotes.map(\.kind),
+                       [.sizeTagRejected(source: .srgeChunk, size: 1, reason: .unusableSize)])
+        XCTAssertEqual(try readOne(wavFile([ramp(4096)], chunks: [clm("<!>abc")]), "nosize.wav").readNotes.map(\.kind),
+                       [.sizeTagUnreadable(source: .clmChunk)])
+        XCTAssertEqual(try readOne(wavFile([ramp(4096)], chunks: [("srge", [1, 0, 0, 0])]), "short.wav").readNotes.map(\.kind),
+                       [.sizeTagUnreadable(source: .srgeChunk)])
+        XCTAssertEqual(try readOne(wavFile([ramp(4096)]), "c.wav", sidecar: "[16]").readNotes.map(\.kind), [.sidecarOutOfRange(16)])
+
+        // A data chunk that runs past the end of the file.
+        var truncated = wavFile([ramp(4096)], chunks: [clm("<!>1024 00000000")])
+        truncated.removeLast(8)
+        let short = try readOne(truncated, "t.wav")
+        XCTAssertEqual(short.readNotes.map(\.kind), [.cutShort, .samplesLeftOut(1022, shortOfAnotherFrame: 2)])
+        XCTAssertEqual(short.notes.first, "The file ends before its audio should (it may have been cut short); what is there is read.")
+
+        // Surge: an unusual size, and more frames than Surge itself takes.
+        let odd = try readOne(surgeFile(size: 1000, frames: [ramp(1000), ramp(1000)]), "odd.wt")
+        XCTAssertEqual(odd.readNotes.map(\.kind), [.unusualSurgeFrameSize(1000)])
+        let tall = try readOne(surgeFile(size: 4, frames: [[Float]](repeating: ramp(4), count: 600)), "tall.wt")
+        XCTAssertEqual(tall.readNotes.map(\.kind), [.highFrameCount(600, limit: 512)])
+        XCTAssertEqual(try readOne(surgeFile(size: 4, frames: [[Float]](repeating: ramp(4), count: 300)), "mid.wt").readNotes.map(\.kind),
+                       [.highFrameCount(300, limit: 256)])
+    }
+
+    /// What settled the frame size, as a value beside the phrase.
+    func testFrameSizeSource() throws {
+        XCTAssertEqual(try readOne(wavFile([ramp(4096)], chunks: [clm("<!>1024 00000000")]), "a.wav").frameSizeSource, .clmChunk)
+        XCTAssertEqual(try readOne(wavFile([ramp(4096)], chunks: [srge(512)]), "a.wav").frameSizeSource, .srgeChunk)
+        XCTAssertEqual(try readOne(wavFile([ramp(8192)], chunks: [("uhWT", [0, 0, 0, 0])]), "u.wav").frameSizeSource, .uhWTChunk)
+        XCTAssertEqual(try readOne(wavFile([ramp(4096)]), "Strings_WT512r.wav").frameSizeSource, .tonverkFileName(tag: "_wt512r"))
+        XCTAssertEqual(try readOne(wavFile([ramp(4096)]), "a.wav", sidecar: "[256]").frameSizeSource, .serumSidecar)
+        XCTAssertEqual(try readOne(wavFile([ramp(4096)], chunks: [cue([0, 1024, 2048, 3072])]), "a.wav").frameSizeSource, .cueMarkers)
+        XCTAssertEqual(try readOne(wavFile([ramp(4096)], chunks: [smpl(loops: [(0, 511)])]), "a.wav").frameSizeSource, .loopMarkers)
+        XCTAssertEqual(try readOne(wavFile([ramp(3 * 2048)]), "s.wav").frameSizeSource, .fileLength)
+        XCTAssertNil(try readOne(wavFile([ramp(8192)]), "p.wav").frameSizeSource)
+        XCTAssertEqual(try readOne(surgeFile(size: 256, frames: [ramp(256)]), "s.wt").frameSizeSource, .surgeHeader)
+        XCTAssertEqual(try readOne(try fixture("wavetable-p.wt"), "p.wt").frameSizeSource, .thirdWaveTable(isP: true))
+        XCTAssertEqual(try readOne(try fixture("wavetable-u.wt"), "u.wt").frameSizeSource, .thirdWaveTable(isP: false))
+        XCTAssertEqual(try readOne(try fixture("unified.pgdata"), "unified.pgdata").frameSizeSource, .thirdWaveTable(isP: false))
     }
 
     // MARK: - Reading from a URL

@@ -314,13 +314,13 @@ final class ConvertPlanRenameTests: XCTestCase {
 /// result), the preview and its cache, and what each destination says about itself.
 final class ConvertPlanStateTests: XCTestCase {
     private func table(_ name: String, frames: Int = 4, size: Int? = 2048, samples: Int? = nil, peak: Float = 0.5,
-                       candidates: [Int] = [], evidence: FrameSizeEvidence? = nil, notes: [String] = [],
+                       candidates: [Int] = [], evidence: FrameSizeEvidence? = nil, notes: [ReadNote] = [],
                        interpolation: Interpolation? = nil) -> FoundTable {
         let n = samples ?? frames * (size ?? 2048)
         return FoundTable(name: name, fileName: name + ".wav", source: .wav,
                           samples: (0..<n).map { Float(sin(Double($0) * 2 * .pi / 2048)) * peak },
                           frameSize: size, frameSizeBasis: "clm chunk", candidateFrameSizes: candidates,
-                          interpolation: interpolation, notes: notes, frameSizeEvidence: evidence)
+                          interpolation: interpolation, readNotes: notes, frameSizeEvidence: evidence)
     }
 
     private func plan(_ tables: [FoundTable], preset: OutputPreset = .thirdWaveU) -> ConvertPlan {
@@ -383,17 +383,21 @@ final class ConvertPlanStateTests: XCTestCase {
     }
 
     func testNotesBySeverity() {
-        let p = plan([table("Loud", peak: 1.234, notes: ["Its samples reach 1.23, beyond ±1.", "The file has 2 channels; only the left (first) channel is read."]),
-                      table("Quiet", notes: ["The clm chunk gives 2,048 samples per frame, but the Serum .txt sidecar gives 1,024; the clm chunk is used."])])
+        // Severity follows the note's kind, not its words: the sentences here are not the
+        // reader's, and the peak note is replaced by the plan's own.
+        let disagree = ReadNote.Kind.sizeClaimsDisagree(chosen: .clmChunk, chosenSize: 2048, other: .serumSidecar, otherSize: 1024)
+        let p = plan([table("Loud", peak: 1.234, notes: [ReadNote(.peak(1.234), "Its samples reach 1.23, beyond ±1."),
+                                                          ReadNote(.channelsDropped(used: 1, of: 2), "Left channel read.")]),
+                      table("Quiet", notes: [ReadNote(disagree, "The sizes differ; the clm chunk wins."),
+                                             ReadNote(.highFrameCount(300, limit: 256), "300 frames.")])])
         let loud = p.itemNotes(for: p.items[0])
-        XCTAssertEqual(loud.warnings, ["Peak 1.23 is over full scale (±1); the table is turned down to fit.", "The file has 2 channels; only the left (first) channel is read."])
+        XCTAssertEqual(loud.warnings, ["Peak 1.23 is over full scale (±1); the table is turned down to fit.", "Left channel read."])
         XCTAssertEqual(loud.information, [])
         XCTAssertEqual(p.notes(for: p.items[0]), loud.all)
         XCTAssertEqual(p.items[0].peak, 1.234, accuracy: 1e-5)
         let quiet = p.itemNotes(for: p.items[1])
-        XCTAssertEqual(quiet.warnings.count, 1)
-        XCTAssertTrue(quiet.warnings[0].hasSuffix("is used."))
-        XCTAssertTrue(quiet.information.isEmpty)
+        XCTAssertEqual(quiet.warnings, ["The sizes differ; the clm chunk wins."])
+        XCTAssertEqual(quiet.information, ["300 frames."])
         XCTAssertFalse(quiet.isEmpty)
     }
 
@@ -711,7 +715,8 @@ final class ConvertChangeWordsTests: XCTestCase {
         let wave = (0..<2048).map { Float(sin(Double($0) * 2 * .pi / 2048)) }
         let big = FoundTable(name: "Big", fileName: "Big.wav", source: .wav, samples: Array((0..<256).map { _ in wave }.joined()).map { $0 * 1.3 },
                              frameSize: 2048, frameSizeBasis: "clm chunk",
-                             notes: ["12 samples after the last whole frame are left out.", "Stereo file: only the left channel is used."])
+                             readNotes: [ReadNote(.samplesLeftOut(12, shortOfAnotherFrame: nil), "12 samples after the last whole frame are left out."),
+                                         ReadNote(.channelsDropped(used: 1, of: 2), "Stereo file: only the left channel is used.")])
         let fits = FoundTable(name: "Fits", fileName: "Fits.wt", source: .thirdWaveWavetable(isP: false),
                               samples: Array((0..<64).map { _ in Array(wave.prefix(1024)) }.joined()).map { $0 * 0.5 },
                               frameSize: 1024, frameSizeBasis: "3rd Wave U table")
@@ -742,12 +747,27 @@ final class ConvertChangeWordsTests: XCTestCase {
                               frameSize: nil, frameSizeBasis: "not stated", candidateFrameSizes: [256, 2048])
         plan.add([found(open)], factory: FactoryLibrary())
         XCTAssertNil(plan.changeWords(for: plan.items[2]))
-        XCTAssertEqual(ConvertPlan.shortWarning("The clm says 2,048 samples per frame, but the .txt says 1,024; the clm is used."), "size tags disagree")
-        XCTAssertEqual(ConvertPlan.shortWarning("The clm asks for a crossfade, but the .txt asks for none; the clm is used."), "interpolation tags disagree")
-        XCTAssertEqual(ConvertPlan.shortWarning("1 sample after the last whole frame is left out."), "1 extra sample dropped")
-        XCTAssertEqual(ConvertPlan.shortWarning("1,500 samples after the last whole frame are left out."), "1,500 extra samples dropped")
-        XCTAssertEqual(ConvertPlan.firstNumber(in: "no digits here"), nil)
-        XCTAssertEqual(ConvertPlan.shortWarning("Something else entirely."), "see note")
+
+        // The short words come from the note's kind alone.
+        XCTAssertEqual(ConvertPlan.shortWarning(.sizeClaimsDisagree(chosen: .clmChunk, chosenSize: 2048, other: .serumSidecar, otherSize: 1024)), "size tags disagree")
+        XCTAssertEqual(ConvertPlan.shortWarning(.interpolationClaimsDisagree(chosen: .clmChunk, chosenValue: .crossfade, other: .serumSidecar, otherValue: Interpolation.none)), "interpolation tags disagree")
+        XCTAssertEqual(ConvertPlan.shortWarning(.samplesLeftOut(1, shortOfAnotherFrame: nil)), "1 extra sample dropped")
+        XCTAssertEqual(ConvertPlan.shortWarning(.samplesLeftOut(1500, shortOfAnotherFrame: 548)), "1,500 extra samples dropped")
+        XCTAssertEqual(ConvertPlan.shortWarning(.channelsDropped(used: 1, of: 2)), "left channel only")
+        XCTAssertEqual(ConvertPlan.shortWarning(.channelsDropped(used: 1, of: 6)), "first channel only")
+        XCTAssertEqual(ConvertPlan.shortWarning(.cutShort), "file cut short")
+        XCTAssertEqual(ConvertPlan.shortWarning(.sidecarOutOfRange(16)), ".txt size out of range, ignored")
+        XCTAssertEqual(ConvertPlan.shortWarning(.sizeTagUnreadable(source: .clmChunk)), "unreadable size tag ignored")
+        XCTAssertEqual(ConvertPlan.shortWarning(.sizeTagRejected(source: .clmChunk, size: 9000, reason: .fileShorterThanFrame(samples: 4096))), "size tag larger than the file, ignored")
+        XCTAssertEqual(ConvertPlan.shortWarning(.sizeTagRejected(source: .serumSidecar, size: 9000, reason: .fileShorterThanFrame(samples: 4096))), ".txt size larger than the file, ignored")
+        XCTAssertEqual(ConvertPlan.shortWarning(.sizeTagRejected(source: .srgeChunk, size: 1, reason: .unusableSize)), "unusable size tag ignored")
+        XCTAssertNil(ConvertPlan.shortWarning(.highFrameCount(300, limit: 256)))
+        XCTAssertNil(ConvertPlan.shortWarning(.peak(1.5)))
+        // Every warning kind has its short words; no other kind does.
+        for kind in [ReadNote.Kind.cutShort, .highFrameCount(600, limit: 512), .unusualSurgeFrameSize(1000),
+                     .tagInComment(key: "COMMENT"), .commentMentionsFrames(key: "FRAMES", value: "3")] {
+            XCTAssertEqual(ConvertPlan.isWarning(kind), ConvertPlan.shortWarning(kind) != nil, "\(kind)")
+        }
     }
 
     func testOriginBadges() {

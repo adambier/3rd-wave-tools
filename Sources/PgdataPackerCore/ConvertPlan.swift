@@ -518,9 +518,9 @@ public struct ConvertPlan: Equatable {
     /// and the reader's notes about disagreeing metadata or samples left out count as warnings.
     public func itemNotes(for item: Item) -> ItemNotes {
         var warnings: [String] = [], information: [String] = []
-        for note in item.table.notes {
-            if Self.isPeakNote(note) { continue }
-            if Self.isWarningNote(note) { warnings.append(note) } else { information.append(note) }
+        for note in item.table.readNotes {
+            if case .peak = note.kind { continue }
+            if Self.isWarning(note.kind) { warnings.append(note.text) } else { information.append(note.text) }
         }
         if item.peak > 1 {
             warnings.insert("Peak \(Self.decimal(item.peak)) is over full scale (±1); "
@@ -535,18 +535,17 @@ public struct ConvertPlan: Equatable {
         return ItemNotes(warnings: warnings, information: information)
     }
 
-    /// Whether a reader's note is about samples over full scale (replaced by the plan's own).
-    static func isPeakNote(_ note: String) -> Bool {
-        note.contains("beyond ±1") || note.contains("over full scale")
-    }
-
-    /// Whether a reader's note is a warning: metadata that disagrees, samples left out, channels
-    /// dropped, or a damaged file.
-    static func isWarningNote(_ note: String) -> Bool {
-        for mark in ["is used.", "left out", "cut short", "only the left", "only the first", "ignored"] {
-            if note.contains(mark) { return true }
+    /// Whether a reader's note is a warning: metadata that disagrees or is ignored, samples left
+    /// out, channels dropped, or a file cut short. Everything else (a high frame count, an
+    /// unusual Surge size, where a FLAC tag was found) is information; the peak has its own note.
+    static func isWarning(_ kind: ReadNote.Kind) -> Bool {
+        switch kind {
+        case .channelsDropped, .sizeClaimsDisagree, .interpolationClaimsDisagree, .samplesLeftOut, .cutShort,
+             .sizeTagRejected, .sizeTagUnreadable, .sidecarOutOfRange:
+            return true
+        case .peak, .highFrameCount, .unusualSurgeFrameSize, .tagInComment, .commentMentionsFrames:
+            return false
         }
-        return false
     }
 
     /// Whether an item can be converted: its frame size is known and its samples divide into frames.
@@ -748,38 +747,30 @@ public struct ConvertPlan: Equatable {
         }
         var warnings: [String] = []
         if e.peakKept { warnings.append("peak \(Self.decimal(e.peak)), over full scale") }
-        for note in item.table.notes where Self.isWarningNote(note) {
-            let word = Self.shortWarning(note)
-            if !warnings.contains(word) { warnings.append(word) }
+        for note in item.table.readNotes where Self.isWarning(note.kind) {
+            if let word = Self.shortWarning(note.kind), !warnings.contains(word) { warnings.append(word) }
         }
         return (changes, warnings)
     }
 
     /// A reader's warning in a few words that stand on their own, for the Changes column; the
-    /// note itself is the tooltip.
-    static func shortWarning(_ note: String) -> String {
-        if note.contains("left out") {
-            if let n = firstNumber(in: note) { return "\(n) extra sample\(n == "1" ? "" : "s") dropped" }
-            return "extra samples dropped"
+    /// note itself is the tooltip. Nil for a kind that is not a warning (see `isWarning`).
+    static func shortWarning(_ kind: ReadNote.Kind) -> String? {
+        switch kind {
+        case let .samplesLeftOut(n, _): return "\(formatCount(n)) extra sample\(n == 1 ? "" : "s") dropped"
+        case let .channelsDropped(_, of): return of == 2 ? "left channel only" : "first channel only"
+        case .sizeClaimsDisagree: return "size tags disagree"
+        case .interpolationClaimsDisagree: return "interpolation tags disagree"
+        case .cutShort: return "file cut short"
+        case .sidecarOutOfRange: return ".txt size out of range, ignored"
+        case .sizeTagUnreadable: return "unreadable size tag ignored"
+        case let .sizeTagRejected(source, _, reason):
+            switch reason {
+            case .unusableSize: return "unusable size tag ignored"
+            case .fileShorterThanFrame: return source == .serumSidecar ? ".txt size larger than the file, ignored" : "size tag larger than the file, ignored"
+            }
+        case .peak, .highFrameCount, .unusualSurgeFrameSize, .tagInComment, .commentMentionsFrames: return nil
         }
-        if note.contains("only the left") { return "left channel only" }
-        if note.contains("only the first") { return "first channel only" }
-        if note.contains("is used.") {
-            return note.contains("samples per frame") ? "size tags disagree" : "interpolation tags disagree"
-        }
-        if note.contains("cut short") { return "file cut short" }
-        if note.contains("ignored") { return note.contains(".txt") ? ".txt size out of range, ignored" : "unreadable size tag ignored" }
-        return "see note"
-    }
-
-    /// The first run of digits (with thousands separators) in a sentence, e.g. "1,024".
-    static func firstNumber(in text: String) -> String? {
-        var out = ""
-        for ch in text {
-            if ch.isNumber || (ch == "," && !out.isEmpty) { out.append(ch) } else if !out.isEmpty { break }
-        }
-        while out.hasSuffix(",") { out.removeLast() }
-        return out.isEmpty ? nil : out
     }
 
     // MARK: Preview

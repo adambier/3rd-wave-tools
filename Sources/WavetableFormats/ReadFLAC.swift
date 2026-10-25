@@ -33,7 +33,7 @@ extension WavetableReader {
     static func readFLAC(_ b: [UInt8], fileName: String, sidecarText: String?) throws -> [FoundTable] {
         let decoded = try FLACDecoder.decode(b, fileName: fileName)
         var chunks: [String: [UInt8]] = [:]
-        var notes: [String] = []
+        var notes: [ReadNote] = []
         // Chunk ids a WAV wavetable can carry, which a FLAC writer may store as application blocks,
         // forwards or (as Phase Plant's library has them) byte-reversed.
         let riffIDs: Set<String> = ["clm ", "srge", "srgo", "uhWT", "cue ", "smpl"]
@@ -50,10 +50,12 @@ extension WavetableReader {
             if value.hasPrefix("<!>") {
                 if chunks["clm "] == nil {
                     chunks["clm "] = Array(value.utf8)
-                    notes.append("The Serum-style tag was found in the file's comments (\(key)), not in a block of its own.")
+                    notes.append(ReadNote(.tagInComment(key: key),
+                                          "The Serum-style tag was found in the file's comments (\(key)), not in a block of its own."))
                 }
             } else if ["FRAME", "CYCLE", "WAVETABLE"].contains(where: { key.uppercased().contains($0) }) {
-                notes.append("The file's comments say \"\(key)=\(value)\"; a frame size is not taken from a comment.")
+                notes.append(ReadNote(.commentMentionsFrames(key: key, value: value),
+                                      "The file's comments say \"\(key)=\(value)\"; a frame size is not taken from a comment."))
             }
         }
         let info = decoded.info

@@ -62,6 +62,8 @@ Add the library to a Swift package with the product `WavetableFormats` of
 - ``FoundTable``
 - ``SourceFormat``
 - ``FrameSizeEvidence``
+- ``FrameSizeSource``
+- ``ReadNote``
 
 ### Tables
 

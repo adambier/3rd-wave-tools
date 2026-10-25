@@ -39,14 +39,17 @@ extension WavetableReader {
                 samples[i] = v
             }
         }
-        var notes: [String] = []
+        var notes: [ReadNote] = []
         if size > 4096 || size & (size - 1) != 0 {
-            notes.append("\(grouped(size)) samples per frame: Surge itself takes only powers of two from 2 to 4,096, so this file may not have come from Surge.")
+            notes.append(ReadNote(.unusualSurgeFrameSize(size),
+                                  "\(grouped(size)) samples per frame: Surge itself takes only powers of two from 2 to 4,096, so this file may not have come from Surge."))
         }
-        if count > 512 { notes.append("\(grouped(count)) frames: Surge takes at most 512, and Serum, Vital, and Pigments 256, so converting for them drops frames (you choose how).") }
-        else if let n = frameCountNote(count) { notes.append(n) }
+        if count > 512 {
+            notes.append(ReadNote(.highFrameCount(count, limit: 512),
+                                  "\(grouped(count)) frames: Surge takes at most 512, and Serum, Vital, and Pigments 256, so converting for them drops frames (you choose how)."))
+        } else if let n = frameCountNote(count) { notes.append(n) }
         if let n = peakNote(samples.reduce(0) { max($0, abs($1)) }) { notes.append(n) }
         return [FoundTable(name: fileStem(fileName), fileName: fileName, source: .surgeWavetable, samples: samples,
-                           frameSize: size, frameSizeBasis: "Surge .wt header", notes: notes)]
+                           frameSize: size, frameSizeBasis: "Surge .wt header", readNotes: notes, frameSizeSource: .surgeHeader)]
     }
 }

@@ -62,6 +62,7 @@ extension WavetableReader {
                           frameSize: isP ? 128 : 1024,
                           frameSizeBasis: isP ? "3rd Wave P table (always 64 frames of 128)" : "3rd Wave U table (always 64 frames of 1,024)",
                           thirdWaveFingerprint: wt.fingerprint,
-                          notes: peakNote(wt.peak).map { [$0] } ?? [])
+                          readNotes: peakNote(wt.peak).map { [$0] } ?? [],
+                          frameSizeSource: .thirdWaveTable(isP: isP))
     }
 }

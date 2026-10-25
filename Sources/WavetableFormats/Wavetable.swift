@@ -71,6 +71,89 @@ public enum FrameSizeEvidence: String, Equatable, Sendable {
     case none
 }
 
+/// Where a claim about a table's frame size comes from: metadata inside the file, its name, a
+/// file beside it, its markers, its fixed layout, or its length alone. The same places (a `clm `
+/// chunk, a Tonverk tag, a Serum sidecar) can also ask for an interpolation.
+public enum FrameSizeSource: Equatable, Sendable {
+    /// A Serum-style `clm ` chunk in a WAV, or the same tag in a FLAC application block or
+    /// comment.
+    case clmChunk
+    /// A Surge `srge` chunk (or FLAC application block).
+    case srgeChunk
+    /// A u-he `uhWT` chunk (or FLAC application block).
+    case uhWTChunk
+    /// A Tonverk `_wt<N>` tag at the end of the file name, with the tag's text (e.g., "_wt1024r").
+    case tonverkFileName(tag: String)
+    /// A Serum `.txt` file beside the WAV or FLAC file.
+    case serumSidecar
+    /// Evenly spaced `cue ` points.
+    case cueMarkers
+    /// A single `smpl` loop over the first frame.
+    case loopMarkers
+    /// The header of a Surge `.wt` file.
+    case surgeHeader
+    /// The fixed layout of a 3rd Wave P table (64 × 128) or U table (64 × 1,024).
+    case thirdWaveTable(isP: Bool)
+    /// The file's length alone: 2,048 samples per frame assumed.
+    case fileLength
+}
+
+/// Something a reader found worth telling the user about a table: what it is (`kind`), which a
+/// tool can weigh and shorten, and the sentence that says it (`text`).
+public struct ReadNote: Equatable, Sendable {
+    /// What a note is about. Each case covers one of the things the readers report.
+    public enum Kind: Equatable, Sendable {
+        /// The largest absolute sample, above 1 (the 3rd Wave's own tables and 16-bit files
+        /// cannot hold more).
+        case peak(Float)
+        /// A file of `of` channels, of which only the first `used` are read.
+        case channelsDropped(used: Int, of: Int)
+        /// Two sources state different frame sizes; the one with precedence (`chosen`) is used.
+        case sizeClaimsDisagree(chosen: FrameSizeSource, chosenSize: Int, other: FrameSizeSource, otherSize: Int)
+        /// Two sources ask for different interpolations; the one with precedence is used.
+        case interpolationClaimsDisagree(chosen: FrameSizeSource, chosenValue: Interpolation,
+                                         other: FrameSizeSource, otherValue: Interpolation)
+        /// Samples after the last whole frame are left out; when at least half a frame is left
+        /// out, `shortOfAnotherFrame` says how many more samples would have made one.
+        case samplesLeftOut(Int, shortOfAnotherFrame: Int?)
+        /// The WAV's audio runs past the end of the file; what is there is read.
+        case cutShort
+        /// A source states a frame size that cannot be used, so it is ignored.
+        case sizeTagRejected(source: FrameSizeSource, size: Int, reason: SizeRejection)
+        /// A source's size cannot be read (a `clm ` tag without a number, an `srge` chunk too
+        /// short), so it is ignored.
+        case sizeTagUnreadable(source: FrameSizeSource)
+        /// A Serum sidecar's size is outside the 32–9,999 Serum accepts, so it is ignored.
+        case sidecarOutOfRange(Int)
+        /// More frames than `limit`, the most some destinations take.
+        case highFrameCount(Int, limit: Int)
+        /// A Surge `.wt` whose frame size Surge itself does not write (not a power of two up
+        /// to 4,096).
+        case unusualSurgeFrameSize(Int)
+        /// In a FLAC file, the Serum-style tag was found in a comment (`key`), not in an
+        /// application block.
+        case tagInComment(key: String)
+        /// In a FLAC file, a comment mentions frames, cycles, or wavetables; it is not used.
+        case commentMentionsFrames(key: String, value: String)
+    }
+
+    /// Why a stated frame size is ignored.
+    public enum SizeRejection: Equatable, Sendable {
+        /// Fewer than 2 samples per frame.
+        case unusableSize
+        /// The file holds fewer samples than one frame (`samples` of them).
+        case fileShorterThanFrame(samples: Int)
+    }
+
+    /// What the note is about.
+    public var kind: Kind
+    /// The note as a sentence for the user.
+    public var text: String
+
+    /// Creates a note.
+    public init(_ kind: Kind, _ text: String) { self.kind = kind; self.text = text }
+}
+
 /// A wavetable found in a file, before or after its frame size is settled.
 public struct FoundTable: Equatable, Sendable {
     /// The table's name.
@@ -88,6 +171,9 @@ public struct FoundTable: Equatable, Sendable {
     /// How the frame size was decided, as a short phrase for display (e.g., "clm chunk",
     /// "Tonverk file name (_wt1024)", "3rd Wave U table", "file length").
     public var frameSizeBasis: String
+    /// What settled `frameSize`, as a value (`frameSizeBasis` is the same in words); nil when
+    /// the file leaves the size open.
+    public var frameSizeSource: FrameSizeSource?
     /// Frame sizes the file's length allows: when `frameSize` is nil, the sizes to choose from;
     /// when it rests on the length only, the other sizes that fit.
     public var candidateFrameSizes: [Int]
@@ -99,19 +185,24 @@ public struct FoundTable: Equatable, Sendable {
     /// factory library uses (FNV-1a 64 of all the file's values as float32), so factory tables can
     /// be recognised. Nil for other sources.
     public var thirdWaveFingerprint: UInt64?
-    /// Things worth telling the user about this table (e.g., samples beyond ±1).
-    public var notes: [String]
+    /// Things worth telling the user about this table (e.g., samples beyond ±1), each with what
+    /// it is about and its sentence.
+    public var readNotes: [ReadNote]
+
+    /// The notes as sentences (`readNotes`' text).
+    public var notes: [String] { readNotes.map(\.text) }
 
     /// Creates a found table; see the properties for what each value means.
     public init(name: String, fileName: String, source: SourceFormat, samples: [Float], frameSize: Int?,
                 frameSizeBasis: String, candidateFrameSizes: [Int] = [], interpolation: Interpolation? = nil,
-                thirdWaveFingerprint: UInt64? = nil, notes: [String] = [],
-                frameSizeEvidence: FrameSizeEvidence? = nil) {
+                thirdWaveFingerprint: UInt64? = nil, readNotes: [ReadNote] = [],
+                frameSizeEvidence: FrameSizeEvidence? = nil, frameSizeSource: FrameSizeSource? = nil) {
         self.name = name; self.fileName = fileName; self.source = source; self.samples = samples
         self.frameSize = frameSize; self.frameSizeBasis = frameSizeBasis
         self.candidateFrameSizes = candidateFrameSizes; self.interpolation = interpolation
-        self.thirdWaveFingerprint = thirdWaveFingerprint; self.notes = notes
+        self.thirdWaveFingerprint = thirdWaveFingerprint; self.readNotes = readNotes
         self.frameSizeEvidence = frameSizeEvidence ?? (frameSize == nil ? .none : .statedInFile)
+        self.frameSizeSource = frameSizeSource
     }
 
     /// The largest absolute sample (computed each time; cache it when it is needed often).
