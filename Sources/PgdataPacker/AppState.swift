@@ -285,7 +285,7 @@ final class AppState: ObservableObject {
         else if addedUnified == 0 && addedPrograms + addedContent > 0 { section = .pack }
         if !problems.isEmpty {
             problems.forEach { note("Could not read \($0)") }
-            alertMessage = "Some files could not be read.\n\n" + problems.prefix(8).map { ReportText.item($0) }.joined(separator: "\n")
+            alertMessage = "Some files could not be read.\n\n" + problems.prefix(8).map { ReportText.item(splitting: $0) }.joined(separator: "\n")
                 + (problems.count > 8 ? "\n\n…and \(problems.count - 8) more (see the log)." : "")
         }
     }
@@ -476,7 +476,7 @@ final class AppState: ObservableObject {
             } catch { failed.append(ReportText.item(item.name, Self.describe(error))) }
         }
         guard let result = Panels.write(outputs, into: folder) else { note("Packing cancelled; nothing written."); return }
-        failed += result.failed.map { ReportText.item($0) }
+        failed += result.failed.map { ReportText.item(splitting: $0) }
         // The report's sections cover the files that were really written.
         var packedPlans: [PackPlan] = []
         var unfamiliar: [String] = [], replaced: [String] = [], converted: [String] = []
@@ -593,7 +593,7 @@ final class AppState: ObservableObject {
         }
         guard let result = Panels.write(outputs, into: folder) else { note("Unpacking cancelled; nothing written."); return }
         var msg = "Unpacked \(items.count) file\(items.count == 1 ? "" : "s") into \"\(folder.lastPathComponent)\": \(result.written) file\(result.written == 1 ? "" : "s") written."
-        if !result.failed.isEmpty { msg += "\n\nNot written:\n" + result.failed.map { ReportText.item($0) }.joined(separator: "\n") }
+        if !result.failed.isEmpty { msg += "\n\nNot written:\n" + result.failed.map { ReportText.item(splitting: $0) }.joined(separator: "\n") }
         note(msg + " (\(folder.path))")
         alertReveal = folder
         alertMessage = msg
@@ -642,7 +642,7 @@ final class AppState: ObservableObject {
         }
         if !c.problems.isEmpty {
             c.problems.forEach { note("Could not read \($0)") }
-            alertMessage = "Some files could not be read.\n\n" + c.problems.prefix(8).map { ReportText.item($0) }.joined(separator: "\n")
+            alertMessage = "Some files could not be read.\n\n" + c.problems.prefix(8).map { ReportText.item(splitting: $0) }.joined(separator: "\n")
                 + (c.problems.count > 8 ? "\n\n…and \(c.problems.count - 8) more (see the log)." : "")
         }
     }
@@ -685,20 +685,30 @@ final class AppState: ObservableObject {
         let conversion = plan.convert()
         let report = ConvertPlan.write(conversion.files, into: folder)
         let n = report.written.count
-        var msg = "Converted \(n) table\(n == 1 ? "" : "s") for \(plan.preset.title) into \"\(folder.lastPathComponent)\"."
+        var msg = plan.reportTitle(converted: n, folderName: folder.lastPathComponent)
         // Each section: a heading line ending in ":" and one item per line (see ReportText).
-        if !conversion.errors.isEmpty { msg += "\n\nNot converted:\n" + conversion.errors.map { ReportText.item($0) }.joined(separator: "\n") }
-        if !report.failed.isEmpty { msg += "\n\nNot written:\n" + report.failed.map { ReportText.item($0) }.joined(separator: "\n") }
+        if !conversion.errors.isEmpty { msg += "\n\nNot converted:\n" + conversion.errors.map { ReportText.item(splitting: $0) }.joined(separator: "\n") }
+        if !report.failed.isEmpty { msg += "\n\nNot written:\n" + report.failed.map { ReportText.item(splitting: $0) }.joined(separator: "\n") }
         if !report.renamed.isEmpty {
             msg += "\n\nAlready in the folder, so written under a new name (nothing was replaced):\n"
                 + report.renamed.map { ReportText.item($0) }.joined(separator: "\n")
         }
-        if !conversion.notes.isEmpty { msg += "\n\nWhat the conversion did:\n" + conversion.notes.map { ReportText.item($0) }.joined(separator: "\n") }
+        // Each distinct note once: "All 74 tables", "12 tables", or the one table it applies to.
+        // The log, below, has every table's own lines.
+        let grouped = ConvertPlan.groupedNotes(conversion.reports)
+        if !grouped.isEmpty {
+            msg += "\n\nWhat converting did:\n" + grouped.map { ReportText.item($0.label, $0.text) }.joined(separator: "\n")
+        }
         let packFiles = toPack ? ConvertPlan.filesForPack(report.written, preset: plan.preset) : []
         if !packFiles.isEmpty {
             msg += "\n\n" + (packFiles.count == 1 ? "The .wt file is" : "The \(packFiles.count) .wt files are") + " added to the Pack page."
         }
-        note(msg + " (\(folder.path))")
+        var logged = msg + " (\(folder.path))"
+        let shared = grouped.filter { $0.names.count > 1 }
+        if !shared.isEmpty || !conversion.notes.isEmpty {
+            logged += "\n\nBy table:\n" + conversion.notes.map { ReportText.item(splitting: $0) }.joined(separator: "\n")
+        }
+        note(logged)
         alertReveal = folder
         alertMessage = msg
         if !packFiles.isEmpty {
@@ -715,6 +725,12 @@ final class AppState: ObservableObject {
 enum ReportText {
     static func item(_ name: String, _ detail: String? = nil) -> String {
         "• " + name + (detail.map { "\t" + $0 } ?? "")
+    }
+    /// An item from a "name: explanation" line (a file name or table name, then what happened),
+    /// so the name is set apart in the alert. A line without ": " is the whole item.
+    static func item(splitting line: String) -> String {
+        guard let r = line.range(of: ": ") else { return item(line) }
+        return item(String(line[..<r.lowerBound]), String(line[r.upperBound...]))
     }
     static func plain(_ s: String) -> String { s.replacingOccurrences(of: "\t", with: " — ") }
     /// "Not used: …" → "not used: …" for an explanation that follows a dash; a label such as "U50 …"

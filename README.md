@@ -283,11 +283,16 @@ Then choose a destination:
 | Surge XT | a Surge `.wt` |
 | WaveEdit, E370 | a 16-bit WAV of 64 frames of 256 |
 
-Each destination says whether it has been tested there yet, and what it rests on. When a destination needs a different number of frames, **Advanced** lets you
-choose how to get there: **Pick evenly** (keeps the first and last frames and spaces the rest,
-adding no new waveforms) or **Interpolate** (crossfades between neighbouring frames). It also sets
-the interpolation to record, Tonverk's frame size, and the PPG waves for P tables. **Clean Up
-Names…** works as on the Pack page. **Convert…** writes the files into a folder you choose (3rd
+Each destination's row says why it is separate and, where its sources leave something open, what
+that is; its sources are in the row's tooltip, and a green seal marks a destination that has been
+tested in its synth (none yet). The pane below the table shows how the selected table will be
+converted: its frame size and where that came from, with a picture of the first wave at each
+size the file allows, the source and the result stacked frame by frame, and what converting
+changes. When a destination needs a different number of frames, **Options** lets you choose how
+to get there: **Keep original frames** (evenly spaced frames, the first and last among them,
+adding no new waves) or **Blend new frames** (crossfades neighbouring frames). It also sets the
+morph saved in the file where the format records one, Tonverk's frame size, and the PPG waves for
+P tables. **Clean Up Names…** works as on the Pack page. **Convert…** writes the files into a folder you choose (3rd
 Wave tables into a `WAVES` folder inside it) and reports everything it changed; it never replaces
 an existing file. For a 3rd Wave destination, **Send to Pack…** does the same and then adds the
 `.wt` files to the Pack page, to embed in programs.

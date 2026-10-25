@@ -285,13 +285,14 @@ enum AlertPresenter {
     }
 
     /// Lays out a report (see `ReportText`): paragraphs separated by blank lines, headings (lines
-    /// ending in ":") in semibold with the list under them as indented bullets, and an item's
-    /// explanation (after the tab) in italic grey after the name.
+    /// ending in ":") in semibold with the list under them as indented bullets. An item's name
+    /// (a file or table) is in semibold label colour and its explanation (after the tab) in the
+    /// secondary label colour after a dash, so the names stand out as the list is scanned; the
+    /// copy button copies the same text plain.
     private static func styled(_ text: String) -> NSAttributedString {
         let size = NSFont.systemFontSize
         let body = NSFont.systemFont(ofSize: size)
         let heading = NSFont.systemFont(ofSize: size, weight: .semibold)
-        let italic = NSFont(descriptor: body.fontDescriptor.withSymbolicTraits(.italic), size: size) ?? body
         let out = NSMutableAttributedString()
         for paragraph in text.components(separatedBy: "\n\n") {
             for line in paragraph.components(separatedBy: "\n") {
@@ -307,11 +308,13 @@ enum AlertPresenter {
                     para.tabStops = [NSTextTab(textAlignment: .left, location: 24)]
                     para.defaultTabInterval = 24
                     let parts = line.dropFirst(2).components(separatedBy: "\t")
-                    out.append(NSAttributedString(string: "•\t" + parts[0], attributes: [
+                    out.append(NSAttributedString(string: "•\t", attributes: [
                         .font: body, .foregroundColor: NSColor.labelColor, .paragraphStyle: para]))
+                    out.append(NSAttributedString(string: parts[0], attributes: [
+                        .font: heading, .foregroundColor: NSColor.labelColor, .paragraphStyle: para]))
                     if parts.count > 1 {
                         out.append(NSAttributedString(string: " — " + parts.dropFirst().joined(separator: " "), attributes: [
-                            .font: italic, .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: para]))
+                            .font: body, .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: para]))
                     }
                 } else {
                     out.append(NSAttributedString(string: line, attributes: [

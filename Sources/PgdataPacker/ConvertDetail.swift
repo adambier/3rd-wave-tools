@@ -83,9 +83,87 @@ struct ConvertItemDetail: View {
         VStack(alignment: .leading, spacing: 10) {
             ConvertDetailHeader(state: state, item: item)
             ConvertFrameSizeSection(state: state, item: item)
+            ConvertOverviewPair(state: state, item: item)
             ConvertBetweenFramesLine(item: item)
             ConvertWhatHappens(state: state, item: item)
         }
+    }
+}
+
+/// The table's frames stacked front to back, as the synths draw them: the source as read, and
+/// beside it what the destination gets (the preview read back from the bytes the writer made).
+struct ConvertOverviewPair: View {
+    @ObservedObject var state: AppState
+    let item: ConvertPlan.Item
+
+    var body: some View {
+        let plan = state.convertPlan
+        if let source = item.table.wavetable(frameSize: item.frameSize) {
+            let result = state.convertPreviews.resultFrames(item, in: plan)
+            HStack(alignment: .top, spacing: 16) {
+                ConvertOverview(frames: source.frames, tint: .secondary,
+                                caption: "Source · \(source.frameCount) × \(ConvertPlan.formatCount(source.frameSize))")
+                if let result, let first = result.first {
+                    ConvertOverview(frames: result, tint: .accentColor,
+                                    caption: "\(plan.preset.shortTitle) · \(result.count) × \(ConvertPlan.formatCount(first.count))")
+                }
+            }
+            .help("The table's frames, front (first) to back (last): the source as read, and what the destination gets, read back from the file Convert would write. At most 64 frames are drawn, each reduced to the width of the picture.")
+        }
+    }
+}
+
+/// One stacked-frames picture with its caption.
+struct ConvertOverview: View {
+    let frames: [[Float]]
+    let tint: Color
+    let caption: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            WavetableStackCanvas(frames: frames, tint: tint)
+                .frame(maxWidth: 360, minHeight: 100, maxHeight: 100)
+            Text(caption).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+        }
+    }
+}
+
+/// Up to 64 frames drawn as polylines stacked diagonally, the first in front, the farthest
+/// fading; each frame is reduced to about a value per two points of width.
+struct WavetableStackCanvas: View {
+    let frames: [[Float]]
+    let tint: Color
+
+    var body: some View {
+        Canvas { (context: inout GraphicsContext, size: CGSize) in
+            let columns = max(8, Int(size.width * 0.7 / 2))
+            let reduced = WavetableSketch.reduce(frames, maxFrames: 64, columns: columns)
+            let n = reduced.count
+            guard n > 0 else { return }
+            let depthX = size.width * 0.3
+            let depthY = size.height * 0.5
+            let waveWidth = size.width - depthX
+            let amplitude = (size.height - depthY) / 2 - 1
+            for k in stride(from: n - 1, through: 0, by: -1) {
+                let t: CGFloat = n > 1 ? CGFloat(k) / CGFloat(n - 1) : 0
+                let x0 = depthX * t
+                let base = size.height - amplitude - 1 - depthY * t
+                let path = WavetableStackCanvas.path(reduced[k], x0: x0, base: base, width: waveWidth, amplitude: amplitude)
+                context.stroke(path, with: .color(tint.opacity(1 - 0.7 * Double(t))), lineWidth: 1)
+            }
+        }
+    }
+
+    /// One frame as a polyline from `x0` across `width`, around the baseline `base`.
+    static func path(_ values: [Float], x0: CGFloat, base: CGFloat, width: CGFloat, amplitude: CGFloat) -> Path {
+        var path = Path()
+        guard values.count > 1 else { return path }
+        let step = width / CGFloat(values.count - 1)
+        for (i, v) in values.enumerated() {
+            let p = CGPoint(x: x0 + step * CGFloat(i), y: base - CGFloat(v) * amplitude)
+            if i == 0 { path.move(to: p) } else { path.addLine(to: p) }
+        }
+        return path
     }
 }
 
@@ -228,24 +306,16 @@ struct WaveThumbnail: View {
         .frame(width: width, height: height)
     }
 
-    /// The samples as points, one per horizontal pixel at most (the largest-magnitude sample of
+    /// The samples as points, one per horizontal point at most (the largest-magnitude sample of
     /// each column, so a peak is never skipped), scaled to the cycle's own peak.
     static func points(_ samples: [Float], width: CGFloat, height: CGFloat) -> [CGPoint] {
         guard !samples.isEmpty, width > 1, height > 1 else { return [] }
-        let peak = max(samples.reduce(0) { max($0, abs($1)) }, 1e-6)
         let columns = max(2, min(samples.count, Int(width)))
-        var out: [CGPoint] = []
-        out.reserveCapacity(columns)
-        for c in 0..<columns {
-            let lo = samples.count * c / columns
-            let hi = max(lo + 1, samples.count * (c + 1) / columns)
-            var v: Float = 0
-            for s in samples[lo..<min(hi, samples.count)] where abs(s) > abs(v) { v = s }
-            let x = width * CGFloat(c) / CGFloat(columns - 1)
-            let y = height / 2 - CGFloat(v / peak) * (height / 2 - 1)
-            out.append(CGPoint(x: x, y: y))
+        guard let values = WavetableSketch.reduce([samples], maxFrames: 1, columns: columns).first, values.count > 1 else { return [] }
+        return values.enumerated().map { (pair: (offset: Int, element: Float)) -> CGPoint in
+            CGPoint(x: width * CGFloat(pair.offset) / CGFloat(values.count - 1),
+                    y: height / 2 - CGFloat(pair.element) * (height / 2 - 1))
         }
-        return out
     }
 }
 

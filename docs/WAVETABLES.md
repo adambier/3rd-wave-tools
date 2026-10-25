@@ -4,10 +4,11 @@ What pgdata Packer's Convert page and the `WavetableFormats` library rely on whe
 wavetables made for other synths and write tables for them. The 3rd Wave's own formats (`.wt` P
 and U tables, and the tables a `.pgdata` embeds) are in [FORMATS.md](FORMATS.md), section 5.1.
 
-Each statement names its source: the maker's manual or documentation, or the maker's own source
-code. Where a statement is an inference, it says so. Nothing here has been tested with this
-project's files unless it says so, and each destination in the app is labelled the same way:
-"tested in …" once it has been, "not yet tested in its destination" until then.
+Each statement names its source: the company's manual, or its own source code. Where a
+statement is an inference, it says so. Nothing here has been tested with this project's files
+unless it says so. The app labels each destination the same way: its sources are in the tooltip
+of its row, a green seal marks one that has been tested, and where the sources leave something
+open (the questions at the end), the row says so in the open.
 Corrections and test results are welcome; see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 This project is not affiliated with Groove Synthesis or with any maker named here; their product

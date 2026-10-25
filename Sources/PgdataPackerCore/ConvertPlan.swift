@@ -280,16 +280,51 @@ public struct ConvertPlan: Equatable {
         public var repeated: Int
     }
 
+    /// What converting one table did: its name and the writer's notes for it.
+    public struct ItemReport: Equatable {
+        /// The table's name (the name it was converted under).
+        public var name: String
+        /// The writer's notes, in order; empty when nothing but the format changed.
+        public var notes: [String]
+        /// Creates a report.
+        public init(name: String, notes: [String]) { self.name = name; self.notes = notes }
+    }
+
+    /// A writer's note with the tables it applies to, for a report that says each thing once.
+    public struct GroupedNote: Equatable {
+        /// The note.
+        public var text: String
+        /// The tables it applies to, in list order.
+        public var names: [String]
+        /// How many tables were converted in all.
+        public var total: Int
+        /// Creates a grouped note.
+        public init(text: String, names: [String], total: Int) { self.text = text; self.names = names; self.total = total }
+        /// Whether every converted table has the note.
+        public var isUniversal: Bool { names.count == total && total > 0 }
+        /// "All 74 tables", "12 tables", or the one table's name.
+        public var label: String {
+            if names.count == 1 { return names[0] }
+            if isUniversal { return "All \(total) tables" }
+            return "\(names.count) tables"
+        }
+    }
+
     /// What a conversion produced, before anything is written.
     public struct Conversion: Equatable {
         /// The converted files, with unique names (see `uniqueNames`).
         public var files: [OutputFile]
         /// The item each file came from, in the same order.
         public var itemIDs: [UUID]
-        /// What the conversions did, as "Name: note".
-        public var notes: [String]
+        /// What converting each table did, one report per file, in the same order.
+        public var reports: [ItemReport]
         /// Tables that could not be converted, as "Name: reason".
         public var errors: [String]
+
+        /// Every note as "Name: note", in order (for the log).
+        public var notes: [String] {
+            reports.flatMap { (r: ItemReport) -> [String] in r.notes.map { r.name + ": " + $0 } }
+        }
     }
 
     /// What writing converted files into a folder did.
@@ -534,12 +569,19 @@ public struct ConvertPlan: Equatable {
     public static var testingFootnote: String {
         let tested = OutputPreset.allCases.filter { !$0.testedIn.isEmpty }
         if tested.isEmpty {
-            return "Not yet tested in these synths; each follows its maker's documentation (hover for sources)."
+            return "Not yet tested in these synths. Hover a row for its sources."
         }
         if tested.count == OutputPreset.allCases.count {
-            return "Every destination has been tested in its synth (hover for details)."
+            return "Every destination has been tested in its synth. Hover a row for details."
         }
-        return "Tested: " + listPhrase(tested.map(\.shortTitle)) + ". The rest follow their makers' documentation (hover for sources)."
+        return "Tested: " + listPhrase(tested.map(\.shortTitle)) + ". Hover a row for its sources."
+    }
+
+    /// The report's first line: "Converted 74 tables for Phase Plant into “output”." (the
+    /// destination's own notes say the sizes, so the title does not).
+    public func reportTitle(converted n: Int, folderName: String) -> String {
+        let to = preset.isThirdWave ? "to \(preset.title)s" : "for \(preset.title)"
+        return "Converted \(n) table\(n == 1 ? "" : "s") \(to) into \u{201C}\(folderName)\u{201D}."
     }
 
     // MARK: Destination
@@ -643,7 +685,7 @@ public struct ConvertPlan: Equatable {
     /// and left out.
     public func convert(write: (Wavetable, OutputPreset, OutputOptions) throws -> OutputFile = WavetableWriter.write)
         -> Conversion {
-        var files: [OutputFile] = [], ids: [UUID] = [], notes: [String] = [], errors: [String] = []
+        var files: [OutputFile] = [], ids: [UUID] = [], reports: [ItemReport] = [], errors: [String] = []
         for item in selectedItems {
             guard var table = item.table.wavetable(frameSize: item.frameSize) else {
                 errors.append("\(item.name): " + (item.frameSize == nil
@@ -655,12 +697,40 @@ public struct ConvertPlan: Equatable {
             do {
                 let f = try write(table, preset, options)
                 files.append(f); ids.append(item.id)
-                notes += f.notes.map { "\(item.name): \($0)" }
+                reports.append(ItemReport(name: item.name, notes: f.notes))
             } catch {
                 errors.append("\(item.name): \(Self.describe(error))")
             }
         }
-        return Conversion(files: Self.uniqueNames(files), itemIDs: ids, notes: notes, errors: errors)
+        return Conversion(files: Self.uniqueNames(files), itemIDs: ids, reports: reports, errors: errors)
+    }
+
+    /// The notes of a conversion, each distinct note once with the tables it applies to: the
+    /// notes every table has first, then those several share (most tables first), then each
+    /// table's own, in table order. Within a group, notes keep the order the writer gave them.
+    public static func groupedNotes(_ reports: [ItemReport]) -> [GroupedNote] {
+        var order: [String] = []
+        var names: [String: [String]] = [:]
+        for r in reports {
+            for n in r.notes {
+                if names[n] == nil { order.append(n); names[n] = [] }
+                names[n]?.append(r.name)
+            }
+        }
+        let all = order.map { GroupedNote(text: $0, names: names[$0] ?? [], total: reports.count) }
+        let universal = all.filter(\.isUniversal)
+        let shared = all.filter { !$0.isUniversal && $0.names.count > 1 }
+            .sorted { (a: GroupedNote, b: GroupedNote) -> Bool in
+                a.names.count != b.names.count ? a.names.count > b.names.count : (order.firstIndex(of: a.text) ?? 0) < (order.firstIndex(of: b.text) ?? 0)
+            }
+        // One table's notes stay together, in table order.
+        let single = reports.flatMap { (r: ItemReport) -> [GroupedNote] in
+            r.notes.compactMap { (n: String) -> GroupedNote? in
+                guard reports.count > 1, let who = names[n], who.count == 1 else { return nil }
+                return GroupedNote(text: n, names: who, total: reports.count)
+            }
+        }
+        return universal + shared + single
     }
 
     /// The files with unique names within their folders, ignoring case as macOS and FAT volumes
@@ -775,7 +845,7 @@ public struct ConvertPlan: Equatable {
         switch t.source {
         case .thirdWaveWavetable(let isP): return "3rd Wave \(isP ? "P" : "U") .wt"
         case .unifiedProgram(let slot, _): return "\(slot) in \(t.fileName)"
-        case .wav: return t.frameSize == 2048 ? "Serum WAV" : "WAV"
+        case .wav: return "WAV"   // one label: how the frame size was decided has its own column
         case .surgeWavetable: return "Surge .wt"
         }
     }
@@ -800,7 +870,13 @@ public final class ConvertPreviewCache {
         var preset: OutputPreset
         var options: OutputOptions
     }
-    private var entries: [UUID: (key: Key, file: OutputFile?)] = [:]
+    private struct Entry {
+        var key: Key
+        var file: OutputFile?
+        /// The written file read back and cut into frames; nil until asked for, then kept.
+        var frames: [[Float]]??
+    }
+    private var entries: [UUID: Entry] = [:]
     private let write: (Wavetable, OutputPreset, OutputOptions) throws -> OutputFile
     /// How many times the writer has run (for tests).
     public private(set) var writerRuns = 0
@@ -810,15 +886,34 @@ public final class ConvertPreviewCache {
         self.write = write
     }
 
-    /// `plan.preview(item)`, from the cache when nothing that affects it has changed.
-    public func preview(_ item: ConvertPlan.Item, in plan: ConvertPlan) -> OutputFile? {
+    private func entry(_ item: ConvertPlan.Item, in plan: ConvertPlan) -> Entry {
         let key = Key(itemID: item.id, name: item.name, frameSize: item.frameSize, sampleCount: item.table.samples.count,
                       preset: plan.preset, options: plan.options)
-        if let hit = entries[item.id], hit.key == key { return hit.file }
+        if let hit = entries[item.id], hit.key == key { return hit }
         writerRuns += 1
-        let file = plan.preview(item, write: write)
-        entries[item.id] = (key, file)
-        return file
+        let e = Entry(key: key, file: plan.preview(item, write: write), frames: nil)
+        entries[item.id] = e
+        return e
+    }
+
+    /// `plan.preview(item)`, from the cache when nothing that affects it has changed.
+    public func preview(_ item: ConvertPlan.Item, in plan: ConvertPlan) -> OutputFile? {
+        entry(item, in: plan).file
+    }
+
+    /// The converted table as the destination gets it: the preview's bytes read back with
+    /// `WavetableReader` and cut into frames of the size the destination writes. Nil when there
+    /// is no preview or the reader finds no table in it. Kept with the preview.
+    public func resultFrames(_ item: ConvertPlan.Item, in plan: ConvertPlan) -> [[Float]]? {
+        let e = entry(item, in: plan)
+        if let known = e.frames { return known }
+        var frames: [[Float]]?
+        if let file = e.file, let found = try? WavetableReader.read(file.data, fileName: file.fileName).first {
+            let size = found.frameSize ?? plan.expected(for: item)?.frameSizeOut
+            frames = found.wavetable(frameSize: size)?.frames
+        }
+        entries[item.id]?.frames = .some(frames)
+        return frames
     }
 
     /// Forgets everything (e.g., when items are removed).

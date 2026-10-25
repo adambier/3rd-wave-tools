@@ -85,6 +85,17 @@ struct ConvertPresetRow: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 2)
                     }
+                    if let caveat = preset.caveat {
+                        // What the sources leave open, in the open rather than on hover.
+                        Label {
+                            Text(caveat).fixedSize(horizontal: false, vertical: true)
+                        } icon: {
+                            Image(systemName: "exclamationmark.triangle")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .padding(.top, 2)
+                    }
                 }
                 Spacer(minLength: 0)
                 ConvertEvidenceIcon(preset: preset)
@@ -97,8 +108,8 @@ struct ConvertPresetRow: View {
     }
 }
 
-/// A book when the preset rests on documentation alone, a green seal when it has been tested;
-/// the sources and the tested status on hover.
+/// A book when the preset rests on its sources alone, a green seal when it has been tested; the
+/// sources (publisher and document) and the tested status on hover.
 struct ConvertEvidenceIcon: View {
     let preset: OutputPreset
     var body: some View {
@@ -106,11 +117,11 @@ struct ConvertEvidenceIcon: View {
         if tested.isEmpty {
             Image(systemName: "book.closed")
                 .foregroundStyle(.secondary)
-                .help("Not yet tested in its synth. Follows: " + preset.basis)
+                .help("Not yet tested in its synth.\nSources: " + preset.basis + ".")
         } else {
             Image(systemName: "checkmark.seal.fill")
                 .foregroundStyle(.green)
-                .help("Tested in " + ConvertPlan.listPhrase(tested) + ". Follows: " + preset.basis)
+                .help("Tested in " + ConvertPlan.listPhrase(tested) + ".\nSources: " + preset.basis + ".")
         }
     }
 }

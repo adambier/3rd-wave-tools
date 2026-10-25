@@ -277,45 +277,61 @@ public enum WavetableWriter {
 }
 
 public extension OutputPreset {
-    /// The name shown to the user (e.g., "Serum, Vital, Pigments (2,048 WAV)").
+    /// The name used in reports (e.g., "Serum, Vital, Pigments"); the destination list shows
+    /// `shortTitle` with `specLine` under it.
     var title: String {
         switch self {
-        case .thirdWaveU: return "3rd Wave U table (.wt)"
-        case .thirdWaveP: return "3rd Wave P table (.wt)"
-        case .wav2048: return "Serum, Vital, Pigments (2,048 WAV)"
-        case .miniFreak: return "MiniFreak V (64 × 2,048 WAV)"
+        case .thirdWaveU: return "3rd Wave U table"
+        case .thirdWaveP: return "3rd Wave P table"
+        case .wav2048: return "Serum, Vital, Pigments"
+        case .miniFreak: return "MiniFreak V"
         case .tonverk: return "Elektron Tonverk"
-        case .phasePlant: return "Phase Plant (256 × 2,048)"
-        case .surge: return "Surge XT (.wt)"
-        case .waveEdit: return "WaveEdit, E370 (64 × 256, 16-bit)"
+        case .phasePlant: return "Phase Plant"
+        case .surge: return "Surge XT"
+        case .waveEdit: return "WaveEdit, E370"
         }
     }
 
-    /// Where the preset's behaviour comes from: the apps or hardware it has been tested in (empty
-    /// when it rests only on the maker's documentation). Nothing has been tested with this app
-    /// yet, so every preset's list is empty.
+    /// The apps or hardware the preset has been tested in (empty while it rests on its sources
+    /// alone). Nothing has been tested with this app yet, so every preset's list is empty.
     var testedIn: [String] { [] }
 
-    /// The documentation the preset rests on, for display (e.g., "Tonverk User Manual OS 1.4.1,
-    /// §5.2.5").
+    /// The sources the preset follows, each with its publisher, for the tooltip (e.g., "Elektron,
+    /// Tonverk User Manual OS 1.4.1, §5.2.5"). docs/WAVETABLES.md gives the links.
     var basis: String {
         switch self {
         case .thirdWaveU:
-            return "Groove Synthesis's user manual (v1.9, Wave Maker) and MIDI CC + SysEx Spec (v2a); the factory .wt files and tests on a 3rd Wave (FORMATS.md section 5.1)"
+            return "Groove Synthesis, 3rd Wave User Manual v1.9 (Wave Maker) and MIDI CC + SysEx Spec v2a; the factory .wt files; tests on a 3rd Wave (FORMATS.md 5.1)"
         case .thirdWaveP:
-            return "Groove Synthesis's user manual (v1.9); the factory .wt files (FORMATS.md section 5.1)"
+            return "Groove Synthesis, 3rd Wave User Manual v1.9; the factory .wt files (FORMATS.md 5.1)"
         case .wav2048:
-            return "Serum 2 User Guide, p. 38; Vital's source code; Pigments User Manual 7.0, §8.12"
+            return "Xfer Records, Serum 2 User Guide, p. 38; Vital Audio, Vital's public source code; Arturia, Pigments User Manual 7.0, §8.12"
         case .miniFreak:
-            return "MiniFreak V User Manual 5.1.0, pp. 30–31"
+            return "Arturia, MiniFreak V User Manual 5.1.0, pp. 30–31"
         case .tonverk:
-            return "Tonverk User Manual OS 1.4.1, §5.2.5, pp. 19–20"
+            return "Elektron, Tonverk User Manual OS 1.4.1, §5.2.5, pp. 19–20"
         case .phasePlant:
-            return "Kilohearts' Phase Plant manual (Wavetable Oscillator) and its Wavetables page"
+            return "Kilohearts, Phase Plant manual (Wavetable Oscillator) and its Wavetables page"
         case .surge:
-            return "Surge XT's source code (WT fileformat.txt, Wavetable.h)"
+            return "Surge Synth Team, Surge XT source code (WT fileformat.txt, Wavetable.h)"
         case .waveEdit:
-            return "WaveEdit's source code (WaveEdit.hpp, bank.cpp); E370 Quick Start V1.4"
+            return "Synthesis Technology, E370 Quick Start 1.4; WaveEdit's source code (WaveEdit.hpp, bank.cpp)"
+        }
+    }
+
+    /// Where the preset's sources are incomplete or unconfirmed, what that leaves open (shown
+    /// with the destination); nil when the sources settle its behaviour. From the open questions
+    /// in docs/WAVETABLES.md.
+    var caveat: String? {
+        switch self {
+        case .wav2048:
+            return "Vital's behaviour is from its public source code, which the current release may differ from. Pigments reads no metadata, so the morph saved in the file doesn't apply to it."
+        case .miniFreak:
+            return "How MiniFreak V reduces tables to 512 samples and 64 cycles is undocumented; Convert reduces the frame count itself. How it treats fewer than 64 frames is unknown."
+        case .phasePlant:
+            return "Kilohearts documents exactly 256 frames; whether a shorter table loads is untested, so Convert always writes 256."
+        case .thirdWaveU, .thirdWaveP, .tonverk, .surge, .waveEdit:
+            return nil
         }
     }
 
