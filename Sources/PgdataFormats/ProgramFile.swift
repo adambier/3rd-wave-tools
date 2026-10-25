@@ -11,9 +11,9 @@ import Foundation
 /// Part k's block starts at line index 3 + S·k; its three oscillator source ids sit at
 /// offsets 3, 4, 5 within the block. The original text of every line is kept so an
 /// unmodified file is rewritten byte for byte. See section 3 of FORMATS.md.
-public struct ProgramFile: Equatable {
+public struct ProgramFile: Equatable, Sendable {
     /// One program value: an integer or a float, with the text of its line.
-    public enum Value: Equatable {
+    public enum Value: Equatable, Sendable {
         /// An integer value and the text it was read from or will be written as.
         case int(Int32, text: String)
         /// A float value and the text it was read from or will be written as.

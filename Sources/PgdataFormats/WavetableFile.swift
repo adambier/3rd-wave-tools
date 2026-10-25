@@ -10,9 +10,9 @@ import Foundation
 /// the wave). U tables: 131,072 values = 64 waves × 1024 samples, followed by band-limited copies
 /// of the same waves at 512, 256, 128, 64, and 64 samples (see docs/FORMATS.md 5.1). The same
 /// values, as little-endian float32, are what a .pgdata embeds.
-public struct WavetableFile: Equatable {
+public struct WavetableFile: Equatable, Sendable {
     /// The kind of wavetable, P or U; the raw value is the file's first line.
-    public enum Kind: String {
+    public enum Kind: String, Sendable {
         /// A P table: PPG-style, 16,384 values, header line `PNAME`. See section 5.1 of FORMATS.md.
         case p = "PNAME"
         /// A U table: 131,072 values (the table and its mipmap chain), header line `UNAME`. See

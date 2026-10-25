@@ -6,14 +6,14 @@ import Foundation
 /// a .pgdata. Older versions lack some fields; on upgrade they get the values the 3rd Wave itself
 /// assigns, as Groove Synthesis's version 1 and version 5 copies of the same multisample show:
 /// 48 kHz, 16-bit, pitch 0, second rate = rate, volume 1.0. See section 5.2 of FORMATS.md.
-public struct Multisample: Equatable {
+public struct Multisample: Equatable, Sendable {
     /// One sample of a multisample: its audio, the key range it plays, and its loop and level
     /// settings.
     ///
     /// The field meanings and ranges are those of Groove Synthesis's *3rd Wave MIDI CC + SysEx
     /// Spec* (v2a), whose "set multisample" message carries the same fields, apart from the name
     /// and ``secondRate``.
-    public struct Sample: Equatable {
+    public struct Sample: Equatable, Sendable {
         /// The sample's name.
         public var name: NameField
         /// The length of the audio, in frames.

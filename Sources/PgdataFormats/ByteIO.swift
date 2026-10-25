@@ -4,7 +4,7 @@ import Foundation
 /// is malformed.
 ///
 /// Each case's ``description`` is a complete sentence suitable for showing to a user.
-public enum FormatError: Error, CustomStringConvertible, Equatable {
+public enum FormatError: Error, CustomStringConvertible, Equatable, Sendable {
     /// The data does not begin with the tag of the expected file type.
     ///
     /// `expected` names the file type (for example, "3rd Wave program (.pro)"), and `found` is the
@@ -90,7 +90,7 @@ struct ByteWriter {
 /// ``fitted(_:)`` is the one rule for making any name fit such a field, and ``init(_:width:)``
 /// applies it; tools that write a name for the 3rd Wave another way (the name line of a `.wt`)
 /// should apply it too, so that the same name comes out the same everywhere.
-public struct NameField: Equatable, Hashable {
+public struct NameField: Equatable, Hashable, Sendable {
     /// The field's bytes exactly as stored, terminator and padding included.
     public private(set) var raw: [UInt8]
 
