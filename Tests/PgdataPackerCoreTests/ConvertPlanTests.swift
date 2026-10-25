@@ -776,7 +776,8 @@ final class ConvertOptionsTextTests: XCTestCase {
     }
 
     func testThirdWaveCapacityNote() throws {
-        var tables = (0..<9).map { table("T\($0)", frames: 64, size: 1024, peak: 0.1 + Float($0) * 0.05) }
+        // Small tables: the note counts them, whatever their size.
+        var tables = (0..<9).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
         var p = plan(tables, preset: .thirdWaveU)
         XCTAssertEqual(p.thirdWaveCapacityNote, "9 U tables to convert; a 3rd Wave holds 8 of your own at a time (with none free, it offers to overwrite its last ones).")
         p.setSelected(p.items[0].id, false)
@@ -785,15 +786,15 @@ final class ConvertOptionsTextTests: XCTestCase {
         XCTAssertNil(p.thirdWaveCapacityNote, "only for the 3rd Wave")
         p.preset = .thirdWaveP
         XCTAssertNil(p.thirdWaveCapacityNote, "12 P slots")
-        tables += (9..<13).map { table("T\($0)", frames: 64, size: 1024, peak: 0.1 + Float($0) * 0.05) }
+        tables += (9..<13).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
         p = plan(tables, preset: .thirdWaveP)
         XCTAssertEqual(p.thirdWaveCapacityNote?.hasPrefix("13 P tables to convert; a 3rd Wave holds 12"), true)
 
         // A factory table does not count: the 3rd Wave already has it.
         let lib = FactoryLibrary.builtIn
         let fp = try XCTUnwrap(lib.tables[.u(7)]?.fingerprint)
-        var withFactory = (0..<8).map { table("T\($0)", frames: 64, size: 1024, peak: 0.1 + Float($0) * 0.05) }
-        withFactory.append(table("Factory", frames: 64, size: 1024, peak: 0.9, fingerprint: fp, source: .thirdWaveWavetable(isP: false)))
+        var withFactory = (0..<8).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
+        withFactory.append(table("Factory", frames: 4, size: 128, peak: 0.9, fingerprint: fp, source: .thirdWaveWavetable(isP: false)))
         p = ConvertPlan(preset: .thirdWaveU)
         p.add(withFactory.map { ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/" + $0.fileName), table: $0) }, factory: lib)
         XCTAssertEqual(p.items[8].factorySlot, .u(7))

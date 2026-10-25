@@ -50,8 +50,9 @@ final class ReviewFixTests: XCTestCase {
         let nfd = "Cafe\u{301} Pad"   // "Café Pad" as macOS file names store it
         let wave = (0..<1024).map { Float(sin(2 * Double.pi * Double($0) / 1024)) * 0.5 }
         let out = try WavetableWriter.write(Wavetable(name: nfd, frames: Array(repeating: wave, count: 64)), preset: .thirdWaveU)
-        let wt = try WavetableFile(data: out.data)
-        XCTAssertEqual(wt.name, "Café Pad")
+        // The .wt's name line (its second line, Latin-1), read without parsing the values below it.
+        let nameLine = out.data.split(separator: UInt8(ascii: "\n"), maxSplits: 2, omittingEmptySubsequences: false)[1]
+        XCTAssertEqual(String(nameLine.map { Character(Unicode.Scalar($0)) }), "Café Pad")
         XCTAssertFalse(out.notes.contains { $0.contains("Latin-1") }, "\(out.notes)")
         XCTAssertEqual(NameField(nfd).text, "Café Pad")
     }

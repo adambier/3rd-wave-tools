@@ -11,10 +11,36 @@ final class WorkbenchTests: XCTestCase {
     }
     override func tearDownWithError() throws { try? FileManager.default.removeItem(at: dir) }
 
+    /// Writes a .wt whose values are a ramp scaled by `seed` (so tables with different seeds have
+    /// different content and fingerprints), and returns its URL.
     func writeWT(_ name: String, kind: WavetableFile.Kind, seed: Float, file: String) throws -> URL {
-        let w = WavetableFile(kind: kind, name: name, values: (0..<kind.valueCount).map { Float($0 % 97) * seed / 97 })
-        let u = dir.appendingPathComponent(file); try w.serialized().write(to: u); return u
+        let u = dir.appendingPathComponent(file); try Self.wtData(name: name, kind: kind, seed: seed).write(to: u); return u
     }
+
+    /// The bytes `WavetableFile(kind:name:values:).serialized()` gives for a `writeWT` table: the
+    /// header, then the value lines, which are kept per kind and seed because serializing a
+    /// U table's 131,072 values is the slow part of these tests and the same tables recur.
+    private static var valueLines: [String: Data] = [:]
+    static func wtData(name: String, kind: WavetableFile.Kind, seed: Float) -> Data {
+        let key = "\(kind.rawValue) \(seed)"
+        let lines: Data
+        if let cached = valueLines[key] {
+            lines = cached
+        } else {
+            let header = Data((kind.rawValue + "\n\n").utf8)
+            lines = WavetableFile(kind: kind, name: "", values: rampValues(kind: kind, seed: seed)).serialized().dropFirst(header.count)
+            valueLines[key] = lines
+        }
+        return Data((kind.rawValue + "\n" + name + "\n").utf8) + lines
+    }
+
+    /// The values of a `writeWT` table.
+    static func rampValues(kind: WavetableFile.Kind, seed: Float) -> [Float] {
+        (0..<kind.valueCount).map { Float($0 % 97) * seed / 97 }
+    }
+
+    /// A U table named "NOSTALGIA" whose content does not matter, serialized once.
+    static let nostalgia: Data = WavetableFile(kind: .u, name: "NOSTALGIA", values: Array(repeating: 0.25, count: 131_072)).serialized()
 
     func testFactoryOnlyProgramNeedsNoUnifiedFile() {
         let pro = makeProgram(sources: [34, 2000, 1000, 41, 42, 42, 2, 35, 42, 41, 42, 42])
@@ -240,7 +266,7 @@ final class WorkbenchTests: XCTestCase {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let u = dir.appendingPathComponent("01.wt")
-        try WavetableFile(kind: .u, name: "NOSTALGIA", values: Array(repeating: 0.25, count: 131_072)).serialized().write(to: u)
+        try Self.nostalgia.write(to: u)
         var cf = try ContentFile.load(u); cf.slot = .u(56)
 
         let before = PackPlan.make(program: pro, files: [cf], factory: FactoryLibrary())
@@ -275,8 +301,8 @@ final class WorkbenchTests: XCTestCase {
     func testUnpackPlanNamesAndFactoryDuplicates() throws {
         let pro = makeProgram(sources: [4010, 2018, 42] + Array(repeating: 42, count: 9))
         let f = dir.appendingPathComponent("factory"); try FileManager.default.createDirectory(at: f, withIntermediateDirectories: true)
-        let wt = WavetableFile(kind: .u, name: "Science_Channel", values: (0..<131_072).map { Float($0 % 50) / 50 })
-        try wt.serialized().write(to: f.appendingPathComponent("25-Science_Channel.wt"))
+        let wt = WavetableFile(kind: .u, name: "Science_Channel", values: Self.rampValues(kind: .u, seed: 0.5))
+        try Self.wtData(name: "Science_Channel", kind: .u, seed: 0.5).write(to: f.appendingPathComponent("25-Science_Channel.wt"))
         let g = try Packer.pack(pro, content: [.s(10): .multisample(makeMultisample()), .u(25): .wavetable(wt)])
         let plan = UnpackPlan.make(g, factory: FactoryLibrary(folders: [f]), skipFactoryDuplicates: true)
         XCTAssertEqual(plan.items.map(\.fileName), ["Test Prog.pro", "U25_Science_Channel.wt", "S010_Test.bin"])
@@ -335,7 +361,7 @@ final class NameCleanerTests: XCTestCase {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let u = dir.appendingPathComponent("01.wt")
-        try WavetableFile(kind: .u, name: "NOSTALGIA", values: Array(repeating: 0.5, count: 131_072)).serialized().write(to: u)
+        try WorkbenchTests.nostalgia.write(to: u)
         var cf = try ContentFile.load(u); cf.slot = .u(56)
         var renamed = pro; renamed.name = "Nostalgia Res"
         let plan = PackPlan.make(program: renamed, files: [cf], factory: FactoryLibrary())

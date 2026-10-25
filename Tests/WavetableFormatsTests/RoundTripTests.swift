@@ -23,8 +23,9 @@ final class RoundTripTests: XCTestCase {
     }
 
     func testEveryPresetReadsBackWithTheSizeItWrote() throws {
+        let t = table()
         for preset in OutputPreset.allCases {
-            let out = try WavetableWriter.write(table(), preset: preset)
+            let out = try WavetableWriter.write(t, preset: preset)
             let found = try readBack(out)
             let expectedSize = preset.frameSize ?? 2048
             if preset == .waveEdit {
@@ -42,10 +43,11 @@ final class RoundTripTests: XCTestCase {
     }
 
     func testInterpolationSurvivesTheWAVPresets() throws {
+        let t = table(frames: 4)   // the flag is what is checked; four frames carry it as well as 64
         for interp in Interpolation.allCases {
             let opts = OutputOptions(interpolation: interp)
-            XCTAssertEqual(try readBack(WavetableWriter.write(table(), preset: .wav2048, options: opts)).interpolation, interp)
-            let tonverk = try readBack(WavetableWriter.write(table(), preset: .tonverk, options: opts))
+            XCTAssertEqual(try readBack(WavetableWriter.write(t, preset: .wav2048, options: opts)).interpolation, interp)
+            let tonverk = try readBack(WavetableWriter.write(t, preset: .tonverk, options: opts))
             XCTAssertEqual(tonverk.interpolation, interp == Interpolation.none ? Interpolation.none : nil)
         }
     }

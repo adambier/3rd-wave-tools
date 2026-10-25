@@ -170,18 +170,25 @@ private func corpusWAV(_ channels: [[Float]], format: CorpusFormat, rate: Int, c
     let nch = channels.count, frames = channels[0].count
     var fmt = u16(tag) + u16(nch) + u32(rate) + u32(rate * nch * bytes) + u16(nch * bytes) + u16(bytes * 8)
     if tag == 3 { fmt += u16(0) }
-    var audio: [UInt8] = []
-    audio.reserveCapacity(frames * nch * bytes)
+    // One sample at a time into a pre-sized byte array (an array per sample made the long
+    // files slow to build).
+    var audio = [UInt8](repeating: 0, count: frames * nch * bytes)
+    var o = 0
     for i in 0..<frames {
         for c in 0..<nch {
             let v = channels[c][i]
             switch format {
-            case .pcm16: audio += u16(Int(Int16(max(-32_768, min(32_767, (v * 32_768).rounded())))) & 0xffff)
-            case .float32: audio += u32(Int(v.bitPattern))
+            case .pcm16:
+                let x = Int16(max(-32_768, min(32_767, (v * 32_768).rounded())))
+                audio[o] = UInt8(truncatingIfNeeded: x); audio[o + 1] = UInt8(truncatingIfNeeded: x >> 8)
+            case .float32:
+                let bits = v.bitPattern
+                for k in 0..<4 { audio[o + k] = UInt8(truncatingIfNeeded: bits >> (8 * UInt32(k))) }
             case .float64:
                 let bits = Double(v).bitPattern
-                audio += (0..<8).map { UInt8(truncatingIfNeeded: bits >> (8 * UInt64($0))) }
+                for k in 0..<8 { audio[o + k] = UInt8(truncatingIfNeeded: bits >> (8 * UInt64(k))) }
             }
+            o += bytes
         }
     }
     var body = Array("WAVE".utf8)
