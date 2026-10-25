@@ -6,11 +6,16 @@ import PgdataFormats
 import PgdataPackerCore
 #endif
 
-/// "Clean Up Names…": proposes tidier names for the programs and the added wavetables and
-/// multisamples (never factory wavetables). Every change is shown and can be edited or unticked.
-/// Names are applied when packing; the source files are not changed.
+/// "Clean Up Names…": proposes tidier names (never for factory wavetables). Every change is shown
+/// and can be edited or unticked; the source files are not changed. On the Pack page it covers the
+/// programs and the added wavetables and multisamples, and the names are applied when packing; on
+/// the Convert page it covers the tables listed there, and the names are applied when converting.
 struct NameCleanupSheet: View {
+    /// The page the sheet renames for.
+    enum Page { case pack, convert }
+
     @ObservedObject var state: AppState
+    let page: Page
     @Environment(\.dismiss) private var dismiss
 
     struct Row: Identifiable {
@@ -26,14 +31,20 @@ struct NameCleanupSheet: View {
     @State private var excluded = Set<UUID>()
     @State private var onlyChanges = true
 
-    init(state: AppState) {
+    init(state: AppState, page: Page = .pack) {
         _state = ObservedObject(wrappedValue: state)
+        self.page = page
         _rules = State(initialValue: state.nameCleaner)
         _keepText = State(initialValue: state.nameCleaner.fixedSpellings.joined(separator: ", "))
     }
 
     private var allRows: [Row] {
-        state.programs.map { Row(id: $0.id, kind: "Program", current: $0.name, isProgram: true) }
+        if page == .convert {
+            return state.convertPlan.items.filter { $0.factorySlot == nil }.map {
+                Row(id: $0.id, kind: $0.sourceDescription, current: $0.name, isProgram: false)
+            }
+        }
+        return state.programs.map { Row(id: $0.id, kind: "Program", current: $0.name, isProgram: true) }
         + state.contentFiles.filter { !state.isFactoryCopy($0) }.map { f in
             Row(id: f.id, kind: f.isSample ? "Multisample" : (f.isPTable ? "P wavetable" : "U wavetable"),
                 current: state.displayName(f), isProgram: false)
@@ -44,12 +55,19 @@ struct NameCleanupSheet: View {
     private func changes(_ r: Row) -> Bool { proposed(r) != r.current }
     private var rows: [Row] { allRows.filter { !onlyChanges || changes($0) || edited[$0.id] != nil } }
     private var toApply: [Row] { allRows.filter { changes($0) && !excluded.contains($0.id) } }
-    private var anyRenamed: Bool { !state.contentNames.isEmpty || state.programs.contains { $0.newName != nil } }
+    private var anyRenamed: Bool {
+        page == .convert ? state.convertPlan.anyRenamed
+                         : !state.contentNames.isEmpty || state.programs.contains { $0.newName != nil }
+    }
+    /// Whether names go into 3rd Wave name fields, so their length and characters matter.
+    private var namesGoToThe3rdWave: Bool { page == .pack || state.convertPlan.preset.isThirdWave }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Clean up names").font(.title3).bold()
-            Text("New names go into the .pgdata files you write; the source files are not changed. Factory wavetables keep their names.")
+            Text(page == .pack
+                 ? "New names go into the .pgdata files you write; the source files are not changed. Factory wavetables keep their names."
+                 : "New names are used for the converted files, and inside them for 3rd Wave tables; the source files are not changed. Factory wavetables keep their names.")
                 .font(.caption).foregroundStyle(.secondary)
 
             HStack(spacing: 18) {
@@ -91,7 +109,9 @@ struct NameCleanupSheet: View {
                         .help("Edit to change the proposed name")
                 }
                 .width(min: 160, ideal: 220)
-                TableColumn("") { (r: Row) in NameLengthNote(name: proposed(r)) }
+                TableColumn("") { (r: Row) in
+                    if namesGoToThe3rdWave { NameLengthNote(name: proposed(r)) }
+                }
                     .width(min: 100, ideal: 140)
             }
             .visibleScrollers()
@@ -99,12 +119,16 @@ struct NameCleanupSheet: View {
 
             HStack {
                 Button("Undo All Renames") {
-                    state.contentNames = [:]
-                    for p in state.programs { state.setProgramName(p.id, nil) }
+                    if page == .convert {
+                        state.convertPlan.undoRenames()
+                    } else {
+                        state.contentNames = [:]
+                        for p in state.programs { state.setProgramName(p.id, nil) }
+                    }
                     edited = [:]
                 }
                 .disabled(!anyRenamed)
-                .help("Undo every rename, for all programs and files")
+                .help(page == .pack ? "Undo every rename, for all programs and files" : "Undo every rename on the Convert page")
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Apply \(toApply.count) Name\(toApply.count == 1 ? "" : "s")") { apply() }
@@ -119,12 +143,19 @@ struct NameCleanupSheet: View {
     private func apply() {
         var n = 0
         for r in toApply {
-            let new = String(String.UnicodeScalarView(proposed(r).unicodeScalars.prefix(NameCleaner.fieldLimit)))
-            if r.isProgram { state.setProgramName(r.id, new) } else { state.contentNames[r.id] = new }
+            if page == .convert {
+                // Not cut here: other destinations take longer names, and the 3rd Wave writer
+                // shortens one that is too long and says so in its report.
+                state.convertPlan.rename(r.id, to: proposed(r))
+            } else {
+                let new = String(String.UnicodeScalarView(proposed(r).unicodeScalars.prefix(NameCleaner.fieldLimit)))
+                if r.isProgram { state.setProgramName(r.id, new) } else { state.contentNames[r.id] = new }
+            }
             n += 1
         }
         state.nameCleaner = rules
-        state.note("Renamed \(n) item\(n == 1 ? "" : "s") for packing.")
+        state.note(page == .pack ? "Renamed \(n) item\(n == 1 ? "" : "s") for packing."
+                                 : "Renamed \(n) table\(n == 1 ? "" : "s") for converting.")
         dismiss()
     }
 }

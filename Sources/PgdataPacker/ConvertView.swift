@@ -17,6 +17,7 @@ struct ConvertView: View {
     @EnvironmentObject var state: AppState
     @State private var selection = Set<UUID>()
     @State private var dropTargeted = false
+    @State private var showNameCleanup = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -49,6 +50,10 @@ struct ConvertView: View {
                 state.addToConvert(urls: Panels.chooseFiles(message: "Choose wavetable files (.wav, .wt, .pgdata) or folders to search"))
             }
             .keyboardShortcut("o")
+            Button("Clean Up Names…") { showNameCleanup = true }
+                .disabled(plan.items.allSatisfy { $0.factorySlot != nil })
+                .help("Propose tidier names for the tables listed (e.g., slot numbers removed, title case), used for the converted files. Factory wavetables keep their names.")
+                .sheet(isPresented: $showNameCleanup) { NameCleanupSheet(state: state, page: .convert) }
             Spacer()
             Button("Remove Selected") { state.removeConvertItems(selection); selection = [] }.disabled(selection.isEmpty)
                 .help("Remove the selected tables from this list (the files are not touched)")

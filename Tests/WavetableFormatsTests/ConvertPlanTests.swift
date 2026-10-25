@@ -283,3 +283,25 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertEqual(ConvertPlan.formatCount(1_000_000), "1,000,000")
     }
 }
+
+final class ConvertPlanRenameTests: XCTestCase {
+    func testRenamedItemIsConvertedUnderItsNewName() throws {
+        var plan = ConvertPlan()
+        let t = FoundTable(name: "SAW_STACK_01", fileName: "SAW_STACK_01.wav", source: .wav,
+                           samples: (0..<8 * 2048).map { Float(sin(Double($0) * 2 * .pi / 2048)) * 0.5 },
+                           frameSize: 2048, frameSizeBasis: "test")
+        _ = plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/SAW_STACK_01.wav"), table: t)])
+        let id = try XCTUnwrap(plan.items.first?.id)
+        plan.preset = .wav2048
+        plan.rename(id, to: NameCleaner().clean("SAW_STACK_01"))
+        XCTAssertTrue(plan.anyRenamed)
+        var seen: [String] = []
+        _ = plan.convert { table, _, _ in seen.append(table.name); return OutputFile(fileName: table.name + ".wav", data: Data()) }
+        XCTAssertEqual(seen, [NameCleaner().clean("SAW_STACK_01")])
+        XCTAssertNotEqual(seen.first, "SAW_STACK_01")
+        plan.rename(id, to: "SAW_STACK_01")   // back to the file's own name
+        XCTAssertFalse(plan.anyRenamed)
+        plan.rename(id, to: "X"); plan.undoRenames()
+        XCTAssertEqual(plan.items.first?.name, "SAW_STACK_01")
+    }
+}

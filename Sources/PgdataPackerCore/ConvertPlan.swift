@@ -76,11 +76,13 @@ public struct ConvertPlan: Equatable {
         public var chosenFrameSize: Int?
         /// The user's tick; nil follows the destination's default (see `ConvertPlan.isSelected`).
         public var userSelection: Bool?
+        /// A new name from Clean Up Names (nil: the name the file gives).
+        public var newName: String?
         /// Content identity for collapsing duplicates.
         let contentKey: ContentKey
 
-        /// The table's name.
-        public var name: String { table.name }
+        /// The name it is converted under: the new name from Clean Up Names, or the file's.
+        public var name: String { newName ?? table.name }
         /// The frame size used: the file's, or the user's choice when the file leaves it open.
         public var frameSize: Int? { table.frameSize ?? chosenFrameSize }
         /// Whether the file leaves the frame size open, so the user must choose one.
@@ -364,6 +366,21 @@ public struct ConvertPlan: Equatable {
         return parts.joined(separator: "; ")
     }
 
+    // MARK: Names
+
+    /// Gives an item a new name for converting (nil, or the file's own name, undoes it). The
+    /// source files are not changed.
+    public mutating func rename(_ id: UUID, to name: String?) {
+        guard let i = items.firstIndex(where: { $0.id == id }) else { return }
+        items[i].newName = name == items[i].table.name ? nil : name
+    }
+
+    /// Whether any item has a new name.
+    public var anyRenamed: Bool { items.contains { $0.newName != nil } }
+
+    /// Undoes every new name.
+    public mutating func undoRenames() { for i in items.indices { items[i].newName = nil } }
+
     // MARK: Converting
 
     /// Converts the ticked items with `write` (each separately; a failure is collected, not
@@ -373,12 +390,13 @@ public struct ConvertPlan: Equatable {
         -> Conversion {
         var files: [OutputFile] = [], ids: [UUID] = [], notes: [String] = [], errors: [String] = []
         for item in selectedItems {
-            guard let table = item.table.wavetable(frameSize: item.frameSize) else {
+            guard var table = item.table.wavetable(frameSize: item.frameSize) else {
                 errors.append("\(item.name): " + (item.frameSize == nil
                     ? "choose a frame size first"
                     : "the samples do not divide into frames of \(Self.formatCount(item.frameSize!))"))
                 continue
             }
+            table.name = item.name
             do {
                 let f = try write(table, preset, options)
                 files.append(f); ids.append(item.id)
