@@ -46,11 +46,8 @@ struct ConvertDestinationPane: View {
                     ConvertOptionsBox(state: state)
                 }
                 .padding(12)
-                // Room for the scroll bar, which lies over the content when it is shown.
-                .padding(.trailing, ConvertDestinationPane.scrollerInset)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .visibleScrollers()
             if plan.preset.isThirdWave {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
@@ -64,11 +61,6 @@ struct ConvertDestinationPane: View {
             }
         }
     }
-
-    /// The width a classic scroll bar covers at the trailing edge of a SwiftUI ScrollView's
-    /// content (`visibleScrollers()` makes the bars classic; SwiftUI lays the content out at the
-    /// full width regardless, so the bar lay over the right edge of the text).
-    static let scrollerInset: CGFloat = NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
 
     /// "For all 75 tables to convert": the destination and its options apply to every table
     /// marked to convert, unlike the preview below the table.
@@ -115,13 +107,18 @@ struct ConvertPresetRow: View {
     let choose: () -> Void
 
     var body: some View {
-        // The row chooses the destination; the sources icon beside it is its own button, so
-        // clicking it opens the sources rather than choosing the row. A tap gesture rather than
-        // a Button: a plain Button's label did not redraw its radio when the choice changed.
+        // The row is a button that chooses the destination, so the keyboard reaches it and
+        // VoiceOver reads it as one element, like a radio button; the sources icon beside it is
+        // its own button, so clicking it opens the sources rather than choosing the row. (The
+        // row's `.id` in `ConvertPresetGroup` changes with the choice, which is what makes the
+        // radio redraw; a plain Button's label alone did not.)
         HStack(alignment: .top, spacing: 4) {
-            ConvertPresetRowLabel(preset: preset, chosen: chosen, caveat: caveat)
-                .onTapGesture { choose() }
-                .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : [.isButton])
+            Button { choose() } label: {
+                ConvertPresetRowLabel(preset: preset, chosen: chosen, caveat: caveat)
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(chosen ? AccessibilityTraits.isSelected : [])
             ConvertSourcesButton(preset: preset)
         }
         .padding(6)
@@ -178,14 +175,16 @@ struct ConvertCaution: View {
     }
 }
 
-/// Heads the column of book icons: "Sources", which opens a note on what the icons show and
-/// why to look.
+/// Heads the column of book icons: "Sources" with an info icon, so it reads as something to
+/// click; it opens a note on what the icons show and why to look.
 struct ConvertSourcesHeader: View {
     @State private var showing = false
 
     var body: some View {
         Button { showing.toggle() } label: {
-            Text("Sources").font(.caption).foregroundStyle(.secondary)
+            Label("Sources", systemImage: "info.circle")
+                .labelStyle(.titleAndIcon)
+                .font(.caption).foregroundStyle(.secondary)
         }
         .buttonStyle(.borderless)
         .help("What each destination rests on, and whether converting to it has been tested")
@@ -218,6 +217,7 @@ struct ConvertSourcesButton: View {
                 .foregroundStyle(tested ? Color.green : Color.secondary)
         }
         .buttonStyle(.borderless)
+        .accessibilityLabel("Sources for \(preset.shortTitle)")
         .help("Sources for this destination, and whether converting to it has been tested")
         .popover(isPresented: $showing, arrowEdge: .leading) {
             VStack(alignment: .leading, spacing: 6) {
@@ -282,7 +282,8 @@ struct ConvertFrameCountOption: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("The destination needs more or fewer frames")
-            Picker("", selection: $state.convertPlan.options.frameCountPolicy) {
+            // The pickers' titles name them for VoiceOver; the text above each shows the words.
+            Picker("If the destination needs more or fewer frames", selection: $state.convertPlan.options.frameCountPolicy) {
                 Text("Keep Original Frames").tag(FrameCountPolicy.pickEvenly)
                 Text("Crossfade New Frames").tag(FrameCountPolicy.interpolate)
             }
@@ -328,7 +329,7 @@ struct ConvertInterpolationOption: View {
         let shared = plan.sharedExistingInterpolation
         VStack(alignment: .leading, spacing: 4) {
             Text("Interpolation saved in the file")
-            Picker("", selection: selection) {
+            Picker("Interpolation saved in the file", selection: selection) {
                 if let own = plan.eachTablesOwnInterpolationLabel {
                     choiceText(own).tag(Optional<Interpolation>.none)
                 }
@@ -378,7 +379,7 @@ struct ConvertTonverkSizeOption: View {
         let shared = plan.sharedTonverkFrameSize
         VStack(alignment: .leading, spacing: 4) {
             Text("Tonverk frame size")
-            Picker("", selection: selection) {
+            Picker("Tonverk frame size", selection: selection) {
                 if let own = plan.eachTablesOwnFrameSizeLabel {
                     choiceText(own).tag(Optional<Int>.none)
                 }

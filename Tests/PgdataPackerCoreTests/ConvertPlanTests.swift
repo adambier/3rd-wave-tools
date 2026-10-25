@@ -484,6 +484,7 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(OutputPreset.Group.thirdWave.presets, [.thirdWaveU, .thirdWaveP])
         XCTAssertEqual(OutputPreset.Group.otherSynths.presets.count, 6)
         XCTAssertEqual(OutputPreset.Group.thirdWave.title, "3rd Wave")
+        XCTAssertEqual(OutputPreset.Group.otherSynths.title, "Other Synths", "a group heading: title case")
         XCTAssertEqual(OutputPreset.thirdWaveU.specLine, "64 × 1,024 · .wt")
         XCTAssertEqual(OutputPreset.allCases.filter(\.recordsInterpolation), [.wav2048, .miniFreak, .tonverk, .phasePlant])
         XCTAssertEqual(Interpolation.none.displayName, "None (stepped)")

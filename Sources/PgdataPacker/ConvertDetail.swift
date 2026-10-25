@@ -39,11 +39,8 @@ struct ConvertDetailPane: View {
                 ScrollView {
                     ConvertItemPreview(state: state, item: chosen[0])
                         .padding(12)
-                        // Room for the scroll bar, which lies over the content when it is shown.
-                        .padding(.trailing, ConvertDestinationPane.scrollerInset)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-                .visibleScrollers()
             } else {
                 ConvertPreviewPlaceholder(items: chosen)
             }
@@ -261,11 +258,15 @@ struct ConvertOverview: View {
                             }
                     }
                 )
+                // The caption and legend say what the picture shows; VoiceOver gets them below.
+                .accessibilityHidden(true)
             Text(caption).font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 .fixedSize(horizontal: false, vertical: true)
             ConvertOverviewLegend(interpolation: interpolation, unstated: unstatedLegend, tint: tint)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
+        // One element: the caption ("Source · 64 × 2,048"), then the legend's lines.
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -291,6 +292,8 @@ struct ConvertSweepView: View {
         VStack(alignment: .leading, spacing: 3) {
             SweepCycleCanvas(source: sourcePoint?.values ?? [], result: resultPoint?.values)
                 .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
+                // The lines under it say which frames are drawn; VoiceOver gets those.
+                .accessibilityHidden(true)
             Text(position == nil ? "Cycle · move the pointer across a picture to sweep" : "Cycle at the pointer")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -307,6 +310,8 @@ struct ConvertSweepView: View {
             .font(.caption).foregroundStyle(.secondary).monospacedDigit()
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
+        // One element: the caption, then which frame of each table is drawn.
+        .accessibilityElement(children: .combine)
     }
 }
 
