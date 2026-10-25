@@ -16,35 +16,6 @@ final class WorkbenchTests: XCTestCase {
         let u = dir.appendingPathComponent(file); try w.serialized().write(to: u); return u
     }
 
-    func testFactoryLibraryReadsGrooveSynthesisNames() throws {
-        let f = dir.appendingPathComponent("factory"); try FileManager.default.createDirectory(at: f, withIntermediateDirectories: true)
-        let save = dir; dir = f
-        _ = try writeWT("Additive_Bell_17", kind: .u, seed: 0.1, file: "00-Additive_Bell_17.wt")
-        _ = try writeWT("Dub Grind", kind: .u, seed: 0.2, file: "50_Dub_Grind.wt")
-        _ = try writeWT("Wavetable P02", kind: .p, seed: 0.3, file: "02P.wt")
-        _ = try writeWT("VS00-63", kind: .p, seed: 0.4, file: "P34_VS_0-63.wt")
-        dir = save
-        let lib = FactoryLibrary(folders: [f])
-        XCTAssertEqual(Set(lib.tables.keys), [.u(0), .u(50), .p(2), .p(34)])
-        XCTAssertEqual(lib.name(.u(50)), "Dub Grind")
-        XCTAssertTrue(lib.problems.isEmpty, "\(lib.problems)")
-        XCTAssertFalse(lib.isComplete)
-        // One parent folder holding both downloads as subfolders is enough.
-        let parent = dir.appendingPathComponent("parent"); try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
-        try FileManager.default.copyItem(at: f, to: parent.appendingPathComponent("3rdWave56UWavetables"))
-        XCTAssertEqual(Set(FactoryLibrary(folders: [parent]).tables.keys), [.u(0), .u(50), .p(2), .p(34)])
-    }
-
-    func testBuiltInFactoryListIsComplete() {
-        let lib = FactoryLibrary.builtIn
-        XCTAssertTrue(lib.isComplete)
-        XCTAssertEqual(lib.tables.count, 92)
-        XCTAssertEqual(lib.name(.u(0)), "Additive_Bell_17")
-        XCTAssertEqual(lib.name(.u(48)), "FM_Crush")
-        XCTAssertEqual(lib.slot(withFingerprint: 0x9D778BEF7D5E8992), .u(7))   // Knob Grotto 6
-        XCTAssertEqual(Set(lib.tables.values.map(\.fingerprint)).count, 92)  // no two factory tables alike
-    }
-
     func testFactoryOnlyProgramNeedsNoUnifiedFile() {
         let pro = makeProgram(sources: [34, 2000, 1000, 41, 42, 42, 2, 35, 42, 41, 42, 42])
         let plan = PackPlan.make(program: pro, files: [], factory: FactoryLibrary())
@@ -165,28 +136,6 @@ final class WorkbenchTests: XCTestCase {
         obx.slot = .u(48)
         let lib2 = FactoryLibrary([.u(48): .init(name: "FM_Crush", fingerprint: obx.fingerprint)])
         XCTAssertEqual(PackPlan.make(program: old, files: [obx], factory: lib2).rows[0].choice, .reference)
-    }
-
-    func testCorruptUnifiedProgramIsRejectedNotCrashed() throws {
-        let pro = makeProgram(sources: [34] + Array(repeating: 42, count: 11))
-        var g = try Packer.pack(pro, content: [.u(0): .reference])
-        var d = g.serialized()
-        // Patch the first program word (values per part) to -200.
-        let start = d.count - 4 * g.words.count
-        d.replaceSubrange(start..<start + 4, with: [0x38, 0xFF, 0xFF, 0xFF])
-        XCTAssertThrowsError(try UnifiedProgram(data: d))
-        // An oscillator index the file does not list: unpacks with a note, no crash.
-        g = try Packer.pack(pro, content: [.u(0): .reference])
-        let osc = g.oscillatorWordIndices[0]
-        var words = g.words; words[osc] = 7
-        d = g.serialized()
-        let s2 = d.count - 4 * g.words.count + 4 * osc
-        d.replaceSubrange(s2..<s2 + 4, with: [7, 0, 0, 0])
-        let u = try UnifiedProgram(data: d)
-        XCTAssertNil(u.oscillatorSources[0])
-        let up = Unpacker.unpack(u)
-        XCTAssertEqual(up.program.sources[0], .p(7))
-        XCTAssertTrue(up.notes.contains { $0.contains("reads as P07") })
     }
 
     func testLongNamesAreWarnedAboutAndFactoryIdenticalFilesExplained() throws {

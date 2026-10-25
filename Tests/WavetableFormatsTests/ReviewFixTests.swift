@@ -1,10 +1,10 @@
 import XCTest
 @testable import PgdataFormats
 @testable import WavetableFormats
-@testable import PgdataPackerCore
 
-/// Cases found in review: ordinary looped samples, frame sizes suggested by length only, and the
-/// 3rd Wave name of an accented file name as macOS stores it.
+/// Cases found in review: ordinary looped samples, the evidence behind a frame size, and the
+/// 3rd Wave name of an accented file name as macOS stores it. (The plan's part of these cases is
+/// `ReviewFixPlanTests` in PgdataPackerCoreTests.)
 final class ReviewFixTests: XCTestCase {
     /// A mono 16-bit WAV with an optional smpl loop over [loopStart, loopEnd].
     private func wav16(_ samples: Int, loop: (Int, Int)? = nil) -> Data {
@@ -29,22 +29,6 @@ final class ReviewFixTests: XCTestCase {
         XCTAssertEqual(try WavetableReader.read(wav16(48_000, loop: (0, 47_999)), fileName: "Pad.wav").count, 0)
     }
 
-    func testLengthOnlyFrameSizeCanBeChanged() throws {
-        let found = try XCTUnwrap(WavetableReader.read(wav16(65_536), fileName: "Table.wav").first)
-        XCTAssertEqual(found.frameSize, 2048)
-        XCTAssertTrue(found.candidateFrameSizes.contains(1024))
-        var plan = ConvertPlan()
-        _ = plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Table.wav"), table: found)])
-        let id = try XCTUnwrap(plan.items.first?.id)
-        XCTAssertEqual(plan.items[0].frameSizeChoices.first, 2048)
-        plan.chooseFrameSize(id, 1024)
-        XCTAssertEqual(plan.items[0].frameSize, 1024)
-        XCTAssertEqual(plan.items[0].frameCount, 64)
-        XCTAssertTrue(plan.items[0].basisDescription.hasPrefix("Set manually"))
-        plan.chooseFrameSize(id, 2048)   // back to the file's own
-        XCTAssertNil(plan.items[0].chosenFrameSize)
-    }
-
     func testFrameSizeEvidence() throws {
         XCTAssertEqual(try WavetableReader.read(wav16(65_536), fileName: "a.wav").first?.frameSizeEvidence, .length)
         XCTAssertEqual(try WavetableReader.read(wav16(16_384), fileName: "b.wav").first?.frameSizeEvidence, FrameSizeEvidence.none)
@@ -60,16 +44,6 @@ final class ReviewFixTests: XCTestCase {
         let found = try XCTUnwrap(WavetableReader.read(wav16(8192), fileName: "Four.wav").first)
         XCTAssertNil(found.frameSize)
         XCTAssertEqual(found.candidateFrameSizes, [128, 2048])
-    }
-
-    func testMetadataSizeIsNotOfferedForChange() {
-        let t = FoundTable(name: "T", fileName: "t.wav", source: .wav, samples: Array(repeating: 0, count: 4096),
-                           frameSize: 2048, frameSizeBasis: "clm chunk")
-        var plan = ConvertPlan()
-        _ = plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/t.wav"), table: t)])
-        XCTAssertEqual(plan.items[0].frameSizeChoices, [])
-        plan.chooseFrameSize(plan.items[0].id, 1024)
-        XCTAssertEqual(plan.items[0].frameSize, 2048)
     }
 
     func testDecomposedAccentsKeepTheirLetters() throws {

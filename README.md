@@ -51,7 +51,7 @@ signed only for that Mac (an "ad-hoc" signature); it opens normally there, and m
 it elsewhere.
 
 The tests (`./run-tests.sh`) need a full Xcode installation (15 or later) on a Mac; on Linux and
-Windows, `swift test` runs them directly. (On a Mac, `Package.swift` includes the test target only
+Windows, `swift test` runs them directly. (On a Mac, `Package.swift` includes the test targets only
 when `PGDATA_TESTS=1` is set, which the script does, so that a plain `swift build` works with the
 command-line tools alone. Such a build has no Sparkle, so no **Check for Updates…**.)
 
@@ -479,7 +479,7 @@ Sources/PgdataPacker/       the app (SwiftUI)
 Sources/tw3pg/              developer tool: inspect, roundtrip, unpack, repack, compare, wtcheck,
                             wtscan, wtdump, factory-catalog, pack, convert, convertcheck, and the
                             3rd Wave-test builders
-Tests/                      unit tests for the three libraries (./run-tests.sh)
+Tests/                      unit tests, one target per library (./run-tests.sh)
 fixtures/                   test files with what each parses to, for other implementers
 Resources/                  app icon, drawn by tools/make-icon.py (needs cairosvg and Pillow)
 docs/                       FORMATS.md (format reference), WAVETABLES.md (other synths' wavetable
