@@ -47,6 +47,8 @@ public enum SourceFormat: Equatable, Sendable {
     case unifiedProgram(slot: String, isP: Bool)
     /// A WAV file.
     case wav
+    /// A FLAC file (as Phase Plant's library uses).
+    case flac
     /// A Surge `.wt` binary file (header "vawt").
     case surgeWavetable
 }

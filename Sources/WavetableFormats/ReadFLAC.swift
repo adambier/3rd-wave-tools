@@ -59,7 +59,7 @@ extension WavetableReader {
         let info = decoded.info
         let wav = DecodedWAV(samples: decoded.firstChannel, channels: info.channels,
                              bytesPerSample: (info.bitsPerSample + 7) / 8, chunks: chunks, notes: notes)
-        return try tables(in: wav, fileName: fileName, sidecarText: sidecarText, source: .wav, chunkWord: "block")
+        return try tables(in: wav, fileName: fileName, sidecarText: sidecarText, source: .flac, chunkWord: "block")
     }
 }
 

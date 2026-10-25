@@ -849,6 +849,7 @@ public struct ConvertPlan: Equatable {
         case .thirdWaveWavetable(let isP): return "3rd Wave \(isP ? "P" : "U") .wt"
         case .unifiedProgram(let slot, _): return "\(slot) in \(t.fileName)"
         case .wav: return "WAV"   // one label: how the frame size was decided has its own column
+        case .flac: return "FLAC"
         case .surgeWavetable: return "Surge .wt"
         }
     }

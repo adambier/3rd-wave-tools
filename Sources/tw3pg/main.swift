@@ -397,6 +397,7 @@ case "wtscan":
             let source: String
             switch t.source {
             case .wav: source = "wav"
+            case .flac: source = "flac"
             case .surgeWavetable: source = "surge"
             case let .thirdWaveWavetable(isP): source = isP ? "3w-P" : "3w-U"
             case let .unifiedProgram(slot, _): source = "pgdata:" + slot

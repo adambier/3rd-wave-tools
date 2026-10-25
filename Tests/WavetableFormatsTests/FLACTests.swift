@@ -209,7 +209,7 @@ final class FLACTests: XCTestCase {
         let t = try XCTUnwrap(WavetableReader.read(try resource("table6_16bit_level8.flac"), fileName: "Evolving Saw.flac").first)
         XCTAssertEqual(t.name, "Evolving Saw")
         XCTAssertEqual(t.fileName, "Evolving Saw.flac")
-        XCTAssertEqual(t.source, .wav)   // the contract has no FLAC case; see the report
+        XCTAssertEqual(t.source, .flac)
         XCTAssertEqual(t.frameSize, 2048)
         XCTAssertEqual(t.frameSizeEvidence, .length)
         XCTAssertEqual(t.frameSizeBasis, "file length only (2,048 per frame, the usual size; the file does not say)")
