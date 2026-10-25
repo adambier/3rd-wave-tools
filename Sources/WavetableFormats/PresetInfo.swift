@@ -59,13 +59,13 @@ public extension OutputPreset {
     var distinction: String {
         switch self {
         case .thirdWaveU:
-            return "The 3rd Wave's U set: 64 waves of 1,024, plus the smaller copies every U .wt carries."
+            return "The 3rd Wave's main set: 64 waves of 1,024. Choose this for Serum-style and other 2,048-sample tables."
         case .thirdWaveP:
-            return "The 3rd Wave's PPG-style P set: 64 waves of 128."
+            return "PPG-style: 64 waves of 128. With \u{201C}use upper wavetable\u{201D} off, the 3rd Wave sweeps positions 0–59 only (60–63 are reached by the wave offset); the PPG waves option fills 60–63 the way the factory tables do."
         case .wav2048:
             return "The common 2,048-sample WAV, up to 256 frames; the file records the interpolation, which Serum and Vital read."
         case .miniFreak:
-            return "The same WAV, but at most 64 frames, which is what a MiniFreak keeps; Convert cuts the table down, since MiniFreak V doesn't say how it would."
+            return "The same WAV, at most 64 frames: what a MiniFreak keeps. Larger tables are cut down to 64 here, before MiniFreak V sees them."
         case .tonverk:
             return "Up to 64 frames; Tonverk reads the frame size and stepping from the file name."
         case .phasePlant:

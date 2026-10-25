@@ -102,7 +102,7 @@ final class AppState: ObservableObject {
     @Published var convertPlan = ConvertPlan() { didSet { saveSettings() } }
     /// Show only the Wavetables page's tables that need a look (blocked, guessed frame size, or a warning).
     @Published var convertOnlyAttention = false
-    /// The writer's results for the tables the Convert detail pane shows, kept between passes.
+    /// The writer's results for the tables the Wavetables page previews, kept between passes.
     let convertPreviews = ConvertPreviewCache()
 
     // Messages
@@ -628,7 +628,7 @@ final class AppState: ObservableObject {
         let s = convertPlan.add(c.found, factory: factory)
         func count(_ n: Int, _ word: String) -> String { "\(n) \(word)\(n == 1 ? "" : "s")" }
         if s.added > 0 {
-            var msg = "Added \(count(s.added, "wavetable")) to Convert"
+            var msg = "Added \(count(s.added, "wavetable"))"
             if s.duplicates > 0 { msg += " (and \(s.duplicates) identical cop\(s.duplicates == 1 ? "y" : "ies"), shown with the table they match)" }
             note(msg + ".")
         } else if c.problems.isEmpty {
@@ -674,7 +674,7 @@ final class AppState: ObservableObject {
         guard marked.contains(where: plan.canConvert) else {
             alertMessage = (marked.count == 1 ? "The table marked to convert can't convert yet: its file doesn't say how long each wave is."
                                               : "None of the tables marked to convert can convert yet: their files don't say how long each wave is.")
-                + "\n\nChoose a frame size in the Size column first."
+                + "\n\nChoose a frame size in the Input column first."
             return
         }
         let toPack = sendToPack && plan.preset.isThirdWave
@@ -698,6 +698,9 @@ final class AppState: ObservableObject {
         let grouped = ConvertPlan.groupedNotes(conversion.reports)
         if !grouped.isEmpty {
             msg += "\n\nWhat converting did:\n" + grouped.map { ReportText.item($0.label, $0.text) }.joined(separator: "\n")
+        }
+        if let capacity = plan.thirdWaveCapacityNote {
+            msg += "\n\n" + capacity
         }
         let packFiles = toPack ? ConvertPlan.filesForPack(report.written, preset: plan.preset) : []
         if !packFiles.isEmpty {

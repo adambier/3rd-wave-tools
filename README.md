@@ -300,9 +300,12 @@ Wave tables into a `WAVES` folder inside it) and reports everything it changed; 
 an existing file. For a 3rd Wave destination, **Send to Pack…** does the same and then adds the
 `.wt` files to the Pack page, to embed in programs.
 
-Convert converts existing wavetables; it does not make wavetables from other audio, which is what
-the 3rd Wave's **Wave Maker** does. Wave Maker also imports a Serum wavetable directly; Convert
-adds other formats and frame sizes, many tables at once, and Send to Pack.
+The page converts existing wavetables; it does not make wavetables from other audio, which is
+what the 3rd Wave's **Wave Maker** does. Wave Maker also imports a Serum wavetable directly; this
+page adds other formats and frame sizes, many tables at once, and Send to Pack. To load the `.wt`
+files it writes, copy the `WAVES` folder onto the 3rd Wave's USB drive and use Global → **Bulk
+wavetable import**; a 3rd Wave has 8 slots for your own U tables (U56–U63) and 12 for P tables
+(P36–P47), and the page warns when more are to be converted.
 [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes what each destination expects, with sources.
 
 ## On the 3rd Wave

@@ -23,10 +23,10 @@ uses internally and what most other synths assume when a file says nothing else.
 
 | Where | What it says | Written by | Read by |
 |---|---|---|---|
-| `clm ` chunk | ASCII `<!>2048 F0000000 …`: the frame size, then flags; the first flag digit F is the interpolation (below) | Serum, Vital, Surge, Convert | Serum (the first 10 bytes); Vital (the flag only); Surge (2,048 only)[^surge-code][^vital] |
+| `clm ` chunk | ASCII `<!>2048 F0000000 …`: the frame size, then flags; the first flag digit F is the interpolation (below) | Serum, Vital, Surge, this app | Serum (the first 10 bytes); Vital (the flag only); Surge (2,048 only)[^surge-code][^vital] |
 | `srge` chunk | int32 version, int32 frame size | Surge | Surge[^surge-code] |
-| `uhWT` chunk | a frame size field (2,048 throughout Hive's library; the layout is an inference from those files), which Surge reads as 2,048 | u-he synths | Surge, Convert[^surge-code] |
-| `_wt<N>` at the end of the file name | the frame size N (64–4,096, a power of two); a trailing `r` means no interpolation | Convert (for Tonverk) | Tonverk[^tonverk] |
+| `uhWT` chunk | a frame size field (2,048 throughout Hive's library; the layout is an inference from those files), which Surge reads as 2,048 | u-he synths | Surge, this app[^surge-code] |
+| `_wt<N>` at the end of the file name | the frame size N (64–4,096, a power of two); a trailing `r` means no interpolation | this app (for Tonverk) | Tonverk[^tonverk] |
 | a `.txt` file beside the WAV | line 1 `[N]`, the samples per frame; optional line 2 `[interp]` or `[no interp]` | people, by hand | Serum (`<name>.txt`, then `FolderInfo.txt`)[^serum] |
 | nothing | the reader's own assumption, usually 2,048 | many | Pigments slices every 2,048 samples[^pigments] |
 
@@ -35,9 +35,9 @@ steps from frame to frame), `1` a crossfade, and `2`–`4` Serum's spectral morp
 reads `0` as none, `1` as crossfade, anything else as spectral, and uses spectral when there is no
 chunk.[^vital] Most other synths set interpolation on the oscillator, not in the file.
 
-## 2. Destinations Convert writes
+## 2. Destinations the Wavetables page writes
 
-| Destination | What Convert writes | Source |
+| Destination | What is written | Source |
 |---|---|---|
 | Serum, Vital, Pigments | Mono 32-bit float WAV, 48 kHz, 2,048 per frame, up to 256 frames, with a `clm ` chunk carrying the interpolation | [^serum] [^vital] [^pigments] |
 | MiniFreak V (for the MiniFreak) | The same, with at most 64 frames | [^minifreak] |
@@ -59,17 +59,17 @@ Notes on each:
   metadata; interpolation is the engine's Morph setting.[^pigments]
 - **MiniFreak V** imports tables (including Pigments') and sends them to a MiniFreak over USB; on
   import it truncates them to 24-bit, 512 samples per cycle, and 64 cycles. How it reduces a
-  2,048-sample frame to 512, or more than 64 frames to 64, is not documented, so Convert reduces
-  the frame count itself, by the method you choose, before MiniFreak V sees the file.[^minifreak]
+  2,048-sample frame to 512, or more than 64 frames to 64, is not documented, so larger tables
+  are cut down to 64 frames here, by the method you choose, before MiniFreak V sees the file.[^minifreak]
 - **Tonverk** reads the frame size from a `_wt<N>` tag at the end of the file name (2,048 when
   there is none) and plays without interpolation when the name ends in `r`. It takes up to 64
   frames and picks evenly spaced ones from a larger table.[^tonverk] The manual's only example of
   the `r` has a size tag (`strings_wt128r.wav`); read literally, any name ending in "r" could load
-  stepped, so Convert always writes an explicit tag and removes any tag the name already has.
+  stepped, so an explicit tag is always written and any tag the name already has is removed.
   (An inference from the manual's wording; untested.)
 - **Phase Plant** documents its wavetables as exactly 256 frames of 2,048 samples (524,288 in
-  all).[^phaseplant] Whether it accepts shorter files is not documented; Convert writes 256 frames,
-  expanding or reducing the table by the method you choose.
+  all).[^phaseplant] Whether it accepts shorter files is not documented; 256 frames are always
+  written, the table expanded or reduced by the method you choose.
 - **Surge XT** reads its own `.wt` and WAV files with the chunks above, with frame sizes from 2 to
   4,096 (powers of two) and up to 512 frames.[^surge-code]
 - **WaveEdit** (Synthesis Technology's editor for the E370 and E352) saves a bank of 64 tables of
@@ -77,15 +77,15 @@ Notes on each:
 - **The 3rd Wave** imports `.wt` files with **Bulk wavetable import** and tables embedded in a
   `.pgdata` with **Import unified program data file**. Its **Wave Maker** also imports a Serum
   wavetable WAV into the U set, and takes a WAV of exactly 8,192 samples (64 × 128) as a P
-  table.[^3w-manual] Convert's 3rd Wave output adds formats and frame sizes Wave Maker does not
-  read, many tables at once, and **Send to Pack**. Convert does not make wavetables from other
+  table.[^3w-manual] The page's 3rd Wave output adds formats and frame sizes Wave Maker does not
+  read, many tables at once, and **Send to Pack**. The page does not make wavetables from other
   audio: that is what Wave Maker is for.
 
 ### The Surge `.wt` file
 
 Not to be confused with the 3rd Wave's `.wt`, which is text: a Surge `.wt` begins with the bytes
-`vawt`, and a 3rd Wave `.wt` with the text `PNAME` or `UNAME`. Convert tells them apart by
-content, not by name.[^surge-code]
+`vawt`, and a 3rd Wave `.wt` with the text `PNAME` or `UNAME`. They are told apart by content,
+not by name.[^surge-code]
 
 | Bytes | Field |
 |---|---|
@@ -95,10 +95,10 @@ content, not by name.[^surge-code]
 | 10–11 | flags, uint16: `0x01` a sample, not a wavetable; `0x02` looped; `0x04` 16-bit data; `0x08` 16-bit data at full scale (otherwise peaking at 2¹⁴); `0x10` an XML metadata block follows the data |
 | 12 … | the samples, float32 or int16, little-endian |
 
-## 3. How Convert decides a frame size
+## 3. How a frame size is decided
 
-When it reads a WAV, Convert takes the first of these that applies, and shows which one it
-used:
+When a WAV is read, the first of these that applies decides the frame size, and the page shows
+which one it was:
 
 1. a `clm ` chunk;
 2. an `srge` chunk;
@@ -117,9 +117,9 @@ Rules 1–5 are written for the purpose and are trusted as long as one whole fra
 samples run past the last whole frame (as in some editors' files, and in Surge's own library),
 the extra samples are left out, with a note. Cue points and loops (rules 6 and 7) mark ordinary
 samples too, so they count only for powers of two up to 4,096 that give at least two frames: a
-single looped cycle is a sample. When two of these disagree, Convert notes both. When only the
+single looped cycle is a sample. When two of these disagree, both are noted. When only the
 length suggested a size, the other sizes the length allows can be chosen instead. When nothing
-settles the size, Convert lists the sizes the length allows and waits for you to choose: a file
+settles the size, the page lists the sizes the length allows and waits for you to choose: a file
 of 8,192 samples is 64 × 128 for the 3rd Wave's Wave Maker (a PPG table) but 4 × 2,048 for Serum,
 Pigments, or Tonverk (whose factory library has one), and one of 16,384 is 64 × 256 for WaveEdit
 but 8 × 2,048 for Serum. A WAV with none of the metadata above is listed only when it is mono, its
@@ -132,12 +132,12 @@ These rules were checked against about 20,000 files from the libraries of Hive, 
 Tonverk, and several Serum packs: every table those libraries hold was listed with the size its
 maker gives it (or, for two Tonverk files of 8,192 and 16,384 samples, with the choice left
 open), and the samples beside them (multisampled notes, single cycles, looped notes, drums) were
-not. DUNE 3's `.wt` files, and Harmor's and Komplexer's, are in formats of their own; Convert
+not. DUNE 3's `.wt` files, and Harmor's and Komplexer's, are in formats of their own; the app
 does not read them.
 
 **An aid for choosing.** When the size is left open, the chooser draws the first wave at each
 size and marks one "likely" when the samples suggest it. The suggestion rests on how alike
-neighbouring frames are: at each candidate size n, Convert takes the mean difference between
+neighbouring frames are: at each candidate size n, the page takes the mean difference between
 every sample and the one n samples later (frame k against frame k + 1), as a fraction of the
 file's mean level, and the same at a lag of n/2. The waves of a wavetable change little from one
 frame to the next, so at the right size the first difference is small (at most 0.5) and much
@@ -157,7 +157,7 @@ frames.
 
 ### FLAC files
 
-Convert reads FLAC files with its own decoder (RFC 9639 [^flac]: CONSTANT, VERBATIM, FIXED, and
+FLAC files are read with the app's own decoder (RFC 9639 [^flac]: CONSTANT, VERBATIM, FIXED, and
 LPC subframes, Rice and Rice2 residuals, wasted bits, the three stereo modes, 4- to 32-bit
 samples, fixed or variable block sizes). It checks each frame's checksums and, when the file
 carries one, the MD5 signature of its audio, and reports a file that fails any of them as
@@ -179,7 +179,7 @@ listed by their length.
 
 Checked: the 402 files of Phase Plant's library decode sample for sample as ffmpeg decodes them
 (as 32-bit floats; all 402 also pass their MD5 signatures), every one is listed as 256 × 2,048,
-and every one round-trips through each of Convert's writers. The decoder's tests use synthetic
+and every one round-trips through each of the app's writers. The decoder's tests use synthetic
 files from ffmpeg and from a small test-only encoder, covering 8-, 12-, 16-, 20-, 24-, and 32-bit
 samples, every subframe kind and stereo mode, wasted bits, variable block sizes, escaped
 partitions, and missing or wrong MD5 signatures, with ffmpeg's decoding as the reference. A
@@ -190,7 +190,7 @@ partitions, and missing or wrong MD5 signatures, with ffmpeg's decoding as the r
 Frames are resized by zero-padding or truncating their spectrum, which is exact for a single
 cycle: going from 1,024 samples to 2,048 and back returns the original samples (to within
 0.0001), and shrinking a frame removes the harmonics the smaller frame cannot hold. Upsampling
-can raise the peak slightly between the original samples; Convert keeps such peaks in 32-bit
+can raise the peak slightly between the original samples; such peaks are kept in 32-bit
 float files and scales the table down for the 3rd Wave and for 16-bit files, saying so.
 
 When a destination needs a different number of frames, you choose how:
@@ -210,7 +210,7 @@ Results from any of these are welcome:
 - Whether Phase Plant loads tables of fewer than 256 frames.
 - Whether Tonverk treats a name ending in "r" without a `_wt<N>` tag as stepped.
 - How MiniFreak V reduces 2,048-sample frames to 512, and how it treats fewer than 64 frames.
-- Whether Convert's 3rd Wave U table from a Serum WAV matches what Wave Maker makes from the same
+- Whether the app's 3rd Wave U table from a Serum WAV matches what Wave Maker makes from the same
   file.
 
 [^serum]: *Serum 2 User Guide*, pp. 38, 285, and 291–295. <https://xferrecords.com/manual/serum-2>

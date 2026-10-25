@@ -237,7 +237,7 @@ public enum WavetableWriter {
         /// the source or the options asked for one.
         mutating func noteUnrecordedInterpolation() {
             if let asked = options.interpolation ?? table.interpolation {
-                notes.append("This format can't store the interpolation (\(asked.displayName.lowercased()) asked for); set it on the destination's oscillator.")
+                notes.append("This format doesn't store the interpolation (\(asked.displayName.lowercased()) asked for); the synth sets how frames blend.")
             }
         }
 
@@ -327,9 +327,9 @@ public extension OutputPreset {
         case .wav2048:
             return "Vital's behaviour is from its public source code, which the current release may differ from. Pigments reads no metadata, so the interpolation saved in the file doesn't apply to it."
         case .miniFreak:
-            return "How MiniFreak V reduces tables to 512 samples and 64 cycles is undocumented; Convert reduces the frame count itself. How it treats fewer than 64 frames is unknown."
+            return "How MiniFreak V reduces 2,048-sample frames to 512, and how it treats fewer than 64 frames, is not documented."
         case .phasePlant:
-            return "Kilohearts documents exactly 256 frames; whether a shorter table loads is untested, so Convert always writes 256."
+            return "Kilohearts documents exactly 256 frames; whether a shorter table loads is untested, so 256 are always written."
         case .thirdWaveU, .thirdWaveP, .tonverk, .surge, .waveEdit:
             return nil
         }

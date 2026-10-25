@@ -26,6 +26,15 @@ struct ConvertDestinationPane: View {
                         Text("Convert to").font(.headline)
                         Text(ConvertDestinationPane.scope(plan.selectedItems.count))
                             .font(.caption).foregroundStyle(.secondary)
+                        if let capacity = plan.thirdWaveCapacityNote {
+                            Label {
+                                Text(capacity).fixedSize(horizontal: false, vertical: true)
+                            } icon: {
+                                Image(systemName: "exclamationmark.triangle")
+                            }
+                            .font(.caption).foregroundStyle(.orange)
+                            .padding(.top, 2)
+                        }
                     }
                     ForEach(OutputPreset.Group.allCases, id: \.self) { (group: OutputPreset.Group) in
                         ConvertPresetGroup(state: state, group: group)
@@ -41,11 +50,14 @@ struct ConvertDestinationPane: View {
             .visibleScrollers()
             if plan.preset.isThirdWave {
                 Divider()
-                Text("Send to Pack also adds the .wt files to the Pack page.")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12).padding(.vertical, 8)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("To load .wt files: copy the WAVES folder onto the 3rd Wave's USB drive, then Global → Bulk wavetable import. A 3rd Wave has 8 slots for your own U tables (U56–U63) and 12 for P tables (P36–P47).")
+                    Text("Send to Pack also adds the .wt files to the Pack page.")
+                }
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12).padding(.vertical, 8)
             }
         }
     }
@@ -196,7 +208,6 @@ struct ConvertFrameCountOption: View {
     @ObservedObject var state: AppState
 
     var body: some View {
-        let affected = state.convertPlan.frameCountChangeCount
         VStack(alignment: .leading, spacing: 4) {
             Text("If the destination needs more or fewer frames")
             Picker("", selection: $state.convertPlan.options.frameCountPolicy) {
@@ -206,8 +217,9 @@ struct ConvertFrameCountOption: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .help("Keep original frames: uses evenly spaced frames, including the first and last; adds no new waves (adding frames repeats some).\nCrossfade new frames: makes each new frame by crossfading its two neighbours. This happens once, when converting; it is separate from the interpolation saved in the file, which is how the synth moves between frames as it plays.")
-            Text(affected == 0 ? "Every table already fits." : "Affects \(affected) table\(affected == 1 ? "" : "s").")
+            Text(state.convertPlan.frameCountCaption)
                 .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -216,26 +228,52 @@ struct ConvertFrameCountOption: View {
 struct ConvertInterpolationOption: View {
     @ObservedObject var state: AppState
 
+    private var tonverk: Bool { state.convertPlan.preset == .tonverk }
+
+    private var tip: String {
+        tonverk ? "Tonverk reads it from the file name: a trailing r means stepped, otherwise smooth. Other synths set interpolation on the oscillator."
+                : "Serum and Vital read it from the WAV; Tonverk reads it from the file name. Other synths set interpolation on the oscillator."
+    }
+
     var body: some View {
-        let tonverk = state.convertPlan.preset == .tonverk
         VStack(alignment: .leading, spacing: 4) {
             Text("Interpolation saved in file")
-            Picker("", selection: $state.convertPlan.options.interpolation) {
-                Text("Same as Source").tag(Optional<Interpolation>.none)
-                Text("None (Stepped)").tag(Optional<Interpolation>.some(Interpolation.none))
-                Text("Crossfade").tag(Optional<Interpolation>.some(Interpolation.crossfade))
-                Text("Spectral").tag(Optional<Interpolation>.some(Interpolation.spectral))
+            if tonverk {
+                // Tonverk's name says stepped or smooth, nothing else: a spectral choice shows
+                // as Smooth, which is what the writer records for it.
+                Picker("", selection: tonverkSelection) {
+                    Text("Same as Source").tag(Optional<Interpolation>.none)
+                    Text("None (Stepped)").tag(Optional<Interpolation>.some(Interpolation.none))
+                    Text("Smooth").tag(Optional<Interpolation>.some(Interpolation.crossfade))
+                }
+                .labelsHidden()
+                .frame(maxWidth: 200)
+                .help(tip)
+            } else {
+                Picker("", selection: $state.convertPlan.options.interpolation) {
+                    Text("Same as Source").tag(Optional<Interpolation>.none)
+                    Text("None (Stepped)").tag(Optional<Interpolation>.some(Interpolation.none))
+                    Text("Crossfade").tag(Optional<Interpolation>.some(Interpolation.crossfade))
+                    Text("Spectral").tag(Optional<Interpolation>.some(Interpolation.spectral))
+                }
+                .labelsHidden()
+                .frame(maxWidth: 200)
+                .help(tip)
             }
-            .labelsHidden()
-            .frame(maxWidth: 200)
-            .help(tonverk
-                  ? "Tonverk reads it from the file name (a trailing r means none); it has no spectral mode, so Spectral is written as smooth. Other synths set interpolation on the oscillator."
-                  : "Serum and Vital read it from the WAV; Tonverk reads it from the file name. Other synths set interpolation on the oscillator.")
-            Text(tonverk ? "Same as source saves smooth when the source doesn't say. None (stepped) adds r to the file name."
-                         : "Same as source saves crossfade when the source doesn't say.")
+            Text(tonverk ? "Same as Source writes smooth when the source doesn't say. None (Stepped) adds r to the file name."
+                         : "Same as Source saves crossfade when the source doesn't say.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    /// The Tonverk menu's selection: a spectral choice reads as Smooth (the writer records it
+    /// so), and choosing Smooth stores crossfade.
+    private var tonverkSelection: Binding<Interpolation?> {
+        Binding(
+            get: { state.convertPlan.options.interpolation == .spectral ? Interpolation.crossfade : state.convertPlan.options.interpolation },
+            set: { (value: Interpolation?) in state.convertPlan.options.interpolation = value }
+        )
     }
 }
 

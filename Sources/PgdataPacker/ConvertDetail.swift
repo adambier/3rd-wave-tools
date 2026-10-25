@@ -10,7 +10,7 @@ import WavetableFormats
 import PgdataPackerCore
 #endif
 
-/// Below the Convert table: a read-only preview of the selected table, on the under-page
+/// Below the Wavetables table: a read-only preview of the selected table, on the under-page
 /// background so it reads as output rather than as a place to edit. The source and the result
 /// are drawn frame by frame on the left; on the right, where the table came from, its frame size
 /// and interpolation, and what converting it does. Names and frame sizes are edited in the table
@@ -78,7 +78,7 @@ struct ConvertSeveralSummary: View {
             return e.resizes || e.changesCount || e.scaledToFit
         }.count
         if blocked > 0 {
-            Label("\(blocked) can't convert yet (see the Size column)", systemImage: "exclamationmark.octagon.fill")
+            Label("\(blocked) can't convert yet (see the Input column)", systemImage: "exclamationmark.octagon.fill")
                 .foregroundStyle(.red)
         }
         Text(ConvertSeveralSummary.changeSentence(changed: changed, of: items.count))
@@ -196,7 +196,7 @@ struct ConvertOverviewPair: View {
                                     unstatedLegend: "interpolation set on the synth")
                 }
             }
-            .help("The table's frames, front (first) to back (last): the source as read, and what the destination gets, read back from the file Convert would write. Solid lines are stored frames (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation, since Serum's and Vital's exact morphs aren't published.")
+            .help("The table's frames, front (first) to back (last): the source as read, and what the destination gets, read back from the file this page would write. Solid lines are stored frames (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation, since Serum's and Vital's exact morphs aren't published.")
         }
     }
 }
@@ -408,7 +408,7 @@ struct ConvertNoteList: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(outputLine).fixedSize(horizontal: false, vertical: true)
             if file.notes.isEmpty {
-                Text("Nothing changes but the format.").foregroundStyle(.secondary)
+                Text("Only the file format changes.").foregroundStyle(.secondary)
             } else {
                 ForEach(0..<file.notes.count, id: \.self) { (i: Int) in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {

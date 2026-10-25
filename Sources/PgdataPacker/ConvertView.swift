@@ -27,7 +27,7 @@ struct ConvertView: View {
             Divider()
             if state.convertPlan.items.isEmpty {
                 EmptyHint(title: "Drop wavetables here",
-                          detail: "Add WAV and FLAC wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table then shows its frames, its frame size, and what converting changes. Convert converts existing wavetables between formats; it does not make wavetables from other audio.")
+                          detail: "Add WAV and FLAC wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table then shows its frames, its frame size, and what converting changes. This page converts existing wavetables between formats; it does not make wavetables from other audio.")
             } else {
                 HSplitView {
                     VSplitView {
@@ -119,6 +119,8 @@ struct ConvertSummaryStrip: View {
             ConvertBlockedCount(count: plan.needsFrameSizeCount, what: "a frame size", plural: "frame sizes")
             ConvertBlockedCount(count: plan.cannotSplitCount, what: "splitting", plural: "splitting")
             Spacer()
+            // A Table header takes no tooltip on macOS 13, so the columns' unit is said here.
+            Text("Sizes are frames × samples per frame.").font(.caption).foregroundStyle(.secondary)
             Toggle("Only tables that can't convert yet", isOn: $state.convertOnlyAttention)
                 .toggleStyle(.checkbox).font(.caption)
                 .disabled(plan.blockedCount == 0)
@@ -144,7 +146,7 @@ struct ConvertBlockedCount: View {
                 .foregroundStyle(.red)
                 .help(what == "splitting"
                       ? "Tables marked to convert whose samples don't divide into frames of the size given"
-                      : "Tables marked to convert whose file doesn't say how long each wave is: choose a size in the Size column")
+                      : "Tables marked to convert whose file doesn't say how long each wave is: choose a size in the Input column")
         }
     }
 }
@@ -193,7 +195,7 @@ struct ConvertCheckCell: View {
                                  set: { state.convertPlan.setSelected(item.id, $0) }))
             .labelsHidden()
             .help(item.factorySlot != nil && state.convertPlan.preset.isThirdWave
-                  ? "Every 3rd Wave already has this factory table, so it starts unchecked" : "")
+                  ? "Your 3rd Wave has this factory table (U48–U55 since the 2025 update, which 24K and 24M owners download), so it starts unchecked" : "")
     }
 }
 
@@ -372,7 +374,7 @@ struct ConvertSizePopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Frame size").font(.headline)
-            Text("A wavetable file is one long run of samples; the frame size says where each wave starts and ends. If it's wrong, every wave is cut in the wrong place. The right size usually shows one complete cycle that joins up at both ends. A size that is too large shows the cycle repeated; one that is too small shows part of it. If in doubt, check the result in the destination synth.")
+            Text("The frame size says where each wave starts and ends; a wrong size cuts every wave in the wrong place. The right size usually shows one complete cycle that joins at both ends; a size that is too large repeats it, too small cuts it off.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Text(item.basisDescription)
@@ -391,17 +393,28 @@ struct ConvertSizePopover: View {
             }
         }
         .padding(12)
-        .frame(width: 380, alignment: .leading)
+        .frame(width: 480, alignment: .leading)
     }
 }
 
-/// One size: the first wave cut at that size, "64 × 128" under it, and "likely" under that
-/// when the samples suggest this size.
+/// One size: the first wave cut at that size, "64 × 128" under it, what the destination makes
+/// of it ("→ 64 × 1,024, 4 → 64 frames, repeated"), and "likely" when the samples suggest it.
 struct ConvertSizeButton: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
     let size: Int
     var likely: Bool = false
+
+    /// "→ 64 × 1,024, 4 → 64 frames, repeated": what the destination writes for this size.
+    private var becomes: String {
+        let plan = state.convertPlan
+        guard let e = plan.expected(for: item, frameSize: size) else { return "" }
+        var line = "→ \(e.frameCountOut) × \(ConvertPlan.formatCount(e.frameSizeOut))"
+        if let words = plan.changeWords(for: item, frameSize: size), !words.changes.isEmpty {
+            line += ", " + words.changes.joined(separator: ", ")
+        }
+        return line
+    }
 
     var body: some View {
         let chosen = item.frameSize == size
@@ -412,11 +425,16 @@ struct ConvertSizeButton: View {
                 Text("\(frames) × \(ConvertPlan.formatCount(size))")
                     .font(.caption).monospacedDigit()
                     .foregroundStyle(chosen ? Color.accentColor : Color.primary)
+                Text(becomes)
+                    .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                 if likely {
                     Text("likely").font(.caption2).foregroundStyle(.secondary)
                 }
             }
             .padding(6)
+            .frame(maxWidth: 150)
             .background(RoundedRectangle(cornerRadius: 6).fill(chosen ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.08)))
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(chosen ? Color.accentColor : Color.clear, lineWidth: 1))
         }

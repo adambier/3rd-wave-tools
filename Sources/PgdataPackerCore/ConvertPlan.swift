@@ -161,7 +161,7 @@ public struct ConvertPlan: Equatable {
             case .inFile, .fileName, .sidecar: return file + "."
             case .markers: return file + "; less certain than a frame size the file states."
             case .guessed:
-                return "Nothing in the file says, so the usual \(ConvertPlan.formatCount(table.frameSize ?? 2048)) is assumed. If it sounds wrong, choose another size in the Size column."
+                return "Nothing in the file says, so the usual \(ConvertPlan.formatCount(table.frameSize ?? 2048)) is assumed. If it sounds wrong, choose another size in the Input column."
             case .notStated:
                 return "The file doesn't say how long each wave is."
                     + (table.candidateFrameSizes.isEmpty ? " Its length allows none of the usual sizes."
@@ -644,8 +644,13 @@ public struct ConvertPlan: Equatable {
 
     /// What converting an item is expected to produce, from the preset's facts and the options;
     /// nil when the item cannot convert (no frame size, or samples that do not divide).
-    public func expected(for item: Item) -> ExpectedResult? {
-        guard let size = item.frameSize, let count = item.frameCount else { return nil }
+    public func expected(for item: Item) -> ExpectedResult? { expected(for: item, frameSize: item.frameSize) }
+
+    /// `expected(for:)` as if the item had the frame size `frameSize` (one of the sizes the file
+    /// allows), for the size chooser; nil when that size does not divide the samples.
+    public func expected(for item: Item, frameSize: Int?) -> ExpectedResult? {
+        guard let size = frameSize, size > 0, !item.table.samples.isEmpty, item.table.samples.count % size == 0 else { return nil }
+        let count = item.table.samples.count / size
         let ppg = preset == .thirdWaveP && options.appendPPGStandardWaves
         // With the PPG waves, the table itself goes into 60 frames and the four waves follow.
         let outCount = ppg ? 64 : destinationFrameCount(source: count)
@@ -666,16 +671,56 @@ public struct ConvertPlan: Equatable {
         var parts = ["\(e.frameCountOut) × \(Self.formatCount(e.frameSizeOut))"]
         if e.resizes { parts.append("resized from \(Self.formatCount(e.frameSizeIn)) samples per frame") }
         if e.changesCount {
-            parts.append("\(Self.formatCount(e.frameCountIn)) frame\(e.frameCountIn == 1 ? "" : "s") → \(e.tableFrameCount), " + Self.policyPhrase(e.countPolicy))
+            parts.append("\(Self.formatCount(e.frameCountIn)) frame\(e.frameCountIn == 1 ? "" : "s") → \(e.tableFrameCount), " + Self.methodWord(e.countPolicy, grows: e.frameCountGrows == true))
         }
         if e.scaledToFit { parts.append("turned down to fit (peak \(Self.decimal(e.peak)))") }
         if e.addsPPGWaves { parts.append("the PPG's four standard waves at 60–63") }
         return parts.joined(separator: "; ")
     }
 
-    /// "keeping original frames" or "crossfading new frames".
-    public static func policyPhrase(_ policy: FrameCountPolicy) -> String {
-        policy == .pickEvenly ? "keeping original frames" : "crossfading new frames"
+    /// How a frame count is changed, in a word: "repeated" (more frames, originals repeated),
+    /// "picked evenly" (fewer frames, originals kept), or "crossfaded" (new frames made by
+    /// crossfading neighbours, either way).
+    public static func methodWord(_ policy: FrameCountPolicy, grows: Bool) -> String {
+        switch policy {
+        case .pickEvenly: return grows ? "repeated" : "picked evenly"
+        case .interpolate: return "crossfaded"
+        }
+    }
+
+    /// How many tables to convert gain frames and how many lose them for the destination.
+    public var frameCountChanges: (gain: Int, lose: Int) {
+        var gain = 0, lose = 0
+        for item in selectedItems {
+            guard let grows = expected(for: item)?.frameCountGrows else { continue }
+            if grows { gain += 1 } else { lose += 1 }
+        }
+        return (gain, lose)
+    }
+
+    /// The Options caption for the frame-count choice: "Affects 12 tables: 9 gain frames
+    /// (repeated), 3 lose frames (picked evenly)." or "Every table already fits."
+    public var frameCountCaption: String {
+        let c = frameCountChanges
+        let total = c.gain + c.lose
+        guard total > 0 else { return "Every table already fits." }
+        var parts: [String] = []
+        if c.gain > 0 { parts.append("\(c.gain) gain frames (\(Self.methodWord(options.frameCountPolicy, grows: true)))") }
+        if c.lose > 0 { parts.append("\(c.lose) lose frames (\(Self.methodWord(options.frameCountPolicy, grows: false)))") }
+        return "Affects \(total) table\(total == 1 ? "" : "s"): " + parts.joined(separator: ", ") + "."
+    }
+
+    /// For a 3rd Wave destination: a warning when more of the user's own tables are to be
+    /// converted than a 3rd Wave holds at a time (U56–U63, P36–P47; factory tables, which it
+    /// already has, do not count); nil otherwise. The 3rd Wave itself, with no slot free,
+    /// offers to overwrite its last tables.
+    public var thirdWaveCapacityNote: String? {
+        guard preset.isThirdWave else { return nil }
+        let own = selectedItems.filter { canConvert($0) && $0.factorySlot == nil }.count
+        let isP = preset == .thirdWaveP
+        let slots = isP ? SourceRef.pCount - SourceRef.factoryPCount : SourceRef.uCount - SourceRef.factoryUCount
+        guard own > slots else { return nil }
+        return "\(own) \(isP ? "P" : "U") tables to convert; a 3rd Wave holds \(slots) of your own at a time (with none free, it offers to overwrite its last ones)."
     }
 
     /// What the Changes column says for an item: short words for each change the destination
@@ -683,10 +728,17 @@ public struct ConvertPlan: Equatable {
     /// short orange words for the warnings ("peak 1.14", "extra samples dropped"). Both empty
     /// when nothing changes but the format; nil when the item cannot convert.
     public func changeWords(for item: Item) -> (changes: [String], warnings: [String])? {
-        guard let e = expected(for: item) else { return nil }
+        changeWords(for: item, frameSize: item.frameSize)
+    }
+
+    /// `changeWords(for:)` as if the item had the frame size `frameSize` (for the size chooser).
+    public func changeWords(for item: Item, frameSize: Int?) -> (changes: [String], warnings: [String])? {
+        guard let e = expected(for: item, frameSize: frameSize) else { return nil }
         var changes: [String] = []
         if e.resizes { changes.append("resized") }
-        if e.changesCount { changes.append("\(Self.formatCount(e.frameCountIn)) → \(e.tableFrameCount) frames") }
+        if e.changesCount {
+            changes.append("\(Self.formatCount(e.frameCountIn)) → \(e.tableFrameCount) frames, " + Self.methodWord(e.countPolicy, grows: e.frameCountGrows == true))
+        }
         if e.scaledToFit { changes.append("turned down") }
         if e.addsPPGWaves { changes.append("+ PPG waves") }
         if preset.isThirdWave, WavetableWriter.thirdWaveName(item.name).name != item.name.trimmingCharacters(in: .whitespaces) {
