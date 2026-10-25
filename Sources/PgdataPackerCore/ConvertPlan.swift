@@ -562,18 +562,9 @@ public struct ConvertPlan: Equatable {
         selectedItems.filter { expected(for: $0)?.changesCount == true }.count
     }
 
-    /// The line under the destination list: that nothing has been tested yet, or which
-    /// destinations have been, from each preset's `testedIn`. (The "Sources" heading over the
-    /// book icons says where to look for more.)
-    public static var testingFootnote: String {
-        let tested = OutputPreset.allCases.filter { !$0.testedIn.isEmpty }
-        if tested.isEmpty { return "Converting to these outputs has not yet been tested." }
-        if tested.count == OutputPreset.allCases.count { return "Converting to every output has been tested." }
-        return "Tested so far: " + listPhrase(tested.map(\.shortTitle)) + "."
-    }
-
-    /// The sources popover's line on a destination: "Converting to this output has not yet been
-    /// tested." or "Tested in Pigments and Serum."
+    /// Whether converting to a destination has been tested (`OutputPreset.testedIn`): the
+    /// chosen row says so in orange when it has not, and the sources popover either way.
+    /// "Converting to this output has not yet been tested." or "Tested in Pigments and Serum."
     public static func testingStatus(_ preset: OutputPreset) -> String {
         preset.testedIn.isEmpty ? "Converting to this output has not yet been tested."
                                 : "Tested in " + listPhrase(preset.testedIn) + "."

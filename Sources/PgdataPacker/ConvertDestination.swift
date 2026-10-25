@@ -43,9 +43,6 @@ struct ConvertDestinationPane: View {
                             state.convertPlan.preset = $0
                         }
                     }
-                    Text(ConvertPlan.testingFootnote)
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                     ConvertOptionsBox(state: state)
                 }
                 .padding(12)
@@ -132,8 +129,9 @@ struct ConvertPresetRow: View {
     }
 }
 
-/// The radio, title, spec line, and (when chosen) why this destination is separate and the
-/// note, if any, on what its sources leave open for these tables.
+/// The radio, title, spec line, and (when chosen) why this destination is separate, then its
+/// cautions in orange: what its sources leave open for these tables, if anything, and that
+/// converting to it has not been tested, unless it has (`OutputPreset.testedIn`).
 struct ConvertPresetRowLabel: View {
     let preset: OutputPreset
     let chosen: Bool
@@ -155,21 +153,28 @@ struct ConvertPresetRowLabel: View {
                         .font(.caption)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 2)
-                }
-                if let caveat {
-                    Label {
-                        Text(caveat).fixedSize(horizontal: false, vertical: true)
-                    } icon: {
-                        Image(systemName: "exclamationmark.triangle")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .padding(.top, 2)
+                    if let caveat { ConvertCaution(text: caveat) }
+                    if preset.testedIn.isEmpty { ConvertCaution(text: ConvertPlan.testingStatus(preset)) }
                 }
             }
             Spacer(minLength: 0)
         }
         .contentShape(Rectangle())
+    }
+}
+
+/// One caution under a destination: a triangle and a sentence or two, in orange.
+struct ConvertCaution: View {
+    let text: String
+    var body: some View {
+        Label {
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: "exclamationmark.triangle")
+        }
+        .font(.caption)
+        .foregroundStyle(.orange)
+        .padding(.top, 2)
     }
 }
 

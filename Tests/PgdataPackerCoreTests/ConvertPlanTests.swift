@@ -489,7 +489,6 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(Interpolation.none.displayName, "None (stepped)")
         XCTAssertEqual(Interpolation.displayName(nil), "Not stated")
         XCTAssertEqual(Interpolation.displayName(.spectral), "Spectral")
-        XCTAssertEqual(ConvertPlan.testingFootnote, "Converting to these outputs has not yet been tested.")
         XCTAssertEqual(ConvertPlan.testingStatus(.tonverk), "Converting to this output has not yet been tested.")
         XCTAssertEqual(ConvertPlan.tablesHave(1, of: 5), "1 table has")
         XCTAssertEqual(ConvertPlan.tablesHave(2, of: 2), "Both tables have")

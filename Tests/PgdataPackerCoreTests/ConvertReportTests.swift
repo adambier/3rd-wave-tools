@@ -207,7 +207,6 @@ final class ConvertReportTests: XCTestCase {
         XCTAssertTrue(OutputPreset.tonverk.basis.hasPrefix("Elektron, "))
         XCTAssertEqual(OutputPreset.allCases.filter { $0.caveat != nil }, [.wav2048, .miniFreak, .phasePlant])
         XCTAssertNil(OutputPreset.tonverk.caveat, "Convert always writes a size tag, so the open question about a bare trailing r does not reach the user")
-        XCTAssertFalse(ConvertPlan.testingFootnote.contains("maker"))
     }
 
     func testSourceLabelsAreDistinctAndWAVIsOneLabel() {
