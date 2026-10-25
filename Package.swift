@@ -57,7 +57,10 @@ products.append(.executable(name: "PgdataPacker", targets: ["PgdataPacker"]))
 
 if includeTests {
     targets.append(.testTarget(name: "PgdataFormatsTests", dependencies: ["PgdataFormats", "WavetableFormats", "PgdataPackerCore"]))
-    targets.append(.testTarget(name: "WavetableFormatsTests", dependencies: ["PgdataFormats", "WavetableFormats", "PgdataPackerCore"]))
+    // Resources/ holds the small synthetic FLAC files FLACTests reads by path (not as bundle
+    // resources, which keeps the test build the same on Linux, macOS, and Windows).
+    targets.append(.testTarget(name: "WavetableFormatsTests", dependencies: ["PgdataFormats", "WavetableFormats", "PgdataPackerCore"],
+                               exclude: ["Resources"]))
 }
 
 let package = Package(

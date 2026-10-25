@@ -20,6 +20,8 @@ import WavetableFormats
 //                                        each file (TSV); --all also lists files without tables;
 //                                        --check-writers writes every table for every preset and
 //                                        reads it back
+//   tw3pg wtdump <file> <out.f32>        the first table's samples as raw float32 little-endian (to compare a
+//                                        decoder with ffmpeg: ffmpeg -i x.flac -f f32le -ac 1 x.raw)
 //   tw3pg maketests | maketest5 | maketest6 ...   build the hardware-test files (see each command's usage line)
 
 func files(under paths: [String], ext: Set<String>) -> [URL] {
@@ -437,6 +439,15 @@ case "wtscan":
     FileHandle.standardError.write(Data(("\(todo.count) files read, \(ignored) other files skipped: \(tables) tables (\(open) with the frame size open), "
         + "\(without) files without tables, \(failed) errors" + (check ? ", \(writerFailures) writer failures" : "") + "\n"
         + bases.sorted { $0.value > $1.value }.map { "  \($0.value)\t\($0.key)" }.joined(separator: "\n") + "\n").utf8))
+
+case "wtdump":
+    need(2, rest, "wtdump <file> <out.f32>")
+    let found = try WavetableReader.read(url: URL(fileURLWithPath: rest[0]))
+    guard let t = found.first else { print("no table in \(rest[0])"); exit(1) }
+    var out = Data(capacity: t.samples.count * 4)
+    for s in t.samples { withUnsafeBytes(of: s.bitPattern.littleEndian) { out.append(contentsOf: $0) } }
+    try out.write(to: URL(fileURLWithPath: rest[1]))
+    print("\(t.samples.count) samples")
 
 default:
     print("unknown command \(cmd)"); exit(2)

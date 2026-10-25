@@ -124,16 +124,14 @@ final class CorpusCaseTests: XCTestCase {
 
     // MARK: - Formats the reader does not read
 
-    /// Phase Plant's factory tables are FLAC (mono, 24-bit, 256 × 2,048 samples); DUNE 3's `.wt`
-    /// is its own binary format; a MiniFreak V bank (`.mnfx`) is a zip of presets that name their
-    /// wavetables without holding them. None is a WAV, a Surge file, or a 3rd Wave file, so each
-    /// is passed over without an error.
+    /// DUNE 3's `.wt` is its own binary format; a MiniFreak V bank (`.mnfx`) is a zip of presets
+    /// that name their wavetables without holding them. Neither is a WAV, a FLAC file, a Surge
+    /// file, or a 3rd Wave file, so each is passed over without an error. (Phase Plant's factory
+    /// tables are FLAC, which the reader does read: FLACTests.)
     func testUnreadFormatsArePassedOverQuietly() throws {
-        XCTAssertFalse(WavetableReader.mayContainWavetables(fileName: "Brass.flac"))
+        XCTAssertTrue(WavetableReader.mayContainWavetables(fileName: "Brass.flac"))
         XCTAssertFalse(WavetableReader.mayContainWavetables(fileName: "Bank.mnfx"))
         XCTAssertTrue(WavetableReader.mayContainWavetables(fileName: "Vintage Saw.wt"))
-        let flac = Data("fLaC".utf8) + Data([0x80, 0, 0, 0x22]) + Data(repeating: 0, count: 34)
-        XCTAssertEqual(try WavetableReader.read(flac, fileName: "Brass.flac"), [])
         let dune = Data(u32(2) + u32(0) + u32(0) + u32(0x0015_0800) + u32(24) + u32(3) + u32(0) + u32(0x3F80_0000)) + Data(repeating: 0, count: 320 + 4096)
         XCTAssertEqual(try WavetableReader.read(dune, fileName: "Vintage Saw.wt"), [])
         XCTAssertEqual(try WavetableReader.read(Data("PK\u{3}\u{4}".utf8) + Data(repeating: 0, count: 64), fileName: "Bank.mnfx"), [])
