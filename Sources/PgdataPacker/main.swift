@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         para.paragraphSpacing = NSFont.smallSystemFontSize
         let source = "github.com/adambier/3rd-wave-tools"
         let credits = NSMutableAttributedString(
-            string: "Packs and unpacks unified program data (.pgdata) files for the Groove Synthesis 3rd Wave.\n"
+            string: "Packs and unpacks unified program data (.pgdata) files for the Groove Synthesis 3rd Wave, and converts wavetables to and from its formats.\n"
                 + "Not affiliated with or endorsed by Groove Synthesis.\n"
                 + "Source: \(source)",   // the licence is the panel's copyright line (NSHumanReadableCopyright)
             attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
