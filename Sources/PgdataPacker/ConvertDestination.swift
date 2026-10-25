@@ -71,57 +71,86 @@ struct ConvertPresetRow: View {
     let choose: () -> Void
 
     var body: some View {
-        Button(action: choose) {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: chosen ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(chosen ? Color.accentColor : Color.secondary)
-                    .padding(.top, 1)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(preset.shortTitle)
-                    Text(preset.specLine).font(.caption).foregroundStyle(.secondary).monospacedDigit()
-                    if chosen {
-                        Text(preset.distinction)
-                            .font(.caption)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 2)
-                    }
-                    if let caveat = preset.caveat {
-                        // What the sources leave open, in the open rather than on hover.
-                        Label {
-                            Text(caveat).fixedSize(horizontal: false, vertical: true)
-                        } icon: {
-                            Image(systemName: "exclamationmark.triangle")
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .padding(.top, 2)
-                    }
-                }
-                Spacer(minLength: 0)
-                ConvertEvidenceIcon(preset: preset)
+        // The row chooses the destination; the sources icon beside it is its own button, so
+        // clicking it opens the sources rather than choosing the row.
+        HStack(alignment: .top, spacing: 4) {
+            Button(action: choose) {
+                ConvertPresetRowLabel(preset: preset, chosen: chosen)
             }
-            .padding(6)
-            .background(RoundedRectangle(cornerRadius: 6).fill(chosen ? Color.accentColor.opacity(0.12) : Color.clear))
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            ConvertSourcesButton(preset: preset)
         }
-        .buttonStyle(.plain)
+        .padding(6)
+        .background(RoundedRectangle(cornerRadius: 6).fill(chosen ? Color.accentColor.opacity(0.12) : Color.clear))
     }
 }
 
-/// A book when the preset rests on its sources alone, a green seal when it has been tested; the
-/// sources (publisher and document) and the tested status on hover.
-struct ConvertEvidenceIcon: View {
+/// The radio, title, spec line, and (when chosen) why this destination is separate, plus any caveat.
+struct ConvertPresetRowLabel: View {
     let preset: OutputPreset
+    let chosen: Bool
+
     var body: some View {
-        let tested = preset.testedIn
-        if tested.isEmpty {
-            Image(systemName: "book.closed")
-                .foregroundStyle(.secondary)
-                .help("Not yet tested in its synth.\nSources: " + preset.basis + ".")
-        } else {
-            Image(systemName: "checkmark.seal.fill")
-                .foregroundStyle(.green)
-                .help("Tested in " + ConvertPlan.listPhrase(tested) + ".\nSources: " + preset.basis + ".")
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: chosen ? "largecircle.fill.circle" : "circle")
+                .foregroundStyle(chosen ? Color.accentColor : Color.secondary)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(preset.shortTitle)
+                Text(preset.specLine).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                if chosen {
+                    Text(preset.distinction)
+                        .font(.caption)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 2)
+                }
+                if let caveat = preset.caveat {
+                    // What the sources leave open, in the open rather than on hover.
+                    Label {
+                        Text(caveat).fixedSize(horizontal: false, vertical: true)
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .padding(.top, 2)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+/// A book when the destination rests on its sources alone, a green seal when it has been tested.
+/// Clicking it shows the sources (publisher and document) and the tested status.
+struct ConvertSourcesButton: View {
+    let preset: OutputPreset
+    @State private var showing = false
+
+    private var tested: [String] { preset.testedIn }
+    private var status: String {
+        tested.isEmpty ? "Not yet tested in its synth." : "Tested in " + ConvertPlan.listPhrase(tested) + "."
+    }
+
+    var body: some View {
+        Button { showing.toggle() } label: {
+            Image(systemName: tested.isEmpty ? "book.closed" : "checkmark.seal.fill")
+                .foregroundStyle(tested.isEmpty ? Color.secondary : Color.green)
+        }
+        .buttonStyle(.borderless)
+        .help("Sources for this destination")
+        .popover(isPresented: $showing, arrowEdge: .leading) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(preset.shortTitle).font(.headline)
+                Text(status)
+                Text("Sources").font(.subheadline).bold().padding(.top, 4)
+                Text(preset.basis + ".")
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(12)
+            .frame(width: 320, alignment: .leading)
         }
     }
 }

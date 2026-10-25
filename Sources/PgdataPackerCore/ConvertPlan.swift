@@ -302,10 +302,10 @@ public struct ConvertPlan: Equatable {
         public init(text: String, names: [String], total: Int) { self.text = text; self.names = names; self.total = total }
         /// Whether every converted table has the note.
         public var isUniversal: Bool { names.count == total && total > 0 }
-        /// "All 74 tables", "12 tables", or the one table's name.
+        /// "All 74 tables" ("Both tables" for two), "12 tables", or the one table's name.
         public var label: String {
             if names.count == 1 { return names[0] }
-            if isUniversal { return "All \(total) tables" }
+            if isUniversal { return CountWords.all(total, "tables") }
             return "\(names.count) tables"
         }
     }
@@ -569,12 +569,12 @@ public struct ConvertPlan: Equatable {
     public static var testingFootnote: String {
         let tested = OutputPreset.allCases.filter { !$0.testedIn.isEmpty }
         if tested.isEmpty {
-            return "Not yet tested in these synths. Hover a row for its sources."
+            return "Not yet tested in these synths. Click a row’s book icon for its sources."
         }
         if tested.count == OutputPreset.allCases.count {
-            return "Every destination has been tested in its synth. Hover a row for details."
+            return "Every destination has been tested in its synth. Click a row’s icon for its sources."
         }
-        return "Tested: " + listPhrase(tested.map(\.shortTitle)) + ". Hover a row for its sources."
+        return "Tested: " + listPhrase(tested.map(\.shortTitle)) + ". Click a row’s book icon for its sources."
     }
 
     /// The report's first line: "Converted 74 tables for Phase Plant into “output”." (the

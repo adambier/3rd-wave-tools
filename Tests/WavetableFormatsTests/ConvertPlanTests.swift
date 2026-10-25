@@ -530,7 +530,7 @@ final class ConvertReportTests: XCTestCase {
         XCTAssertEqual(c.reports, [ConvertPlan.ItemReport(name: "A", notes: ["same", "only A"]),
                                    ConvertPlan.ItemReport(name: "B", notes: ["same", "only B"])])
         XCTAssertEqual(c.notes, ["A: same", "A: only A", "B: same", "B: only B"])
-        XCTAssertEqual(ConvertPlan.groupedNotes(c.reports).map(\.label), ["All 2 tables", "A", "B"])
+        XCTAssertEqual(ConvertPlan.groupedNotes(c.reports).map(\.label), ["Both tables", "A", "B"])
     }
 
     func testReportTitleIsShort() {
