@@ -171,7 +171,10 @@ final class ReadingTests: XCTestCase {
 
     func testStereoUsesLeftChannel() throws {
         let left = ramp(8192), right = [Float](repeating: 0.25, count: 8192)
-        let t = try XCTUnwrap(WavetableReader.read(wavFile([left, right], format: .pcm24), fileName: "st.wav").first)
+        // Stereo files are read when they carry metadata (here a clm chunk); without it, ordinary audio.
+        let t = try XCTUnwrap(WavetableReader.read(wavFile([left, right], format: .pcm24, chunks: [clm("<!>2048 10000000")]),
+                                                   fileName: "st.wav").first)
+        XCTAssertEqual(try WavetableReader.read(wavFile([left, right], format: .pcm24), fileName: "plain.wav"), [])
         XCTAssertEqual(t.samples.count, 8192)
         XCTAssertEqual(t.samples[100], left[100], accuracy: 1e-6)
         XCTAssertTrue(t.notes.contains { $0.contains("2 channels") }, "\(t.notes)")

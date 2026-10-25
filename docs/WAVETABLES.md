@@ -106,8 +106,8 @@ used:
 5. a Serum `.txt` file beside it;
 6. evenly spaced `cue ` points;
 7. a single `smpl` loop whose length divides the file;
-8. the length: multiples of 2,048 as 2,048 per frame, up to 512 frames, except 8,192 and 16,384
-   samples (below).
+8. the length, for a mono file: multiples of 2,048 as 2,048 per frame, up to 256 frames, except
+   8,192 and 16,384 samples (below).
 
 Cue points and loops count only for frame sizes up to 4,096, since ordinary samples have them
 too. When two of these disagree, Convert notes both. When rules 1–5 give a
@@ -117,8 +117,9 @@ other sizes the length allows can be chosen instead. When nothing settles the si
 the sizes the length allows and waits for you to choose: a file of 8,192 samples is 64 × 128 for
 the 3rd Wave's Wave Maker (a PPG table) but 4 × 2,048 for Serum, Pigments, or Tonverk (whose
 factory library has one), and one of 16,384 is 64 × 256 for WaveEdit but 8 × 2,048 for Serum. A WAV with none of the metadata above is
-listed only when its length is 8,192 or 16,384 samples or a multiple of 2,048 (up to 512 frames);
-anything else is taken to be ordinary audio.
+listed only when it is mono and its length is a multiple of 2,048 (up to 256 frames); anything
+else is taken to be ordinary audio. Some audio still fits that rule by chance (a sample library's
+mono loops, say), and is listed with "file length" as the reason.
 
 ## 4. Changing frame size and frame count
 

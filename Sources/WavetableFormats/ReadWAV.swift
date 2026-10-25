@@ -138,6 +138,12 @@ extension WavetableReader {
                 notes.append("\(capitalized(other.subject)) gives \(grouped(other.size)) samples per frame, but "
                              + "\(chosen.subject) gives \(grouped(chosen.size)); \(chosen.subject) is used.")
             }
+        } else if wav.channels > 1 || count % 2048 != 0 && count != 8192 {
+            // No metadata, and stereo or a length that is not a multiple of 2,048: with nothing to
+            // say it is a wavetable, it is taken to be ordinary audio. (Wavetable files without
+            // metadata are mono; among sample libraries scanned, stereo samples and a few one-shots
+            // had lengths that happened to divide into frames.)
+            return []
         } else if count == 8192 {
             // The 3rd Wave's Wave Maker reads this length as a 64 × 128 PPG table, while Serum,
             // Pigments, and Tonverk read 4 × 2,048 (Tonverk's own factory library has one), so ask.
@@ -147,16 +153,14 @@ extension WavetableReader {
             basis = "length 16,384: WaveEdit's 64 × 256 or 8 × 2,048; the file does not say which"
             candidates = wav.bytesPerSample == 2 ? [256, 2048] : [2048, 256]
         } else if count % 2048 == 0 {
-            // Length alone: longer than Surge's 512 frames is taken to be ordinary audio.
-            guard count / 2048 <= 512 else { return [] }
+            // Length alone: more than the 256 frames Serum, Vital, and Pigments take is taken to be
+            // ordinary audio (a 16-second sample at 48 kHz is 375 × 2,048).
+            guard count / 2048 <= 256 else { return [] }
             frameSize = 2048
             basis = "file length (multiples of 2,048, the Serum convention)"
             candidates = fittingFrameSizes(count).filter { $0 != 2048 }
         } else {
-            // No metadata and a length that is not a multiple of 2,048: with nothing to say it is
-            // a wavetable, it is taken to be ordinary audio. (Among one collection's 700 or so
-            // percussion samples, a few had lengths that happened to divide into frames.)
-            return []
+            return []   // unreachable: the first branch takes every other length
         }
 
         var interpolation: Interpolation?
