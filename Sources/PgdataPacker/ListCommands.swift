@@ -41,10 +41,20 @@ final class ListCommands {
         entries.setObject(source, forKey: tableView)
     }
 
-    /// The handlers of the list whose table view is the window's first responder; nil when the
-    /// first responder is something else (a text field, a button, nothing).
+    /// The handlers of the list whose table view is the window's first responder. When the
+    /// first responder is a text field being edited, nil: Delete and Return belong to the
+    /// typing. When it is anything else (a button or slider after a click on Listen or the
+    /// Frame slider, say), the handlers of the one visible list in the window that shows a
+    /// selection, since that selection is what the user sees highlighted and means by Delete
+    /// (Adam, 2026-10-26: Delete did nothing on a playing table while Remove Selected worked).
     func handlers(forFirstResponderOf window: NSWindow?) -> Handlers? {
-        guard let table = window?.firstResponder as? NSTableView else { return nil }
+        guard let window else { return nil }
+        if let table = window.firstResponder as? NSTableView { return entries.object(forKey: table)?.handlers }
+        if window.firstResponder is NSText { return nil }
+        let candidates = (entries.keyEnumerator().allObjects as? [NSTableView] ?? []).filter {
+            $0.window === window && !$0.isHiddenOrHasHiddenAncestor && $0.selectedRowIndexes.count > 0
+        }
+        guard candidates.count == 1, let table = candidates.first else { return nil }
         return entries.object(forKey: table)?.handlers
     }
 
