@@ -9,7 +9,7 @@ A macOS app that packs Groove Synthesis 3rd Wave programs (`.pro`) together with
 `.pgdata` files back into those parts, and converts wavetables between the 3rd Wave's formats and
 those of other synths.
 
-Why you might want it:
+Why you might want to use it:
 
 - You have programs, your own or downloaded, whose wavetables or samples come as separate files,
   and you'd like each bundled into one file, for archiving, for import into the 3rd Wave Terminal
