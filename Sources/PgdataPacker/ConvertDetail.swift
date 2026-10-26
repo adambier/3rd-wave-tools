@@ -377,7 +377,7 @@ struct ConvertSweepNoteView: View {
         }
         .help(isCaution
               ? "The destination needs more frames than the table has, and Original Frames Only fills the count by repeating frames. Blending can only act where one frame gives way to the next, so most of the sweep sounds the same whichever interpolation is chosen."
-              : "The frames of this table differ little from one to the next (measured as the typical difference between a frame and the next), so stepping and blending between them are hard to tell apart by ear. Nothing to change.")
+              : "The frames of this table differ little from one to the next (measured as the typical difference between a frame and the next), so stepping and blending between them can be hard to tell apart by ear. Nothing to change.")
     }
 }
 

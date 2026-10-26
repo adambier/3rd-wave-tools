@@ -1136,7 +1136,7 @@ public struct ConvertPlan: Equatable {
     public static func alikeFramesNote(for frames: [[Float]]) -> SweepNote? {
         guard let d = neighborDifference(frames), d < alikeThreshold else { return nil }
         return SweepNote(kind: .alikeFrames, text:
-            "Neighboring frames are much alike, so stepping and blending between frames sound nearly the same.")
+            "Neighboring frames are much alike, so stepping and blending between frames can be hard to tell apart.")
     }
 
     /// Below this, neighboring frames are "much alike". A heuristic, set by Adam's ear on

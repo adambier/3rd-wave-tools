@@ -385,7 +385,7 @@ hard to hear: a caution, in orange, when a small table's frames are repeated to 
 destination's frame count (a synth that blends between frames, the 3rd Wave's wavetable smoothing
 among them, can then blend only where the frame changes; **Crossfade New Frames** under
 **Options** makes the sweep continuous), and a note when neighboring frames are much alike, so
-that stepping and blending sound nearly the same.
+that stepping and blending can be hard to tell apart.
 
 #### Converting
 
