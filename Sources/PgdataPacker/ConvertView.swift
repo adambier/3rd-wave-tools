@@ -43,7 +43,7 @@ struct ConvertView: View {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                             Divider()
                             ConvertDetailPane(selection: selection,
-                                              maxHeight: max(ConvertDetailPane.minimumHeight, geo.size.height * 0.45))
+                                              maxHeight: max(ConvertDetailPane.minimumHeight, geo.size.height * 0.5))
                         }
                     }
                     .frame(minWidth: 660, maxWidth: .infinity, maxHeight: .infinity)

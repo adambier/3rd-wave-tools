@@ -26,6 +26,11 @@ struct ConvertDetailPane: View {
 
     /// The least the pane is given, whatever the window's height.
     static let minimumHeight: CGFloat = 120
+    /// The height the pane keeps whatever is selected, so it does not grow and shrink as the
+    /// selection or the Frame slider changes the text in it (Adam, 2026-10-26): room for the
+    /// pictures with four lines of legend under them, and for the facts with three notes. Taller
+    /// content, which is rare, still grows it (or scrolls it in a short window).
+    static let preferredHeight: CGFloat = 320
 
     /// The selected rows the table shows (a row the filter hides stays selected out of sight,
     /// as in Pack).
@@ -39,10 +44,11 @@ struct ConvertDetailPane: View {
 
     var body: some View {
         let chosen = self.chosen
-        // The pane is as tall as its content, up to `maxHeight`: a status display, not a pane
-        // to resize or scroll. Only in a short window does the content exceed the room; it then
-        // scrolls, and a fade at the bottom edge shows there is more.
-        let height = min(max(contentHeight, Self.minimumHeight), maxHeight)
+        // The pane keeps `preferredHeight`, growing only for taller content, up to `maxHeight`:
+        // a status display, not a pane to resize or scroll. Only in a short window does the
+        // content exceed the room; it then scrolls, and a fade at the bottom edge shows there is
+        // more.
+        let height = min(max(contentHeight, Self.preferredHeight, Self.minimumHeight), maxHeight)
         let overflows = contentHeight > maxHeight + 0.5
         ScrollView {
             Group {
@@ -500,6 +506,11 @@ struct ConvertOverview: View {
     /// The Frame slider's place, 0…1.
     let position: Double
 
+    /// Room for four lines of legend under every picture, so the three legends end at one
+    /// height whatever they say, and the Frame slider under them keeps its place as the words
+    /// change ("frame 9 of 64" to "between frames 15 and 16 (crossfade)" wraps differently).
+    static let legendHeight: CGFloat = 60
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             WavetableStackCanvas(frames: frames, interpolation: interpolation, tint: tint, highlight: position)
@@ -509,6 +520,7 @@ struct ConvertOverview: View {
             Text(caption).font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 .fixedSize(horizontal: false, vertical: true)
             ConvertOverviewLegend(interpolation: interpolation, unstated: unstatedLegend, note: interpolationNote, tint: tint)
+                .frame(minHeight: ConvertOverview.legendHeight, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
         // One element: the caption ("Input · 64 × 2,048"), then the legend's lines.
@@ -570,6 +582,7 @@ struct ConvertSweepView: View {
                 }
             }
             .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            .frame(minHeight: ConvertOverview.legendHeight, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
         // One element: the caption, then which frame of each table is drawn.
