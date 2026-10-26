@@ -803,6 +803,22 @@ public struct ConvertPlan: Equatable {
         WavetableWriter.interpolationRecorded(for: preset, source: item.table.interpolation, options: options)
     }
 
+    /// The interpolation the destination's synth plays the result with, for the preview's
+    /// pictures and Listen: what the file records when the format records it; for the 3rd Wave,
+    /// whose files record none, what its Wave Flow does by default (checked on an 8M; FORMATS.md
+    /// section 5.1): a U table plays with wavetable smoothing on, taken here to be a crossfade
+    /// between frames (the manual says "interpolation between neighbouring frames"; the method
+    /// is an inference), and a P table with it off, stepping from frame to frame. Nil for a
+    /// format that records nothing when the synth's default is not known.
+    public func interpolationPlayed(for item: Item) -> Interpolation? {
+        if let recorded = interpolationRecorded(for: item) { return recorded }
+        switch preset {
+        case .thirdWaveU: return .crossfade
+        case .thirdWaveP: return Interpolation.none
+        default: return nil
+        }
+    }
+
     // MARK: Existing choices (the Options pickers)
 
     // The Interpolation and Tonverk frame size pickers list every value the destination can take

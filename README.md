@@ -366,7 +366,10 @@ Shown when a choice applies to the destination and the tables (the captions coun
 
 The pane under the table shows the selected table: the input and the result stacked frame by
 frame, with the interpolation drawn between frames where a file records one; its file, its frame
-size and what that rests on, its interpolation, and what converting changes. The **Frame** slider
+size and what that rests on, its interpolation, and what converting changes. A 3rd Wave result is
+drawn and played the way the 3rd Wave plays it by default: a U table with wavetable smoothing on,
+blending between frames (drawn as a crossfade, an inference from the manual's description), and a
+P table with it off, stepping from frame to frame. The **Frame** slider
 sweeps through the table and draws the cycle there large, input and result together. **Listen** plays that cycle, following the slider, at the pitch chosen
 beside it (a piano key and its frequency; A3, 220 Hz, to start) through the device chosen under
 **Audio Output**, the speaker icon at the right of the toolbar.

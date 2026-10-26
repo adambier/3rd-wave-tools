@@ -371,7 +371,9 @@ struct ConvertOverviewPair: View {
             // input is drawn at once; the result's place says it is being converted).
             let converted = state.convertPreview(item)
             let result = converted?.frames
-            let resultInterpolation = plan.interpolationRecorded(for: item)
+            // What the destination's synth plays, for the result's in-betweens and Listen: the
+            // 3rd Wave's wavetable smoothing by default (a U table blends, a P table steps).
+            let resultInterpolation = plan.interpolationPlayed(for: item)
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 16) {
                     ConvertOverview(frames: source.frames,
@@ -384,7 +386,8 @@ struct ConvertOverviewPair: View {
                         ConvertOverview(frames: result,
                                         caption: "\(plan.preset.shortTitle) · \(result.count) × \(ConvertPlan.formatCount(first.count))",
                                         interpolation: resultInterpolation,
-                                        unstatedLegend: ConvertOverviewPair.resultLegend(for: plan.preset),
+                                        unstatedLegend: "interpolation set in the synth",
+                                        interpolationNote: ConvertOverviewPair.interpolationNote(for: plan.preset),
                                         tint: WavetableStackCanvas.resultColor,
                                         position: position)
                     } else if converted == nil {
@@ -406,14 +409,14 @@ struct ConvertOverviewPair: View {
         }
     }
 
-    /// The words after "Frames in the file" under the result when its file records no
-    /// interpolation: for the 3rd Wave, what its wavetable smoothing does by default (checked on
-    /// an 8M; FORMATS.md section 5.1); for the others, that the synth sets it.
-    static func resultLegend(for preset: OutputPreset) -> String {
+    /// Why the result is drawn and played with its interpolation when its file records none:
+    /// for the 3rd Wave, what its wavetable smoothing does by default (checked on an 8M;
+    /// FORMATS.md section 5.1; `ConvertPlan.interpolationPlayed(for:)`). Nil for the others.
+    static func interpolationNote(for preset: OutputPreset) -> String? {
         switch preset {
-        case .thirdWaveP: return "wavetable smoothing is off by default on the 3rd Wave, so it steps between them"
-        case .thirdWaveU: return "wavetable smoothing is on by default on the 3rd Wave, so it blends between them"
-        default: return "interpolation set in the synth"
+        case .thirdWaveU: return "wavetable smoothing, on by default on the 3rd Wave, taken as a crossfade"
+        case .thirdWaveP: return "wavetable smoothing is off by default on the 3rd Wave"
+        default: return nil
         }
     }
 
@@ -488,6 +491,9 @@ struct ConvertOverview: View {
     let interpolation: Interpolation?
     /// The words after "Frames in the file" when `interpolation` is nil.
     let unstatedLegend: String
+    /// Why the table plays with `interpolation` when its file does not say (the 3rd Wave's
+    /// default); nil when the file says, or nothing is known.
+    var interpolationNote: String? = nil
     /// The table's color: the source's (`WavetableStackCanvas.sourceColor`) or the result's
     /// (`resultColor`), the same in the cycle picture beside them.
     let tint: Color
@@ -502,7 +508,7 @@ struct ConvertOverview: View {
                 .accessibilityHidden(true)
             Text(caption).font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 .fixedSize(horizontal: false, vertical: true)
-            ConvertOverviewLegend(interpolation: interpolation, unstated: unstatedLegend, tint: tint)
+            ConvertOverviewLegend(interpolation: interpolation, unstated: unstatedLegend, note: interpolationNote, tint: tint)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
         // One element: the caption ("Input · 64 × 2,048"), then the legend's lines.
@@ -603,20 +609,23 @@ struct SweepCycleCanvas: View {
 struct ConvertOverviewLegend: View {
     let interpolation: Interpolation?
     let unstated: String
+    /// Why the table plays this way when its file does not say (see `ConvertOverview`).
+    var note: String? = nil
     let tint: Color
 
     private var storedWords: String {
         guard let mode = interpolation else { return "Frames in the file · " + unstated }
-        return mode == Interpolation.none ? "Frames in the file (the table steps between them)" : "Frames in the file"
+        guard mode == Interpolation.none else { return "Frames in the file" }
+        return "Frames in the file (the table steps between them" + (note.map { "; " + $0 } ?? "") + ")"
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             ConvertSwatch(color: tint, text: storedWords)
             if interpolation == .crossfade {
-                ConvertSwatch(color: WavetableStackCanvas.crossfadeColor(tint), text: "Crossfades")
+                ConvertSwatch(color: WavetableStackCanvas.crossfadeColor(tint), text: "Crossfades" + (note.map { " (" + $0 + ")" } ?? ""))
             } else if interpolation == .spectral {
-                ConvertSwatch(color: WavetableStackCanvas.spectralColor, text: "Spectral blends (approx.)")
+                ConvertSwatch(color: WavetableStackCanvas.spectralColor, text: "Spectral blends (approx.)" + (note.map { " (" + $0 + ")" } ?? ""))
             }
         }
         .font(.caption).foregroundStyle(.secondary)

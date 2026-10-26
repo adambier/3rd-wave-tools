@@ -779,6 +779,25 @@ final class WavetableSketchInterpolationTests: XCTestCase {
         plan.preset = .surge
         XCTAssertNil(plan.interpolationRecorded(for: plan.items[0]))
     }
+
+    /// What the preview draws and Listen plays for a result whose file records no interpolation:
+    /// the 3rd Wave's wavetable smoothing by default (on for a U table, taken as a crossfade;
+    /// off for a P table), nothing known for the others; a recorded interpolation wins.
+    func testInterpolationPlayedFollowsTheThirdWaveDefaults() {
+        let wave = (0..<2048).map { Float(sin(Double($0) * 2 * .pi / 2048)) * 0.5 }
+        let t = FoundTable(name: "T", fileName: "T.wav", source: .wav, samples: wave + wave, frameSize: 2048,
+                           frameSizeBasis: "clm chunk", interpolation: .spectral)
+        var plan = ConvertPlan(preset: .thirdWaveU)
+        plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/T.wav"), table: t)], factory: FactoryLibrary())
+        XCTAssertNil(plan.interpolationRecorded(for: plan.items[0]))
+        XCTAssertEqual(plan.interpolationPlayed(for: plan.items[0]), .crossfade)
+        plan.preset = .thirdWaveP
+        XCTAssertEqual(plan.interpolationPlayed(for: plan.items[0]), Interpolation.none)
+        plan.preset = .surge
+        XCTAssertNil(plan.interpolationPlayed(for: plan.items[0]))
+        plan.preset = .wav2048
+        XCTAssertEqual(plan.interpolationPlayed(for: plan.items[0]), .spectral)
+    }
 }
 
 

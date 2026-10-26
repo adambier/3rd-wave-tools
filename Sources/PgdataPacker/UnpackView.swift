@@ -12,6 +12,8 @@ struct UnpackView: View {
     @EnvironmentObject var state: AppState
     @State private var selection = Set<UUID>()
     @State private var dropTargeted = false
+    /// What Edit › Delete does in the list of .pgdata files (see `ListCommands`).
+    @State private var listCommandSource = ListCommandSource()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,6 +43,8 @@ struct UnpackView: View {
                 EmptyHint(title: "Drop .pgdata files here",
                           detail: "Add unified program (.pgdata) files; folders work too. Each is then split into its program (.pro), its embedded wavetables (.wt), and its multisamples (.bin, named with their S slot). To rename a file, double-click its row or select it and press Return.")
             } else {
+                // Edit › Delete acts only while rows are selected (nil disables the item).
+                let commands = listCommandSource.set(delete: selection.isEmpty ? nil : { state.removeUnpacks(selection); selection = [] })
                 HSplitView {
                     List(selection: $selection) {
                         ForEach(state.unpacks) { u in
@@ -48,11 +52,10 @@ struct UnpackView: View {
                                 Text(u.plan.programName).lineLimit(1).help(u.plan.programName)
                                 Text(u.url.lastPathComponent).font(.caption).foregroundStyle(.secondary).lineLimit(1).help(u.url.path)
                             }
+                            .listCommands(commands)
                             .tag(u.id)
                         }
                     }
-                    // Edit › Delete acts only while rows are selected (nil disables the item).
-                    .listCommands(delete: selection.isEmpty ? nil : { state.removeUnpacks(selection); selection = [] })
                     .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(state.unpacks.map(\.id)) }
                     .frame(minWidth: 230, idealWidth: 270, maxWidth: 420)
                     .onChange(of: selection) { s in
@@ -107,6 +110,8 @@ struct UnpackDetail: View {
     @State private var tableSelection = Set<UUID>()
     /// The row whose file name is being edited, after a double-click or the Rename File command.
     @State private var renaming: UUID?
+    /// What Return does in the file table (see `ListCommands`); nothing is removed here.
+    @State private var listCommandSource = ListCommandSource()
 
     /// Starts editing the file name of the one row double-clicked or chosen.
     private func rename(_ ids: Set<UUID>) {
@@ -117,6 +122,9 @@ struct UnpackDetail: View {
         let st = state
         let several = items.count > 1
         let rows = items.flatMap { u in u.plan.items.map { Row(unpackID: u.id, programName: u.plan.programName, file: $0) } }
+        // Return edits the file name of the one selected row; nothing is removed here (the rows
+        // are the files to be written, and Write unchecks one).
+        let commands = listCommandSource.set(delete: nil, rename: tableSelection.count == 1 ? { rename(tableSelection) } : nil)
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text(several ? "\(items.count) files selected" : items[0].plan.programName).font(.title2)
@@ -140,7 +148,7 @@ struct UnpackDetail: View {
             Group {
                 if several {
                     Table(rows, selection: $tableSelection) {
-                        TableColumn("Write") { (r: Row) in WriteToggleCell(state: st, unpackID: r.unpackID, file: r.file) }
+                        TableColumn("Write") { (r: Row) in WriteToggleCell(state: st, unpackID: r.unpackID, file: r.file).listCommands(commands) }
                             .width(44)
                         TableColumn("Program") { (r: Row) in Text(r.programName).lineLimit(1).help(r.programName) }
                             .width(min: 80, ideal: 150)
@@ -153,13 +161,10 @@ struct UnpackDetail: View {
                     } primaryAction: { (ids: Set<UUID>) in
                         rename(ids)
                     }
-                    // Return edits the file name of the one selected row; nothing is removed here
-                    // (the rows are the files to be written, and Write unchecks one).
-                    .listCommands(delete: nil, rename: tableSelection.count == 1 ? { rename(tableSelection) } : nil)
                     .onCommand(#selector(NSResponder.selectAll(_:))) { tableSelection = Set(rows.map(\.id)) }
                 } else {
                     Table(rows, selection: $tableSelection) {
-                        TableColumn("Write") { (r: Row) in WriteToggleCell(state: st, unpackID: r.unpackID, file: r.file) }
+                        TableColumn("Write") { (r: Row) in WriteToggleCell(state: st, unpackID: r.unpackID, file: r.file).listCommands(commands) }
                             .width(44)
                         TableColumn("File Name") { (r: Row) in FileNameCell(state: st, unpackID: r.unpackID, file: r.file, renaming: $renaming) }
                             .width(min: 180, ideal: 260)
@@ -170,9 +175,6 @@ struct UnpackDetail: View {
                     } primaryAction: { (ids: Set<UUID>) in
                         rename(ids)
                     }
-                    // Return edits the file name of the one selected row; nothing is removed here
-                    // (the rows are the files to be written, and Write unchecks one).
-                    .listCommands(delete: nil, rename: tableSelection.count == 1 ? { rename(tableSelection) } : nil)
                     .onCommand(#selector(NSResponder.selectAll(_:))) { tableSelection = Set(rows.map(\.id)) }
                 }
             }

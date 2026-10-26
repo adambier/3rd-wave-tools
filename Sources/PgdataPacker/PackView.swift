@@ -15,6 +15,8 @@ struct PackView: View {
     /// The rows selected in the Added Wavetables and Samples table (its own selection; the
     /// program list has `selection`). Remove Selected and Edit › Delete remove both.
     @State private var contentSelection = Set<UUID>()
+    /// What Edit › Delete and Return do in the program list (see `ListCommands`).
+    @State private var listCommandSource = ListCommandSource()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -107,6 +109,11 @@ struct PackView: View {
 
     private var programList: some View {
         let st = state
+        // Edit › Delete acts only while programs are selected (nil disables the item); Return
+        // with one program selected puts the cursor in its name field, the page's way of
+        // renaming (the other pages' lists edit the name in the row).
+        let commands = listCommandSource.set(delete: visibleSelection.isEmpty ? nil : { state.removePrograms(visibleSelection); selection = [] },
+                                             rename: visibleSelection.count == 1 ? { state.focusProgramName() } : nil)
         return VStack(spacing: 0) {
             SearchField(text: $state.programFilter, placeholder: "Filter by name or location")
                 .padding(.horizontal, 10).padding(.vertical, 6)
@@ -118,14 +125,9 @@ struct PackView: View {
             Divider()
             List(selection: $selection) {
                 ForEach(shownPrograms) { item in
-                    ProgramRow(state: st, item: item).tag(item.id)
+                    ProgramRow(state: st, item: item).listCommands(commands).tag(item.id)
                 }
             }
-            // Edit › Delete acts only while programs are selected (nil disables the item); Return
-            // with one program selected puts the cursor in its name field, the page's way of
-            // renaming (the other pages' lists edit the name in the row).
-            .listCommands(delete: visibleSelection.isEmpty ? nil : { state.removePrograms(visibleSelection); selection = [] },
-                          rename: visibleSelection.count == 1 ? { state.focusProgramName() } : nil)
             // Edit › Select All (⌘A) selects every program shown (the list's own handling, when
             // it has the focus, does the same).
             .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(shownPrograms.map(\.id)) }
@@ -424,17 +426,23 @@ struct ContentFilesTable: View {
     /// The selected files; removed with Remove Selected or Edit › Delete, as rows in the other
     /// lists are (no per-row button: the lists all work the same way).
     @Binding var selection: Set<UUID>
+    /// What Edit › Delete does here (see `ListCommands`).
+    @State private var listCommandSource = ListCommandSource()
 
     var body: some View {
         let st = state
         let unused = st.unusedContent
+        let commands = listCommandSource.set(delete: selection.isEmpty ? nil : { st.removeContent(selection); selection = [] })
         VStack(alignment: .leading, spacing: 4) {
             Text("Added Wavetables and Samples").font(.headline).padding(.horizontal, 12).padding(.top, 8)
             Text("A file assigned to a slot is used by every program here that uses that slot, with two exceptions for factory slots. In U48–U55, a file is used only by programs from before 2025, when those were user slots; later programs keep the factory table unless you choose the file in their Plays menu. In any other factory slot, the file replaces the factory table, and the report after packing says where.")
                 .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12)
             Table(st.contentFiles, selection: $selection) {
                 // Most important first: what the file is, its slot, and whether anything uses it.
-                TableColumn("File") { (f: ContentFile) in Text(f.url.lastPathComponent).lineLimit(1).help(f.url.path) }
+                TableColumn("File") { (f: ContentFile) in
+                    Text(f.url.lastPathComponent).lineLimit(1).help(f.url.path)
+                        .listCommands(commands)
+                }
                     .width(min: 120, ideal: 170)
                 TableColumn("Name") { (f: ContentFile) in
                     HStack(spacing: 4) {
@@ -451,7 +459,6 @@ struct ContentFilesTable: View {
                 TableColumn("Type") { (f: ContentFile) in Text(f.kindLabel).foregroundStyle(.secondary).lineLimit(1).help(f.kindLabel) }
                     .width(min: 150, ideal: 170)
             }
-            .listCommands(delete: selection.isEmpty ? nil : { st.removeContent(selection); selection = [] })
             .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(st.contentFiles.map(\.id)) }
             .overlay {
                 if st.contentFiles.isEmpty {

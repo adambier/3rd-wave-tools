@@ -277,12 +277,21 @@ struct ConvertTable: View {
     @Binding var selection: Set<UUID>
     /// The row whose name is being edited, if any (see `ConvertNameField`).
     @State private var renaming: UUID?
+    /// What Edit › Delete and Return do here (see `ListCommands`); set on every pass below.
+    @State private var commands = ListCommandSource()
 
     var body: some View {
         let st = state
         let plan = st.convertPlan
+        // Edit › Delete and Return act only when they have something to act on (nil disables
+        // the menu item and lets the key pass).
+        let commands = self.commands.set(delete: visibleSelection.isEmpty ? nil : { state.removeConvertItems(visibleSelection); selection = [] },
+                                         rename: visibleSelection.count == 1 ? { if let id = visibleSelection.first { rename(id) } } : nil)
         Table(items, selection: $selection) {
-            TableColumn("") { (item: ConvertPlan.Item) in ConvertStatusCell(status: plan.status(item), tip: plan.statusDescription(item)) }
+            TableColumn("") { (item: ConvertPlan.Item) in
+                ConvertStatusCell(status: plan.status(item), tip: plan.statusDescription(item))
+                    .listCommands(commands)
+            }
                 .width(22)
             TableColumn("Name") { (item: ConvertPlan.Item) in ConvertNameCell(state: st, item: item, renaming: $renaming) }
                 .width(min: 170, ideal: 250)
@@ -324,10 +333,6 @@ struct ConvertTable: View {
         } primaryAction: { (ids: Set<UUID>) in
             if ids.count == 1, let id = ids.first { rename(id) }
         }
-        // Edit › Delete and Return act only when they have something to act on (nil disables
-        // the menu item and lets the key pass).
-        .listCommands(delete: visibleSelection.isEmpty ? nil : { state.removeConvertItems(visibleSelection); selection = [] },
-                      rename: visibleSelection.count == 1 ? { if let id = visibleSelection.first { rename(id) } } : nil)
         .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(items.map(\.id)) }
     }
 
@@ -341,8 +346,9 @@ struct ConvertTable: View {
     }
 }
 
-/// Red when the table can't be converted yet, a gray check when it is ready, nothing when
-/// Convert All leaves it out.
+/// Red when the table can't be converted yet, a gray check when it is ready, and a faint
+/// slashed circle when Convert All leaves it out (a page of factory tables would otherwise show
+/// an empty column).
 struct ConvertStatusCell: View {
     let status: ConvertPlan.Status
     let tip: String
@@ -358,7 +364,8 @@ struct ConvertStatusCell: View {
             Image(systemName: "checkmark.circle").foregroundStyle(.secondary).help(tip)
                 .accessibilityLabel("Ready to convert")
         case .excluded:
-            Text("").help(tip)
+            Image(systemName: "circle.slash").foregroundStyle(.tertiary).help(tip)
+                .accessibilityLabel("Left out by Convert All")
         }
     }
 }

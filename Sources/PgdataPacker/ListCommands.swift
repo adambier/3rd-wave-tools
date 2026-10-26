@@ -9,11 +9,14 @@ import AppKit
 /// the table, and Return reached only the tables whose double-click action SwiftUI itself
 /// runs on Return.)
 ///
-/// A list registers through `.listCommands(delete:rename:)`, which puts a `ListCommandBridge`
-/// behind it; the bridge's view finds the table view that shares its place in the window and
-/// records the closures for it, replacing them on every update so they see the current
-/// selection. `MenuActions` asks `handlers(forFirstResponderOf:)` to validate and run Edit ›
-/// Delete and to act on Return.
+/// A list keeps a `ListCommandSource` in its `@State`, sets the source's handlers on every pass
+/// of its body (so they always see the current selection), and puts a `ListCommandBridge` for the
+/// source behind each row's content. The bridge's view walks up from the row to the table view
+/// and registers the source for it; a row that scrolls away leaves the registration standing,
+/// and the source keeps it current. (An earlier bridge behind the whole list matched table
+/// views by their frames in the window and matched the wrong ones on the Pack page.)
+/// `MenuActions` asks `handlers(forFirstResponderOf:)` to validate and run Edit › Delete and to
+/// act on Return.
 final class ListCommands {
     static let shared = ListCommands()
 
@@ -31,24 +34,12 @@ final class ListCommands {
         }
     }
 
-    private final class Entry {
-        var handlers: Handlers
-        init(_ handlers: Handlers) { self.handlers = handlers }
-    }
-
     /// Weak keys: a table view that goes (a page switched away) takes its entry with it.
-    private let entries = NSMapTable<NSTableView, Entry>(keyOptions: .weakMemory, valueOptions: .strongMemory)
+    private let entries = NSMapTable<NSTableView, ListCommandSource>(keyOptions: .weakMemory, valueOptions: .strongMemory)
 
-    func set(_ handlers: Handlers, for tableView: NSTableView) {
-        entries.setObject(Entry(handlers), forKey: tableView)
+    func set(_ source: ListCommandSource, for tableView: NSTableView) {
+        entries.setObject(source, forKey: tableView)
     }
-
-    func remove(_ tableView: NSTableView) {
-        entries.removeObject(forKey: tableView)
-    }
-
-    /// How many lists are registered (for the log's diagnostics).
-    var count: Int { entries.count }
 
     /// The handlers of the list whose table view is the window's first responder; nil when the
     /// first responder is something else (a text field, a button, nothing).
@@ -56,73 +47,70 @@ final class ListCommands {
         guard let table = window?.firstResponder as? NSTableView else { return nil }
         return entries.object(forKey: table)?.handlers
     }
+
+    /// How many lists are registered (for the log's diagnostics).
+    var count: Int { entries.count }
 }
 
-extension View {
-    /// Registers what this list does on Edit › Delete and on Return (see `ListCommands`). Pass
-    /// nil for a command the list cannot do just now; the menu item is then disabled, and the
-    /// key goes on to the table.
-    func listCommands(delete: (() -> Void)?, rename: (() -> Void)? = nil) -> some View {
-        background(ListCommandBridge(handlers: ListCommands.Handlers(delete: delete, rename: rename)))
+/// A list's current commands, held by reference so the registration behind its table view sees
+/// each pass's closures. Kept in the list's view as `@State`, and set at the top of its body.
+final class ListCommandSource {
+    var handlers = ListCommands.Handlers()
+
+    /// Sets this pass's handlers (nil for a command the list cannot do just now) and returns
+    /// the source, for one expression in a view's body.
+    @discardableResult
+    func set(delete: (() -> Void)?, rename: (() -> Void)? = nil) -> ListCommandSource {
+        handlers = ListCommands.Handlers(delete: delete, rename: rename)
+        return self
     }
 }
 
-/// The view behind a list that finds the list's `NSTableView` and registers the handlers for it.
+extension View {
+    /// Behind a row's content: registers the list's `ListCommandSource` for the table view the
+    /// row is in (see `ListCommands`).
+    func listCommands(_ source: ListCommandSource) -> some View {
+        background(ListCommandBridge(source: source))
+    }
+}
+
+/// The view behind a row that finds the row's `NSTableView` up the view hierarchy and registers
+/// the list's source for it.
 struct ListCommandBridge: NSViewRepresentable {
-    let handlers: ListCommands.Handlers
+    let source: ListCommandSource
 
     func makeNSView(context: Context) -> ListCommandBridgeView { ListCommandBridgeView() }
 
     func updateNSView(_ view: ListCommandBridgeView, context: Context) {
-        view.handlers = handlers
+        view.source = source
         view.attach()
     }
 }
 
 final class ListCommandBridgeView: NSView {
-    var handlers = ListCommands.Handlers() {
-        didSet { if let table = tableView { ListCommands.shared.set(handlers, for: table) } }
-    }
-    private(set) weak var tableView: NSTableView?
+    var source: ListCommandSource?
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         attach()
     }
 
-    override func layout() {
-        super.layout()
-        if tableView == nil { attach() }
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        attach()
     }
 
-    /// Finds the table view that occupies this view's place in the window (a `.background` is
-    /// laid out to the list's own frame): among the window's table views, the one whose scroll
-    /// view overlaps this view the most. Registers the handlers for it; a change of table view
-    /// moves them.
+    /// Registers the source for the table view this row is in: the first `NSTableView` up the
+    /// superview chain (the row's cell view and SwiftUI's own views sit between).
     func attach() {
-        guard let window, let content = window.contentView else { return }
-        let mine = convert(bounds, to: nil)
-        guard mine.width > 0, mine.height > 0 else { return }
-        var best: (table: NSTableView, area: CGFloat)?
-        for table in Self.tableViews(in: content) {
-            // The scroll view is where the list sits; the table view inside it scrolls and can
-            // be taller than the room.
-            let container: NSView = table.enclosingScrollView ?? table
-            let theirs = container.convert(container.bounds, to: nil)
-            let overlap = mine.intersection(theirs)
-            let area = overlap.isNull ? 0 : overlap.width * overlap.height
-            if area > 0, area > (best?.area ?? 0) { best = (table, area) }
+        guard let source, window != nil else { return }
+        var view: NSView? = superview
+        while let v = view {
+            if let table = v as? NSTableView {
+                ListCommands.shared.set(source, for: table)
+                return
+            }
+            view = v.superview
         }
-        guard let found = best?.table else { return }
-        if let old = tableView, old !== found { ListCommands.shared.remove(old) }
-        tableView = found
-        ListCommands.shared.set(handlers, for: found)
-    }
-
-    private static func tableViews(in view: NSView) -> [NSTableView] {
-        var out: [NSTableView] = []
-        if let table = view as? NSTableView { out.append(table) }
-        for sub in view.subviews { out += tableViews(in: sub) }
-        return out
     }
 }
