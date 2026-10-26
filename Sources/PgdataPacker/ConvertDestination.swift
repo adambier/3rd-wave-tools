@@ -344,9 +344,11 @@ struct ConvertInterpolationOption: View {
         tonverk ? [Interpolation.none, .crossfade] : [Interpolation.none, .crossfade, .spectral]
     }
 
-    /// The menu's words for a value: its `displayName` (Tonverk's manual says "smooth" for a
-    /// crossfade; the page keeps one word for one thing).
-    private func label(_ value: Interpolation) -> String { value.displayName }
+    /// The menu's words for a value: its `displayName`, except plain "None" for no
+    /// interpolation, since the caption under the menu says what None means (the preview's
+    /// pop-up and facts, with no caption beside them, keep "None (stepped)"; Adam, 2026-10-26).
+    /// Tonverk's manual says "smooth" for a crossfade; the page keeps one word for one thing.
+    private func label(_ value: Interpolation) -> String { value == Interpolation.none ? "None" : value.displayName }
 
     /// What the choices mean, and what "existing" means when the menu says it. One sentence
     /// each, nothing the menu already says.
