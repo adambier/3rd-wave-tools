@@ -2,23 +2,31 @@
 
 # pgdata Packer
 
-*for the Groove Synthesis 3rd Wave advanced wavetable synth*
+*for the Groove Synthesis 3rd Wave advanced wavetable synthesizer*
 
 A macOS app that packs Groove Synthesis 3rd Wave programs (`.pro`) together with the wavetables
 (`.wt`) and multisamples (`.bin`) they use into unified program files (`.pgdata`), unpacks
 `.pgdata` files back into those parts, and converts wavetables between the 3rd Wave's formats and
 those of other synths.
 
-Why might you want to use this app?
+Why you might want it:
 
-* You have existing programs you created or downloaded that have separate wavetables or samples and you'd like to bundle them together for ease of archiving, importation into the 3rd Wave Terminal app, and sharing with others
-* You'd like to run an analysis on a set of program data files to see which wavetables or samples are missing or orphaned (without any programs that make use of them)
-* You'd like to bulk-extract program, wavetable, or sample files from unified program data files
-* You'd like to convert wavetables in different hardware and VST synth formats to 3rd Wave-compatible formats, or to convert 3rd Wave P or U wavetables to formats usably by other synths
-* You'd like to analyze sets of wavetables (with in-app 3D visualizations and audio preview tools!) to determine interpolation and other attributes
-* You're developing other software for use with the 3rd Wave and would like to make use of extensive format documentation and open-source code
-* You're vibe-coding and want to get a head start by importing agent-optimized data about this project and associated file-format analyses
-
+- You have programs, your own or downloaded, whose wavetables or samples come as separate files,
+  and you'd like each bundled into one file, for archiving, for import into the 3rd Wave Terminal
+  app, and for sharing.
+- You'd like to check a set of programs for the wavetables or samples they need and don't have,
+  and for added files that no program uses.
+- You'd like to extract the program, wavetable, and sample files from unified program files, many
+  at a time.
+- You'd like to convert wavetables from other hardware and software synths' formats to the 3rd
+  Wave's, or 3rd Wave P and U tables to formats other synths read.
+- You'd like to look at a set of wavetables and listen to them, the frames of each drawn stacked
+  front to back and played at the pitch you choose, and see what each file says about its frame
+  size and interpolation.
+- You're developing software for the 3rd Wave and would like the file formats documented and the
+  code behind this app free to use.
+- You're building with an AI coding tool and want it briefed: `AGENTS.md` orients Claude Code,
+  Cursor, Copilot, and similar tools on this project and the file formats.
 
 Not affiliated with or endorsed by Groove Synthesis. Everything here was worked out from files and
 checked on an 8M and a 24M, both running OS 2.0d.
