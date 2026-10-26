@@ -561,18 +561,19 @@ struct ConvertSweepControls: View {
     var recordedHelp: String = ""
     let cycle: () -> [Float]
 
-    /// The slider's value with stored frames made magnetic: a position within `snapTolerance`
-    /// of a whole frame becomes that frame exactly, so the slider lands on frames as it is
-    /// dragged (Adam, 2026-10-26: it should periodically land on frames, not only at the ends)
-    /// while the positions between frames, where the interpolation shows and sounds, stay
-    /// reachable. The tolerance is a tenth of the gap between frames, and never less than 0.4%
-    /// of the slider (about a point of travel), so a 64-frame table still catches frames.
+    /// The slider's value with stored frames made magnetic: a position close to a whole frame
+    /// becomes that frame exactly, so the slider lands on frames as it is dragged (Adam,
+    /// 2026-10-26: it should periodically land on frames, not only at the ends) while the
+    /// positions between frames, where the interpolation shows and sounds, stay reachable. The
+    /// magnet reaches a twentieth of the gap between frames, and never less than 0.15% of the
+    /// slider (about a point of travel): with 64 frames the gap is only ten points or so, and
+    /// a wider magnet made the slider jump and the glide between frames hard to reach (Adam).
     private var snappedPosition: Binding<Double> {
         Binding(get: { position }, set: { (value: Double) in
             let gaps = Double(max(1, frameCount - 1))
             let p = value * gaps
             let nearest = p.rounded()
-            let tolerance = max(0.1, 0.004 * gaps)
+            let tolerance = max(0.05, 0.0015 * gaps)
             position = abs(p - nearest) <= tolerance ? min(max(nearest / gaps, 0), 1) : value
         })
     }
