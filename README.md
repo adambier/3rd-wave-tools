@@ -15,9 +15,9 @@ Why might you want to use this app?
 * You'd like to run an analysis on a set of program data files to see which wavetables or samples are missing or orphaned (without any programs that make use of them)
 * You'd like to bulk-extract program, wavetable, or sample files from unified program data files
 * You'd like to convert wavetables in different hardware and VST synth formats to 3rd Wave-compatible formats, or to convert 3rd Wave P or U wavetables to formats usably by other synths
-* You'd like to analyze sets of wavetables to determine interpolation and other settings
+* You'd like to analyze sets of wavetables (with in-app 3D visualizations and audio preview tools!) to determine interpolation and other attributes
 * You're developing other software for use with the 3rd Wave and would like to make use of extensive format documentation and open-source code
-* You'd like to vibe-code such software and want 
+* You're vibe-coding and want to get a head start by importing agent-optimized data about this project and associated file-format analyses
 
 
 Not affiliated with or endorsed by Groove Synthesis. Everything here was worked out from files and
