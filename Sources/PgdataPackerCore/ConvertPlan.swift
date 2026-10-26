@@ -843,20 +843,27 @@ public struct ConvertPlan: Equatable {
     // anything the default item simply stands for no override, unmarked. Tables that cannot
     // convert yet are left out of the counts.
 
-    /// A picker item's words in two parts: the value ("Crossfade", "Each table’s own") and, set
-    /// apart after a dash and in a second style, what the tables already have ("existing",
-    /// "existing: 3 stepped, 2 crossfade").
+    /// A picker item's words in three parts: the value ("Crossfade", "Each table’s own"); set
+    /// apart after a dash and in a second style, the mark that the tables already have it
+    /// ("existing"); and, for "Each table’s own", the breakdown of what they have ("3 stepped,
+    /// 2 crossfade"), which the menu item leaves out (it made the item long and wide: Adam,
+    /// 2026-10-26) and the caption under the menu carries.
     public struct ChoiceLabel: Equatable {
         /// The value the item chooses.
         public var value: String
         /// What the tables to convert already have, or nil when the item is not marked.
         public var existing: String?
+        /// The breakdown behind "existing", for the caption, or nil.
+        public var detail: String?
 
-        /// Creates a label from its two parts.
-        public init(value: String, existing: String? = nil) { self.value = value; self.existing = existing }
+        /// Creates a label from its parts.
+        public init(value: String, existing: String? = nil, detail: String? = nil) {
+            self.value = value; self.existing = existing; self.detail = detail
+        }
 
-        /// The parts as one string: "Crossfade — existing".
-        public var text: String { existing.map { value + " — " + $0 } ?? value }
+        /// The parts as one string, for a tooltip: "Crossfade — existing", "Each table’s own —
+        /// existing: 3 stepped, 2 crossfade".
+        public var text: String { (existing.map { value + " — " + $0 } ?? value) + (detail.map { ": " + $0 } ?? "") }
     }
 
     /// The interpolation the writer records when a file says nothing and nothing is chosen
@@ -914,7 +921,7 @@ public struct ConvertPlan: Equatable {
         }.joined(separator: ", ")
         let unstated = unstatedInterpolationCount
         if unstated > 0 { parts += "; \(unstated) not stated" }
-        return ChoiceLabel(value: "Each table’s own", existing: "existing: " + parts)
+        return ChoiceLabel(value: "Each table’s own", existing: "existing", detail: parts)
     }
 
     /// The word for an interpolation in the existing counts: "stepped", "crossfade", or
@@ -962,7 +969,7 @@ public struct ConvertPlan: Equatable {
             let n = notTaken.reduce(0) { $0 + (counts[$1] ?? 0) }
             parts.append("2,048 for \(n) table\(n == 1 ? "" : "s") of \(Self.listPhrase(notTaken.map(Self.formatCount))), which Tonverk doesn’t take")
         }
-        return ChoiceLabel(value: "Each table’s own", existing: "existing: " + parts.joined(separator: "; "))
+        return ChoiceLabel(value: "Each table’s own", existing: "existing", detail: parts.joined(separator: "; "))
     }
 
     /// The one key of a count, when there is exactly one.

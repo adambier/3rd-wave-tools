@@ -414,7 +414,7 @@ public extension OutputPreset {
         case .thirdWaveP: return "3rd Wave P table"
         case .wav2048: return "Serum, Vital, Pigments"
         case .miniFreak: return "MiniFreak V"
-        case .tonverk: return "Elektron Tonverk"
+        case .tonverk: return "Tonverk"
         case .phasePlant: return "Phase Plant"
         case .surge: return "Surge XT"
         case .waveEdit: return "WaveEdit, E370"

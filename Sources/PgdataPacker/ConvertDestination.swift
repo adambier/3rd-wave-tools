@@ -356,8 +356,13 @@ struct ConvertInterpolationOption: View {
     private var caption: String {
         let plan = state.convertPlan
         var lines: [String] = []
-        if plan.sharedExistingInterpolation != nil || plan.eachTablesOwnInterpolationLabel != nil {
-            var sentence = "\u{201C}Existing\u{201D} is what a table’s file states"
+        if let own = plan.eachTablesOwnInterpolationLabel, let detail = own.detail {
+            // The breakdown the menu item leaves out: what each file states, and what the
+            // files that state nothing get.
+            lines.append("Each table’s own keeps what each file states: \(detail)"
+                         + (plan.unstatedInterpolationCount > 0 ? "; a file that states nothing is saved as crossfade." : "."))
+        } else if plan.sharedExistingInterpolation != nil {
+            var sentence = "\u{201C}Existing\u{201D} is what every table’s file states"
             if plan.unstatedInterpolationCount > 0 {
                 sentence += "; a file that states nothing is saved as crossfade"
             }
@@ -449,6 +454,11 @@ struct ConvertTonverkSizeOption: View {
             .labelsHidden()
             .frame(maxWidth: 260, alignment: .leading)
             .help((plan.eachTablesOwnFrameSizeLabel.map { $0.text + "\n" } ?? "") + "\u{201C}Existing\u{201D} is the frame size the tables already have; Tonverk takes 64 to 4,096 (powers of two), and a table of another size is written at 2,048. Any other choice resamples every table to that size. The size goes into the file name as a _wt tag (the preview shows each table’s); a trailing \u{201C}r\u{201D} marks a stepped table.")
+            // The breakdown the "Each table’s own" item leaves out.
+            if let detail = plan.eachTablesOwnFrameSizeLabel?.detail {
+                ConvertSentences("Each table’s own keeps the sizes the tables have: \(detail).")
+                    .padding(.top, ConvertPreviewFacts.detailSpacing - 4)
+            }
         }
     }
 

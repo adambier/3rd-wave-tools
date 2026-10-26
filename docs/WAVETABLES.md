@@ -41,7 +41,7 @@ chunk.[^vital] Most other synths set interpolation on the oscillator, not in the
 |---|---|---|
 | Serum, Vital, Pigments | Mono 32-bit float WAV, 48 kHz, 2,048 per frame, up to 256 frames, with a `clm ` chunk carrying the interpolation | [^serum] [^vital] [^pigments] |
 | MiniFreak V (for the MiniFreak) | The same, with at most 64 frames | [^minifreak] |
-| Elektron Tonverk | Mono 32-bit float WAV, 48 kHz, at most 64 frames, its frame size and interpolation in the file name (`Name_wt1024.wav`, `Name_wt128r.wav`) | [^tonverk] |
+| Tonverk (Elektron) | Mono 32-bit float WAV, 48 kHz, at most 64 frames, its frame size and interpolation in the file name (`Name_wt1024.wav`, `Name_wt128r.wav`) | [^tonverk] |
 | Phase Plant | Exactly 256 frames of 2,048, with a `clm ` chunk | [^phaseplant] |
 | Surge XT | A Surge `.wt` (binary, below) | [^surge-code] |
 | WaveEdit, E370 | Mono 16-bit WAV, 44.1 kHz, 64 frames of 256, no extra chunk | [^waveedit] |

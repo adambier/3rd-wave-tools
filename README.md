@@ -330,7 +330,7 @@ filter field above the table narrows the list by name or file, as on the Pack pa
 | 3rd Wave U table | a `.wt` of 64 frames of 1,024 samples, with its mipmap chain |
 | Serum, Vital, Pigments | a 32-bit float WAV of up to 256 frames of 2,048, recording the interpolation |
 | MiniFreak V | the same, with at most 64 frames, for MiniFreak V to send to a MiniFreak |
-| Elektron Tonverk | a 32-bit float WAV of up to 64 frames, its frame size and interpolation in its name |
+| Tonverk | a 32-bit float WAV of up to 64 frames, with the frame size and interpolation in the file name |
 | Phase Plant | a 32-bit float WAV of exactly 256 frames of 2,048 |
 | Surge XT | a Surge `.wt` |
 | WaveEdit, E370 | a 16-bit WAV of 64 frames of 256 |
