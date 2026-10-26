@@ -11,8 +11,11 @@ each size the .icns holds (16, 32, 64, 128, 256, 512, and 1024 px, each drawn at
 fewer and heavier shapes at 32 px and below), and the .icns is assembled here, with the entry types
 iconutil writes (icp4, icp5, ic07–ic14), so no macOS tool is needed.
 
-The glyph: three morphing frames, cyan, white, and pink, a sine leaning more toward a saw from
-back to front, rising out of an open box (settled with Adam on 2026-10-26).
+The glyph: three frames of a wavetable, cyan, white, and pink, rising out of an open box
+(settled with Adam on 2026-10-26). At 128 px and above they are the oscillator's waveforms drawn
+exactly, two cycles each: a sine, a triangle, and a sawtooth, back to front (Adam, 2026-10-26: at
+the large sizes the waveforms should be accurate, not squiggles). At 64 px and below, where exact
+shapes would not survive, they are heavier single-cycle sines leaning toward a saw.
 
 The tile follows Apple's macOS icon grid for a flattened icon: an 824-point rounded square
 centered on a 1024-point canvas, with a soft shadow, as macOS 13 to 15 draw it. Its corners are a
@@ -45,19 +48,35 @@ def squircle_path(x, y, w, h, n=5.0, steps=96):
 
 def leaned_sine(a, x):
     """A sine leaned like a saw by phase distortion: the rise takes (1 + a) / 2 of the cycle and
-    the fall the rest, with no corners. a = 0 is a sine; a = 0.55 is clearly saw-like. The
-    three frames of the box icon are a = 0, 0.3, and 0.55, back to front, so the morph between
-    them is visible at any size the shapes survive (Adam, 2026-10-26: highlight the morphing)."""
+    the fall the rest, with no corners. a = 0 is a sine; a = 0.55 is clearly saw-like. At 64 px
+    and below the box icon's frames are a = 0 and 0.55, back and front, so the morph between
+    them is visible where exact shapes would not be (Adam, 2026-10-26: highlight the morphing)."""
     p = (x / (2 * math.pi)) % 1.0
     r = 0.5 * (1 + a)
     u = (p / r) * 0.5 if p < r else 0.5 + (p - r) / (1 - r) * 0.5
     return math.sin(2 * math.pi * u)
 
-def shape_points(fn, cx, base, width, amp, n=200):
-    """The points of one frame, `fn` over a cycle, scaled so every frame has the same height."""
-    raw = [fn(j / n * 2 * math.pi) for j in range(n + 1)]
+def shape_points(fn, cx, base, width, amp, n=200, cycles=1):
+    """The points of one frame, `fn` over `cycles` cycles, scaled so every frame has the same
+    height."""
+    raw = [fn(j / n * 2 * math.pi * cycles) for j in range(n + 1)]
     peak = max(abs(v) for v in raw) or 1
     return [(cx - width / 2 + j / n * width, base - amp * raw[j] / peak) for j in range(n + 1)]
+
+def triangle_points(cx, base, width, amp, cycles):
+    """A triangle wave as its corners, starting and ending at the midline."""
+    pts, x0, q = [], cx - width / 2, width / cycles / 4
+    for c in range(cycles):
+        xa = x0 + c / cycles * width
+        pts += [(xa, base), (xa + q, base - amp), (xa + 3 * q, base + amp)]
+    return pts + [(x0 + width, base)]
+
+def sawtooth_points(cx, base, width, amp, cycles):
+    """A sawtooth as its corners: a rise over each cycle and a vertical drop."""
+    pts, x0 = [], cx - width / 2
+    for c in range(cycles):
+        pts += [(x0 + c / cycles * width, base + amp), (x0 + (c + 1) / cycles * width, base - amp)]
+    return pts + [(x0 + width, base + amp)]
 
 def path_d(pts, close=False):
     return "M" + " L".join("%.1f,%.1f" % p for p in pts) + (" Z" if close else "")
@@ -68,14 +87,15 @@ AMBER_TOP, AMBER_BOTTOM = "#f7bd5c", "#d8862a"
 # The box icon's frames, back to front: cyan, white, pink, so the three read as three even at
 # 32 px, where their shapes no longer do.
 FRAME_COLORS = ("#7fdcff", "#ffffff", "#ff5fae")
-FRAME_LEANS = (0.0, 0.3, 0.55)
+FRAME_LEANS = (0.0, 0.3, 0.55)        # the leaned sines of the small sizes
+FRAME_CYCLES = 2                      # cycles per frame at 128 px and above
 
 def glyph_box(detail):
-    """Three morphing frames rising out of an open box. detail: 2 (small sizes), 3 (64 px),
-    4 (full). The glyph is centered on the tile: about 85 points above the back frame's crest
-    and below the box (Adam, 2026-10-26: neither the box weighing the bottom half nor the back
-    frame crowding the top); the front frame's trough dips behind the box front, so it rises
-    out of the box."""
+    """Three frames rising out of an open box. detail: 2 (small sizes), 3 (64 px), 4 (128 px
+    and above: the exact waveforms, two cycles each, in thinner strokes). The glyph is centered
+    on the tile: about 85 points above the back frame's crest and below the box (Adam,
+    2026-10-26: neither the box weighing the bottom half nor the back frame crowding the top);
+    the front frame's troughs dip behind the box front, so it rises out of the box."""
     bx, bw = 252, 520                      # the box front: x and width
     bottom, front = 830, 660               # y of the box bottom and the opening's front edge
     back = front - 60                      # y of the opening's back edge
@@ -91,9 +111,15 @@ def glyph_box(detail):
         base = lerp(588, 290, depth) if len(indices) == 3 else lerp(588, 370, depth)
         amp = lerp(100, 80, depth)
         width = (380, 420, 460)[i]
-        stroke = (50, 60, 66)[i] if detail >= 3 else (70, 0, 86)[i]
         opacity = (0.85, 0.95, 1.0)[i]
-        pts = shape_points(lambda x, a=FRAME_LEANS[i]: leaned_sine(a, x), cx, base, width, amp)
+        if detail >= 4:
+            stroke = (28, 32, 36)[i]
+            if i == 0: pts = shape_points(math.sin, cx, base, width, amp, cycles=FRAME_CYCLES)
+            elif i == 1: pts = triangle_points(cx, base, width, amp, FRAME_CYCLES)
+            else: pts = sawtooth_points(cx, base, width, amp, FRAME_CYCLES)
+        else:
+            stroke = (50, 60, 66)[i] if detail >= 3 else (70, 0, 86)[i]
+            pts = shape_points(lambda x, a=FRAME_LEANS[i]: leaned_sine(a, x), cx, base, width, amp)
         out.append(f'<path d="{path_d(pts)}" fill="none" stroke="{FRAME_COLORS[i]}" stroke-width="{stroke}" '
                    f'stroke-linecap="round" stroke-linejoin="round" opacity="{opacity:.2f}"/>')
     # Side flaps, hinged on the opening's front corners and folded outwards.
