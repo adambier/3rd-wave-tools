@@ -319,6 +319,7 @@ struct ConvertFrameCountOption: View {
             .labelsHidden()
             .help("Original frames only: no new waveforms are made. Fewer frames keeps evenly spaced originals, the first and last among them (256 → 64 keeps about every 4th); more frames repeats each original in order (16 → 64 repeats each about 4 times).\nCrossfade new frames: makes each new frame by crossfading its two neighbors. This happens once, when converting; it is separate from the interpolation saved in the file, which is how the synth moves between frames as it plays.")
             ConvertSentences(state.convertPlan.frameCountCaption)
+                .padding(.top, ConvertPreviewFacts.detailSpacing - 4)
         }
     }
 }
@@ -395,8 +396,9 @@ struct ConvertInterpolationOption: View {
             // carries the full text.
             .help((plan.eachTablesOwnInterpolationLabel.map { $0.text + "\n" } ?? "") + tip)
             // The caption's sentences a paragraph apiece, as the preview's explanations (Adam,
-            // 2026-10-26: a wall of text).
+            // 2026-10-26: a wall of text), set a little below the control.
             ConvertSentences(caption)
+                .padding(.top, ConvertPreviewFacts.detailSpacing - 4)
         }
     }
 
