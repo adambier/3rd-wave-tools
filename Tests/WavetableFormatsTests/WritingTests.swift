@@ -167,7 +167,7 @@ final class WritingTests: XCTestCase {
             XCTAssertEqual(samples, wave, "position \(60 + k)")
         }
         notes(out, contain: "Frame count changed from 64 to 60")
-        notes(out, contain: "standard waves")
+        notes(out, contain: "standard waveforms")
         notes(out, contain: "harmonic and above are dropped")
     }
 
@@ -389,7 +389,7 @@ final class WritingTests: XCTestCase {
 
     // MARK: The plan
 
-    func testPlanFields() {
+    func testPlanFields() throws {
         let big = WavetableWriter.plan(frameSize: 2048, frameCount: 256, peak: 1.5, interpolation: nil, preset: .thirdWaveU)
         XCTAssertEqual(big.frameSizeOut, 1024)
         XCTAssertEqual(big.frameSizeGrows, false)
@@ -404,6 +404,15 @@ final class WritingTests: XCTestCase {
         XCTAssertFalse(big.peakKept)
         XCTAssertNil(big.interpolationRecorded)
         XCTAssertEqual(big.fileExtension, "wt")
+
+        // Shrinking can raise the peak too: band-limiting a sharp edge overshoots (Gibbs), so a
+        // full-scale square is "may be turned down" for a P table, and the writer turns it down.
+        let shrinks = WavetableWriter.plan(frameSize: 2048, frameCount: 64, peak: 1, interpolation: nil, preset: .thirdWaveP)
+        XCTAssertEqual(shrinks.scaling, .possible)
+        let square = Wavetable(name: "Square", frames: (0..<64).map { _ in (0..<2048).map { $0 < 1024 ? Float(1) : Float(-1) } })
+        notes(try write(square, .thirdWaveP), contain: "Turned down to fit")
+        // A change of frame count alone cannot raise the peak.
+        XCTAssertEqual(WavetableWriter.plan(frameSize: 1024, frameCount: 256, peak: 1, interpolation: nil, preset: .thirdWaveU).scaling, .none)
 
         let grows = WavetableWriter.plan(frameSize: 128, frameCount: 64, peak: 0.9, interpolation: .spectral, preset: .thirdWaveU)
         XCTAssertEqual(grows.scaling, .possible)
@@ -501,7 +510,7 @@ final class WritingTests: XCTestCase {
                     func said(_ text: String) -> Bool { out.notes.contains { $0.contains(text) } }
                     XCTAssertEqual(said("Resized from"), plan.resizes, label)
                     XCTAssertEqual(said("Frame count changed from"), plan.changesCount, label)
-                    XCTAssertEqual(said("standard waves"), plan.addsPPGWaves, label)
+                    XCTAssertEqual(said("standard waveforms"), plan.addsPPGWaves, label)
                     if plan.peakKept {
                         XCTAssertTrue(said("kept, over full scale"), label)
                     } else if plan.scalesToFit || plan.frameSizeGrows != true {

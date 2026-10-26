@@ -94,11 +94,15 @@ public struct ConvertReport: Equatable {
         if !grouped.isEmpty {
             after += "\n\nWhat converting did:\n" + grouped.map { ReportText.item($0.label, $0.text) }.joined(separator: "\n")
         }
-        if let capacity = plan.thirdWaveCapacityNote {
+        if let capacity = plan.thirdWaveCapacityNote(for: plan.preset, converted: true) {
             after += "\n\n" + capacity
         }
         if !packFiles.isEmpty {
             after += "\n\n" + (packFiles.count == 1 ? "The .wt file is" : "The \(packFiles.count) .wt files are") + " added to the Pack page."
+        }
+        // The report is where the files are in hand, so it says how they get onto the 3rd Wave.
+        if plan.preset.isThirdWave, !written.written.isEmpty {
+            after += "\n\n" + Self.loadingLine
         }
         message = before + writtenShort + after
         // The log names the folder in full, on the title's line, and lists every file written.
@@ -108,6 +112,9 @@ public struct ConvertReport: Equatable {
         }
         log = logged
     }
+
+    /// How the .wt files get onto the 3rd Wave; the destination pane's footer says the same.
+    public static let loadingLine = "To load them: copy the WAVES folder onto the 3rd Wave’s USB drive and use Global → “Bulk wavetable import”, or add them to the 3rd Wave Terminal app’s library and sync."
 
     /// "Written to the WAVES folder:" when every file went into the same subfolder of `folder`; "Written:"
     /// when they went into `folder` itself (or into different subfolders).

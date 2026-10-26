@@ -69,7 +69,9 @@ public extension WavetableSketch {
     /// the position for `.none` or nil (the table steps from frame to frame, or nothing says,
     /// and a stored frame is the only certain thing to show). Each frame is first reduced to
     /// `columns` values (``reduceCycle(_:to:)``), enough for a picture, so a spectral blend of
-    /// long frames stays quick. Nil for an empty table.
+    /// long frames stays quick; the reduction keeps peaks rather than resampling, so the spectrum
+    /// blended is the picture's, not the table's, which is fine for a drawing (the audio preview
+    /// uses ``fullCycle(at:in:interpolation:)``). Nil for an empty table.
     static func cycle(at position: Double, in frames: [[Float]], interpolation: Interpolation?, columns: Int = 256) -> SweepPoint? {
         cycle(at: position, in: frames, interpolation: interpolation) { reduceCycle($0, to: columns) }
     }

@@ -212,13 +212,19 @@ final class ConvertPlanTests: XCTestCase {
                   found(table("U", file: "U.wt", source: .thirdWaveWavetable(isP: false), frames: 64, size: 1024, seed: 0.2), "U.wt")],
                  factory: FactoryLibrary())
         let (big, few, u) = (plan.items[0], plan.items[1], plan.items[2])
-        XCTAssertEqual(plan.expectedResult(for: big), "64 × 1,024; resized from 2,048 samples per frame; 256 frames → 64, picked evenly")
-        XCTAssertEqual(plan.expectedResult(for: few), "64 × 1,024; resized from 2,048 samples per frame; 8 frames → 64, repeated")
+        // Any change of frame size may turn the table down (band-limiting can overshoot).
+        XCTAssertEqual(plan.expectedResult(for: big), "64 × 1,024; resized from 2,048 samples per frame; 256 frames → 64, picked evenly; may be turned down a little to fit after resizing")
+        XCTAssertEqual(plan.expectedResult(for: few), "64 × 1,024; resized from 2,048 samples per frame; 8 frames → 64, repeated; may be turned down a little to fit after resizing")
         XCTAssertEqual(plan.expectedResult(for: u), "64 × 1,024")
+        // What the page says when nothing changes: a 3rd Wave table going back to the 3rd Wave is
+        // the same table (a U table's mipmap chain is recomputed); anything else changes format.
+        XCTAssertEqual(plan.unchangedWords(for: u), "The table is unchanged; its mipmap chain is recomputed.")
+        XCTAssertEqual(plan.unchangedWords(for: big), "Only the file format changes.")
         plan.options.frameCountPolicy = .interpolate
-        XCTAssertTrue(plan.expectedResult(for: big).hasSuffix("256 frames → 64, crossfaded"))
+        XCTAssertTrue(plan.expectedResult(for: big).contains("256 frames → 64, crossfaded"))
 
         plan.preset = .wav2048
+        XCTAssertEqual(plan.unchangedWords(for: u), "Only the file format changes.")
         XCTAssertEqual(plan.expectedResult(for: few), "8 × 2,048")
         XCTAssertEqual(plan.expectedResult(for: big), "256 × 2,048")
 
@@ -230,7 +236,7 @@ final class ConvertPlanTests: XCTestCase {
 
         plan.preset = .thirdWaveP
         plan.options.appendPPGStandardWaves = true
-        XCTAssertEqual(plan.expectedResult(for: u), "64 × 128; resized from 1,024 samples per frame; 64 frames → 60, crossfaded; the PPG’s four standard waves at 60–63")
+        XCTAssertEqual(plan.expectedResult(for: u), "64 × 128; resized from 1,024 samples per frame; 64 frames → 60, crossfaded; may be turned down a little to fit after resizing; the PPG’s four standard waveforms at 60–63")
     }
 
     // MARK: Converting and writing
@@ -550,7 +556,7 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(Interpolation.none.displayName, "None (stepped)")
         XCTAssertEqual(Interpolation.displayName(nil), "Not stated")
         XCTAssertEqual(Interpolation.displayName(.spectral), "Spectral")
-        XCTAssertEqual(ConvertPlan.testingStatus(.tonverk), "Converting to this output has not yet been tested.")
+        XCTAssertEqual(ConvertPlan.testingStatus(.tonverk), "Converting to this destination has not yet been tested in its synth.")
         XCTAssertEqual(ConvertPlan.tablesHave(1, of: 5), "1 table has")
         XCTAssertEqual(ConvertPlan.tablesHave(2, of: 2), "Both tables have")
         XCTAssertEqual(ConvertPlan.tablesHave(2, of: 5), "2 tables have")
@@ -754,7 +760,7 @@ final class ConvertChangeWordsTests: XCTestCase {
         plan.preset = .thirdWaveP
         plan.options.appendPPGStandardWaves = true
         plan.rename(plan.items[1].id, to: String(repeating: "x", count: 40))
-        XCTAssertEqual(plan.changeWords(for: plan.items[1])?.changes, ["resized", "64 → 60 frames, picked evenly", "+ PPG waves", "name changed"])
+        XCTAssertEqual(plan.changeWords(for: plan.items[1])?.changes, ["resized", "64 → 60 frames, picked evenly", "may be turned down", "+ PPG waveforms", "name changed"])
         plan.options.frameCountPolicy = .interpolate
         XCTAssertEqual(plan.changeWords(for: plan.items[1])?.changes.dropFirst().first, "64 → 60 frames, crossfaded")
         plan.options.frameCountPolicy = .pickEvenly
@@ -911,7 +917,7 @@ final class ConvertOptionsTextTests: XCTestCase {
         // Small tables: the note counts them, whatever their size.
         var tables = (0..<9).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
         var p = plan(tables, preset: .thirdWaveU)
-        XCTAssertEqual(p.thirdWaveCapacityNote, "9 U tables to convert. The 3rd Wave holds 64 U tables, 56 of them Groove Synthesis’s (U00–U55); with no slot free, it offers to overwrite the last slot (U63); which slots several tables would take has not been tested.")
+        XCTAssertEqual(p.thirdWaveCapacityNote, "9 U tables to convert for 8 user slots (U56–U63; U00–U55 hold Groove Synthesis’s tables). With no slot free, the 3rd Wave offers to overwrite the last slot (U63); which slots several tables would take has not been tested.")
         p.setSelected(p.items[0].id, false)
         XCTAssertNil(p.thirdWaveCapacityNote, "8 fit")
         p.preset = .wav2048
@@ -920,7 +926,7 @@ final class ConvertOptionsTextTests: XCTestCase {
         XCTAssertNil(p.thirdWaveCapacityNote, "12 P slots")
         tables += (9..<13).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
         p = plan(tables, preset: .thirdWaveP)
-        XCTAssertEqual(p.thirdWaveCapacityNote, "13 P tables to convert. The 3rd Wave holds 48 P tables, 36 of them Groove Synthesis’s (P00–P35); with no slot free, it offers to overwrite the last slot (P47); which slots several tables would take has not been tested.")
+        XCTAssertEqual(p.thirdWaveCapacityNote, "13 P tables to convert for 12 user slots (P36–P47; P00–P35 hold Groove Synthesis’s tables). With no slot free, the 3rd Wave offers to overwrite the last slot (P47); which slots several tables would take has not been tested.")
 
         // A factory table does not count: the 3rd Wave already has it.
         let lib = FactoryLibrary.builtIn
@@ -946,8 +952,8 @@ final class ConvertOptionsTextTests: XCTestCase {
         XCTAssertEqual(asP?.frameCountIn, 64)
         XCTAssertEqual(asP?.frameCountOut, 64)
         XCTAssertEqual(asP?.frameSizeOut, 1024)
-        XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 128)?.changes, ["resized", "may be turned down"])   // growing the frame can raise the peak
-        XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 2048)?.changes, ["resized", "4 → 64 frames, repeated"])
+        XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 128)?.changes, ["resized", "may be turned down"])   // resizing can raise the peak
+        XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 2048)?.changes, ["resized", "4 → 64 frames, repeated", "may be turned down"])
         XCTAssertNil(p.expected(for: p.items[0], frameSize: 1000), "does not divide")
     }
 }
@@ -1000,7 +1006,7 @@ final class ConvertExistingChoicesTests: XCTestCase {
         }
         let nine = pickerPlan(.thirdWaveU, Array(repeating: (Interpolation?.none, 2048), count: 9))
         XCTAssertEqual(nine.caveat(for: .thirdWaveU), nine.thirdWaveCapacityNote)
-        XCTAssertEqual(nine.caveat(for: .thirdWaveU)?.hasPrefix("9 U tables to convert. The 3rd Wave holds 64 U tables"), true)
+        XCTAssertEqual(nine.caveat(for: .thirdWaveU)?.hasPrefix("9 U tables to convert for 8 user slots"), true)
         XCTAssertNil(nine.caveat(for: .thirdWaveP), "12 P slots")
         // A table that cannot convert yet does not count.
         XCTAssertNil(ConvertPlan(preset: .miniFreak).caveat(for: .miniFreak))

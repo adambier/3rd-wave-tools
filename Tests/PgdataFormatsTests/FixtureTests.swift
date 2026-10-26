@@ -198,7 +198,7 @@ enum FixtureBuilder {
         return ProgramFile(version: "W3_PROG_3", name: "Fixture 2022 Layout", values: v)
     }
 
-    /// A P table: 60 waves morphing from sine to sawtooth, then the PPG's four standard waves
+    /// A P table: 60 frames morphing from sine to sawtooth, then the PPG's four standard waveforms
     /// (WavetableFormats' `PPGStandardWaves`), laid out by `WavetableFile(kind:name:frames:)`.
     static func pTable() -> WavetableFile {
         let morph: [[Float]] = (0..<60).map { w in

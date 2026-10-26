@@ -48,8 +48,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let wavetables = urls.filter { ["wav", "wave", "flac"].contains($0.pathExtension.lowercased()) }
         let rest = urls.filter { !wavetables.contains($0) }
         if !wavetables.isEmpty {
-            state.addToConvert(urls: wavetables)
-            if rest.isEmpty { state.section = .convert }
+            if state.showsUnderDevelopmentFeatures {
+                state.addToConvert(urls: wavetables)
+                if rest.isEmpty { state.section = .convert }
+            } else {
+                let n = wavetables.count
+                state.note("\(n) WAV or FLAC file\(n == 1 ? "" : "s") not opened: the Wavetables page is under development and hidden (View › Show Under-Development Features).")
+            }
         }
         if !rest.isEmpty { state.add(urls: rest) }
     }
@@ -195,6 +200,12 @@ final class MenuActions: NSObject, NSMenuItemValidation {
         appState.showLog.toggle()
     }
 
+    /// View › Show Under-Development Features: shows or hides the Wavetables page (and the audio
+    /// output in the toolbar) while wavetable conversion is being tested.
+    @objc func toggleUnderDevelopmentFeatures(_ sender: Any?) {
+        appState.showsUnderDevelopmentFeatures.toggle()
+    }
+
     private var mainActionTitle: String {
         switch appState.section {
         case .pack: return "Pack All…"
@@ -227,8 +238,15 @@ final class MenuActions: NSObject, NSMenuItemValidation {
             return appState.section == .convert && !appState.isWorking
                 && !plan.selectedItems.isEmpty && plan.preset.isThirdWave
         case #selector(showPage(_:)):
-            let current = AppState.Section.allCases.firstIndex(of: appState.section) ?? -1
+            let sections = AppState.Section.allCases
+            let current = sections.firstIndex(of: appState.section) ?? -1
             menuItem.state = menuItem.tag == current ? .on : .off
+            // A page under development is out of the menu while hidden (its ⌘3 with it).
+            let shown = sections.indices.contains(menuItem.tag) && appState.availableSections.contains(sections[menuItem.tag])
+            menuItem.isHidden = !shown
+            return shown
+        case #selector(toggleUnderDevelopmentFeatures(_:)):
+            menuItem.state = appState.showsUnderDevelopmentFeatures ? .on : .off
             return true
         case #selector(toggleLog(_:)):
             menuItem.title = appState.showLog ? "Hide Log" : "Show Log"
@@ -247,17 +265,25 @@ final class ToolbarController: NSObject, NSToolbarDelegate {
     private static let pageItem = NSToolbarItem.Identifier("page")
     private static let outputItem = NSToolbarItem.Identifier("audioOutput")
     private let appState: AppState
+    private weak var toolbar: NSToolbar?
     private weak var control: NSSegmentedControl?
     private weak var outputItem: NSMenuToolbarItem?
-    private var cancellable: AnyCancellable?
+    private var cancellables: Set<AnyCancellable> = []
     private var outputCancellable: AnyCancellable?
 
     init(appState: AppState) {
         self.appState = appState
         super.init()
-        cancellable = appState.$section.sink { [weak self] (section: AppState.Section) in
-            self?.control?.selectedSegment = AppState.Section.allCases.firstIndex(of: section) ?? 0
-        }
+        appState.$section.sink { [weak self] (section: AppState.Section) in
+            guard let self, let control = self.control else { return }
+            control.selectedSegment = self.appState.availableSections.firstIndex(of: section) ?? 0
+        }.store(in: &cancellables)
+        // The pages offered, and the audio output beside them, follow View › Show
+        // Under-Development Features (the one time this toolbar's items change).
+        appState.$showsUnderDevelopmentFeatures.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] (shows: Bool) in
+            self?.fillSegments()
+            self?.showOutputItem(shows)
+        }.store(in: &cancellables)
     }
 
     func makeToolbar() -> NSToolbar {
@@ -266,15 +292,16 @@ final class ToolbarController: NSObject, NSToolbarDelegate {
         toolbar.allowsUserCustomization = false
         toolbar.displayMode = .iconOnly
         toolbar.centeredItemIdentifier = Self.pageItem
+        self.toolbar = toolbar
         return toolbar
     }
 
-    // The page switcher in the centre; at the trailing end, the audio output for the Wavetables
-    // page's Listen control. The output pop-up is there on every page: a toolbar whose items
-    // come and go with the page is what the HIG advises against, and the device is one setting
-    // for the app.
+    // The page switcher in the centre; at the trailing end, while the Wavetables page is shown,
+    // the audio output for its Listen control. The output item is there on every page then: a
+    // toolbar whose items come and go with the page is what the HIG advises against, and the
+    // device is one setting for the app.
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, Self.pageItem, .flexibleSpace, Self.outputItem]
+        [.flexibleSpace, Self.pageItem, .flexibleSpace] + (appState.showsUnderDevelopmentFeatures ? [Self.outputItem] : [])
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -285,17 +312,11 @@ final class ToolbarController: NSObject, NSToolbarDelegate {
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         if itemIdentifier == Self.outputItem { return makeOutputItem() }
         guard itemIdentifier == Self.pageItem else { return nil }
-        let sections = AppState.Section.allCases
-        let control = NSSegmentedControl(labels: sections.map(\.rawValue), trackingMode: .selectOne,
-                                         target: self, action: #selector(pageChosen(_:)))
+        let control = NSSegmentedControl(labels: [], trackingMode: .selectOne, target: self, action: #selector(pageChosen(_:)))
         control.segmentStyle = .automatic
-        for (i, s) in sections.enumerated() {
-            control.setImage(NSImage(systemSymbolName: s.icon, accessibilityDescription: s.rawValue), forSegment: i)
-            control.setImageScaling(.scaleProportionallyDown, forSegment: i)
-        }
-        control.selectedSegment = sections.firstIndex(of: appState.section) ?? 0
         control.setAccessibilityLabel("Page")
         self.control = control
+        fillSegments()
         let item = NSToolbarItem(itemIdentifier: itemIdentifier)
         item.view = control
         item.label = "Page"
@@ -304,8 +325,33 @@ final class ToolbarController: NSObject, NSToolbarDelegate {
         return item
     }
 
+    /// One segment per page offered (`AppState.availableSections`), the current one selected.
+    private func fillSegments() {
+        guard let control else { return }
+        let sections = appState.availableSections
+        control.segmentCount = sections.count
+        for (i, s) in sections.enumerated() {
+            control.setLabel(s.rawValue, forSegment: i)
+            control.setImage(NSImage(systemSymbolName: s.icon, accessibilityDescription: s.rawValue), forSegment: i)
+            control.setImageScaling(.scaleProportionallyDown, forSegment: i)
+        }
+        control.selectedSegment = sections.firstIndex(of: appState.section) ?? 0
+        control.sizeToFit()
+    }
+
+    /// Adds or removes the audio output item at the toolbar's trailing end.
+    private func showOutputItem(_ shows: Bool) {
+        guard let toolbar else { return }
+        let index = toolbar.items.firstIndex { $0.itemIdentifier == Self.outputItem }
+        if shows, index == nil {
+            toolbar.insertItem(withItemIdentifier: Self.outputItem, at: toolbar.items.count)
+        } else if !shows, let index {
+            toolbar.removeItem(at: index)
+        }
+    }
+
     @objc private func pageChosen(_ sender: NSSegmentedControl) {
-        let sections = AppState.Section.allCases
+        let sections = appState.availableSections
         guard sections.indices.contains(sender.selectedSegment) else { return }
         appState.section = sections[sender.selectedSegment]
     }
@@ -429,6 +475,11 @@ private func buildMainMenu(appDelegate: AppDelegate, menuActions: MenuActions) -
     let logItem = viewMenu.addItem(withTitle: "Show Log", action: #selector(MenuActions.toggleLog(_:)), keyEquivalent: "l")
     logItem.keyEquivalentModifierMask = [.command, .option]
     logItem.target = menuActions
+    viewMenu.addItem(.separator())
+    // A checkmark item, as the HIG has for a setting toggled from a menu; validation sets its state.
+    let devItem = viewMenu.addItem(withTitle: "Show Under-Development Features", action: #selector(MenuActions.toggleUnderDevelopmentFeatures(_:)), keyEquivalent: "")
+    devItem.target = menuActions
+    devItem.toolTip = "Show the Wavetables page, which converts wavetables between synths and is still being tested"
     viewMenuItem.submenu = viewMenu
     mainMenu.addItem(viewMenuItem)
 

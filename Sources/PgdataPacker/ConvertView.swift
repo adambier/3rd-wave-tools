@@ -311,7 +311,8 @@ struct ConvertTable: View {
                 .width(min: 170, ideal: 190)
             TableColumn("Changes") { (item: ConvertPlan.Item) in
                 ConvertChangesCell(words: plan.changeWords(for: item), summary: plan.expectedResult(for: item),
-                                   notes: plan.itemNotes(for: item), included: plan.isSelected(item))
+                                   notes: plan.itemNotes(for: item), included: plan.isSelected(item),
+                                   unchanged: plan.unchangedWords(for: item))
             }
                 .width(min: 200, ideal: 330)
         }
@@ -352,7 +353,8 @@ struct ConvertCheckCell: View {
                                                       set: { state.convertPlan.setSelected(item.id, $0) }))
             .labelsHidden()
             .help(item.factorySlot != nil && state.convertPlan.preset.isThirdWave
-                  ? "Your 3rd Wave is expected to have this factory table (U48–U55 since the 2025 update, which Groove Synthesis offers as a download), so it starts unchecked" : "")
+                  ? "Your 3rd Wave is expected to have this factory table, so it starts unchecked"
+                    + (item.factorySlot?.is2025FactorySlot == true ? " (U48–U55 joined the factory set in 2025; Groove Synthesis offers them as a download)" : "") : "")
     }
 }
 
@@ -462,8 +464,8 @@ struct ConvertNameField: View {
                 .lineLimit(1)
                 .foregroundStyle(included ? Color.primary : Color.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .help(item.newName == nil ? "The table’s name; double-click the row to edit it. The name goes on the converted file (and inside a 3rd Wave table); the source file is not changed."
-                                          : "Was \u{201C}\(item.table.name)\u{201D}; double-click the row to edit")
+                .help(item.newName == nil ? "\u{201C}\(item.name)\u{201D}. Double-click the row to edit the name, which goes on the converted file (and inside a 3rd Wave table); the source file is not changed."
+                                          : "\u{201C}\(item.name)\u{201D}, was \u{201C}\(item.table.name)\u{201D}; double-click the row to edit")
         }
     }
 
@@ -512,7 +514,8 @@ struct ConvertFrameSizeCell: View {
         let choices = item.frameSizeChoices
         if choices.isEmpty && !item.needsFrameSize {
             ConvertSizeText(item: item, included: included, plain: true)
-                .help("Input: " + item.sizeDescription + " (frames × samples per frame). " + item.basisDescription)
+                .help("Input: " + item.sizeDescription + " (frames × samples per frame). " + item.basisDescription
+                      + (item.frameSizeAlternatives.isEmpty ? "" : " To use another size, see Override Frame Size… in the preview."))
         } else if choices.isEmpty {
             Label("Can’t split", systemImage: "xmark.octagon.fill").foregroundStyle(.red).lineLimit(1)
                 .help(state.convertPlan.statusDescription(item))
@@ -531,6 +534,7 @@ struct ConvertFrameSizeCell: View {
             .help(item.needsFrameSize
                   ? "Unable to estimate a frame size from this file. Click to choose one of the sizes its length allows (frames × samples per frame)."
                   : "Input: " + item.sizeDescription + " (frames × samples per frame). " + item.basisDescription + " Click to choose another size.")
+
             .popover(isPresented: $choosing, arrowEdge: .bottom) {
                 ConvertSizePopover(state: state, item: item)
             }
@@ -748,6 +752,8 @@ struct ConvertChangesCell: View {
     let summary: String
     let notes: ConvertPlan.ItemNotes
     let included: Bool
+    /// The tip's first line when nothing changes (`ConvertPlan.unchangedWords(for:)`).
+    var unchanged: String = "Only the file format changes."
 
     /// Plain sentences: the output and what changes, then each warning and note as the reader
     /// or the plan wrote it.
@@ -758,7 +764,7 @@ struct ConvertChangesCell: View {
     var body: some View {
         if let words {
             if words.changes.isEmpty && words.warnings.isEmpty {
-                Text("—").foregroundStyle(.secondary).help("Nothing changes but the format.\n" + tip)
+                Text("—").foregroundStyle(.secondary).help(unchanged + "\n" + tip)
             } else {
                 line(words).lineLimit(2).help(tip)
             }

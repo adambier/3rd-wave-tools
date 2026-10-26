@@ -51,7 +51,7 @@ struct ConvertDestinationPane: View {
             if plan.preset.isThirdWave {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("To load .wt files: copy the WAVES folder onto the 3rd Wave’s USB drive, then Global → Bulk wavetable import; or add them to the 3rd Wave Terminal app’s library and sync.")
+                    Text("To load .wt files: copy the WAVES folder onto the 3rd Wave’s USB drive and use Global → “Bulk wavetable import”, or add them to the 3rd Wave Terminal app’s library and sync.")
                     Text("Send to Pack also adds the .wt files to the Pack page.")
                 }
                 .font(.caption).foregroundStyle(.secondary)
@@ -310,8 +310,8 @@ struct ConvertInterpolationOption: View {
     private var tonverk: Bool { state.convertPlan.preset == .tonverk }
 
     private var tip: String {
-        tonverk ? "Tonverk reads it from the file name: a trailing \u{201C}r\u{201D} means stepped, otherwise crossfade (its manual says \u{201C}smooth\u{201D}). Other synths set interpolation on the oscillator."
-                : "Serum and Vital read it from the WAV; Tonverk reads it from the file name. Other synths set the interpolation method on the oscillator."
+        tonverk ? "Tonverk reads it from the file name: a trailing \u{201C}r\u{201D} means stepped, otherwise crossfade (its manual says \u{201C}smooth\u{201D}, taken here to mean a crossfade)."
+                : "Serum and Vital read it from the WAV. Other synths set the interpolation method on the oscillator."
     }
 
     /// The values the destination can record. Tonverk's name says stepped or smooth, nothing
@@ -337,9 +337,9 @@ struct ConvertInterpolationOption: View {
             lines.append(sentence + ".")
         }
         if tonverk {
-            lines.append("Crossfade is an interpolation method: each frame blends into the next. None is no interpolation: Tonverk jumps from frame to frame, and the file name gets an \u{201C}r\u{201D}.")
+            lines.append("Crossfade is an interpolation method: each frame blends into the next. None is no interpolation: Tonverk steps from frame to frame, and the file name gets an \u{201C}r\u{201D}.")
         } else {
-            lines.append("Crossfade and spectral are interpolation methods: crossfade blends each frame into the next; spectral blends their harmonics (Serum’s and Vital’s spectral morph). None is no interpolation: the synth jumps from frame to frame.")
+            lines.append("Crossfade and spectral are interpolation methods: crossfade blends each frame into the next; spectral blends their harmonics (Serum’s and Vital’s spectral morph). None is no interpolation: the synth steps from frame to frame.")
         }
         return lines.joined(separator: " ")
     }
@@ -351,8 +351,8 @@ struct ConvertInterpolationOption: View {
         // file states any, the writer's default; neither is marked unless it is "existing".
         let unmarkedDefault = shared ?? plan.defaultInterpolationItem
         VStack(alignment: .leading, spacing: 4) {
-            Text("Interpolation saved in the file")
-            Picker("Interpolation saved in the file", selection: selection) {
+            Text(tonverk ? "Interpolation marked in the file name" : "Interpolation saved in the file")
+            Picker(tonverk ? "Interpolation marked in the file name" : "Interpolation saved in the file", selection: selection) {
                 if let own = plan.eachTablesOwnInterpolationLabel {
                     choiceText(own).tag(Optional<Interpolation>.none)
                 }
@@ -363,7 +363,9 @@ struct ConvertInterpolationOption: View {
             }
             .labelsHidden()
             .frame(maxWidth: 260)
-            .help(tip)
+            // The "Each table's own — existing: …" item can be longer than the pop-up; its tip
+            // carries the full text.
+            .help((plan.eachTablesOwnInterpolationLabel.map { $0.text + "\n" } ?? "") + tip)
             Text(caption)
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -416,7 +418,7 @@ struct ConvertTonverkSizeOption: View {
             }
             .labelsHidden()
             .frame(maxWidth: 260)
-            .help("\u{201C}Existing\u{201D} is the frame size the tables already have; Tonverk takes 64 to 4,096 (powers of two), and a table of another size is written at 2,048. Any other choice resamples every table to that size. The size goes into the file name as a _wt tag (the preview shows each table’s); a trailing \u{201C}r\u{201D} marks a stepped table.")
+            .help((plan.eachTablesOwnFrameSizeLabel.map { $0.text + "\n" } ?? "") + "\u{201C}Existing\u{201D} is the frame size the tables already have; Tonverk takes 64 to 4,096 (powers of two), and a table of another size is written at 2,048. Any other choice resamples every table to that size. The size goes into the file name as a _wt tag (the preview shows each table’s); a trailing \u{201C}r\u{201D} marks a stepped table.")
         }
     }
 
@@ -435,12 +437,12 @@ struct ConvertTonverkSizeOption: View {
     }
 }
 
-/// The PPG's four standard waves at 60–63 of a P table.
+/// The PPG's four standard waveforms at 60–63 of a P table.
 struct ConvertPPGOption: View {
     @ObservedObject var state: AppState
 
     var body: some View {
-        Toggle("Add the PPG’s standard waves at 60–63", isOn: $state.convertPlan.options.appendPPGStandardWaves)
+        Toggle("Add the PPG’s standard waveforms at 60–63", isOn: $state.convertPlan.options.appendPPGStandardWaves)
             .toggleStyle(.checkbox)
             .help("Triangle, narrow pulse, square, and sawtooth, as in the 3rd Wave’s PPG-derived P tables. Your table is fitted into frames 0–59, the part the 3rd Wave sweeps when \u{201C}use upper wavetable\u{201D} is off.")
     }

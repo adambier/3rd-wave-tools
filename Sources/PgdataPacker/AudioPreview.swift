@@ -34,7 +34,7 @@ final class AudioPreview: ObservableObject {
     @Published var pitch: PianoKey {
         didSet {
             UserDefaults.standard.set(pitch.number, forKey: Self.pitchKey)
-            retune()
+            if isPlaying { retune() }
         }
     }
     /// The output devices with the system's current list of devices that can play.
@@ -57,29 +57,37 @@ final class AudioPreview: ObservableObject {
     private static let pitchKey = "ListenPitch"
     private static let outputKey = "ListenOutputDeviceUID"
     /// The band-limited cycle's length: long enough that reading it with linear interpolation
-    /// adds little of its own.
-    private static let tableSize = 4096
+    /// adds little of its own. Every cycle handed to the voice has exactly this length.
+    static let tableSize = 4096
     private static let gain: Float = 0.25   // −12 dB
 
     private let engine = AVAudioEngine()
     private var source: AVAudioSourceNode?
     /// The sample rate the source node renders at (the mixer converts to the device's).
     private var renderRate: Double = 48_000
-    private let voice = Voice()
+    private let voice = Voice(tableSize: AudioPreview.tableSize)
     /// The cycle as given, full length, so a change of pitch can band-limit it again.
     private var cycle: [Float] = []
     private var stopWork: DispatchWorkItem?
     private var deviceListener: AudioOutputDevices.Listener?
+    private var configurationObserver: NSObjectProtocol?
 
     private init() {
         let saved = UserDefaults.standard.integer(forKey: Self.pitchKey)
-        pitch = saved > 0 ? PianoKey(saved) : PianoKey.defaultPitch
+        let savedKey = PianoKey(saved > 0 ? saved : PianoKey.defaultPitch.number)
+        // A saved pitch outside the pop-up's range (edited defaults) would leave it blank.
+        pitch = Self.pitches.contains(savedKey) ? savedKey : PianoKey.defaultPitch
         outputDeviceUID = UserDefaults.standard.string(forKey: Self.outputKey)
         outputDevices = AudioOutputDevices.all()
         deviceListener = AudioOutputDevices.listen { [weak self] in
             guard let self else { return }
             self.outputDevices = AudioOutputDevices.all()
             self.applyOutputDevice()
+        }
+        // The engine stops itself when its output device goes away or changes its format (the
+        // default output switching to headphones, say); it must then be started again.
+        configurationObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
+            self?.restartIfPlaying()
         }
     }
 
@@ -92,19 +100,21 @@ final class AudioPreview: ObservableObject {
     // MARK: Playing
 
     /// Starts playing `cycle` (the values of one frame, or a blend of two), or replaces the cycle
-    /// playing. Values beyond ±1 are allowed; the level is scaled to fit.
+    /// playing. Values beyond ±1 are allowed; the level is scaled to fit. An empty cycle plays
+    /// silence.
     func play(_ cycle: [Float]) {
         stopWork?.cancel(); stopWork = nil
         self.cycle = cycle
+        problem = nil
         if !engine.isRunning {
             do {
                 try start()
             } catch {
                 problem = "Can’t play: \(error.localizedDescription)"
+                isPlaying = false
                 return
             }
         }
-        problem = nil
         isPlaying = true
         retune()
         voice.setGain(Self.gain)
@@ -122,23 +132,22 @@ final class AudioPreview: ObservableObject {
         guard isPlaying else { return }
         isPlaying = false
         voice.setGain(0)
+        // Long enough for the gain ramp at any buffer size the engine uses (the ramp is 10 ms;
+        // a 4,096-frame buffer at 44.1 kHz is 93 ms).
         let work = DispatchWorkItem { [weak self] in
             guard let self, !self.isPlaying else { return }
             self.engine.pause()
         }
         stopWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: work)
-    }
-
-    func toggle(_ cycle: [Float]) {
-        if isPlaying { stop() } else { play(cycle) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
     }
 
     /// Band-limits the cycle for the pitch and hands it to the voice.
     private func retune() {
-        guard !cycle.isEmpty, source != nil else { return }
+        guard source != nil else { return }
         let rate = renderRate
         let f = pitch.frequency
+        guard !cycle.isEmpty else { voice.set(table: [], increment: f / rate); return }
         // Keep the harmonics that stay below half the sample rate, with a little margin.
         let maxHarmonic = max(1, Int(rate / (2 * f)) - 1)
         var table = Resampling.bandLimitedCycle(cycle, to: Self.tableSize, maxHarmonic: maxHarmonic)
@@ -149,6 +158,8 @@ final class AudioPreview: ObservableObject {
 
     private func start() throws {
         if source == nil {
+            // The device first, so the render rate is the chosen device's, not the default's.
+            applyOutputDevice()
             let deviceRate = engine.outputNode.outputFormat(forBus: 0).sampleRate
             renderRate = deviceRate > 0 ? deviceRate : 48_000
             guard let format = AVAudioFormat(standardFormatWithSampleRate: renderRate, channels: 1) else {
@@ -164,16 +175,15 @@ final class AudioPreview: ObservableObject {
             engine.attach(node)
             engine.connect(node, to: engine.mainMixerNode, format: format)
             source = node
-            applyOutputDevice()
         }
         try engine.start()
     }
 
-    /// Points the engine at the chosen device (or the default). The engine must be stopped to
-    /// change device; if it was playing, it starts again.
+    /// Points the engine at the chosen device (or the system default). The engine is stopped for
+    /// the change, since the device's format can differ; if it was playing, it starts again.
     private func applyOutputDevice() {
         let wasRunning = engine.isRunning
-        if wasRunning { engine.pause() }
+        if wasRunning { engine.stop() }
         let id = effectiveOutputDevice?.id ?? AudioOutputDevices.systemDefaultID()
         if let id, id != engine.outputNode.auAudioUnit.deviceID {
             do {
@@ -182,12 +192,19 @@ final class AudioPreview: ObservableObject {
                 problem = "Can’t use that output: \(error.localizedDescription)"
             }
         }
-        if wasRunning {
-            do {
-                try engine.start()
-            } catch {
-                problem = "Can’t play: \(error.localizedDescription)"
-            }
+        if wasRunning { restartIfPlaying() }
+    }
+
+    /// Starts the engine again after it stopped on its own or for a device change, when a cycle
+    /// should be sounding; says so when it can't.
+    private func restartIfPlaying() {
+        guard isPlaying, !engine.isRunning else { return }
+        do {
+            try engine.start()
+            retune()
+        } catch {
+            problem = "Can’t play: \(error.localizedDescription)"
+            isPlaying = false
         }
     }
 
@@ -195,19 +212,27 @@ final class AudioPreview: ObservableObject {
 
     /// The oscillator the render block runs: one band-limited cycle read with linear
     /// interpolation at a phase increment, a gain that ramps to its target over about 10 ms, and
-    /// a short crossfade from the cycle before whenever the cycle is replaced. The main thread
-    /// leaves a new cycle, increment, or gain under a lock held only for the assignment; the
-    /// render block picks them up under the same lock at the start of each buffer and otherwise
-    /// owns every value it plays with, so neither thread waits on the other for long.
+    /// a crossfade from the cycle before whenever the cycle is replaced.
+    ///
+    /// Nothing is allocated or freed on the audio thread: the voice owns three buffers of the
+    /// one table size, and a new cycle goes into the staging buffer under a lock the main thread
+    /// holds only for the copy; at the start of a buffer the render thread, under the same lock,
+    /// rotates the three pointers (current becomes previous, staging becomes current, the old
+    /// previous becomes staging). A new cycle waits while a crossfade is still running, so the
+    /// output never jumps; the main thread may overwrite the staging buffer meanwhile, and the
+    /// latest cycle is the one taken.
     final class Voice {
         private let lock: UnsafeMutablePointer<os_unfair_lock>
-        // Left by the main thread, taken by the render thread.
-        private var pendingTable: [Float]?
+        private let size: Int
+        private var current: UnsafeMutablePointer<Float>
+        private var previous: UnsafeMutablePointer<Float>
+        private var staging: UnsafeMutablePointer<Float>
+        // Written by the main thread under the lock, read by the render thread under the lock.
+        private var pending = false
         private var pendingIncrement: Double?
         private var pendingGain: Float?
         // The render thread's own.
-        private var table: [Float] = []
-        private var previous: [Float] = []
+        private var hasTable = false
         private var fade = 0
         private var increment: Double = 0
         private var phase: Double = 0
@@ -216,19 +241,30 @@ final class AudioPreview: ObservableObject {
         /// Samples of crossfade when the cycle changes, and of gain ramp (at 48 kHz, 10 ms).
         private let fadeLength = 480
 
-        init() {
+        init(tableSize: Int) {
+            size = tableSize
             lock = UnsafeMutablePointer<os_unfair_lock>.allocate(capacity: 1)
             lock.initialize(to: os_unfair_lock())
+            current = UnsafeMutablePointer<Float>.allocate(capacity: tableSize); current.initialize(repeating: 0, count: tableSize)
+            previous = UnsafeMutablePointer<Float>.allocate(capacity: tableSize); previous.initialize(repeating: 0, count: tableSize)
+            staging = UnsafeMutablePointer<Float>.allocate(capacity: tableSize); staging.initialize(repeating: 0, count: tableSize)
         }
 
         deinit {
-            lock.deinitialize(count: 1)
-            lock.deallocate()
+            lock.deinitialize(count: 1); lock.deallocate()
+            current.deallocate(); previous.deallocate(); staging.deallocate()
         }
 
+        /// Leaves a cycle for the render thread: `table` is copied into the staging buffer (an
+        /// empty table means silence; a shorter one is zero-padded, a longer one cut).
         func set(table: [Float], increment: Double) {
             os_unfair_lock_lock(lock)
-            pendingTable = table
+            let n = min(table.count, size)
+            table.withUnsafeBufferPointer { src in
+                if n > 0, let base = src.baseAddress { staging.update(from: base, count: n) }
+            }
+            if n < size { (staging + n).update(repeating: 0, count: size - n) }
+            pending = true
             pendingIncrement = increment
             os_unfair_lock_unlock(lock)
         }
@@ -241,25 +277,28 @@ final class AudioPreview: ObservableObject {
 
         func render(into out: UnsafeMutablePointer<Float>, count: Int) {
             os_unfair_lock_lock(lock)
-            let newTable = pendingTable, newIncrement = pendingIncrement, newGain = pendingGain
-            pendingTable = nil; pendingIncrement = nil; pendingGain = nil
-            os_unfair_lock_unlock(lock)
-            if let newTable {
-                if !table.isEmpty { previous = table; fade = fadeLength }
-                table = newTable
+            if pending, fade == 0 {
+                let old = previous
+                previous = current
+                current = staging
+                staging = old
+                if hasTable { fade = fadeLength }
+                hasTable = true
+                pending = false
             }
-            if let newIncrement { increment = newIncrement }
-            if let newGain { targetGain = newGain }
-            guard !table.isEmpty else {
-                for i in 0..<count { out[i] = 0 }
+            if let newIncrement = pendingIncrement { increment = newIncrement; pendingIncrement = nil }
+            if let newGain = pendingGain { targetGain = newGain; pendingGain = nil }
+            os_unfair_lock_unlock(lock)
+            guard hasTable else {
+                out.update(repeating: 0, count: count)
                 return
             }
             let step = 1 / Float(fadeLength)
             for i in 0..<count {
-                var v = Voice.read(table, at: phase)
+                var v = read(current, at: phase)
                 if fade > 0 {
                     let w = Float(fade) / Float(fadeLength)
-                    v = v * (1 - w) + Voice.read(previous, at: phase) * w
+                    v = v * (1 - w) + read(previous, at: phase) * w
                     fade -= 1
                 }
                 if gain < targetGain { gain = min(targetGain, gain + step * 0.25) }
@@ -270,12 +309,13 @@ final class AudioPreview: ObservableObject {
             }
         }
 
-        /// The table's value at a phase of 0…1, linearly interpolated.
-        private static func read(_ table: [Float], at phase: Double) -> Float {
-            let x = phase * Double(table.count)
-            let i = Int(x)
+        /// The buffer's value at a phase of 0…1, linearly interpolated.
+        private func read(_ table: UnsafeMutablePointer<Float>, at phase: Double) -> Float {
+            let x = phase * Double(size)
+            var i = Int(x)
+            if i >= size { i -= size }
             let frac = Float(x - Double(i))
-            let a = table[i % table.count], b = table[(i + 1) % table.count]
+            let a = table[i], b = table[i + 1 == size ? 0 : i + 1]
             return a + (b - a) * frac
         }
     }

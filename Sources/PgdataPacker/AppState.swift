@@ -23,6 +23,26 @@ final class AppState: ObservableObject {
             case .convert: return "waveform"
             }
         }
+        /// Whether the page is still under development, so it is shown only when View › Show
+        /// Under-Development Features is on (`AppState.showsUnderDevelopmentFeatures`).
+        var isUnderDevelopment: Bool { self == .convert }
+    }
+
+    private static let underDevelopmentKey = "ShowUnderDevelopmentFeatures"
+
+    /// Whether the pages still under development (the Wavetables page, with Listen and the audio
+    /// output in the toolbar) are shown: View › Show Under-Development Features. Off by default;
+    /// kept between sessions. Turning it off while such a page is current goes back to Pack.
+    @Published var showsUnderDevelopmentFeatures: Bool = UserDefaults.standard.bool(forKey: AppState.underDevelopmentKey) {
+        didSet {
+            UserDefaults.standard.set(showsUnderDevelopmentFeatures, forKey: Self.underDevelopmentKey)
+            if !showsUnderDevelopmentFeatures, section.isUnderDevelopment { section = .pack }
+        }
+    }
+
+    /// The pages shown, in the toolbar's and the View menu's order.
+    var availableSections: [Section] {
+        Section.allCases.filter { showsUnderDevelopmentFeatures || !$0.isUnderDevelopment }
     }
 
     struct PackItem: Identifiable {
@@ -71,7 +91,13 @@ final class AppState: ObservableObject {
     /// (names, slots, choices, frame sizes). The window hands this manager out
     /// (`AppDelegate.windowWillReturnUndoManager`), so the standard menu items reach it. The
     /// files themselves are never touched either way.
-    let undoManager = UndoManager()
+    let undoManager: UndoManager = {
+        let manager = UndoManager()
+        // Each removal keeps its rows (a removed wavetable keeps its samples) until undone or
+        // dropped; a bound keeps that memory within reason.
+        manager.levelsOfUndo = 20
+        return manager
+    }()
 
     @Published var section: Section = .pack
     /// Whether the log is open under the status bar (the View menu and the status bar's button
@@ -474,15 +500,22 @@ final class AppState: ObservableObject {
                        message: "This removes \(what) from the lists, with any slots, choices, and names you set for them. The files themselves are not touched.",
                        ok: "Remove All") { [weak self] (confirmed: Bool) in
             guard confirmed, let self else { return }
-            let programs = self.programs, files = self.contentFiles, names = self.contentNames, selected = self.selectedProgram
+            // Rows are put back by index, so rows added after a Remove All survive its undo.
+            let programs = Array(self.programs.enumerated()), files = Array(self.contentFiles.enumerated())
+            let names = self.contentNames, selected = self.selectedProgram
             self.programs = []; self.contentFiles = []; self.contentNames = [:]; self.selectedProgram = nil
             self.note("Removed \(what) from the Pack page.")
             self.registerUndo("Remove All") { [weak self] in
                 guard let self else { return }
-                self.programs = programs; self.contentFiles = files; self.contentNames = names; self.selectedProgram = selected
+                self.programs = Self.putBack(programs, into: self.programs)
+                self.contentFiles = Self.putBack(files, into: self.contentFiles)
+                self.contentNames.merge(names) { current, _ in current }
+                if self.selectedProgram == nil { self.selectedProgram = selected }
+                let programIDs = Set(programs.map(\.element.id)), fileIDs = files.map(\.element.id)
                 self.registerUndo("Remove All") { [weak self] in
                     guard let self else { return }
-                    self.programs = []; self.contentFiles = []; self.contentNames = [:]; self.selectedProgram = nil
+                    self.removePrograms(programIDs)
+                    for id in fileIDs { self.removeContent(id) }
                 }
             }
         }
@@ -690,13 +723,14 @@ final class AppState: ObservableObject {
                        message: "This removes \(what) from the list, with the files you unchecked and the names you changed. The files themselves are not touched.",
                        ok: "Remove All") { [weak self] (confirmed: Bool) in
             guard confirmed, let self else { return }
-            let unpacks = self.unpacks, selected = self.selectedUnpack
+            let unpacks = Array(self.unpacks.enumerated()), selected = self.selectedUnpack
             self.unpacks = []; self.selectedUnpack = nil
             self.note("Removed \(what) from the Unpack page.")
             self.registerUndo("Remove All") { [weak self] in
                 guard let self else { return }
-                self.unpacks = unpacks; self.selectedUnpack = selected
-                self.registerUndo("Remove All") { [weak self] in self?.unpacks = []; self?.selectedUnpack = nil }
+                self.unpacks = Self.putBack(unpacks, into: self.unpacks)
+                if self.selectedUnpack == nil { self.selectedUnpack = selected }
+                self.registerUndo("Remove All") { [weak self] in self?.removeUnpacks(Set(unpacks.map(\.element.id))) }
             }
         }
     }
@@ -801,12 +835,11 @@ final class AppState: ObservableObject {
         let removed = convertPlan.items.enumerated().filter { ids.contains($0.element.id) }
         guard !removed.isEmpty else { return }
         convertPlan.remove(ids)
-        convertPreviews.removeAll()
+        convertPreviews.remove(ids)
         let name = "Remove \(removed.count == 1 ? "Table" : "Tables")"
         registerUndo(name) { [weak self] in
             guard let self else { return }
             self.convertPlan.items = Self.putBack(removed, into: self.convertPlan.items)
-            self.convertPreviews.removeAll()
             self.registerUndo(name) { [weak self] in self?.removeConvertItems(ids) }
         }
     }
@@ -815,23 +848,18 @@ final class AppState: ObservableObject {
     func removeAllConvert() {
         let n = convertPlan.items.count
         guard n > 0 else { return }
-        let what = "\(n) wavetable\(n == 1 ? "" : "s")"
+        let what = "\(n) table\(n == 1 ? "" : "s")"
         Panels.confirm(title: "Remove everything from the Wavetables page?",
                        message: "This removes \(what) from the list, with the tables you marked to convert and the frame sizes you chose. The files themselves are not touched.",
                        ok: "Remove All") { [weak self] (confirmed: Bool) in
             guard confirmed, let self else { return }
-            let items = self.convertPlan.items
+            let items = Array(self.convertPlan.items.enumerated())
             self.convertPlan.items = []
             self.convertPreviews.removeAll()
             self.registerUndo("Remove All") { [weak self] in
                 guard let self else { return }
-                self.convertPlan.items = items
-                self.convertPreviews.removeAll()
-                self.registerUndo("Remove All") { [weak self] in
-                    guard let self else { return }
-                    self.convertPlan.items = []
-                    self.convertPreviews.removeAll()
-                }
+                self.convertPlan.items = Self.putBack(items, into: self.convertPlan.items)
+                self.registerUndo("Remove All") { [weak self] in self?.removeConvertItems(Set(items.map(\.element.id))) }
             }
             self.note("Removed \(what) from the Wavetables page.")
         }

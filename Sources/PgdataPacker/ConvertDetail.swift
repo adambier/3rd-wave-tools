@@ -60,7 +60,7 @@ struct ConvertPreviewPlaceholder: View {
         let plan = state.convertPlan
         VStack(alignment: .leading, spacing: 6) {
             ConvertPreviewHeading(title: items.isEmpty ? "No table selected" : "\(items.count) tables selected")
-            Text(items.isEmpty ? "Select a table to preview it." : "Select a single table to preview it.")
+            Text(items.isEmpty ? "Select a table to preview it." : "Select a single table to preview it; the frame size of several can be set below.")
                 .foregroundStyle(.secondary)
             if items.count > 1 {
                 ConvertSeveralSummary(plan: plan, items: items)
@@ -76,8 +76,8 @@ struct ConvertPreviewPlaceholder: View {
 /// For several selected tables: one frame size for those whose file does not state one
 /// (assumed, estimated, or open), from the sizes all of them allow. Select all (⌘A) and a folder
 /// of unlabelled WAVs from one maker is settled in one choice. Tables whose file states a size
-/// keep it (the preview's Override Frame Size… is for one table at a time). Nothing when no
-/// selected table is adjustable, or no one size fits them all.
+/// keep it (the preview's Override Frame Size… is for one table at a time). When no selected
+/// table is adjustable, or no one size fits them all, a line says so instead.
 struct ConvertSeveralFrameSize: View {
     @ObservedObject var state: AppState
     let items: [ConvertPlan.Item]
@@ -87,15 +87,24 @@ struct ConvertSeveralFrameSize: View {
         let ids = Set(items.map(\.id))
         let adjustable = plan.adjustableItems(in: ids)
         let sizes = ConvertPlan.commonFrameSizes(of: adjustable)
-        if !adjustable.isEmpty, !sizes.isEmpty {
-            let shared = ConvertPlan.sharedFrameSize(of: adjustable)
-            let stated = items.count - adjustable.count
-            VStack(alignment: .leading, spacing: 4) {
+        let stated = items.count - adjustable.count
+        VStack(alignment: .leading, spacing: 4) {
+            if adjustable.isEmpty {
+                // Nothing to set: every selected table takes its size from the file (the
+                // preview's Override Frame Size… changes one at a time).
+                Text("\(CountWords.all(items.count, "tables")) take their frame size from the file.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if sizes.isEmpty {
+                Text("No one frame size fits \(CountWords.all(adjustable.count, "tables").lowercased()) whose size is assumed or estimated; set them in the Input column.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                let shared = ConvertPlan.sharedFrameSize(of: adjustable)
                 HStack(spacing: 8) {
                     Text(adjustable.count == items.count
-                         ? "Frame size for all \(items.count) tables:"
-                         : (adjustable.count == 1 ? "Frame size for the one table whose file doesn’t state it:"
-                                                  : "Frame size for the \(adjustable.count) tables whose files don’t state it:"))
+                         ? "Frame size for \(CountWords.all(items.count, "tables").lowercased()):"
+                         : (adjustable.count == 1 ? "Frame size for the one table whose size is assumed or estimated:"
+                                                  : "Frame size for the \(adjustable.count) tables whose size is assumed or estimated:"))
                     Picker("Frame size", selection: Binding<Int>(
                         get: { shared ?? 0 },
                         set: { (size: Int) in if size != 0 { state.convertPlan.chooseFrameSize(size, forAll: ids) } })) {
@@ -106,11 +115,11 @@ struct ConvertSeveralFrameSize: View {
                     }
                     .labelsHidden()
                     .fixedSize()
-                    .help("One frame size for the selected tables whose file doesn’t state one; only the sizes every one of their lengths allows are offered. Each table’s Input column shows the result and can still be changed on its own.")
+                    .help("One frame size for the selected tables whose size is assumed or estimated (not stated in the file); only the sizes every one of their lengths allows are offered. Each table’s Input column shows the result and can still be changed on its own.")
                 }
                 if stated > 0 {
-                    Text(stated == 1 ? "1 table states its frame size in the file and keeps it."
-                                     : "\(stated) tables state their frame size in the file and keep it.")
+                    Text(stated == 1 ? "1 table takes its frame size from the file and keeps it."
+                                     : "\(stated) tables take their frame size from the file and keep it.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -118,30 +127,45 @@ struct ConvertSeveralFrameSize: View {
     }
 }
 
-/// For several selected tables: how many can't be converted yet and how many change on the way.
+/// For several selected tables: how many can't be converted yet, and what converting does to
+/// them, counted by kind of change (the Changes column holds each table's own).
 struct ConvertSeveralSummary: View {
     let plan: ConvertPlan
     let items: [ConvertPlan.Item]
 
     var body: some View {
         let blocked = items.filter { plan.status($0).isBlocked }.count
-        let changed = items.filter { (item: ConvertPlan.Item) -> Bool in
-            guard let e = plan.expected(for: item) else { return false }
-            return e.resizes || e.changesCount || e.scaledToFit
-        }.count
         if blocked > 0 {
             Label("\(blocked) can’t be converted yet (see the Input column)", systemImage: "exclamationmark.octagon.fill")
                 .foregroundStyle(.red)
         }
-        Text(ConvertSeveralSummary.changeSentence(changed: changed, of: items.count))
+        Text(ConvertSeveralSummary.changeSentence(plan: plan, items: items))
             .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// "12 of them change frame size, frame count, or volume; the rest change format only."
-    static func changeSentence(changed: Int, of total: Int) -> String {
-        if changed == 0 { return "None of them changes frame size, frame count, or volume; all change format only." }
-        if changed == total { return "All of them change frame size, frame count, or volume." }
-        return "\(changed) of them change\(changed == 1 ? "s" : "") frame size, frame count, or volume; the rest change format only."
+    /// "Converting to a U table resizes 13 of the 13 tables (see the Changes column); 11 get fewer
+    /// frames; 2 are turned down." or "Converting changes only the file format of all 13 tables."
+    static func changeSentence(plan: ConvertPlan, items: [ConvertPlan.Item]) -> String {
+        let expected = items.compactMap { plan.expected(for: $0) }
+        let resized = expected.filter(\.resizes).count
+        let fewer = expected.filter { $0.changesCount && $0.frameCountGrows == false }.count
+        let more = expected.filter { $0.changesCount && $0.frameCountGrows == true }.count
+        let down = expected.filter(\.scaledToFit).count
+        let total = items.count
+        let kind = plan.preset.shortTitle
+        let these = CountWords.all(total, "tables").lowercased()   // "all 13 tables", "both tables"
+        if resized + fewer + more + down == 0 {
+            return "Converting to \(kind) changes only the file format of \(these)."
+        }
+        func count(_ n: Int) -> String { n == total ? "all" : "\(n)" }
+        var parts: [String] = []
+        if resized > 0 { parts.append("resizes the frames of \(resized == total ? these : "\(resized) of the \(total) tables")") }
+        if fewer > 0 { parts.append("\(count(fewer)) get fewer frames") }
+        if more > 0 { parts.append("\(count(more)) get more frames") }
+        if down > 0 { parts.append("\(count(down)) \(down == 1 ? "is" : "are") turned down") }
+        if resized == 0 { parts[0] = "changes \(these): " + parts[0] }
+        return "Converting to \(kind) " + parts.joined(separator: "; ") + " (see the Changes column)."
     }
 }
 
@@ -216,7 +240,7 @@ struct ConvertPreviewFacts: View {
     /// Where the size comes from; for an assumed size, also where to change it.
     private var inputDetail: String {
         item.sizeSource == .guessed || item.sizeSource == .likely
-            ? item.basisDescription + " If it sounds wrong, choose another size in the Input column."
+            ? item.basisDescription + " If the frames look or sound wrong, choose another size in the Input column."
             : item.basisDescription
     }
 
@@ -321,7 +345,7 @@ struct ConvertOverviewPair: View {
                         ConvertOverview(frames: result,
                                         caption: "\(plan.preset.shortTitle) · \(result.count) × \(ConvertPlan.formatCount(first.count))",
                                         interpolation: resultInterpolation,
-                                        unstatedLegend: "interpolation not stored in the file",
+                                        unstatedLegend: plan.preset.isThirdWave ? "the 3rd Wave sets the interpolation itself" : "interpolation set in the synth",
                                         tint: WavetableStackCanvas.resultColor,
                                         position: position)
                     }
@@ -329,16 +353,14 @@ struct ConvertOverviewPair: View {
                                      result: result, resultInterpolation: resultInterpolation,
                                      resultTitle: plan.preset.shortTitle, position: position)
                 }
-                .help("The table’s frames, front (first) to back (last): the input as read, and what the destination gets, read back from the file this page would write. Solid lines are the frames in the file (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum’s or Vital’s own morphs. The Frame slider below sweeps through the table; the third picture draws the cycle there.")
+                .help("The table’s frames, front (first) to back (last): the input as read, and what the destination gets, read back from the file this page would write. Solid lines are the frames in the file (at most 64 are drawn, 24 when the interpolation is drawn between them, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum’s or Vital’s own morphs. The Frame slider below sweeps through the table; the third picture draws the cycle there.")
                 ConvertSweepControls(position: $position, preview: preview,
-                                     playing: result != nil ? "the \(plan.preset.shortTitle) output" : "the input")
+                                     playing: result != nil ? "the \(plan.preset.shortTitle) output" : "the input",
+                                     cycle: { cycleToPlay(source: source.frames, result: result, resultInterpolation: resultInterpolation) })
             }
             .onChange(of: position) { _ in updatePlaying(source: source.frames, result: result, resultInterpolation: resultInterpolation) }
             .onChange(of: result) { (r: [[Float]]?) in updatePlaying(source: source.frames, result: r, resultInterpolation: resultInterpolation) }
             .onChange(of: item.id) { _ in updatePlaying(source: source.frames, result: result, resultInterpolation: resultInterpolation) }
-            .onChange(of: preview.isPlaying) { (playing: Bool) in
-                if playing { preview.play(cycleToPlay(source: source.frames, result: result, resultInterpolation: resultInterpolation)) }
-            }
             .onDisappear { preview.stop() }
         }
     }
@@ -359,11 +381,13 @@ struct ConvertOverviewPair: View {
 }
 
 /// Under the pictures: the Frame slider, the Listen button, and the pitch pop-up (piano keys
-/// with their numbers and frequencies). `playing` names what Listen plays, for its tip.
+/// with their numbers and frequencies). `playing` names what Listen plays, for its tip; `cycle`
+/// gives the cycle to play when Listen is pressed.
 struct ConvertSweepControls: View {
     @Binding var position: Double
     @ObservedObject var preview: AudioPreview
     let playing: String
+    let cycle: () -> [Float]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -376,9 +400,7 @@ struct ConvertSweepControls: View {
                     .accessibilityValue(Text("\(Int((position * 100).rounded())) percent through the table"))
                     .help("Sweep through the table: the frame at the slider is drawn in pink in the pictures and large in the third; Listen plays it")
                 Button {
-                    // The toggle only flips the state; ConvertOverviewPair hands the cycle over
-                    // when it sees `isPlaying` change, so the two stay in step.
-                    if preview.isPlaying { preview.stop() } else { preview.play([]) }
+                    if preview.isPlaying { preview.stop() } else { preview.play(cycle()) }
                 } label: {
                     Label(preview.isPlaying ? "Stop" : "Listen", systemImage: preview.isPlaying ? "stop.fill" : "play.fill")
                         .frame(minWidth: 58)
@@ -688,7 +710,7 @@ struct ConvertWhatHappens: View {
             Text("Output").font(.caption).foregroundStyle(.secondary)
             if plan.canConvert(item) {
                 if let file = state.convertPreviews.preview(item, in: plan) {
-                    ConvertNoteList(file: file, output: plan.expected(for: item))
+                    ConvertNoteList(file: file, output: plan.expected(for: item), unchanged: plan.unchangedWords(for: item))
                 } else {
                     Label("The table can’t be converted; the report after converting says why.", systemImage: "xmark.octagon")
                         .foregroundStyle(.red)
@@ -711,6 +733,8 @@ struct ConvertWhatHappens: View {
 struct ConvertNoteList: View {
     let file: OutputFile
     let output: ConvertPlan.ExpectedResult?
+    /// What to say when the writer has no notes (`ConvertPlan.unchangedWords(for:)`).
+    var unchanged: String = "Only the file format changes."
 
     /// "64 frames × 2,048 samples".
     private var sizeLine: String? {
@@ -730,7 +754,7 @@ struct ConvertNoteList: View {
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if file.notes.isEmpty {
-                Text("Only the file format changes.").font(.caption).foregroundStyle(.secondary)
+                Text(unchanged).font(.caption).foregroundStyle(.secondary)
             } else if file.notes.count == 1 {
                 // One note is a sentence, not a list of one.
                 Text(file.notes[0]).font(.caption).foregroundStyle(.secondary)

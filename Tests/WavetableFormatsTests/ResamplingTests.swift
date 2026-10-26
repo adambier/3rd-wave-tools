@@ -2,7 +2,7 @@ import XCTest
 @testable import WavetableFormats
 
 /// The band-limited cycle resize (the first seven tests are ported from ThirdWaveWT's
-/// CycleResamplerTests), frame-count policies, the U table mipmap chain, and the PPG waves.
+/// CycleResamplerTests), frame-count policies, the U table mipmap chain, and the PPG waveforms.
 final class ResamplingTests: XCTestCase {
     private func sine(_ n: Int, amplitude: Float = 1, phase: Float = 0, harmonic: Int = 1) -> [Float] {
         (0..<n).map { amplitude * sin(2 * .pi * Float(harmonic * $0) / Float(n) + phase) }
@@ -217,7 +217,7 @@ final class ResamplingTests: XCTestCase {
         XCTAssertLessThanOrEqual(chain.map(abs).max() ?? 0, 1.00001)
     }
 
-    // MARK: PPG standard waves
+    // MARK: PPG standard waveforms
 
     func testPPGStandardWaves() {
         XCTAssertEqual(PPGStandardWaves.frames.count, 4)

@@ -49,10 +49,10 @@ public enum WavetableWriter {
 
     /// What converting a table of `frameCount` frames of `frameSize` samples, peaking at `peak`
     /// and asking for `interpolation` (nil when its file does not say), will do for `preset` with
-    /// `options`: the frame size and count written, how the count changes, whether the PPG waves
+    /// `options`: the frame size and count written, how the count changes, whether the PPG waveforms
     /// are added, whether the table is turned down, the interpolation recorded, and the file
     /// extension. ``write(_:preset:options:)`` follows the same plan, so a tool can show it before
-    /// converting; only whether a table within ±1 is turned down after its frame size grows
+    /// converting; only whether a table within ±1 is turned down after its frame size changes
     /// (``WritePlan/Scaling/possible``) waits for the conversion itself.
     public static func plan(frameSize: Int, frameCount: Int, peak: Float, interpolation: Interpolation?,
                             preset: OutputPreset, options: OutputOptions = OutputOptions()) -> WritePlan {
@@ -60,10 +60,14 @@ public enum WavetableWriter {
         let ppg = preset == .thirdWaveP && options.appendPPGStandardWaves
         // With the PPG standard waveforms, the table itself goes into 60 frames and the four follow.
         let tableCount = ppg ? 60 : self.frameCount(for: preset, source: frameCount)
+        // Resizing a cycle, up or down, can raise its peak: band-limiting a square or a saw
+        // overshoots at the edges (Gibbs), and a 2,048-sample square shrunk to 128 peaks at
+        // about 1.18. So a table within ±1 may be turned down after any change of frame size;
+        // a change of frame count or the PPG waveforms cannot raise the peak.
         let scaling: WritePlan.Scaling
         if !preset.scalesToFit { scaling = .none }
         else if peak > 1 { scaling = .certain }
-        else { scaling = sizeOut > frameSize ? .possible : .none }
+        else { scaling = sizeOut != frameSize ? .possible : .none }
         return WritePlan(preset: preset, frameSizeIn: frameSize, frameSizeOut: sizeOut,
                          frameCountIn: frameCount, frameCountOut: tableCount + (ppg ? 4 : 0),
                          countPolicy: options.frameCountPolicy, addsPPGWaves: ppg,
@@ -107,7 +111,7 @@ public enum WavetableWriter {
                 throw WavetableError(.cannotConvert, "Tonverk takes frames of 64, 128, 256, 512, 1,024, 2,048, or 4,096 samples, not \(grouped(asked)).")
             }
             // The shared steps, in the plan's order: the frame count and size, the level, the
-            // PPG waves; then what each destination says and writes.
+            // PPG waveforms; then what each destination says and writes.
             reshape()
             if preset == .miniFreak, plan.frameCountIn < 64 {
                 let n = plan.frameCountIn
@@ -116,7 +120,7 @@ public enum WavetableWriter {
             if plan.scalesToFit { scaleToFit() } else { notePeakKept() }
             if plan.addsPPGWaves {
                 frames += PPGStandardWaves.frames
-                notes.append("The PPG’s four standard waves (triangle, narrow pulse, square, and sawtooth) were added at positions 60–63.")
+                notes.append("The PPG’s four standard waveforms (triangle, narrow pulse, square, and sawtooth) were added at positions 60–63.")
             }
             switch preset {
             case .thirdWaveU:
@@ -144,9 +148,9 @@ public enum WavetableWriter {
         mutating func tonverk() -> OutputFile {
             let stepped = plan.interpolationRecorded == Interpolation.none
             if interpolation == .spectral {
-                notes.append("A Tonverk file name can mark a table only as stepped (a trailing “r”) or not, so the spectral morph asked for is left unmarked: Tonverk plays it as a crossfade (its manual says “smooth”).")
+                notes.append("A Tonverk file name can mark a table only as stepped (a trailing “r”) or not, so the spectral morph asked for is left unmarked: Tonverk plays it as a crossfade (its manual says “smooth”, taken here to mean a crossfade).")
             }
-            noteDefaultInterpolation(prefix: "", result: "so the file name carries no “r” and Tonverk plays the table as a crossfade (its manual says “smooth”)")
+            noteDefaultInterpolation(prefix: "", result: "so the file name carries no “r” and Tonverk plays the table as a crossfade (its manual says “smooth”, taken here to mean a crossfade)")
             let named = WavetableWriter.Names.fileStem(table.name)
             notes += named.notes
             let untagged = WavetableWriter.Names.removeTonverkTag(named.stem)
@@ -186,8 +190,8 @@ public enum WavetableWriter {
         var countReason: String {
             switch preset {
             case .thirdWaveU: return "a 3rd Wave U table has exactly 64"
-            case .thirdWaveP: return plan.addsPPGWaves ? "the PPG’s standard waves take the last 4 of 64" : "a 3rd Wave P table has exactly 64"
-            case .wav2048: return "Serum and Pigments take at most 256"
+            case .thirdWaveP: return plan.addsPPGWaves ? "the PPG’s standard waveforms take the last 4 of 64" : "a 3rd Wave P table has exactly 64"
+            case .wav2048: return "Serum, Vital, and Pigments take at most 256"
             case .miniFreak: return "a MiniFreak stores 64"
             case .phasePlant: return "Phase Plant’s documentation asks for exactly 256"
             case .tonverk: return "Tonverk takes at most 64"
@@ -229,8 +233,9 @@ public enum WavetableWriter {
         }
 
         /// For a destination that cannot hold samples beyond ±1 (`plan.scalesToFit`): scales the
-        /// frames down so the peak is 1 when, after resizing, it is above 1. This is the one
-        /// decision the plan cannot make beforehand (``WritePlan/Scaling/possible``).
+        /// frames down so the peak is 1 when, after resizing, it is above 1 (resizing either way
+        /// can overshoot). This is the one decision the plan cannot make beforehand
+        /// (``WritePlan/Scaling/possible``).
         mutating func scaleToFit() {
             let peak = currentPeak
             guard peak > 1 else { return }
@@ -262,7 +267,8 @@ public enum WavetableWriter {
         mutating func noteUnrecordedInterpolation() {
             if let asked = options.interpolation ?? table.interpolation {
                 let who = preset.isThirdWave ? "the 3rd Wave" : "the synth"
-                notes.append("This format doesn’t store the interpolation method (\(asked.displayName.lowercased()) asked for); \(who) sets how frames blend.")
+                let askedFor = asked == Interpolation.none ? "no interpolation" : asked.displayName.lowercased()
+                notes.append("This format doesn’t store the interpolation method (\(askedFor) asked for); \(who) sets how frames blend.")
             }
         }
 
@@ -274,7 +280,7 @@ public enum WavetableWriter {
 
     /// The frame count `preset` writes for a table of `source` frames: the preset's required
     /// count, else the source's up to its most (``OutputPreset/requiredFrameCount``,
-    /// ``OutputPreset/maxFrameCount``). With the PPG waves, the table itself goes into 60 frames
+    /// ``OutputPreset/maxFrameCount``). With the PPG waveforms, the table itself goes into 60 frames
     /// instead; see ``plan(frameSize:frameCount:peak:interpolation:preset:options:)``.
     public static func frameCount(for preset: OutputPreset, source: Int) -> Int {
         preset.requiredFrameCount ?? Swift.min(source, preset.maxFrameCount)
@@ -287,7 +293,8 @@ public enum WavetableWriter {
     public static func frameSize(for preset: OutputPreset, source: Int, options: OutputOptions = OutputOptions()) -> Int {
         switch preset {
         case .tonverk:
-            if let n = options.tonverkFrameSize { return n }
+            // A requested size Tonverk does not take is not planned for either: `run()` refuses it.
+            if let n = options.tonverkFrameSize, tonverkFrameSizes.contains(n) { return n }
             return tonverkFrameSizes.contains(source) ? source : 2048
         case .surge:
             return isSurgeFrameSize(source) ? source : 2048
@@ -325,11 +332,12 @@ public struct WritePlan: Equatable, Sendable {
     /// Whether the table is turned down to fit the destination.
     public enum Scaling: Equatable, Sendable {
         /// Not turned down: the destination keeps samples beyond ±1 as they are, or the peak is
-        /// within ±1 and the frame size does not grow.
+        /// within ±1 and the frame size does not change.
         case none
-        /// The peak is within ±1, but the frame size grows, which can raise the peak a little
-        /// between the original samples; the writer then turns the table down for a destination
-        /// that cannot hold more than ±1. Only converting settles it.
+        /// The peak is within ±1, but the frame size changes, which can raise the peak a little
+        /// (new samples between the originals, or the overshoot of band-limiting a sharp edge);
+        /// the writer then turns the table down for a destination that cannot hold more than ±1.
+        /// Only converting settles it.
         case possible
         /// The peak is above 1 and the destination cannot hold it: turned down.
         case certain
@@ -343,11 +351,11 @@ public struct WritePlan: Equatable, Sendable {
     public var frameSizeOut: Int
     /// Frames in the source.
     public var frameCountIn: Int
-    /// Frames written (with the PPG waves, the 60 the table goes into plus the 4 waves).
+    /// Frames written (with the PPG waveforms, the 60 the table goes into plus the 4 waveforms).
     public var frameCountOut: Int
     /// How the frame count is changed, when it is.
     public var countPolicy: FrameCountPolicy
-    /// Whether the PPG's four standard waves are added at 60–63.
+    /// Whether the PPG's four standard waveforms are added at 60–63.
     public var addsPPGWaves: Bool
     /// The source's peak.
     public var peak: Float
@@ -365,7 +373,7 @@ public struct WritePlan: Equatable, Sendable {
     public var resizes: Bool { frameSizeIn != frameSizeOut }
     /// Whether the frame size grows (nil when it does not change).
     public var frameSizeGrows: Bool? { resizes ? frameSizeOut > frameSizeIn : nil }
-    /// The frames the table itself goes into (60 with the PPG waves, else `frameCountOut`).
+    /// The frames the table itself goes into (60 with the PPG waveforms, else `frameCountOut`).
     public var tableFrameCount: Int { addsPPGWaves ? frameCountOut - 4 : frameCountOut }
     /// Whether the table's frame count changes.
     public var changesCount: Bool { tableFrameCount != frameCountIn }

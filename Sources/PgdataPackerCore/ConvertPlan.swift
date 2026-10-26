@@ -211,7 +211,12 @@ public struct ConvertPlan: Equatable {
             case .markers: return file + "; less certain than a frame size the file states."
             case .guessed:
                 // 2,048 samples per frame is the size of Serum-style wavetables (WAVETABLES.md section 2).
-                return "The file doesn’t specify a frame size; \(ConvertPlan.formatCount(table.frameSize ?? 2048)) samples per frame is assumed, the size of Serum-style wavetables."
+                var text = "The file doesn’t specify a frame size; \(ConvertPlan.formatCount(table.frameSize ?? 2048)) samples per frame is assumed, the size of Serum-style wavetables."
+                // When the samples point elsewhere, say so here too, not only in the chooser.
+                if case .likely(let n) = frameSizeFit, n != frameSize {
+                    text += " Its frames are more alike at \(ConvertPlan.formatCount(n)), which the chooser marks likely."
+                }
+                return text
             case .likely:
                 let others = table.candidateFrameSizes.filter { $0 != frameSize }.map(ConvertPlan.formatCount)
                 return "The file doesn’t specify a frame size; \(ConvertPlan.formatCount(frameSize ?? 0)) samples per frame is assumed because frames of that size are alike from one to the next, as a wavetable’s are."
@@ -645,6 +650,24 @@ public struct ConvertPlan: Equatable {
     /// The items marked to convert that cannot, for either reason.
     public var blockedCount: Int { items.filter { status($0).isBlocked }.count }
 
+    /// What converting does to a table whose destination changes none of its frames, size, or
+    /// level: for a 3rd Wave `.wt` or `.pgdata` table going back to a 3rd Wave table, the table
+    /// itself is unchanged and only its wrapping differs; for any other source, the file format
+    /// changes. (A U table's mipmap chain is recomputed on the way, from the frames; the 3rd Wave
+    /// identifies a table by its frames alone. See section 5.1 of FORMATS.md.)
+    public func unchangedWords(for item: Item) -> String {
+        switch item.table.source {
+        case .thirdWaveWavetable(let isP):
+            return preset.isThirdWave && isP == (preset == .thirdWaveP) && !isP
+                ? "The table is unchanged; its mipmap chain is recomputed."
+                : (preset.isThirdWave ? "The table is unchanged." : "Only the file format changes.")
+        case .unifiedProgram:
+            return preset.isThirdWave ? "The table is unchanged, written as its own .wt file." : "Only the file format changes."
+        case .wav, .flac, .surgeWavetable:
+            return "Only the file format changes."
+        }
+    }
+
     /// The first item, in the page's order, with the given status; nil when none has it. The
     /// page's counts of blocked tables jump to this item when clicked.
     public func firstItem(with status: Status) -> Item? { items.first { self.status($0) == status } }
@@ -656,9 +679,10 @@ public struct ConvertPlan: Equatable {
 
     /// Whether converting to a destination has been tested (`OutputPreset.testedIn`): the
     /// chosen row says so in orange when it has not, and the sources popover either way.
-    /// "Converting to this output has not yet been tested." or "Tested in Pigments and Serum."
+    /// "Converting to this destination has not yet been tested in its synth." or "Tested in
+    /// Pigments and Serum."
     public static func testingStatus(_ preset: OutputPreset) -> String {
-        preset.testedIn.isEmpty ? "Converting to this output has not yet been tested."
+        preset.testedIn.isEmpty ? "Converting to this destination has not yet been tested in its synth."
                                 : "Tested in " + listPhrase(preset.testedIn) + "."
     }
 
@@ -726,7 +750,7 @@ public struct ConvertPlan: Equatable {
     }
 
     /// The frame count the destination writes for a source frame count (the writer's own rule;
-    /// with the PPG waves the table itself goes into 60, which `expected(for:)` accounts for).
+    /// with the PPG waveforms the table itself goes into 60, which `expected(for:)` accounts for).
     public func destinationFrameCount(source: Int) -> Int {
         WavetableWriter.frameCount(for: preset, source: source)
     }
@@ -906,7 +930,7 @@ public struct ConvertPlan: Equatable {
         }
         if e.scaledToFit { parts.append("turned down to fit (peak \(Wavetable.peakText(e.peak)))") }
         else if e.mayScaleToFit { parts.append("may be turned down a little to fit after resizing") }
-        if e.addsPPGWaves { parts.append("the PPG’s four standard waves at 60–63") }
+        if e.addsPPGWaves { parts.append("the PPG’s four standard waveforms at 60–63") }
         return parts.joined(separator: "; ")
     }
 
@@ -960,18 +984,28 @@ public struct ConvertPlan: Equatable {
     /// (observed once, for one table, which went to U63; what several would take is untested;
     /// see section 7 of FORMATS.md).
     public func thirdWaveCapacityNote(for preset: OutputPreset) -> String? {
+        thirdWaveCapacityNote(for: preset, converted: false)
+    }
+
+    /// The capacity note (above) in the tense for the report, after converting: "9 U tables were
+    /// converted for 8 user slots …".
+    public func thirdWaveCapacityNote(for preset: OutputPreset, converted: Bool) -> String? {
         guard preset.isThirdWave else { return nil }
         let own = selectedItems.filter { canConvert($0) && $0.factorySlot == nil }.count
         let isP = preset == .thirdWaveP
         let total = isP ? SourceRef.pCount : SourceRef.uCount
         let factory = isP ? SourceRef.factoryPCount : SourceRef.factoryUCount
-        guard own > total - factory else { return nil }
+        let free = total - factory
+        guard own > free else { return nil }
         let kind = isP ? "P" : "U"
-        return "\(own) \(kind) tables to convert. The 3rd Wave holds \(total) \(kind) tables, \(factory) of them Groove Synthesis’s (\(kind)00–\(kind)\(factory - 1)); with no slot free, it offers to overwrite the last slot (\(kind)\(total - 1)); which slots several tables would take has not been tested."
+        let slots = "\(kind)\(String(format: "%02d", factory))–\(kind)\(total - 1)"
+        let factorySlots = "\(kind)00–\(kind)\(String(format: "%02d", factory - 1))"
+        let opening = converted ? "\(own) \(kind) tables were converted for \(free) user slots" : "\(own) \(kind) tables to convert for \(free) user slots"
+        return "\(opening) (\(slots); \(factorySlots) hold Groove Synthesis’s tables). With no slot free, the 3rd Wave offers to overwrite the last slot (\(kind)\(total - 1)); which slots several tables would take has not been tested."
     }
 
     /// What the Changes column says for an item: short words for each change the destination
-    /// makes ("resized", "64 → 256 frames", "turned down", "+ PPG waves", "name changed"), and
+    /// makes ("resized", "64 → 256 frames", "turned down", "+ PPG waveforms", "name changed"), and
     /// short orange words for the warnings ("peak 1.14", "extra samples dropped"). Both empty
     /// when nothing changes but the format; nil when the item cannot convert.
     public func changeWords(for item: Item) -> (changes: [String], warnings: [String])? {
@@ -988,7 +1022,7 @@ public struct ConvertPlan: Equatable {
         }
         if e.scaledToFit { changes.append("turned down") }
         else if e.mayScaleToFit { changes.append("may be turned down") }
-        if e.addsPPGWaves { changes.append("+ PPG waves") }
+        if e.addsPPGWaves { changes.append("+ PPG waveforms") }
         if preset.isThirdWave, WavetableWriter.thirdWaveName(item.name).name != item.name.trimmingCharacters(in: .whitespaces) {
             changes.append("name changed")
         }
@@ -1285,4 +1319,8 @@ public final class ConvertPreviewCache {
 
     /// Forgets everything (e.g., when items are removed).
     public func removeAll() { entries = [:] }
+
+    /// Forgets the previews of the given items only (e.g., when those rows are removed); the
+    /// others keep theirs, so removing one row does not cost the selected table its preview.
+    public func remove(_ ids: Set<UUID>) { for id in ids { entries[id] = nil } }
 }
