@@ -271,17 +271,31 @@ the layout, so the unpacked `.pro` is always in the current format, `W3_PROG_5`.
 ### Wavetables
 
 Drop wavetable files or folders: WAV and FLAC wavetables (the kinds Serum, Vital, Phase Plant,
-and many other synths use), the 3rd Wave's `.wt` and `.pgdata` files, and Surge `.wt` files. Folders are searched, and
-files without wavetables are passed over. Each table is listed once, with any identical copies
-noted beside it, and with its frames, its frame size, and how the frame size was decided: from
-metadata in the file, a `_wt<N>` tag in its name, a Serum `.txt` file beside it, or its length.
-When nothing settles the size, the table waits for you to choose from the sizes its length
-allows; when only the length suggested a size, the list says so and lets you choose another.
-Groove Synthesis's factory tables are marked, and for a 3rd Wave destination they start
+and many other synths use), the 3rd Wave's `.wt` and `.pgdata` files, and Surge `.wt` files.
+Folders are searched, and files without wavetables are passed over. Each table is listed once,
+with any identical copies noted beside it, its frames and frame size, and what converting it
+changes. Groove Synthesis's factory tables are marked, and for a 3rd Wave destination they start
 unchecked, since the app assumes your 3rd Wave already has them (see
-[Factory wavetables](#factory-wavetables)).
+[Factory wavetables](#factory-wavetables)). Names are edited in the table (double-click a row);
+**Clean Up Names…** works as on the Pack page.
 
-Then choose a destination:
+The page converts existing wavetables; it does not make wavetables from other audio, which is
+what the 3rd Wave's **Wave Maker** does. Wave Maker also imports a Serum wavetable directly; this
+page adds other formats and frame sizes, many tables at once, and Send to Pack.
+
+#### Frame sizes
+
+The Input column says where each table's frame size comes from. A size the file's contents state
+(a chunk, a header, or a format that fixes it) is taken as it is. One the page estimated, from a
+`_wt<N>` tag in the file name, a Serum `.txt` beside the file, or markers, is the default of a
+choice: click it to see every size the length allows, each drawn so the one that cuts the frames
+in the right place is visible. When the file states nothing, the page assumes a size and says so:
+2,048 samples per frame, the Serum-style size, when the length allows it; otherwise the size
+whose frames are most alike from one to the next, marked "likely" in the chooser. A size nothing
+settles must be chosen before the table can be converted. For the rare WAV whose chunk states the
+wrong size, a **Change…** link in the preview overrides it.
+
+#### Destinations
 
 | Destination | What the Wavetables page writes |
 |---|---|
@@ -294,47 +308,48 @@ Then choose a destination:
 | Surge XT | a Surge `.wt` |
 | WaveEdit, E370 | a 16-bit WAV of 64 frames of 256 |
 
-The chosen destination says why it is separate and, in orange, what is open about it: that
-converting to it has not yet been tested (none has), and anything its sources leave open that
-the tables to convert bring about; the book icon beside each row (under the heading **Sources**)
-opens its sources, and a green seal in its place marks a destination that has been tested. The
-destination and its options apply to every table marked to convert. Each row's Input column says
-where its frame size comes from (in the file, in the name, from markers, assumed, or set
-manually), and the Interpolation column whether its file specifies an interpolation (crossfade or
-spectral) or none. The
-preview below the table shows one table: the input and the result stacked frame by frame (with
-the interpolation drawn between frames where a file records one), its file, its frame size and
-what that rests on, and what converting changes. The **Frame** slider under the pictures (or the
-pointer over one) sweeps through the table and draws the cycle there large, input and result
-together; **Listen** plays that cycle, following the slider, at the pitch chosen beside it (a
-piano key with its number; A3, 220 Hz, to start) through the output device chosen in the toolbar.
-Names are edited in the table (double-click a row). A frame size the file's contents state (a chunk, a
-header, or a format that fixes it) is taken as it is (a **Change…** link in the preview overrides
-it, for the rare WAV whose chunk is wrong); one the page estimated (from a tag in the
-file name, a `.txt` beside the file, or markers) is the default of a choice in the Input column,
-where every size the length allows is drawn so the one that cuts the frames in the right place
-is visible. When the file states nothing, the page assumes a size and says so: 2,048 samples per
-frame, the Serum-style size, when the length allows it, otherwise the size whose frames are most
-alike from one to the next, marked "likely" in the chooser; a size nothing settles must be chosen
-there. When a destination needs a different number of frames, **Options** lets you choose how
-to get there: **Original Frames Only** (fewer frames keeps evenly spaced originals, the first
-and last among them; more frames repeats each original in order; no new waveforms) or
-**Crossfade New Frames** (each new frame is a crossfade of its neighbours). It also sets the interpolation saved in the file where the format records one,
-Tonverk's frame size, and the PPG standard waveforms for P tables. **Clean Up Names…** works as on the
-Pack page. **Convert…** writes the files into a folder you choose (3rd Wave tables into a `WAVES`
-folder inside it) and reports everything it changed; it never replaces an existing file. For a
-3rd Wave destination, **Send to Pack…** does the same and then adds the `.wt` files to the Pack
-page, to embed in programs.
-
-The page converts existing wavetables; it does not make wavetables from other audio, which is
-what the 3rd Wave's **Wave Maker** does. Wave Maker also imports a Serum wavetable directly; this
-page adds other formats and frame sizes, many tables at once, and Send to Pack. To load the `.wt`
-files it writes, copy the `WAVES` folder onto the 3rd Wave's USB drive and use Global → **Bulk
-wavetable import**, or add them to the 3rd Wave Terminal app's library and sync. The 3rd Wave
-holds 48 P tables and 64 U tables; its factory tables fill P00–P35 and U00–U55, leaving P36–P47 and
-U56–U63 initially available for user tables, and the page warns when more tables are to be converted
-than those slots hold, since the 3rd Wave then offers to overwrite its last slots.
+The destination applies to every table marked to convert. The chosen row says why its format is
+separate and, in orange, what is open about it: that converting to it has not yet been tested
+(none has), and anything its sources leave open that the tables to convert bring about. The book
+icon beside each row (under **Sources**) opens the documents the format rests on; a green seal in
+its place marks a destination that has been tested.
 [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes what each destination expects, with sources.
+
+#### Options
+
+Shown when a choice applies to the destination and the tables to convert:
+
+- When the destination needs a different number of frames, **Original Frames Only** keeps evenly
+  spaced originals (the first and last among them) for fewer frames and repeats each original in
+  order for more, making no new waveforms; **Crossfade New Frames** makes each new frame by
+  crossfading its neighbours.
+- **Interpolation**, for formats whose file records it: crossfade or spectral, or none (no
+  interpolation: the synth steps from frame to frame). The Interpolation column shows what each
+  table's own file specifies; by default each table keeps that, and a table whose file says
+  nothing gets crossfade.
+- Tonverk's frame size, and the PPG's four standard waveforms for P tables.
+
+#### Preview
+
+The pane below the table shows the selected table: the input and the result stacked frame by
+frame, with the interpolation drawn between frames where a file records one; its file, its frame
+size and what that rests on, its interpolation, and what converting changes. The **Frame** slider
+(or the pointer over a picture) sweeps through the table and draws the cycle there large, input
+and result together. **Listen** plays that cycle, following the slider, at the pitch chosen
+beside it (a piano key with its number; A3, 220 Hz, to start) through the audio output chosen in
+the toolbar.
+
+#### Converting
+
+**Convert…** writes the files into a folder you choose (3rd Wave tables into a `WAVES` folder
+inside it) and reports everything it changed; it never replaces an existing file. For a 3rd Wave
+destination, **Send to Pack…** does the same and then adds the `.wt` files to the Pack page, to
+embed in programs. The page warns when more tables are to be converted than the 3rd Wave's user
+slots hold (P36–P47 and U56–U63; the factory tables fill the rest), since the 3rd Wave then offers
+to overwrite its last slots.
+
+To load the `.wt` files on the 3rd Wave, copy the `WAVES` folder onto its USB drive and use
+Global → **Bulk wavetable import**, or add them to the 3rd Wave Terminal app's library and sync.
 
 ## On the 3rd Wave
 
