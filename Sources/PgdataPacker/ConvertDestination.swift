@@ -51,7 +51,7 @@ struct ConvertDestinationPane: View {
             if plan.preset.isThirdWave {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("To load .wt files: copy the WAVES folder onto the 3rd Wave’s USB drive, then Global → Bulk wavetable import; or add them to the 3rd Wave Terminal app’s library and sync. The 3rd Wave holds 48 P tables and 64 U tables; its factory tables fill P00–P35 and U00–U55, leaving P36–P47 and U56–U63 initially available for user tables.")
+                    Text("To load .wt files: copy the WAVES folder onto the 3rd Wave’s USB drive, then Global → Bulk wavetable import; or add them to the 3rd Wave Terminal app’s library and sync.")
                     Text("Send to Pack also adds the .wt files to the Pack page.")
                 }
                 .font(.caption).foregroundStyle(.secondary)
