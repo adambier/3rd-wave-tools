@@ -16,8 +16,8 @@ public struct Multisample: Equatable, Sendable {
     public struct Sample: Equatable, Sendable {
         /// The sample's name.
         public var name: NameField
-        /// The length of the audio, in frames.
-        public var length: UInt32              // frames
+        /// The length of the audio, in samples (mono: one int16 value each).
+        public var length: UInt32              // samples
         /// The recording's sample rate in Hz, for example 48,000. Version 1 files lack it, and it
         /// is then 48,000.
         public var sampleRate: Float = 48_000
@@ -42,7 +42,7 @@ public struct Multisample: Equatable, Sendable {
         public var highNote: UInt8
         /// The loop mode: 0 = off, 1 = on while the note is held, 2 = always on.
         public var loopMode: UInt8             // 0 off, 1 while key held, 2 always
-        /// The loop crossfade length, in frames.
+        /// The loop crossfade length, in samples.
         public var crossfade: UInt32           // samples
         /// The loop crossfade type: 0 = off, 1 = equal volume, 2 = equal power.
         public var crossfadeType: UInt8        // 0 off, 1 equal volume, 2 equal power
@@ -80,7 +80,7 @@ public struct Multisample: Equatable, Sendable {
 
     /// The multisample's name as text.
     public var name: String { slotName.text }
-    /// The total length of all the samples, in frames.
+    /// The total length of all the samples, in sample values.
     public var totalFrames: Int { samples.reduce(0) { $0 + Int($1.length) } }
 
     /// Departures from what the 3rd Wave's SysEx specification allows for a multisample, each as
@@ -97,7 +97,7 @@ public struct Multisample: Equatable, Sendable {
             if s.loopMode > 2 { out.append("\(n) has loop mode \(s.loopMode); the 3rd Wave uses 0, 1, or 2") }
             if s.crossfadeType > 2 { out.append("\(n) has crossfade type \(s.crossfadeType); the 3rd Wave uses 0, 1, or 2") }
             if s.lowNote > s.highNote || s.rootNote > 127 || s.lowNote > 127 || s.highNote > 127 { out.append("\(n) has a key range of \(s.lowNote)–\(s.highNote) with root \(s.rootNote), which is not a valid range of MIDI notes") }
-            if max(s.start, s.end, s.loopStart, s.loopEnd) > s.length { out.append("\(n) has start, end, or loop points past its \(s.length) frames") }
+            if max(s.start, s.end, s.loopStart, s.loopEnd) > s.length { out.append("\(n) has start, end, or loop points past its \(s.length) samples") }
             if !(s.volume >= 0 && s.volume <= 2) || !(s.pitch >= -1 && s.pitch <= 1) { out.append("\(n) has a volume of \(s.volume) or a pitch of \(s.pitch) outside the 3rd Wave's ranges (0–2 and ±1)") }
         }
         return out

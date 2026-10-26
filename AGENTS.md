@@ -197,7 +197,7 @@ Do:
   (currently complete in both); document new public API in `PgdataPackerCore` too (coverage there
   is partial today).
 - Put any new or changed claim about what the 3rd Wave does in `docs/FORMATS.md` with its evidence
-  (a test on a 3rd Wave with model and OS version, a Groove Synthesis document, or a count of files),
+  (a test on a 3rd Wave synth with model and OS version, a Groove Synthesis document, or a count of files),
   and mark inferences as inferences, in the code comment as well as the document.
 - For a new wavetable destination, set `OutputPreset.basis` to its sources and leave `testedIn`
   empty until someone has tested it in that synth (`docs/WAVETABLES.md` carries the sources).
@@ -256,7 +256,7 @@ WavetableFormats (`Sources/WavetableFormats/`):
 | `WavetableWriter`, `WritePlan` | `Writing.swift` + `WriteWAV.swift`, `WriteNames.swift` | `write(_:preset:options:) -> OutputFile`; `plan(...) -> WritePlan`, the one statement of what a conversion will do (the writer and the app's preview both derive from it); per-preset facts (`frameSize`, `maxFrameCount`, `basis`, `caveat`, `testedIn`) as `OutputPreset` extensions |
 | `OutputPreset.recordsInterpolation`, `Interpolation.displayName` | `PresetInfo.swift` | Whether a format records the interpolation; the words for an interpolation (used in the writer's notes) |
 | `Resampling` | `Resampling.swift`, `FFT.swift` | `resizeCycle`, `changeFrameCount`, `thirdWaveMipmapChain` |
-| `PPGStandardWaves` | `PPGWaves.swift` | The four waves P tables carry at positions 60–63 |
+| `PPGStandardWaves` | `PPGWaves.swift` | The PPG's four standard waveforms, which P tables from the PPG carry as frames 60–63 |
 
 PgdataPackerCore (`Sources/PgdataPackerCore/`):
 
@@ -342,7 +342,8 @@ No tests cover the SwiftUI views; a UI change is verified by building and using 
 ## 10. House style for text (README, docs, DocC, app strings)
 
 - "3rd Wave", never "Third Wave"; "Groove Synthesis" in full; "the 3rd Wave" or "your 3rd Wave",
-  not "the synth".
+  not "the synth"; with the indefinite article, "a 3rd Wave synth", never "a 3rd Wave" standing
+  alone (as an adjective, "a 3rd Wave program" is fine).
 - Standing behaviour in the present tense; single observations as "has been observed to …";
   inferences said to be inferences; never claim more than the evidence supports.
 - The serial (Oxford) comma. "e.g.," or "for example" before parenthetical examples.
@@ -417,7 +418,7 @@ credentials that are not in the repository.
   its synth through this project. WAVETABLES.md "Open questions" lists what each test would settle.
 - The mipmap chain written for U tables uses ideal spectral cut-offs; the factory filter is unknown
   (the 3rd Wave identifies a table by its first 65,536 values, so the chain need not match).
-- `fixtures/` exercise structure, not sound, and have not been loaded on a 3rd Wave.
+- `fixtures/` exercise structure, not sound, and have not been loaded on a 3rd Wave synth.
 - The app is macOS-only; CI compiles it but has no tests for it. A Linux or Windows front end would
   build on `PgdataPackerCore`, whose API may change between versions more than `PgdataFormats`'s.
 - `WavetableFormats` is provisional in 1.1: its API may change until a 1.1.x release, once its
@@ -437,11 +438,11 @@ credentials that are not in the repository.
 | Slot | A position on the 3rd Wave a source id names: P00–P47, U00–U63, S*n*; what plays is whatever that 3rd Wave holds there |
 | Factory slot, factory table | P00–P35 and U00–U55, holding Groove Synthesis's tables; known here by name and fingerprint, never embedded by the app |
 | User slot | P36–P47 and U56–U63 (8 U and 12 P slots for the user's own tables) |
-| P table | PPG-style wavetable: 64 waves of 128 samples, each point stored with its difference to the next (16,384 values) |
-| U table | Wavetable of 64 waves of 1,024 samples followed by its mipmap chain (131,072 values) |
-| Frame | One cycle of a waveform; a wavetable is a sequence of frames of equal length |
+| P table | PPG-style wavetable: 64 frames of 128 samples, each point stored with its difference to the next (16,384 values) |
+| U table | Wavetable of 64 frames of 1,024 samples followed by its mipmap chain (131,072 values) |
+| Frame | One cycle of a waveform; a wavetable is a sequence of frames of equal length. The 3rd Wave's own terms (its wave offset and wave envelope, the manual's counts of waves) and WaveEdit's say "wave" for the same thing; this project says frame throughout, and keeps "wave" for the analog oscillator's waves, for the PPG's four standard waveforms, and in names (Wave Maker, the `WAVES` folder) |
 | Frame size | Samples per frame (128, 1,024, 2,048, …); for WAV and FLAC sources it is settled by metadata, file name, sidecar, markers, or length (`FrameSizeEvidence`), or left to the user |
-| Mipmap chain | The band-limited copies of a U table's 64 waves at 512, 256, 128, 64, and 64 samples (65,536 values) that follow the waves in a `.wt` |
+| Mipmap chain | The band-limited copies of a U table's 64 frames at 512, 256, 128, 64, and 64 samples (65,536 values) that follow the frames in a `.wt` |
 | Fingerprint | 64-bit FNV-1a of a table's values as little-endian float32 (`fnv1a64`); how factory tables and duplicates are recognised |
 | Preset (`OutputPreset`) | A conversion destination (3rd Wave U or P table, Serum-style WAV, MiniFreak V, Tonverk, Phase Plant, Surge XT, WaveEdit) |
 | Plan | A `PgdataPackerCore` value describing what a page will do (`PackPlan`, `UnpackPlan`, `ConvertPlan`) |

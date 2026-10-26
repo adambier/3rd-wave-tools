@@ -72,10 +72,10 @@ public enum Resampling {
     /// The filters are ideal (spectral) cut-offs. The factory chains show cut-offs of about these
     /// proportions, but their exact filter is not known: they carry small gain changes and, in
     /// tables made from recorded audio, a constant phase shift, so a real filter was presumably
-    /// used. Tests on a 3rd Wave (FORMATS.md section 5.1) found that it
+    /// used. Tests on a 3rd Wave synth (FORMATS.md section 5.1) found that it
     /// identifies a table by its first 65,536 values only and plays a table the same with its chain
     /// zeroed, so the chain does not need to match the factory's; it is written because the 3rd
-    /// Wave's own tables carry one. A low-pass can raise a wave's peak (Gibbs overshoot); a level whose
+    /// Wave's own tables carry one. A low-pass can raise a frame's peak (Gibbs overshoot); a level whose
     /// peak would exceed the table's own is scaled back to it, so a table within ±1 has a chain
     /// within ±1.
     ///

@@ -58,7 +58,7 @@ public enum WavetableWriter {
                             preset: OutputPreset, options: OutputOptions = OutputOptions()) -> WritePlan {
         let sizeOut = self.frameSize(for: preset, source: frameSize, options: options)
         let ppg = preset == .thirdWaveP && options.appendPPGStandardWaves
-        // With the PPG waves, the table itself goes into 60 frames and the four waves follow.
+        // With the PPG standard waveforms, the table itself goes into 60 frames and the four follow.
         let tableCount = ppg ? 60 : self.frameCount(for: preset, source: frameCount)
         let scaling: WritePlan.Scaling
         if !preset.scalesToFit { scaling = .none }
@@ -146,7 +146,7 @@ public enum WavetableWriter {
             if interpolation == .spectral {
                 notes.append("A Tonverk file name can mark a table only as stepped (a trailing “r”) or not, so the spectral morph asked for is left unmarked: Tonverk plays it as a crossfade (its manual says smooth).")
             }
-            noteDefaultInterpolation(as: "The file name carries no “r”, so Tonverk plays the table as a crossfade (its manual says smooth)")
+            noteDefaultInterpolation(prefix: "", result: "so the file name carries no “r” and Tonverk plays the table as a crossfade (its manual says smooth)")
             let named = WavetableWriter.Names.fileStem(table.name)
             notes += named.notes
             let untagged = WavetableWriter.Names.removeTonverkTag(named.stem)
@@ -222,7 +222,7 @@ public enum WavetableWriter {
             let how: String
             switch (options.frameCountPolicy, m < n) {
             case (.pickEvenly, true): how = "keeping evenly spaced original frames, the first and last among them"
-            case (.pickEvenly, false): how = "repeating frames at evenly spaced positions (no new waves)"
+            case (.pickEvenly, false): how = "repeating frames at evenly spaced positions (no new frames)"
             case (.interpolate, _): how = "crossfading neighbouring frames at evenly spaced positions, keeping the first and last"
             }
             notes.append("Frame count changed from \(grouped(n)) to \(grouped(m)) (\(reason) frames), \(how).")
@@ -247,11 +247,13 @@ public enum WavetableWriter {
         }
 
         /// For destinations that record the interpolation: says that the file records a
-        /// crossfade (or, for Tonverk, no stepped mark) because the source file specified no
-        /// interpolation and none was chosen.
-        mutating func noteDefaultInterpolation(as words: String = "This format records how a synth moves between frames; crossfade is saved") {
+        /// crossfade (or, for Tonverk, no stepped mark) because the source file doesn't specify
+        /// the interpolation and no other choice was made. `prefix` opens the note (a sentence
+        /// and a space, or nothing); `result` closes it, after "so".
+        mutating func noteDefaultInterpolation(prefix: String = "This format records how a synth moves between frames. ",
+                                               result: String = "so crossfade is saved") {
             if options.interpolation == nil && table.interpolation == nil {
-                notes.append("\(words): the source file doesn’t specify an interpolation, and none was chosen.")
+                notes.append("\(prefix)The source file doesn’t specify the interpolation and no other choice was made, \(result).")
             }
         }
 
@@ -403,7 +405,7 @@ public extension OutputPreset {
     var basis: String {
         switch self {
         case .thirdWaveU:
-            return "Groove Synthesis, 3rd Wave User Manual v1.9 (Wave Maker) and MIDI CC + SysEx Spec v2a; the factory .wt files; tests on a 3rd Wave (FORMATS.md 5.1)"
+            return "Groove Synthesis, 3rd Wave User Manual v1.9 (Wave Maker) and MIDI CC + SysEx Spec v2a; the factory .wt files; tests on a 3rd Wave synth (FORMATS.md 5.1)"
         case .thirdWaveP:
             return "Groove Synthesis, 3rd Wave User Manual v1.9; the factory .wt files (FORMATS.md 5.1)"
         case .wav2048:

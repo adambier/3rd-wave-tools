@@ -123,7 +123,8 @@ struct ConvertItemPreview: View {
                         .help("Was \u{201C}\(item.table.name)\u{201D} in the file; renamed here")
                 }
                 Spacer()
-                Button("Show in Finder") { Panels.reveal(item.location.url) }.buttonStyle(.link)
+                Button("Show Input File in Finder") { Panels.reveal(item.location.url) }.buttonStyle(.link)
+                    .help("Show the file this table was read from in the Finder")
             }
             // The facts column takes up to 340 points and gives way down to 200 in a narrow
             // pane; the pictures take the width that is left, however little, and their text
@@ -230,7 +231,7 @@ struct ConvertOverviewPair: View {
             let resultInterpolation = plan.interpolationRecorded(for: item)
             HStack(alignment: .top, spacing: 16) {
                 ConvertOverview(frames: source.frames,
-                                caption: "Source · \(source.frameCount) × \(ConvertPlan.formatCount(source.frameSize))",
+                                caption: "Input · \(source.frameCount) × \(ConvertPlan.formatCount(source.frameSize))",
                                 interpolation: item.table.interpolation,
                                 unstatedLegend: "interpolation not stated",
                                 tint: WavetableStackCanvas.sourceColor,
@@ -247,7 +248,7 @@ struct ConvertOverviewPair: View {
                                  result: result, resultInterpolation: resultInterpolation,
                                  resultTitle: plan.preset.shortTitle, position: sweep)
             }
-            .help("The table’s frames, front (first) to back (last): the source as read, and what the destination gets, read back from the file this page would write. Solid lines are stored frames (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum’s or Vital’s own morphs. Move the pointer across a picture to sweep through the table; the third picture draws the cycle at the pointer.")
+            .help("The table’s frames, front (first) to back (last): the input as read, and what the destination gets, read back from the file this page would write. Solid lines are the frames in the file (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum’s or Vital’s own morphs. Move the pointer across a picture to sweep through the table; the third picture draws the cycle at the pointer.")
         }
     }
 }
@@ -261,7 +262,7 @@ struct ConvertOverview: View {
     let caption: String
     /// The interpolation to draw between the stored frames; nil when nothing says.
     let interpolation: Interpolation?
-    /// The words after "Stored frames" when `interpolation` is nil.
+    /// The words after "Frames in the file" when `interpolation` is nil.
     let unstatedLegend: String
     /// The table's colour: the source's (`WavetableStackCanvas.sourceColor`) or the result's
     /// (`resultColor`), the same in the cycle picture beside them.
@@ -293,7 +294,7 @@ struct ConvertOverview: View {
             ConvertOverviewLegend(interpolation: interpolation, unstated: unstatedLegend, tint: tint)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        // One element: the caption ("Source · 64 × 2,048"), then the legend's lines.
+        // One element: the caption ("Input · 64 × 2,048"), then the legend's lines.
         .accessibilityElement(children: .combine)
     }
 }
@@ -303,7 +304,7 @@ struct ConvertOverview: View {
 /// louder of the two when a table goes beyond it, so a table that was turned down shows
 /// smaller). Under it, which frames each comes from ("Frame 12 of 64"; "Between frames 12 and
 /// 13 (crossfade)"), from `WavetableSketch.cycle(at:in:interpolation:)`. With the pointer
-/// elsewhere, the first frame and a word on what to do. (The pink line in the stacks marks
+/// elsewhere, the first frame, with what to do written over it. (The pink line in the stacks marks
 /// where the pointer is; here the two tables need two colours of their own.)
 struct ConvertSweepView: View {
     let source: [[Float]]
@@ -320,15 +321,28 @@ struct ConvertSweepView: View {
         VStack(alignment: .leading, spacing: 3) {
             SweepCycleCanvas(source: sourcePoint?.values ?? [], result: resultPoint?.values)
                 .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
+                // Until the pointer is over a picture, the instruction sits on the drawing
+                // itself, where it is seen; the caption alone was missed.
+                .overlay {
+                    if position == nil {
+                        Label("Move the pointer across a picture to see each frame", systemImage: "hand.point.up.left")
+                            .font(.caption)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 8).padding(.vertical, 5)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                            .padding(8)
+                            .allowsHitTesting(false)
+                    }
+                }
                 // The lines under it say which frames are drawn; VoiceOver gets those.
                 .accessibilityHidden(true)
-            Text(position == nil ? "Cycle · move the pointer across a picture to sweep" : "Cycle at the pointer")
+            Text(position == nil ? "Cycle · the first frame" : "Cycle at the pointer")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 2) {
                 if let sourcePoint {
                     ConvertSwatch(color: WavetableStackCanvas.sourceColor,
-                                  text: "Source: " + WavetableSketch.sweepWords(sourcePoint, of: source.count, interpolation: sourceInterpolation))
+                                  text: "Input: " + WavetableSketch.sweepWords(sourcePoint, of: source.count, interpolation: sourceInterpolation))
                 }
                 if let resultPoint, let result {
                     ConvertSwatch(color: WavetableStackCanvas.resultColor,
@@ -370,16 +384,16 @@ struct SweepCycleCanvas: View {
     }
 }
 
-/// The legend under a picture, one line per kind of line: a swatch and a word for the stored
-/// frames, and another for the in-betweens when there are any.
+/// The legend under a picture, one line per kind of line: a swatch and a few words for the
+/// frames the file holds, and another for the in-betweens when there are any.
 struct ConvertOverviewLegend: View {
     let interpolation: Interpolation?
     let unstated: String
     let tint: Color
 
     private var storedWords: String {
-        guard let mode = interpolation else { return "Stored frames · " + unstated }
-        return mode == Interpolation.none ? "Stored frames (stepped; nothing between)" : "Stored frames"
+        guard let mode = interpolation else { return "Frames in the file · " + unstated }
+        return mode == Interpolation.none ? "Frames in the file (the table steps between them)" : "Frames in the file"
     }
 
     var body: some View {
@@ -580,10 +594,10 @@ struct ConvertNoteList: View {
         output.map { "\($0.frameCountOut) frame\($0.frameCountOut == 1 ? "" : "s") × \(ConvertPlan.formatCount($0.frameSizeOut)) samples" }
     }
 
-    /// "Written as “Pad.wt” in WAVES": the file the page will write, which can share the source
-    /// file's name, so it is said to be the file written.
+    /// "Written as “Pad.wt” in the WAVES folder.": the file the page will write, which can share
+    /// the source file's name, so it is said to be the file written.
     private var fileLine: String {
-        "Written as \u{201C}\(file.fileName)\u{201D}" + (file.folder.map { " in \($0)" } ?? "")
+        "Written as \u{201C}\(file.fileName)\u{201D}" + (file.folder.map { " in the \($0) folder" } ?? "") + "."
     }
 
     var body: some View {

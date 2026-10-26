@@ -1,14 +1,14 @@
 import Foundation
 
 /// An aid for choosing a frame size the file leaves open: how well each candidate size fits the
-/// samples, judged by how alike neighbouring frames are at that size. The waves of a wavetable
-/// change little from one frame to the next, so at the right size frame k + 1 is close to frame
-/// k, and much closer than the two halves of a frame are to each other. At a size that is too
-/// small a "frame" is a fragment of the cycle, and a smooth wave is about as like itself a
+/// samples, judged by how alike neighbouring frames are at that size. The frames of a wavetable
+/// change little from one to the next, so at the right size frame k + 1 is close to frame k,
+/// and much closer than the two halves of a frame are to each other. At a size that is too
+/// small a "frame" is a fragment of the cycle, and a smooth cycle is about as like itself a
 /// fragment later as half a fragment later; at a multiple of the right size the frames are
 /// alike, but no more alike than at the right size. This is a heuristic: it is shown as
-/// "likely", never applied by itself, and a table whose frames differ sharply (a bank of
-/// unrelated waves) fits no size well.
+/// "likely", and assumed only when nothing states a size (`ConvertPlan.Item.frameSize`); a
+/// table whose frames differ sharply (a bank of unrelated frames) fits no size well.
 public enum FrameSizeFit {
     /// How a candidate size fits.
     public struct Rating: Equatable {

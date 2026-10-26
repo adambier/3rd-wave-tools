@@ -23,6 +23,7 @@ struct ConvertView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if ConvertPlan.conversionUnderDevelopment { ConvertDevelopmentNotice() }
             controls
             Divider()
             if state.convertPlan.items.isEmpty {
@@ -98,6 +99,20 @@ struct ConvertView: View {
     }
 }
 
+/// The notice under the toolbar while `ConvertPlan.conversionUnderDevelopment` is true: in
+/// orange, centred, with the reason as its tip. It goes by itself once every destination has
+/// been tested in its synth (`OutputPreset.testedIn`).
+struct ConvertDevelopmentNotice: View {
+    var body: some View {
+        Label("Wavetable conversion under development.", systemImage: "exclamationmark.triangle")
+            .font(.callout)
+            .foregroundStyle(.orange)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 8)
+            .help("Converting has not yet been tested in every destination’s synth; the Sources beside each destination say whether it has been there. The notice goes when all have.")
+    }
+}
+
 /// The divider between the table and the preview: dragging it changes the preview's height
 /// (`AppState.convertPreviewHeight`), between `minimumHeight` and `tallest`, as a split view's
 /// divider would, with the up-down cursor. A thin line in a strip wide enough to grab.
@@ -160,17 +175,49 @@ struct ConvertTablesPane: View {
 
     var body: some View {
         let st = state
+        let rows = shown
         VStack(alignment: .leading, spacing: 0) {
-            ConvertSummaryStrip(state: st)
-            ConvertTable(state: st, items: shown, selection: $selection)
+            ConvertSummaryStrip(state: st) { (status: ConvertPlan.Status) in
+                // Jump to the first table with that status: select it (the preview follows)
+                // and scroll it into view.
+                guard let item = st.convertPlan.firstItem(with: status) else { return }
+                selection = [item.id]
+                if let row = rows.firstIndex(where: { $0.id == item.id }) {
+                    DispatchQueue.main.async { TableReveal.scroll(toRow: row, rowCount: rows.count) }
+                }
+            }
+            ConvertTable(state: st, items: rows, selection: $selection)
         }
     }
 }
 
+/// Scrolls the page's table to a row. SwiftUI's `Table` gives no way to scroll to a row on
+/// macOS 13 (`ScrollViewReader` does not reach its rows), so the `NSTableView` behind it is
+/// looked up in the window, told apart from any other by its row count, and asked directly.
+/// When none is found, nothing happens (the row is still selected).
+enum TableReveal {
+    static func scroll(toRow row: Int, rowCount: Int) {
+        guard row >= 0, let root = (NSApp.keyWindow ?? NSApp.mainWindow)?.contentView,
+              let table = tableView(in: root, rows: rowCount) else { return }
+        table.scrollRowToVisible(row)
+    }
+
+    private static func tableView(in view: NSView, rows: Int) -> NSTableView? {
+        if let table = view as? NSTableView, table.numberOfRows == rows { return table }
+        for sub in view.subviews {
+            if let table = tableView(in: sub, rows: rows) { return table }
+        }
+        return nil
+    }
+}
+
 /// One line above the table: how many tables there are and how many are marked to convert,
-/// what blocks any of them, and the filter for the blocked ones.
+/// what blocks any of them (each count a button that jumps to the first such table), and the
+/// filter for the blocked ones.
 struct ConvertSummaryStrip: View {
     @ObservedObject var state: AppState
+    /// Called with a blocking status when its count is clicked.
+    let jump: (ConvertPlan.Status) -> Void
 
     var body: some View {
         let plan = state.convertPlan
@@ -180,9 +227,13 @@ struct ConvertSummaryStrip: View {
             Text("\(total) table\(total == 1 ? "" : "s") · \(marked) to convert")
                 .monospacedDigit()
             ConvertBlockedCount(count: plan.needsFrameSizeCount, one: "needs a frame size", many: "need frame sizes",
-                                help: "Tables marked to convert whose file doesn’t specify a frame size: choose one in the Input column")
+                                help: "Tables marked to convert whose file doesn’t specify a frame size: choose one in the Input column. Click to go to the first.") {
+                jump(.needsFrameSize)
+            }
             ConvertBlockedCount(count: plan.cannotSplitCount, one: "can’t be split", many: "can’t be split",
-                                help: "Tables marked to convert whose samples don’t divide into frames of the size given")
+                                help: "Tables marked to convert whose samples don’t divide into frames of the size given. Click to go to the first.") {
+                jump(.cannotSplit)
+            }
             Spacer()
             Toggle("Show only tables that can’t be converted yet", isOn: $state.convertOnlyAttention)
                 .toggleStyle(.checkbox).font(.caption)
@@ -197,18 +248,26 @@ struct ConvertSummaryStrip: View {
 }
 
 /// "1 needs a frame size" or "3 can't be split" in red, or nothing when the count is 0. `one` and
-/// `many` complete the count for one table and for several.
+/// `many` complete the count for one table and for several. A borderless button, as Xcode's
+/// issue counts are: clicking it goes to the first such table, and the pointer says so.
 struct ConvertBlockedCount: View {
     let count: Int
     let one: String
     let many: String
     let help: String
+    let action: () -> Void
 
     var body: some View {
         if count > 0 {
-            Label("\(count) \(count == 1 ? one : many)", systemImage: "exclamationmark.octagon.fill")
-                .foregroundStyle(.red)
-                .help(help)
+            Button(action: action) {
+                Label("\(count) \(count == 1 ? one : many)", systemImage: "exclamationmark.octagon.fill")
+                    .foregroundStyle(.red)
+            }
+            .buttonStyle(.plain)
+            .help(help)
+            .onHover { (inside: Bool) in
+                if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
         }
     }
 }
@@ -534,7 +593,7 @@ struct ConvertFramesBySize: View {
 }
 
 /// The size chooser: where the size comes from, a button per size the file's length allows with
-/// the first wave drawn at that size, and what the "likely" mark means (see `FrameSizeFit`; a
+/// the first frame drawn at that size, and what the "likely" mark means (see `FrameSizeFit`; a
 /// suggestion, never applied by itself).
 struct ConvertSizePopover: View {
     @ObservedObject var state: AppState
@@ -598,7 +657,7 @@ struct ConvertSizePopover: View {
     }
 }
 
-/// One size: the first wave cut at that size, "64 × 128" under it, what the destination makes
+/// One size: the first frame cut at that size, "64 × 128" under it, what the destination makes
 /// of it ("→ 64 × 1,024, 4 → 64 frames, repeated"), and "likely" when the samples suggest it.
 struct ConvertSizeButton: View {
     @ObservedObject var state: AppState
@@ -626,7 +685,7 @@ struct ConvertSizeButton: View {
         let frames = item.table.samples.count / max(size, 1)
         Button { state.convertPlan.chooseFrameSize(item.id, size) } label: {
             VStack(spacing: 3) {
-                // The first wave cut at this size, as wide as the button: the right size shows one
+                // The first frame cut at this size, as wide as the button: the right size shows one
                 // complete cycle; too large repeats it, too small cuts it off.
                 WaveThumbnail(samples: Array(item.table.samples.prefix(size)), tint: chosen ? Color.accentColor : Color.primary,
                               width: Self.width - 16, height: 36)

@@ -79,7 +79,7 @@ public extension OutputPreset {
         case .surge:
             return "Surge’s own .wt; keeps the source’s frame size when it is a power of two up to 4,096 (otherwise 2,048)."
         case .waveEdit:
-            return "16-bit, 64 waves of 256: the bank format the E370 and E352 read."
+            return "16-bit, 64 frames of 256: the bank format the E370 and E352 read."
         }
     }
 }

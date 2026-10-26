@@ -135,23 +135,24 @@ open), and the samples beside them (multisampled notes, single cycles, looped no
 not. DUNE 3's `.wt` files, and Harmor's and Komplexer's, are in formats of their own; the app
 does not read them.
 
-**An aid for choosing.** When the size is left open, the chooser draws the first wave at each
+**An aid for choosing.** When the size is left open, the chooser draws the first frame at each
 size and marks one "likely" when the samples suggest it. The suggestion rests on how alike
 neighbouring frames are: at each candidate size n, the page takes the mean difference between
 every sample and the one n samples later (frame k against frame k + 1), as a fraction of the
-file's mean level, and the same at a lag of n/2. The waves of a wavetable change little from one
-frame to the next, so at the right size the first difference is small (at most 0.5) and much
+file's mean level, and the same at a lag of n/2. The frames of a wavetable change little from one
+to the next, so at the right size the first difference is small (at most 0.5) and much
 smaller than the second (at most half of it: the two halves of a cycle differ). A size that is
-too small fails the second test, since a smooth wave is about as like itself a fragment later as
+too small fails the second test, since a smooth cycle is about as like itself a fragment later as
 half a fragment later; a multiple of the right size passes neither better than the right size
 does, and when several sizes pass, the smallest is marked. The pictures themselves are not
 decisive either: a size twice too large shows the cycle repeated, and one too small shows part
-of it, both of them smooth. A bank of unrelated waves (a WaveEdit bank, say) fits no size, and
-the chooser says so. The mark is a hint, never applied by itself.
+of it, both of them smooth. A bank of unrelated frames (a WaveEdit bank, say) fits no size, and
+the chooser says so. When nothing states a size and the length does not allow 2,048, the likely
+size is assumed, and the Input column says so; the chooser stays, for another choice.
 
-**Single-cycle files are not listed.** A WAV holding one wave (for example, a single-cycle
-library's 600-sample waves, each looped over the whole file) is a building block for a wavetable
-rather than a wavetable, and making tables from such waves is what the 3rd Wave's Wave Maker
+**Single-cycle files are not listed.** A WAV holding one cycle (for example, a single-cycle
+library's 600-sample cycles, each looped over the whole file) is a building block for a wavetable
+rather than a wavetable, and making tables from such cycles is what the 3rd Wave's Wave Maker
 and other synths' editors do. A short file is listed when its metadata says it holds several
 frames.
 
@@ -200,7 +201,7 @@ is turned down to fit, which the report says.
 When a destination needs a different number of frames, you choose how:
 
 - **Keep Original Frames** uses evenly spaced frames, the first and last among them. It adds no
-  new waves. Bringing a table *up* to more frames this way repeats frames.
+  new frames. Bringing a table *up* to more frames this way repeats frames.
 - **Crossfade New Frames** makes each new frame by crossfading its two neighbours, once, when
   converting. This is separate from the interpolation a file records, which is how the synth
   moves between frames as it plays.

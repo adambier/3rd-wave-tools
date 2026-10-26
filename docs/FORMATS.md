@@ -52,7 +52,7 @@ for checking an implementation.
 **How sure each statement is.** A plain statement describes what every file examined does; the
 test is that every file reads and writes back byte for byte (section
 [9](#9-how-this-was-established)). A statement that rests on more than the files has a footnote
-saying where it comes from: a test on a 3rd Wave, or Groove Synthesis's own documents and files.
+saying where it comes from: a test on a 3rd Wave synth, or Groove Synthesis's own documents and files.
 Where something is reasoning that has not been checked, the text says so in words ("probably",
 "not yet checked").
 
@@ -320,7 +320,7 @@ the format number, which a `.pgdata` does not carry, so it has to be read from t
 *S* = 181 with *F* below 136 was written by both `W3_PROG_4` and `W3_PROG_5`, which differ only in
 how event records name parts (section 3.4), so look at the note and automation records (types 1
 and 2): a target above 3 means `W3_PROG_5`; otherwise a target 0 means `W3_PROG_4`; with neither,
-assume `W3_PROG_5`. This rule is an inference from the files, not checked on a 3rd Wave. The same rule serves a `.pro` whose tag disagrees with its layout
+assume `W3_PROG_5`. This rule is an inference from the files, not checked on a 3rd Wave synth. The same rule serves a `.pro` whose tag disagrees with its layout
 (a `W3_PROG_5` tag on a 173-value layout, as an unpacker that does not convert would write): go by
 the layout, except that a 181-integer layout with fewer than 136 floats keeps a tag of 4 or 5.
 
@@ -341,7 +341,7 @@ tables).
 - The 3rd Wave's exports are always in the current program layout.
 
 *How this was established:* the layout reads and rewrites byte for byte 221 files from Groove
-Synthesis, third parties, and a 3rd Wave's own exports. Files that the library builds
+Synthesis, third parties, and a 3rd Wave synth's own exports. Files that the library builds
 import correctly.[^both]
 
 ## 5. Wavetable (.wt) and multisample (.bin)
@@ -364,12 +364,13 @@ Plain text, LF or CRLF line ends.
 
 **P tables (PPG-style).** The P set is the 3rd Wave's form of the PPG Wave's wavetables. P00–P31
 are derived from the PPG Wave 2.2/2.3's own tables (P30 is the PPG's *upper wavetable*), P32 and
-P33 are Groove Synthesis's, P34 and P35 hold the Prophet VS waves; 48 slots in all, the rest for
+P33 are Groove Synthesis's, P34 and P35 hold the Prophet VS waveforms; 48 slots in all, the rest for
 the user's own.[^manual] The format:
 
-- **64 waves of 128 points**, a wave being one cycle. The file stores each point as a pair, the
-  sample and then the difference to the next sample of the same wave (the last point's difference
-  leads back to the first), so a wave takes 256 values and the table 16,384. The difference is
+- **64 frames of 128 points**, a frame being one cycle (the manual and the PPG say *wave*; this
+  document says *frame*, as the rest of the project does). The file stores each point as a pair,
+  the sample and then the difference to the next sample of the same frame (the last point's
+  difference leads back to the first), so a frame takes 256 values and the table 16,384. The difference is
   derived data: in every factory P table examined it equals the next sample minus this one to
   float precision, and over SysEx the 3rd Wave sends a P table as 64 × 128 plain samples.[^p-diff]
   A writer should compute the differences
@@ -381,39 +382,39 @@ the user's own.[^manual] The format:
   it imports or plays a table, and is not recorded in the file.
 - **Positions 60–63 hold the PPG's four standard waveforms** (60 a triangle, 61 a narrow pulse, 62 a
   square, 63 a sawtooth) in the tables that came from the PPG: every PPG wavetable had only 60
-  waves of its own, and these four were always the same;[^manual] P00, P01, P23, and P27 show
+  frames of its own, and these four were always the same;[^manual] P00, P01, P23, and P27 show
   this. It is a property of the content, not of the format: P33 and the Prophet VS table P34 use
-  all 64 positions for their own waves.
+  all 64 positions for their own frames.
 
 How a P table *plays* is set in the program, not the file, by three settings in the oscillator's
 Wave Flow menu meant to reproduce the PPG:[^manual] **wavetable smoothing** (interpolation
-between neighbouring waves), **waveform smoothing** (interpolation within the wave and of pitch),
+between neighbouring frames), **waveform smoothing** (interpolation within the frame and of pitch),
 and **use upper wavetable**. With **use upper wavetable** on, a sweep past position 63 continues
 into P30, the PPG's upper wavetable; with it off, the 3rd Wave sweeps positions 0–59 only, and
 60–63 are reached by setting the wave offset there with the wave envelope off. That is why a P
-table's last four waves look unrelated to the rest. The user manual's "About Wave Flow and the
+table's last four frames look unrelated to the rest. The user manual's "About Wave Flow and the
 Upper Wavetables", "Importing Wavetables into the P Set", and "How to Sound Like a Vintage PPG"
 have more.
 
-**U tables: the table and its mipmaps.** A U table is 64 waves of 1,024 samples: the manual's
+**U tables: the table and its mipmaps.** A U table is 64 frames of 1,024 samples: the manual's
 **Wave Maker** chapter says "the period length that the 3rd Wave uses is 1024 samples" and takes a
 64 × 1,024-sample `.wav` as a ready-made table, and the SysEx spec defines the U payload as
 65,536 floats, "64 different waveforms ... each with a length of 1024 samples".[^manual][^spec] The
 131,072 values of a U `.wt` are that table followed by progressively band-limited, smaller copies
-of the same 64 waves (a mipmap chain, of the kind usually played at higher pitches):
+of the same 64 frames (a mipmap chain, of the kind usually played at higher pitches):
 
 | Values | Content |
 |---|---|
-| 0 – 65,535 | the table: 64 waves × 1,024 samples |
-| 65,536 – 98,303 | the same 64 waves at 512 samples each |
+| 0 – 65,535 | the table: 64 frames × 1,024 samples |
+| 65,536 – 98,303 | the same 64 frames at 512 samples each |
 | 98,304 – 114,687 | at 256 samples each |
 | 114,688 – 122,879 | at 128 samples each, band-limited |
 | 122,880 – 126,975 | at 64 samples each, band-limited further |
 | 126,976 – 131,071 | at 64 samples each again, band-limited further still (only the lowest few harmonics) |
 
 All 56 factory U tables have this layout, and the 8M's own `.pgdata` exports carry all 131,072
-values; a SysEx dump of U08 from a 24M equals the file's first 65,536 values exactly.[^24m] Wave *f* of each level
-corresponds to wave *f* of the table, with the harmonic amplitudes of the base wave up to each
+values; a SysEx dump of U08 from a 24M equals the file's first 65,536 values exactly.[^24m] Frame *f* of each level
+corresponds to frame *f* of the table, with the harmonic amplitudes of the base frame up to each
 level's cutoff and a small gain change; in tables made from recorded audio the smaller copies are
 also shifted in phase by a constant, so they were probably made with a real filter, not an ideal
 resample.
@@ -423,7 +424,7 @@ is matched to the loaded table by its first 65,536 values alone (so the content 
 the table); one carrying a new table with a zeroed chain is stored, plays identically from C2 to
 C7, and exports again with the zeros intact.[^24m] So the chain is kept and
 passed through but neither hashed nor played; a writer should still fill it with band-limited
-resamples of its waves, as the factory files do, in case a later firmware reads it. The P set has
+resamples of its frames, as the factory files do, in case a later firmware reads it. The P set has
 no such chain: PPG-style playback is meant to alias.
 
 [^p-diff]: Checked in six P tables embedded in Groove Synthesis's `.pgdata` files (five exactly,
@@ -445,14 +446,14 @@ Each sample (version 5):
 
 | Field | Type | Notes |
 |---|---|---|
-| length | u32 | in frames |
+| length | u32 | in samples (the audio is mono; one int16 value each) |
 | sample rate | f32 | the recording's rate, e.g., 48000 |
 | bit depth | u8 | the recording's: 0 = 8-bit, 1 = 12-bit, 2 = 16-bit |
 | name | char[32] | |
-| start, end, loop start, loop end | u32 × 4 | frame positions |
+| start, end, loop start, loop end | u32 × 4 | sample positions |
 | root note, low note, high note | u8 × 3 | the note the recording is assigned to, and the key range it plays, as MIDI note numbers |
 | loop mode | u8 | 0 off, 1 on while the note is held, 2 always on |
-| crossfade length | u32 | in frames |
+| crossfade length | u32 | in samples |
 | crossfade type | u8 | 0 off, 1 equal volume, 2 equal power |
 | pitch | f32 | −1.0 to 1.0 |
 | second rate | f32 | not in the SysEx record. Equal to the sample rate in all but 40 of 1,270 samples seen; in those it is another standard rate (12,000, 22,050, 44,100, or 48,000), so it is probably the rate the sample is played back or was resampled at |

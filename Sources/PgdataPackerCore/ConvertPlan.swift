@@ -587,6 +587,10 @@ public struct ConvertPlan: Equatable {
     /// The items marked to convert that cannot, for either reason.
     public var blockedCount: Int { items.filter { status($0).isBlocked }.count }
 
+    /// The first item, in the page's order, with the given status; nil when none has it. The
+    /// page's counts of blocked tables jump to this item when clicked.
+    public func firstItem(with status: Status) -> Item? { items.first { self.status($0) == status } }
+
     /// The items marked to convert whose frame count the destination changes.
     public var frameCountChangeCount: Int {
         selectedItems.filter { expected(for: $0)?.changesCount == true }.count
@@ -600,6 +604,14 @@ public struct ConvertPlan: Equatable {
                                 : "Tested in " + listPhrase(preset.testedIn) + "."
     }
 
+    /// Whether converting to any listed destination has yet to be tested in its synth
+    /// (`OutputPreset.testedIn` empty). While true, the Wavetables page carries a notice that
+    /// wavetable conversion is under development; the notice goes when the last destination
+    /// is tested.
+    public static var conversionUnderDevelopment: Bool {
+        OutputPreset.allCases.contains { $0.testedIn.isEmpty }
+    }
+
     /// The orange note under the chosen destination, or nil: one of the things its sources leave
     /// open (`OutputPreset.caveat` has the general statement, shown with the sources), said
     /// only when the tables to convert, or a choice made, bring it about:
@@ -608,7 +620,7 @@ public struct ConvertPlan: Equatable {
     /// - MiniFreak V: some table has fewer than 64 frames, which it is not documented to handle.
     /// - Phase Plant: some table has fewer than the 256 frames its documentation asks for, so
     ///   frames are added.
-    /// - U table, P table: more of the user's own tables than a 3rd Wave holds at a time
+    /// - U table, P table: more of the user's own tables than a 3rd Wave synth holds at a time
     ///   (`thirdWaveCapacityNote(for:)`).
     public func caveat(for preset: OutputPreset) -> String? {
         let tables = selectedItems.filter(canConvert)
@@ -878,14 +890,14 @@ public struct ConvertPlan: Equatable {
     }
 
     /// For the chosen 3rd Wave destination: a warning when more of the user's own tables are to
-    /// be converted than a 3rd Wave holds at a time (see `thirdWaveCapacityNote(for:)`).
+    /// be converted than a 3rd Wave synth holds at a time (see `thirdWaveCapacityNote(for:)`).
     public var thirdWaveCapacityNote: String? { thirdWaveCapacityNote(for: preset) }
 
     /// For a 3rd Wave destination: a warning when more of the user's own tables are to be
     /// converted than the slots its factory tables leave free (U56–U63, P36–P47; factory
     /// tables, which it already has, do not count), since the 3rd Wave will then offer to
     /// overwrite; nil otherwise, and for other destinations. The note states the facts: how
-    /// many tables a 3rd Wave holds (64 U, 48 P), how many of them are Groove Synthesis's
+    /// many tables a 3rd Wave synth holds (64 U, 48 P), how many of them are Groove Synthesis's
     /// (U00–U55, P00–P35), and that with no slot free it offers to overwrite the last slot
     /// (observed once, for one table, which went to U63; what several would take is untested;
     /// see section 7 of FORMATS.md).
@@ -897,7 +909,7 @@ public struct ConvertPlan: Equatable {
         let factory = isP ? SourceRef.factoryPCount : SourceRef.factoryUCount
         guard own > total - factory else { return nil }
         let kind = isP ? "P" : "U"
-        return "\(own) \(kind) tables to convert. A 3rd Wave holds \(total) \(kind) tables, \(factory) of them Groove Synthesis’s (\(kind)00–\(kind)\(factory - 1)); with no slot free, it offers to overwrite the last slot (\(kind)\(total - 1)); which slots several tables would take has not been tested."
+        return "\(own) \(kind) tables to convert. A 3rd Wave synth holds \(total) \(kind) tables, \(factory) of them Groove Synthesis’s (\(kind)00–\(kind)\(factory - 1)); with no slot free, it offers to overwrite the last slot (\(kind)\(total - 1)); which slots several tables would take has not been tested."
     }
 
     /// What the Changes column says for an item: short words for each change the destination

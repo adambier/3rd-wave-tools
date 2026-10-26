@@ -301,12 +301,12 @@ public struct PackPlan {
                 warnings += f.problems.map { "\(f.url.lastPathComponent): \($0)." }
                 if case let .multisample(m) = f.body {
                     bytes = multisampleBytes(m)
-                    status = .ok("Embeds \u{201C}\(name)\u{201D} (\(f.url.lastPathComponent)); a 3rd Wave that already has it reuses it, otherwise it goes into a free S slot")
+                    status = .ok("Embeds \u{201C}\(name)\u{201D} (\(f.url.lastPathComponent)); a 3rd Wave synth that already has it reuses it, otherwise it goes into a free S slot")
                     brief = "Embedded; reused or stored in a free S slot"
                 } else {
                     bytes = tableBytes
                     if let same = factory.slot(withFingerprint: f.fingerprint) {
-                        status = .ok("Embeds \u{201C}\(name)\u{201D}, identical to factory \(same.label); a 3rd Wave that has it reuses it")
+                        status = .ok("Embeds \u{201C}\(name)\u{201D}, identical to factory \(same.label); a 3rd Wave synth that has it reuses it")
                         brief = "Embedded; same as factory \(same.label), reused"
                     } else if isFactory && !replacingIsExpected {
                         mayNeedSlot = true

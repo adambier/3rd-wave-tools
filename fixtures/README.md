@@ -2,13 +2,13 @@
 
 Small files of each kind the 3rd Wave reads and writes, for anyone writing their own reader or
 writer, in any language. Each file has a JSON file next to it (`<file>.json`) saying what it
-should parse to, so a new implementation can be checked against it without a 3rd Wave at hand.
+should parse to, so a new implementation can be checked against it without a 3rd Wave synth at hand.
 [`docs/FORMATS.md`](../docs/FORMATS.md) describes the formats; the section numbers below refer
 to it.
 
 The files are synthetic: the PgdataFormats and WavetableFormats libraries built them, and they
 contain no one else's sounds, so they can be used freely under this project's MIT licence. They
-exercise the structure of each format; they are not meant as sounds, and loading them on a 3rd Wave
+exercise the structure of each format; they are not meant as sounds, and loading them on a 3rd Wave synth
 has not been tested.
 
 | File | What it is |

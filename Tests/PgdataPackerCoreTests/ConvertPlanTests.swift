@@ -783,7 +783,7 @@ final class FrameSizeFitTests: XCTestCase {
     }
 
     func testUnrelatedFramesFitNoSizeAndSilenceSaysNothing() {
-        // 64 frames of noise-like, unrelated waves: neither size stands out.
+        // 64 frames of noise-like, unrelated frames: neither size stands out.
         var seed: UInt32 = 7
         let bank: [Float] = (0..<16_384).map { _ in
             seed = seed &* 1_664_525 &+ 1_013_904_223
@@ -861,7 +861,7 @@ final class ConvertOptionsTextTests: XCTestCase {
         // Small tables: the note counts them, whatever their size.
         var tables = (0..<9).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
         var p = plan(tables, preset: .thirdWaveU)
-        XCTAssertEqual(p.thirdWaveCapacityNote, "9 U tables to convert. A 3rd Wave holds 64 U tables, 56 of them Groove Synthesis’s (U00–U55); with no slot free, it offers to overwrite the last slot (U63); which slots several tables would take has not been tested.")
+        XCTAssertEqual(p.thirdWaveCapacityNote, "9 U tables to convert. A 3rd Wave synth holds 64 U tables, 56 of them Groove Synthesis’s (U00–U55); with no slot free, it offers to overwrite the last slot (U63); which slots several tables would take has not been tested.")
         p.setSelected(p.items[0].id, false)
         XCTAssertNil(p.thirdWaveCapacityNote, "8 fit")
         p.preset = .wav2048
@@ -870,7 +870,7 @@ final class ConvertOptionsTextTests: XCTestCase {
         XCTAssertNil(p.thirdWaveCapacityNote, "12 P slots")
         tables += (9..<13).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
         p = plan(tables, preset: .thirdWaveP)
-        XCTAssertEqual(p.thirdWaveCapacityNote, "13 P tables to convert. A 3rd Wave holds 48 P tables, 36 of them Groove Synthesis’s (P00–P35); with no slot free, it offers to overwrite the last slot (P47); which slots several tables would take has not been tested.")
+        XCTAssertEqual(p.thirdWaveCapacityNote, "13 P tables to convert. A 3rd Wave synth holds 48 P tables, 36 of them Groove Synthesis’s (P00–P35); with no slot free, it offers to overwrite the last slot (P47); which slots several tables would take has not been tested.")
 
         // A factory table does not count: the 3rd Wave already has it.
         let lib = FactoryLibrary.builtIn
@@ -950,7 +950,7 @@ final class ConvertExistingChoicesTests: XCTestCase {
         }
         let nine = pickerPlan(.thirdWaveU, Array(repeating: (Interpolation?.none, 2048), count: 9))
         XCTAssertEqual(nine.caveat(for: .thirdWaveU), nine.thirdWaveCapacityNote)
-        XCTAssertEqual(nine.caveat(for: .thirdWaveU)?.hasPrefix("9 U tables to convert. A 3rd Wave holds 64 U tables"), true)
+        XCTAssertEqual(nine.caveat(for: .thirdWaveU)?.hasPrefix("9 U tables to convert. A 3rd Wave synth holds 64 U tables"), true)
         XCTAssertNil(nine.caveat(for: .thirdWaveP), "12 P slots")
         // A table that cannot convert yet does not count.
         XCTAssertNil(ConvertPlan(preset: .miniFreak).caveat(for: .miniFreak))

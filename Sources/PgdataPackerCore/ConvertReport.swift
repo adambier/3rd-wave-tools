@@ -47,7 +47,7 @@ public struct ConvertReport: Equatable {
     /// The alert's text (see `ReportText` for its form): the title, then, each only when it has
     /// something to say, the tables not converted, the files not written, the files written under
     /// a new name, the files written (the first `namesShown`, with the subfolder once in the
-    /// heading: "Written to WAVES:"), what converting did (each note once, with the tables it
+    /// heading: "Written to the WAVES folder:"), what converting did (each note once, with the tables it
     /// applies to), the 3rd Wave capacity note, and the sentence about the .wt files added to the
     /// Pack page.
     public var message: String
@@ -109,7 +109,7 @@ public struct ConvertReport: Equatable {
         log = logged
     }
 
-    /// "Written to WAVES:" when every file went into the same subfolder of `folder`; "Written:"
+    /// "Written to the WAVES folder:" when every file went into the same subfolder of `folder`; "Written:"
     /// when they went into `folder` itself (or into different subfolders).
     static func writtenHeading(_ written: [URL], folder: URL) -> String {
         let base = folder.standardizedFileURL.path
@@ -118,6 +118,6 @@ public struct ConvertReport: Equatable {
             return parent == base ? "" : url.deletingLastPathComponent().lastPathComponent
         })
         guard subfolders.count == 1, let sub = subfolders.first, !sub.isEmpty else { return "Written:" }
-        return "Written to \(sub):"
+        return "Written to the \(sub) folder:"
     }
 }

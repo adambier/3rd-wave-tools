@@ -104,7 +104,7 @@ public enum Packer {
     /// Whether the program needs a `.pgdata`, rather than a plain `.pro`, to play as intended.
     ///
     /// True when it uses a multisample slot, or a wavetable slot for which `isFactoryContent`
-    /// returns false: content that a 3rd Wave holding only factory content in its slots does not
+    /// returns false: content that a 3rd Wave synth holding only factory content in its slots does not
     /// have.
     public static func needsUnifiedFile(_ program: ProgramFile, isFactoryContent: (SourceRef) -> Bool) -> Bool {
         program.distinctSources.contains { ref in

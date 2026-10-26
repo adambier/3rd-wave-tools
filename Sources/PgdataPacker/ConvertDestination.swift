@@ -51,7 +51,7 @@ struct ConvertDestinationPane: View {
             if plan.preset.isThirdWave {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("To load .wt files: copy the WAVES folder onto the 3rd Wave’s USB drive, then Global → Bulk wavetable import. A 3rd Wave holds 64 U tables and 48 P tables; its factory tables fill U00–U55 and P00–P35, leaving U56–U63 and P36–P47.")
+                    Text("To load .wt files: copy the WAVES folder onto the 3rd Wave’s USB drive, then Global → Bulk wavetable import; or add them to the 3rd Wave Terminal app’s library and send them from there. A 3rd Wave synth holds 64 U tables and 48 P tables; its factory tables fill U00–U55 and P00–P35, leaving U56–U63 and P36–P47.")
                     Text("Send to Pack also adds the .wt files to the Pack page.")
                 }
                 .font(.caption).foregroundStyle(.secondary)
@@ -291,7 +291,7 @@ struct ConvertFrameCountOption: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .help("Keep original frames: uses evenly spaced frames, including the first and last; adds no new waves (adding frames repeats some).\nCrossfade new frames: makes each new frame by crossfading its two neighbours. This happens once, when converting; it is separate from the interpolation saved in the file, which is how the synth moves between frames as it plays.")
+            .help("Keep original frames: uses evenly spaced frames, including the first and last; adds no new frames (adding frames repeats some).\nCrossfade new frames: makes each new frame by crossfading its two neighbours. This happens once, when converting; it is separate from the interpolation saved in the file, which is how the synth moves between frames as it plays.")
             Text(state.convertPlan.frameCountCaption)
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
