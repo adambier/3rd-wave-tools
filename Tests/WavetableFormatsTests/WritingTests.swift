@@ -263,7 +263,7 @@ final class WritingTests: XCTestCase {
 
         let spectral = try write(t, .tonverk, OutputOptions(interpolation: .spectral))
         XCTAssertEqual(spectral.fileName, "Test Table_wt1024.wav")
-        notes(spectral, contain: "spectral morph asked for is marked smooth")
+        notes(spectral, contain: "spectral morph asked for is left unmarked")
     }
 
     func testTonverkReplacesExistingTag() throws {

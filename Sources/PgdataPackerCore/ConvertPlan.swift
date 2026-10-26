@@ -92,8 +92,10 @@ public struct ConvertPlan: Equatable {
 
         /// The name it is converted under: the new name from Clean Up Names, or the file's.
         public var name: String { newName ?? table.name }
-        /// The frame size used: the user's choice, or else the file's.
-        public var frameSize: Int? { chosenFrameSize ?? table.frameSize }
+        /// The frame size used: the user's choice, else the file's, else the size the samples
+        /// make likely when the file leaves the size open (`FrameSizeFit`; assumed, and said to
+        /// be). Nil when nothing settles it.
+        public var frameSize: Int? { chosenFrameSize ?? table.frameSize ?? FrameSizeFit.likelySize(frameSizeFit) }
         /// The sizes the user can choose from, when the size is open or an estimate
         /// (`sizeIsEstimate`): the file's own first, then the other sizes its length allows
         /// (`WavetableReader.fittingFrameSizes`). Empty when the file's contents state the
@@ -116,8 +118,9 @@ public struct ConvertPlan: Equatable {
             case .statedInFile, .none: return false
             }
         }
-        /// Whether the file leaves the frame size open, so the user must choose one.
-        public var needsFrameSize: Bool { table.frameSize == nil }
+        /// Whether the frame size is still open, so the user must choose one: the file leaves it
+        /// open, the samples make none of the sizes likely, and nothing has been chosen.
+        public var needsFrameSize: Bool { frameSize == nil }
         /// Frames at the frame size used; nil when no size is known or the samples do not divide.
         public var frameCount: Int? {
             guard let n = frameSize, n > 0, !table.samples.isEmpty, table.samples.count % n == 0 else { return nil }
@@ -130,9 +133,9 @@ public struct ConvertPlan: Equatable {
             if frameSize != nil { return "Can’t split into frames" }
             return "Choose a frame size"
         }
-        /// Whether the frame size rests on the file's length alone (an assumption the user may
-        /// want to change), with no choice made.
-        public var isGuessed: Bool { chosenFrameSize == nil && !needsFrameSize && table.frameSizeEvidence == .length }
+        /// Whether the frame size is the page's assumption (from the file's length alone, or from
+        /// the samples' fit), with no choice made.
+        public var isGuessed: Bool { chosenFrameSize == nil && (sizeSource == .guessed || sizeSource == .likely) }
         /// A word or two after the size in the Input column, saying where the size comes from,
         /// so every row shows how much to trust it: "in the file" (a chunk or header states
         /// it, or the format fixes it), "in the name" (a Tonverk tag), "in the .txt" (a Serum
@@ -145,7 +148,7 @@ public struct ConvertPlan: Equatable {
             case .fileName: return "in the name"
             case .sidecar: return "in the .txt"
             case .markers: return "from markers"
-            case .guessed: return "assumed"
+            case .guessed, .likely: return "assumed"
             case .setManually: return "set manually"
             case .notStated: return nil
             }
@@ -166,6 +169,7 @@ public struct ConvertPlan: Equatable {
         public var sizeSource: SizeSource {
             if chosenFrameSize != nil { return .setManually }
             if needsFrameSize { return .notStated }
+            if table.frameSize == nil { return .likely }   // the samples' fit settled it
             switch table.frameSizeEvidence {
             case .statedInFile: return .inFile
             case .fileName: return .fileName
@@ -185,16 +189,20 @@ public struct ConvertPlan: Equatable {
             case .markers: return file + "; less certain than a frame size the file states."
             case .guessed:
                 // 2,048 samples per frame is the size of Serum-style wavetables (WAVETABLES.md section 2).
-                return "Nothing in the file says; \(ConvertPlan.formatCount(table.frameSize ?? 2048)) samples per frame is assumed, the size of Serum-style wavetables."
+                return "The file doesn’t specify a frame size; \(ConvertPlan.formatCount(table.frameSize ?? 2048)) samples per frame is assumed, the size of Serum-style wavetables."
+            case .likely:
+                let others = table.candidateFrameSizes.filter { $0 != frameSize }.map(ConvertPlan.formatCount)
+                return "The file doesn’t specify a frame size; \(ConvertPlan.formatCount(frameSize ?? 0)) samples per frame is assumed because frames of that size are alike from one to the next, as a wavetable’s are."
+                    + (others.isEmpty ? "" : " Its length also allows \(ConvertPlan.listPhrase(others)).")
             case .notStated:
-                return "The file doesn’t say how long each wave is."
+                return "The file doesn’t specify a frame size."
                     + (table.candidateFrameSizes.isEmpty ? " Its length allows none of the sizes offered here (powers of two from 64 to 4,096)."
                                                           : " Its length allows " + ConvertPlan.candidateList(table) + ".")
             case .setManually:
                 if let suggested = table.frameSize {
                     return "Set manually; the file’s length suggested \(ConvertPlan.formatCount(suggested))."
                 }
-                return "Set manually; the file doesn’t say."
+                return "Set manually; the file doesn’t specify a frame size."
             }
         }
         /// The interpolation the source asks for: None (stepped), Crossfade, Spectral, or Not stated.
@@ -222,6 +230,8 @@ public struct ConvertPlan: Equatable {
         case markers
         /// The file's length alone: 2,048 assumed.
         case guessed
+        /// The file leaves the size open and the samples make one size likely: that one assumed.
+        case likely
         /// Nothing says: the user must choose.
         case notStated
         /// The user chose a size.
@@ -234,7 +244,7 @@ public struct ConvertPlan: Equatable {
             case .fileName: return "File name"
             case .sidecar: return "Serum .txt"
             case .markers: return "Markers"
-            case .guessed: return "Assumed"
+            case .guessed, .likely: return "Assumed"
             case .notStated: return "Not stated"
             case .setManually: return "Set manually"
             }
@@ -492,7 +502,9 @@ public struct ConvertPlan: Equatable {
     public mutating func chooseFrameSize(_ id: UUID, _ size: Int?) {
         guard let i = items.firstIndex(where: { $0.id == id }) else { return }
         if let size, !items[i].frameSizeChoices.contains(size) { return }
-        items[i].chosenFrameSize = size == items[i].table.frameSize ? nil : size
+        // The file's own size, or the one assumed from the samples, is no choice at all.
+        let assumed = items[i].table.frameSize ?? FrameSizeFit.likelySize(items[i].frameSizeFit)
+        items[i].chosenFrameSize = size == assumed ? nil : size
     }
 
     /// Notes for an item, warnings first: the reader's, and what the destination means for it.
@@ -551,7 +563,7 @@ public struct ConvertPlan: Equatable {
         case .ready: return "Ready to convert."
         case .excluded: return "Not marked to convert; left out."
         case .needsFrameSize:
-            return "Choose a frame size: the file doesn’t say how long each wave is."
+            return "Choose a frame size: the file doesn’t specify one."
                 + (item.table.candidateFrameSizes.isEmpty ? " Its length allows none of the sizes offered here (powers of two from 64 to 4,096)."
                                                            : " Its length allows \(Self.candidateList(item.table)).")
         case .cannotSplit:
@@ -688,7 +700,7 @@ public struct ConvertPlan: Equatable {
     }
 
     /// The interpolation the writer records when a file says nothing and nothing is chosen
-    /// (`WavetableWriter`'s default; Tonverk's name calls it smooth).
+    /// (`WavetableWriter`'s default; Tonverk's manual calls a crossfade "smooth").
     public static let defaultInterpolation: Interpolation = .crossfade
 
     /// The interpolations the tables to convert state in their files, as the destination would
@@ -731,7 +743,7 @@ public struct ConvertPlan: Equatable {
 
     /// The Interpolation picker's first item when the tables to convert state different
     /// interpolations, or some state one and others say nothing: "Each table’s own — existing:
-    /// 3 stepped, 2 crossfade; 4 not stated" (for Tonverk, "smooth" for crossfade). Nil when
+    /// 3 stepped, 2 crossfade; 4 not stated". Nil when
     /// they all state one value (that value's item is then marked existing) and when no file
     /// states any (the default's item then stands for no override).
     public var eachTablesOwnInterpolationLabel: ChoiceLabel? {
@@ -746,11 +758,11 @@ public struct ConvertPlan: Equatable {
     }
 
     /// The word for an interpolation in the existing counts: "stepped", "crossfade", or
-    /// "spectral"; for Tonverk, "smooth" for crossfade (what its file name says).
+    /// "spectral" (Tonverk's manual says "smooth" for a crossfade; the page keeps one word).
     func existingWord(_ i: Interpolation) -> String {
         switch i {
         case Interpolation.none: return "stepped"
-        case .crossfade: return preset == .tonverk ? "smooth" : "crossfade"
+        case .crossfade: return "crossfade"
         case .spectral: return "spectral"
         }
     }

@@ -198,6 +198,7 @@ struct ConvertSourcesHeader: View {
             }
             .padding(12)
             .frame(width: 320, alignment: .leading)
+            .lineLimit(nil)   // whatever the anchor's environment says
         }
     }
 }
@@ -236,6 +237,7 @@ struct ConvertSourcesButton: View {
             }
             .padding(12)
             .frame(width: 320, alignment: .leading)
+            .lineLimit(nil)   // whatever the anchor's environment says
         }
     }
 }
@@ -308,7 +310,7 @@ struct ConvertInterpolationOption: View {
     private var tonverk: Bool { state.convertPlan.preset == .tonverk }
 
     private var tip: String {
-        tonverk ? "Tonverk reads it from the file name: a trailing \u{201C}r\u{201D} means stepped, otherwise smooth. Other synths set interpolation on the oscillator."
+        tonverk ? "Tonverk reads it from the file name: a trailing \u{201C}r\u{201D} means stepped, otherwise crossfade (its manual says smooth). Other synths set interpolation on the oscillator."
                 : "Serum and Vital read it from the WAV; Tonverk reads it from the file name. Other synths set interpolation on the oscillator."
     }
 
@@ -318,11 +320,9 @@ struct ConvertInterpolationOption: View {
         tonverk ? [Interpolation.none, .crossfade] : [Interpolation.none, .crossfade, .spectral]
     }
 
-    /// The menu's words for a value: its `displayName`, except Tonverk's "Smooth (crossfade)"
-    /// for crossfade (Tonverk's word, with the one the rest of the page uses).
-    private func label(_ value: Interpolation) -> String {
-        value == .crossfade && tonverk ? "Smooth (crossfade)" : value.displayName
-    }
+    /// The menu's words for a value: its `displayName` (Tonverk's manual says "smooth" for a
+    /// crossfade; the page keeps one word for one thing).
+    private func label(_ value: Interpolation) -> String { value.displayName }
 
     /// What the choices mean, and what "existing" means when the menu says it. One sentence
     /// each, nothing the menu already says.
@@ -332,12 +332,12 @@ struct ConvertInterpolationOption: View {
         if plan.sharedExistingInterpolation != nil || plan.eachTablesOwnInterpolationLabel != nil {
             var sentence = "\u{201C}Existing\u{201D} is the interpolation a table’s file states"
             if plan.unstatedInterpolationCount > 0 {
-                sentence += "; a file that says nothing is saved as \(tonverk ? "smooth" : "crossfade")"
+                sentence += "; a file that doesn’t specify one is saved as crossfade"
             }
             lines.append(sentence + ".")
         }
         if tonverk {
-            lines.append("Smooth blends each frame into the next; None (stepped) jumps between them and adds \u{201C}r\u{201D} to the file name.")
+            lines.append("Crossfade blends each frame into the next; None (stepped) jumps between them and adds \u{201C}r\u{201D} to the file name.")
         } else {
             lines.append("Crossfade blends each frame into the next; spectral blends their harmonics (Serum’s and Vital’s spectral morph); None (stepped) jumps between them.")
         }

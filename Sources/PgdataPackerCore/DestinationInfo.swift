@@ -46,17 +46,18 @@ public extension OutputPreset {
         }
     }
 
-    /// The size and file kind in one line ("64 × 1,024 · .wt", "up to 256 × 2,048 · WAV").
+    /// The size and file kind in one line ("64 × 1,024 · .wt", "up to 256 × 2,048 · .wav"): the
+    /// file's extension names the kind, the same way for every destination.
     var specLine: String {
         switch self {
         case .thirdWaveU: return "64 × 1,024 · .wt"
         case .thirdWaveP: return "64 × 128 · .wt"
-        case .wav2048: return "up to 256 × 2,048 · WAV"
-        case .miniFreak: return "up to 64 × 2,048 · WAV"
-        case .tonverk: return "up to 64 frames · WAV, size in name"
-        case .phasePlant: return "256 × 2,048 · WAV"
+        case .wav2048: return "up to 256 × 2,048 · .wav"
+        case .miniFreak: return "up to 64 × 2,048 · .wav"
+        case .tonverk: return "up to 64 frames · .wav, size in name"
+        case .phasePlant: return "256 × 2,048 · .wav"
         case .surge: return "up to 512 frames · Surge .wt"
-        case .waveEdit: return "64 × 256 · 16-bit WAV"
+        case .waveEdit: return "64 × 256 · 16-bit .wav"
         }
     }
 

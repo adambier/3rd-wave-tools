@@ -171,7 +171,7 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertEqual(item.sourceDescription, "WAV")
         XCTAssertEqual(item.sizeDescription, "Choose a frame size")
         XCTAssertEqual(item.sizeSource, .notStated)
-        XCTAssertEqual(item.basisDescription, "The file doesn’t say how long each wave is. Its length allows 256 (64 frames) or 2,048 (8 frames).")
+        XCTAssertEqual(item.basisDescription, "The file doesn’t specify a frame size. Its length allows 256 (64 frames) or 2,048 (8 frames).")
         XCTAssertFalse(plan.canConvert(item))
         XCTAssertTrue(plan.isSelected(item))   // ticked, but not converted until a size is chosen
         XCTAssertEqual(plan.expectedResult(for: item), "Choose a frame size first")
@@ -310,6 +310,15 @@ final class ConvertPlanRenameTests: XCTestCase {
     }
 }
 
+/// Samples that make no frame size likely (`FrameSizeFit`), so a table whose file leaves the size
+/// open stays open: deterministic noise, within ±0.5.
+func openNoise(_ n: Int) -> [Float] {
+    (0..<n).map { (i: Int) -> Float in
+        let x = sin(Double(i) * 12.9898 + 78.233) * 43758.5453
+        return Float(x - x.rounded(.down)) - 0.5
+    }
+}
+
 /// The state the Wavetables page shows per item (status, attention, notes by severity, the expected
 /// result), the preview and its cache, and what each destination says about itself.
 final class ConvertPlanStateTests: XCTestCase {
@@ -317,8 +326,9 @@ final class ConvertPlanStateTests: XCTestCase {
                        candidates: [Int] = [], evidence: FrameSizeEvidence? = nil, notes: [ReadNote] = [],
                        interpolation: Interpolation? = nil) -> FoundTable {
         let n = samples ?? frames * (size ?? 2048)
+        // A table whose file leaves the size open gets noise, so no size is likely and it stays open.
         return FoundTable(name: name, fileName: name + ".wav", source: .wav,
-                          samples: (0..<n).map { Float(sin(Double($0) * 2 * .pi / 2048)) * peak },
+                          samples: size == nil ? openNoise(n) : (0..<n).map { Float(sin(Double($0) * 2 * .pi / 2048)) * peak },
                           frameSize: size, frameSizeBasis: "clm chunk", candidateFrameSizes: candidates,
                           interpolation: interpolation, readNotes: notes, frameSizeEvidence: evidence)
     }
@@ -346,7 +356,7 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertTrue(guess.isGuessed)
         XCTAssertEqual(guess.sizeSource, .guessed)
         XCTAssertEqual(guess.sizeSource.label, "Assumed")
-        XCTAssertEqual(guess.basisDescription, "Nothing in the file says; 2,048 samples per frame is assumed, the size of Serum-style wavetables.")
+        XCTAssertEqual(guess.basisDescription, "The file doesn’t specify a frame size; 2,048 samples per frame is assumed, the size of Serum-style wavetables.")
         XCTAssertEqual(ready.sizeSource, .inFile)
         XCTAssertEqual(ready.basisDescription, "Clm chunk.")   // the reader’s own phrase, capitalised
 
@@ -699,7 +709,7 @@ final class ConvertChangeWordsTests: XCTestCase {
         XCTAssertEqual(plan.changeWords(for: plan.items[1])?.changes.dropFirst().first, "64 → 60 frames, crossfaded")
         plan.options.frameCountPolicy = .pickEvenly
 
-        let open = FoundTable(name: "Open", fileName: "Open.wav", source: .wav, samples: Array(wave.prefix(16_384 / 2)) + Array(wave.prefix(16_384 / 2)),
+        let open = FoundTable(name: "Open", fileName: "Open.wav", source: .wav, samples: openNoise(16_384),
                               frameSize: nil, frameSizeBasis: "not stated", candidateFrameSizes: [256, 2048])
         plan.add([found(open)], factory: FactoryLibrary())
         XCTAssertNil(plan.changeWords(for: plan.items[2]))
@@ -795,7 +805,20 @@ final class FrameSizeFitTests: XCTestCase {
         var plan = ConvertPlan()
         plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Open.wav"), table: t)], factory: FactoryLibrary())
         XCTAssertEqual(plan.items[0].frameSizeFit, .likely(128))
-        XCTAssertNil(plan.items[0].frameSize, "never applied by itself")
+        // The likely size is assumed, and said to be (Adam, 2026-10-25); the chooser still offers the rest.
+        XCTAssertEqual(plan.items[0].frameSize, 128)
+        XCTAssertEqual(plan.items[0].sizeSource, .likely)
+        XCTAssertEqual(plan.items[0].sizeQualifier, "assumed")
+        XCTAssertTrue(plan.items[0].isGuessed)
+        XCTAssertEqual(plan.status(plan.items[0]), .ready)
+        XCTAssertEqual(plan.items[0].basisDescription, "The file doesn’t specify a frame size; 128 samples per frame is assumed because frames of that size are alike from one to the next, as a wavetable’s are. Its length also allows 2,048.")
+        XCTAssertEqual(plan.items[0].frameSizeChoices, [128, 2048])
+        plan.chooseFrameSize(plan.items[0].id, 2048)
+        XCTAssertEqual(plan.items[0].sizeSource, .setManually)
+        XCTAssertEqual(plan.items[0].frameSize, 2048)
+        plan.chooseFrameSize(plan.items[0].id, 128)   // back to the assumed size: no choice stands
+        XCTAssertNil(plan.items[0].chosenFrameSize)
+        XCTAssertEqual(plan.items[0].sizeSource, .likely)
         let settled = FoundTable(name: "Set", fileName: "Set.wav", source: .wav, samples: table(frames: 4, size: 2048),
                                  frameSize: 2048, frameSizeBasis: "clm chunk")
         plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Set.wav"), table: settled)], factory: FactoryLibrary())
@@ -865,8 +888,10 @@ final class ConvertOptionsTextTests: XCTestCase {
     func testExpectedForAnotherSizeFeedsTheChooser() {
         let open = table("Open", frames: 4, size: 2048, candidates: [128, 2048], frameSize: .some(nil))
         let p = plan([open], preset: .thirdWaveU)
-        XCTAssertNil(p.items[0].frameSize)
-        XCTAssertNil(p.expected(for: p.items[0]))
+        // A 2,048-period wave makes 2,048 likely, so it is assumed; the chooser still asks about 128.
+        XCTAssertEqual(p.items[0].frameSize, 2048)
+        XCTAssertEqual(p.items[0].sizeSource, .likely)
+        XCTAssertNotNil(p.expected(for: p.items[0]))
         let asP = p.expected(for: p.items[0], frameSize: 128)
         XCTAssertEqual(asP?.frameCountIn, 64)
         XCTAssertEqual(asP?.frameCountOut, 64)
@@ -969,10 +994,10 @@ final class ConvertExistingChoicesTests: XCTestCase {
         XCTAssertEqual(plan.existingInterpolations(), [:])
         XCTAssertEqual(plan.unstatedInterpolationCount, 0)
         XCTAssertNil(plan.eachTablesOwnInterpolationLabel)
-        // Tonverk: spectral counts as smooth, and the words are Tonverk's.
+        // Tonverk: spectral counts as crossfade (its name can say only stepped or smooth).
         plan.preset = .tonverk
         XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 2, Interpolation.none: 2])
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped, 2 smooth; 1 not stated")
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped, 2 crossfade; 1 not stated")
         let smooth = pickerPlan(.tonverk, [(.spectral, 2048), (.crossfade, 1024)])
         XCTAssertEqual(smooth.sharedExistingInterpolation, .crossfade)
         XCTAssertNil(smooth.eachTablesOwnInterpolationLabel)
@@ -980,7 +1005,7 @@ final class ConvertExistingChoicesTests: XCTestCase {
 
     func testExistingInterpolationsLeaveOutTablesThatCannotConvertYet() {
         var plan = pickerPlan(.wav2048, [(Interpolation.none, 2048)])
-        let open = FoundTable(name: "Open", fileName: "Open.wav", source: .wav, samples: Array(repeating: 0.2, count: 8192),
+        let open = FoundTable(name: "Open", fileName: "Open.wav", source: .wav, samples: openNoise(8192),
                               frameSize: nil, frameSizeBasis: "not stated", candidateFrameSizes: [128, 2048], interpolation: .spectral)
         plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Open.wav"), table: open)], factory: FactoryLibrary())
         XCTAssertEqual(plan.existingInterpolations(), [Interpolation.none: 1])

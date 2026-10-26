@@ -750,8 +750,8 @@ final class AppState: ObservableObject {
             return
         }
         guard marked.contains(where: plan.canConvert) else {
-            alertMessage = (marked.count == 1 ? "The table marked to convert can’t be converted yet: its file doesn’t say how long each wave is."
-                                              : "None of the tables marked to convert can be converted yet: their files don’t say how long each wave is.")
+            alertMessage = (marked.count == 1 ? "The table marked to convert can’t be converted yet: its file doesn’t specify a frame size."
+                                              : "None of the tables marked to convert can be converted yet: their files don’t specify a frame size.")
                 + "\n\nChoose a frame size in the Input column first."
             return
         }

@@ -405,7 +405,7 @@ final class ReadingTests: XCTestCase {
 
         let s = try readOne(wavFile([ramp(3 * 2048)]), "s.wav")
         XCTAssertEqual(s.frameSize, 2048)
-        XCTAssertEqual(s.frameSizeBasis, "file length only (2,048 per frame assumed, the Serum-style size; the file does not say)")
+        XCTAssertEqual(s.frameSizeBasis, "file length only (2,048 per frame assumed, the Serum-style size; the file does not specify a frame size)")
         XCTAssertEqual(s.frameSizeEvidence, .length)
         XCTAssertEqual(s.candidateFrameSizes, [64, 128, 256, 512, 1024])
 

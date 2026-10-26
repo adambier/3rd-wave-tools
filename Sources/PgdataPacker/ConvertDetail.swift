@@ -167,7 +167,7 @@ struct ConvertPreviewFacts: View {
 
     /// Where the size comes from; for an assumed size, also where to change it.
     private var inputDetail: String {
-        item.sizeSource == .guessed
+        item.sizeSource == .guessed || item.sizeSource == .likely
             ? item.basisDescription + " If it sounds wrong, choose another size in the Input column."
             : item.basisDescription
     }
@@ -575,15 +575,23 @@ struct ConvertNoteList: View {
     let file: OutputFile
     let output: ConvertPlan.ExpectedResult?
 
-    /// "64 frames × 2,048 samples, “Pad.wav” in WAVES".
-    private var outputLine: String {
-        let size = output.map { "\($0.frameCountOut) frame\($0.frameCountOut == 1 ? "" : "s") × \(ConvertPlan.formatCount($0.frameSizeOut)) samples, " } ?? ""
-        return size + "\u{201C}\(file.fileName)\u{201D}" + (file.folder.map { " in \($0)" } ?? "")
+    /// "64 frames × 2,048 samples".
+    private var sizeLine: String? {
+        output.map { "\($0.frameCountOut) frame\($0.frameCountOut == 1 ? "" : "s") × \(ConvertPlan.formatCount($0.frameSizeOut)) samples" }
+    }
+
+    /// "Written as “Pad.wt” in WAVES": the file the page will write, which can share the source
+    /// file's name, so it is said to be the file written.
+    private var fileLine: String {
+        "Written as \u{201C}\(file.fileName)\u{201D}" + (file.folder.map { " in \($0)" } ?? "")
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: ConvertPreviewFacts.lineSpacing) {
-            Text(outputLine).fixedSize(horizontal: false, vertical: true)
+            if let sizeLine { Text(sizeLine) }
+            Text(fileLine)
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             if file.notes.isEmpty {
                 Text("Only the file format changes.").font(.caption).foregroundStyle(.secondary)
             } else if file.notes.count == 1 {

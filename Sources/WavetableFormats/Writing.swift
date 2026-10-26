@@ -144,9 +144,9 @@ public enum WavetableWriter {
         mutating func tonverk() -> OutputFile {
             let stepped = plan.interpolationRecorded == Interpolation.none
             if interpolation == .spectral {
-                notes.append("A Tonverk file name can say only stepped or smooth, so the spectral morph asked for is marked smooth.")
+                notes.append("A Tonverk file name can mark a table only as stepped (a trailing “r”) or not, so the spectral morph asked for is left unmarked: Tonverk plays it as a crossfade (its manual says smooth).")
             }
-            noteDefaultInterpolation(as: "marked as smooth")
+            noteDefaultInterpolation(as: "The file name carries no “r”, so Tonverk plays the table as a crossfade (its manual says smooth)")
             let named = WavetableWriter.Names.fileStem(table.name)
             notes += named.notes
             let untagged = WavetableWriter.Names.removeTonverkTag(named.stem)
@@ -246,11 +246,12 @@ public enum WavetableWriter {
             notes.append("Peak \(Wavetable.peakText(peak)) kept, over full scale (±1): unless the synth turns the table down, it may clip the loudest parts, which adds a hard, buzzy edge.")
         }
 
-        /// For destinations that record the interpolation: says when crossfade (or
-        /// Tonverk's smooth) was chosen because nothing said otherwise.
-        mutating func noteDefaultInterpolation(as words: String = "saved as crossfade") {
+        /// For destinations that record the interpolation: says that the file records a
+        /// crossfade (or, for Tonverk, no stepped mark) because the source file specified no
+        /// interpolation and none was chosen.
+        mutating func noteDefaultInterpolation(as words: String = "This format records how a synth moves between frames; crossfade is saved") {
             if options.interpolation == nil && table.interpolation == nil {
-                notes.append("Interpolation \(words); the source doesn’t say.")
+                notes.append("\(words): the source file doesn’t specify an interpolation, and none was chosen.")
             }
         }
 

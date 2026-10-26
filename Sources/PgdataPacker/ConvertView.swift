@@ -180,7 +180,7 @@ struct ConvertSummaryStrip: View {
             Text("\(total) table\(total == 1 ? "" : "s") · \(marked) to convert")
                 .monospacedDigit()
             ConvertBlockedCount(count: plan.needsFrameSizeCount, one: "needs a frame size", many: "need frame sizes",
-                                help: "Tables marked to convert whose file doesn’t say how long each wave is: choose a size in the Input column")
+                                help: "Tables marked to convert whose file doesn’t specify a frame size: choose one in the Input column")
             ConvertBlockedCount(count: plan.cannotSplitCount, one: "can’t be split", many: "can’t be split",
                                 help: "Tables marked to convert whose samples don’t divide into frames of the size given")
             Spacer()
@@ -469,7 +469,7 @@ struct ConvertFrameSizeCell: View {
             }
             .buttonStyle(.bordered)
             .help(item.needsFrameSize
-                  ? "The file doesn’t say how long each wave is. Click to choose one of the sizes its length allows (frames × samples per frame)."
+                  ? "The file doesn’t specify a frame size. Click to choose one of the sizes its length allows (frames × samples per frame)."
                   : "Input: " + item.sizeDescription + " (frames × samples per frame). " + item.basisDescription + " Click to choose another size.")
             .popover(isPresented: $choosing, arrowEdge: .bottom) {
                 ConvertSizePopover(state: state, item: item)
@@ -542,15 +542,16 @@ struct ConvertSizePopover: View {
 
     /// Three buttons to a row, with the popover's padding.
     private static let width: CGFloat = 3 * ConvertSizeButton.width + 2 * 8 + 24
-    /// The width the sentences wrap at (the popover's, less its padding). Set on each Text: in a
-    /// popover a Text left to size itself was cut to one line instead of wrapping.
+    /// The width the sentences wrap at (the popover's, less its padding).
     private static let textWidth: CGFloat = width - 24
 
-    /// What the “likely” mark on a button means, or that nothing stands out.
+    /// What the “likely” mark on a button means, or that nothing stands out; nothing when the
+    /// likely size is the one assumed (the sentence above the buttons says so then).
     private var fitLine: String? {
         switch item.frameSizeFit {
         case .likely(let n):
-            return "\u{201C}Likely\u{201D}: frames of \(ConvertPlan.formatCount(n)) are alike from one to the next, as a wavetable’s are. A suggestion, not a certainty."
+            if item.sizeSource == .likely { return nil }
+            return "The likely size, \(ConvertPlan.formatCount(n)), is the one whose frames are alike from one to the next, as a wavetable’s are. A suggestion, not a certainty."
         case .tie:
             return "The sizes fit the samples equally well; nothing here settles it."
         case .unclear:
@@ -590,6 +591,10 @@ struct ConvertSizePopover: View {
         }
         .padding(12)
         .frame(width: Self.width, alignment: .leading)
+        // The popover inherits its anchor's environment, and the table's cells hold their text
+        // to one line; without this every sentence and result here was cut to one line with an
+        // ellipsis, whatever its frame.
+        .lineLimit(nil)
     }
 }
 
