@@ -472,6 +472,7 @@ final class VolumeMenuView: NSView {
     /// Where a menu item's title begins: the check-mark column's width.
     private static let titleInset: CGFloat = 21
     private static let rightMargin: CGFloat = 12
+    private static let height: CGFloat = 28
 
     /// The slider's position, set from the audio state when the menu is filled.
     var volume: Float {
@@ -479,44 +480,53 @@ final class VolumeMenuView: NSView {
         set { slider.doubleValue = Double(newValue) }
     }
 
+    // Laid out by Auto Layout, not by frames: a menu sizes a custom item view from its
+    // constraints and intrinsic size, and lays it out when the menu opens, by which time a
+    // frame-based layout done at init (or in `layout()` with a zero-height bounds) had put the
+    // label and icons outside the view, leaving a sliver of slider (Adam, 2026-10-26: the
+    // slider "disappeared" on 75d1724).
     init(volume: Float, changed: @escaping (Float) -> Void) {
         self.changed = changed
-        super.init(frame: NSRect(x: 0, y: 0, width: 280, height: 26))
+        super.init(frame: NSRect(x: 0, y: 0, width: 280, height: Self.height))
         autoresizingMask = [.width]   // the menu gives the view its width
         label.font = NSFont.menuFont(ofSize: 0)
-        addSubview(label)
+        label.textColor = .labelColor
         quiet.contentTintColor = .secondaryLabelColor
-        addSubview(quiet)
+        loud.contentTintColor = .secondaryLabelColor
         slider.controlSize = .small
         slider.isContinuous = true
         slider.doubleValue = Double(volume)
         slider.target = self
         slider.action = #selector(slid(_:))
         slider.setAccessibilityLabel("Volume")
-        addSubview(slider)
-        loud.contentTintColor = .secondaryLabelColor
-        addSubview(loud)
-        layoutSubviews()
+        for view in [label, quiet, slider, loud] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(view)
+        }
+        label.setContentHuggingPriority(.required, for: .horizontal)
+        label.setContentCompressionResistancePriority(.required, for: .horizontal)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.titleInset),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+            quiet.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 10),
+            quiet.centerYAnchor.constraint(equalTo: centerYAnchor),
+            quiet.widthAnchor.constraint(equalToConstant: 14),
+            quiet.heightAnchor.constraint(equalToConstant: 14),
+            slider.leadingAnchor.constraint(equalTo: quiet.trailingAnchor, constant: 6),
+            slider.centerYAnchor.constraint(equalTo: centerYAnchor),
+            slider.widthAnchor.constraint(greaterThanOrEqualToConstant: 60),
+            loud.leadingAnchor.constraint(equalTo: slider.trailingAnchor, constant: 6),
+            loud.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.rightMargin),
+            loud.centerYAnchor.constraint(equalTo: centerYAnchor),
+            loud.widthAnchor.constraint(equalToConstant: 18),
+            loud.heightAnchor.constraint(equalToConstant: 14),
+        ])
     }
 
     required init?(coder: NSCoder) { nil }
 
-    override func layout() {
-        super.layout()
-        layoutSubviews()
-    }
-
-    private func layoutSubviews() {
-        let height = bounds.height
-        label.sizeToFit()
-        label.frame.origin = NSPoint(x: Self.titleInset, y: (height - label.frame.height) / 2)
-        let quietX = label.frame.maxX + 10
-        quiet.frame = NSRect(x: quietX, y: (height - 14) / 2, width: 14, height: 14)
-        let loudWidth: CGFloat = 18
-        loud.frame = NSRect(x: bounds.width - Self.rightMargin - loudWidth, y: (height - 14) / 2, width: loudWidth, height: 14)
-        let sliderX = quiet.frame.maxX + 6
-        slider.frame = NSRect(x: sliderX, y: (height - 20) / 2, width: max(60, loud.frame.minX - 6 - sliderX), height: 20)
-    }
+    /// The size the menu starts from; the menu widens the view to its own width.
+    override var intrinsicContentSize: NSSize { NSSize(width: 280, height: Self.height) }
 
     @objc private func slid(_ sender: NSSlider) {
         changed(Float(sender.doubleValue))
