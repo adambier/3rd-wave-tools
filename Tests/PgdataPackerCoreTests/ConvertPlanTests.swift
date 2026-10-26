@@ -346,6 +346,23 @@ final class ConvertPlanStateTests: XCTestCase {
         return p
     }
 
+    func testLikelySizeInDoubtIsShownBesideTheAssumption() {
+        // A length-only WAV is assumed Serum-style (2,048), but its frames repeat every 1,024
+        // samples, so the fit marks 1,024 likely: the row says so beside "assumed".
+        let doubtful = FoundTable(name: "Doubt", fileName: "Doubt.wav", source: .wav,
+                                  samples: (0..<(12 * 2048)).map { Float(sin(Double($0) * 2 * .pi / 1024)) * 0.5 },
+                                  frameSize: 2048, frameSizeBasis: "file length only", candidateFrameSizes: [1024, 512, 4096],
+                                  frameSizeEvidence: .length)
+        var p = plan([doubtful, table("Plain", frames: 4, size: 2048, evidence: .length)])
+        XCTAssertEqual(p.items[0].sizeSource, .guessed)
+        XCTAssertEqual(p.items[0].likelySizeInDoubt, 1024)
+        XCTAssertTrue(p.items[0].basisDescription.contains("more alike at 1,024"))
+        // A plain 2,048-period table has no doubt; a chosen size removes it.
+        XCTAssertNil(p.items[1].likelySizeInDoubt)
+        p.chooseFrameSize(p.items[0].id, 1024)
+        XCTAssertNil(p.items[0].likelySizeInDoubt)
+    }
+
     func testOneFrameSizeForSeveralTables() {
         // Two tables whose size is assumed from the length (8,192 samples: 2,048 assumed), one
         // open (noise, 16,384 samples), and one whose file states 2,048.
@@ -745,7 +762,7 @@ final class ConvertChangeWordsTests: XCTestCase {
         var plan = ConvertPlan(preset: .thirdWaveU)
         plan.add([found(big), found(fits)], factory: FactoryLibrary())
         let b = plan.changeWords(for: plan.items[0])
-        XCTAssertEqual(b?.changes, ["resized", "256 → 64 frames, picked evenly", "turned down"])
+        XCTAssertEqual(b?.changes, ["2,048 → 1,024 samples", "256 → 64 frames, picked evenly", "turned down"])
         XCTAssertEqual(b?.warnings, ["12 extra samples dropped", "left channel only"])
         let f = plan.changeWords(for: plan.items[1])
         XCTAssertEqual(f?.changes, [])
@@ -760,7 +777,7 @@ final class ConvertChangeWordsTests: XCTestCase {
         plan.preset = .thirdWaveP
         plan.options.appendPPGStandardWaves = true
         plan.rename(plan.items[1].id, to: String(repeating: "x", count: 40))
-        XCTAssertEqual(plan.changeWords(for: plan.items[1])?.changes, ["resized", "64 → 60 frames, picked evenly", "may be turned down", "+ PPG waveforms", "name changed"])
+        XCTAssertEqual(plan.changeWords(for: plan.items[1])?.changes, ["1,024 → 128 samples", "64 → 60 frames, picked evenly", "may be turned down", "+ PPG waveforms", "name changed"])
         plan.options.frameCountPolicy = .interpolate
         XCTAssertEqual(plan.changeWords(for: plan.items[1])?.changes.dropFirst().first, "64 → 60 frames, crossfaded")
         plan.options.frameCountPolicy = .pickEvenly
@@ -883,7 +900,7 @@ final class FrameSizeFitTests: XCTestCase {
 }
 
 
-/// The frame-count caption, the 3rd Wave capacity note, and the size chooser's per-size results.
+/// The frame-count caption and the size chooser's per-size results.
 final class ConvertOptionsTextTests: XCTestCase {
     private func table(_ name: String, frames: Int, size: Int = 2048, peak: Float = 0.5, fingerprint: UInt64? = nil,
                        source: SourceFormat = .wav, candidates: [Int] = [], frameSize: Int?? = nil) -> FoundTable {
@@ -913,34 +930,6 @@ final class ConvertOptionsTextTests: XCTestCase {
         XCTAssertEqual(p.frameCountCaption, "2 tables gain frames (crossfaded).")
     }
 
-    func testThirdWaveCapacityNote() throws {
-        // Small tables: the note counts them, whatever their size.
-        var tables = (0..<9).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
-        var p = plan(tables, preset: .thirdWaveU)
-        XCTAssertEqual(p.thirdWaveCapacityNote, "9 U tables to convert for 8 user slots (U56–U63; U00–U55 hold Groove Synthesis’s tables). With no slot free, the 3rd Wave offers to overwrite the last slot (U63); which slots several tables would take has not been tested.")
-        p.setSelected(p.items[0].id, false)
-        XCTAssertNil(p.thirdWaveCapacityNote, "8 fit")
-        p.preset = .wav2048
-        XCTAssertNil(p.thirdWaveCapacityNote, "only for the 3rd Wave")
-        p.preset = .thirdWaveP
-        XCTAssertNil(p.thirdWaveCapacityNote, "12 P slots")
-        tables += (9..<13).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
-        p = plan(tables, preset: .thirdWaveP)
-        XCTAssertEqual(p.thirdWaveCapacityNote, "13 P tables to convert for 12 user slots (P36–P47; P00–P35 hold Groove Synthesis’s tables). With no slot free, the 3rd Wave offers to overwrite the last slot (P47); which slots several tables would take has not been tested.")
-
-        // A factory table does not count: the 3rd Wave already has it.
-        let lib = FactoryLibrary.builtIn
-        let fp = try XCTUnwrap(lib.tables[.u(7)]?.fingerprint)
-        var withFactory = (0..<8).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
-        withFactory.append(table("Factory", frames: 4, size: 128, peak: 0.9, fingerprint: fp, source: .thirdWaveWavetable(isP: false)))
-        p = ConvertPlan(preset: .thirdWaveU)
-        p.add(withFactory.map { ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/" + $0.fileName), table: $0) }, factory: lib)
-        XCTAssertEqual(p.items[8].factorySlot, .u(7))
-        p.setSelected(p.items[8].id, true)
-        XCTAssertEqual(p.selectedItems.count, 9)
-        XCTAssertNil(p.thirdWaveCapacityNote)
-    }
-
     func testExpectedForAnotherSizeFeedsTheChooser() {
         let open = table("Open", frames: 4, size: 2048, candidates: [128, 2048], frameSize: .some(nil))
         let p = plan([open], preset: .thirdWaveU)
@@ -952,8 +941,8 @@ final class ConvertOptionsTextTests: XCTestCase {
         XCTAssertEqual(asP?.frameCountIn, 64)
         XCTAssertEqual(asP?.frameCountOut, 64)
         XCTAssertEqual(asP?.frameSizeOut, 1024)
-        XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 128)?.changes, ["resized", "may be turned down"])   // resizing can raise the peak
-        XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 2048)?.changes, ["resized", "4 → 64 frames, repeated", "may be turned down"])
+        XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 128)?.changes, ["128 → 1,024 samples", "may be turned down"])   // resizing can raise the peak
+        XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 2048)?.changes, ["2,048 → 1,024 samples", "4 → 64 frames, repeated", "may be turned down"])
         XCTAssertNil(p.expected(for: p.items[0], frameSize: 1000), "does not divide")
     }
 }
@@ -999,15 +988,13 @@ final class ConvertExistingChoicesTests: XCTestCase {
         tall.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Tall.wav"), table: table)], factory: FactoryLibrary())
         XCTAssertNil(tall.caveat(for: .miniFreak))
         XCTAssertNotNil(tall.caveat(for: .phasePlant))
-        // Destinations whose sources settle their behaviour never warn; the 3rd Wave ones only
-        // when more tables are to convert than it holds (two fit).
+        // Destinations whose sources settle their behaviour never warn, the 3rd Wave ones among
+        // them (how many tables fit is the 3rd Wave's matter, not a caution here).
         for preset in [OutputPreset.thirdWaveU, .thirdWaveP, .tonverk, .surge, .waveEdit] {
             XCTAssertNil(two.caveat(for: preset), "\(preset)")
         }
         let nine = pickerPlan(.thirdWaveU, Array(repeating: (Interpolation?.none, 2048), count: 9))
-        XCTAssertEqual(nine.caveat(for: .thirdWaveU), nine.thirdWaveCapacityNote)
-        XCTAssertEqual(nine.caveat(for: .thirdWaveU)?.hasPrefix("9 U tables to convert for 8 user slots"), true)
-        XCTAssertNil(nine.caveat(for: .thirdWaveP), "12 P slots")
+        XCTAssertNil(nine.caveat(for: .thirdWaveU))
         // A table that cannot convert yet does not count.
         XCTAssertNil(ConvertPlan(preset: .miniFreak).caveat(for: .miniFreak))
     }

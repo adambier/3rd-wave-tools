@@ -175,6 +175,13 @@ public struct ConvertPlan: Equatable {
             case .notStated: return nil
             }
         }
+        /// When the size is the Serum-style assumption but the samples point to another size
+        /// (`FrameSizeFit.likelySize`), that size: the Input column shows it in orange beside
+        /// "assumed", so the doubt is seen without opening the chooser. Nil otherwise.
+        public var likelySizeInDoubt: Int? {
+            guard sizeSource == .guessed, case .likely(let n) = frameSizeFit, n != frameSize else { return nil }
+            return n
+        }
         /// A short badge for where the table came from, when that matters: the slot and file for
         /// a table inside a `.pgdata`, "3rd Wave U" or "3rd Wave P", "Surge .wt", or "FLAC"; nil
         /// for a WAV, the usual case.
@@ -702,8 +709,8 @@ public struct ConvertPlan: Equatable {
     /// - MiniFreak V: some table has fewer than 64 frames, which it is not documented to handle.
     /// - Phase Plant: some table has fewer than the 256 frames its documentation asks for, so
     ///   frames are added.
-    /// - P table, U table: more of the user's own tables than the 3rd Wave holds at a time
-    ///   (`thirdWaveCapacityNote(for:)`).
+    /// The 3rd Wave destinations have none: how many tables fit is a matter for the 3rd Wave
+    /// (section 7 of FORMATS.md), not a caution the page raises.
     public func caveat(for preset: OutputPreset) -> String? {
         let tables = selectedItems.filter(canConvert)
         switch preset {
@@ -721,9 +728,7 @@ public struct ConvertPlan: Equatable {
             let short = tables.filter { ($0.frameCount ?? 256) < 256 }.count
             guard short > 0 else { return nil }
             return "\(Self.tablesHave(short, of: tables.count)) fewer than 256 frames; whether Phase Plant loads shorter tables is untested, so frames are added to reach 256."
-        case .thirdWaveU, .thirdWaveP:
-            return thirdWaveCapacityNote(for: preset)
-        case .tonverk, .surge, .waveEdit:
+        case .thirdWaveU, .thirdWaveP, .tonverk, .surge, .waveEdit:
             return nil
         }
     }
@@ -971,41 +976,8 @@ public struct ConvertPlan: Equatable {
         return "Affects \(total) tables: " + part(c.gain, "gain", grows: true, noun: false) + ", " + part(c.lose, "lose", grows: false, noun: false) + "."
     }
 
-    /// For the chosen 3rd Wave destination: a warning when more of the user's own tables are to
-    /// be converted than the 3rd Wave holds at a time (see `thirdWaveCapacityNote(for:)`).
-    public var thirdWaveCapacityNote: String? { thirdWaveCapacityNote(for: preset) }
-
-    /// For a 3rd Wave destination: a warning when more of the user's own tables are to be
-    /// converted than the slots its factory tables leave free (P36–P47, U56–U63; factory
-    /// tables, which it already has, do not count), since the 3rd Wave will then offer to
-    /// overwrite; nil otherwise, and for other destinations. The note states the facts: how
-    /// many tables the 3rd Wave holds (48 P, 64 U), how many of them are Groove Synthesis's
-    /// (P00–P35, U00–U55), and that with no slot free it offers to overwrite the last slot
-    /// (observed once, for one table, which went to U63; what several would take is untested;
-    /// see section 7 of FORMATS.md).
-    public func thirdWaveCapacityNote(for preset: OutputPreset) -> String? {
-        thirdWaveCapacityNote(for: preset, converted: false)
-    }
-
-    /// The capacity note (above) in the tense for the report, after converting: "9 U tables were
-    /// converted for 8 user slots …".
-    public func thirdWaveCapacityNote(for preset: OutputPreset, converted: Bool) -> String? {
-        guard preset.isThirdWave else { return nil }
-        let own = selectedItems.filter { canConvert($0) && $0.factorySlot == nil }.count
-        let isP = preset == .thirdWaveP
-        let total = isP ? SourceRef.pCount : SourceRef.uCount
-        let factory = isP ? SourceRef.factoryPCount : SourceRef.factoryUCount
-        let free = total - factory
-        guard own > free else { return nil }
-        let kind = isP ? "P" : "U"
-        let slots = "\(kind)\(String(format: "%02d", factory))–\(kind)\(total - 1)"
-        let factorySlots = "\(kind)00–\(kind)\(String(format: "%02d", factory - 1))"
-        let opening = converted ? "\(own) \(kind) tables were converted for \(free) user slots" : "\(own) \(kind) tables to convert for \(free) user slots"
-        return "\(opening) (\(slots); \(factorySlots) hold Groove Synthesis’s tables). With no slot free, the 3rd Wave offers to overwrite the last slot (\(kind)\(total - 1)); which slots several tables would take has not been tested."
-    }
-
     /// What the Changes column says for an item: short words for each change the destination
-    /// makes ("resized", "64 → 256 frames", "turned down", "+ PPG waveforms", "name changed"), and
+    /// makes ("2,048 → 1,024 samples", "64 → 256 frames", "turned down", "+ PPG waveforms", "name changed"), and
     /// short orange words for the warnings ("peak 1.14", "extra samples dropped"). Both empty
     /// when nothing changes but the format; nil when the item cannot convert.
     public func changeWords(for item: Item) -> (changes: [String], warnings: [String])? {
@@ -1016,7 +988,8 @@ public struct ConvertPlan: Equatable {
     public func changeWords(for item: Item, frameSize: Int?) -> (changes: [String], warnings: [String])? {
         guard let e = expected(for: item, frameSize: frameSize) else { return nil }
         var changes: [String] = []
-        if e.resizes { changes.append("resized") }
+        // Parallel to the frame-count change, so a reader sees which number changes.
+        if e.resizes { changes.append("\(Self.formatCount(e.frameSizeIn)) → \(Self.formatCount(e.frameSizeOut)) samples") }
         if e.changesCount {
             changes.append("\(Self.formatCount(e.frameCountIn)) → \(e.tableFrameCount) frames, " + Self.methodWord(e.countPolicy, grows: e.frameCountGrows == true))
         }

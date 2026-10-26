@@ -151,7 +151,9 @@ struct ConvertPresetRowLabel: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 2)
                     if let caveat { ConvertCaution(text: caveat) }
-                    if preset.testedIn.isEmpty { ConvertCaution(text: ConvertPlan.testingStatus(preset)) }
+                    // While the page carries its under-development notice, the row does not say
+                    // "untested" a second time; the Sources popover still does.
+                    if preset.testedIn.isEmpty, !ConvertPlan.conversionUnderDevelopment { ConvertCaution(text: ConvertPlan.testingStatus(preset)) }
                 }
             }
             Spacer(minLength: 0)

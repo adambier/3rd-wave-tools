@@ -318,7 +318,9 @@ struct ConvertTable: View {
                 .width(min: 230, ideal: 260)
             // The interpolation the table came with ("Not stated" for most WAVs); what the
             // destination's file records is the Options box's affair.
-            TableColumn("Interpolation") { (item: ConvertPlan.Item) in
+            // "in file": the column shows what the source file states; the Options box sets what
+            // the destination records.
+            TableColumn("Interpolation in file") { (item: ConvertPlan.Item) in
                 ConvertInterpolationCell(interpolation: item.table.interpolation, included: plan.isSelected(item))
             }
                 .width(min: 100, ideal: 120)
@@ -579,6 +581,11 @@ struct ConvertSizeText: View {
             if let word = item.sizeQualifier {
                 Text(word).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
+            // The Serum-style assumption with the samples pointing elsewhere: a doubt worth
+            // seeing in the row, in the warning colour.
+            if let likely = item.likelySizeInDoubt {
+                Text("\(ConvertPlan.formatCount(likely)) likely").font(.caption).foregroundStyle(.orange).lineLimit(1)
+            }
         }
         .padding(.leading, plain ? ConvertFramesBySize.buttonInset : 0)
     }
@@ -761,7 +768,7 @@ struct ConvertOutputCell: View {
     }
 }
 
-/// What converting changes, in a few words each ("resized, 64 → 256 frames"), then the
+/// What converting changes, in a few words each ("2,048 → 1,024 samples, 64 → 256 frames"), then the
 /// warnings in orange ("peak 1.14"), on up to two lines; "—" when only the format changes. The
 /// whole story on hover.
 struct ConvertChangesCell: View {

@@ -109,8 +109,8 @@ final class ConvertReportTests: XCTestCase {
         XCTAssertFalse(ReportText.isSingleItem(["• A.wt"]))
     }
 
-    func testCapacityNoteFollowsTheNotes() {
-        // Nine of the user's own U tables marked for a 3rd Wave U destination: more than it holds.
+    func testLoadingLineEndsAThirdWaveReport() {
+        // Nine U tables for a 3rd Wave destination: the report ends with how to load them.
         let wave = (0..<128).map { Float(sin(Double($0) * 2 * .pi / 128)) }
         func table(_ i: Int) -> ConvertPlan.Found {
             let t = FoundTable(name: "T\(i)", fileName: "T\(i).wav", source: .wav, samples: (wave + wave).map { $0 * (0.1 + Float(i) * 0.05) },
@@ -121,20 +121,13 @@ final class ConvertReportTests: XCTestCase {
         plan.add((0..<9).map(table), factory: FactoryLibrary())
         let names = plan.items.map(\.name)
         let c = conversion(names, notes: names.map { _ in ["Resized from 128 to 1,024 samples per frame."] })
-        let note = "9 U tables to convert for 8 user slots (U56–U63; U00–U55 hold Groove Synthesis’s tables). With no slot free, the 3rd Wave offers to overwrite the last slot (U63); which slots several tables would take has not been tested."
-        let reported = note.replacingOccurrences(of: "to convert for", with: "were converted for")
         let r = make(plan, c, written(names.map { "WAVES/\($0).wt" }))
-        XCTAssertEqual(plan.thirdWaveCapacityNote, note)
-        // After converting the note is in the past tense, and the report ends with how the files
-        // get onto the 3rd Wave.
-        XCTAssertTrue(r.message.hasSuffix("What converting did:\n• All 9 tables\tResized from 128 to 1,024 samples per frame.\n\n" + reported + "\n\n" + ConvertReport.loadingLine), r.message)
+        // The report ends with how the files get onto the 3rd Wave.
+        XCTAssertTrue(r.message.hasSuffix("What converting did:\n• All 9 tables\tResized from 128 to 1,024 samples per frame.\n\n" + ConvertReport.loadingLine), r.message)
         XCTAssertTrue(r.log.hasPrefix(r.title + " (/Users/me/Desktop/output)\n\nWritten to the WAVES folder:\n• T0.wt\n"), r.log)
-        XCTAssertTrue(r.log.contains(reported + "\n\n" + ConvertReport.loadingLine + "\n\nBy table:\n"), r.log)
-        // Eight fit: no note, and the pack sentence follows the notes directly.
-        plan.setSelected(plan.items[0].id, false)
-        XCTAssertNil(plan.thirdWaveCapacityNote)
+        XCTAssertTrue(r.log.contains(ConvertReport.loadingLine + "\n\nBy table:\n"), r.log)
+        // The pack sentence follows the notes directly.
         let fits = make(plan, c, written(names.map { "WAVES/\($0).wt" }), pack: [folder.appendingPathComponent("WAVES/T1.wt")])
-        XCTAssertFalse(fits.message.contains("user slots"))
         XCTAssertTrue(fits.message.hasSuffix("samples per frame.\n\nThe .wt file is added to the Pack page.\n\n" + ConvertReport.loadingLine), fits.message)
     }
 

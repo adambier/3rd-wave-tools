@@ -366,9 +366,7 @@ beside it (a piano key with its number; A3, 220 Hz, to start) through the device
 **Convert…** writes the files into a folder you choose (3rd Wave tables into a `WAVES` folder
 inside it) and reports everything it changed; it never replaces an existing file. For a 3rd Wave
 destination, **Send to Pack…** does the same and then adds the `.wt` files to the Pack page, to
-embed in programs. The page warns when more tables are to be converted than the 3rd Wave's user
-slots hold (P36–P47 and U56–U63; the factory tables fill the rest), since the 3rd Wave then offers
-to overwrite its last slots.
+embed in programs.
 
 To load the `.wt` files on the 3rd Wave, copy the `WAVES` folder onto its USB drive and use
 Global → **Bulk wavetable import**, or add them to the 3rd Wave Terminal app's library and sync.

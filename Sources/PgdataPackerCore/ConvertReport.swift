@@ -48,7 +48,7 @@ public struct ConvertReport: Equatable {
     /// something to say, the tables not converted, the files not written, the files written under
     /// a new name, the files written (the first `namesShown`, with the subfolder once in the
     /// heading: "Written to the WAVES folder:"), what converting did (each note once, with the tables it
-    /// applies to), the 3rd Wave capacity note, and the sentence about the .wt files added to the
+    /// applies to), and the sentence about the .wt files added to the
     /// Pack page.
     public var message: String
     /// The log's text: the message with the folder's path after the title and every file written
@@ -61,7 +61,7 @@ public struct ConvertReport: Equatable {
 
     /// Assembles the report.
     /// - Parameters:
-    ///   - plan: The plan converted (its destination names the title; its capacity note is shown).
+    ///   - plan: The plan converted (its destination names the title).
     ///   - conversion: What converting produced.
     ///   - written: What writing the converted files into `folder` did.
     ///   - folder: The folder the files were written into.
@@ -93,9 +93,6 @@ public struct ConvertReport: Equatable {
         let grouped = ConvertPlan.groupedNotes(conversion.reports)
         if !grouped.isEmpty {
             after += "\n\nWhat converting did:\n" + grouped.map { ReportText.item($0.label, $0.text) }.joined(separator: "\n")
-        }
-        if let capacity = plan.thirdWaveCapacityNote(for: plan.preset, converted: true) {
-            after += "\n\n" + capacity
         }
         if !packFiles.isEmpty {
             after += "\n\n" + (packFiles.count == 1 ? "The .wt file is" : "The \(packFiles.count) .wt files are") + " added to the Pack page."
