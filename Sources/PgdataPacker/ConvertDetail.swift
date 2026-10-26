@@ -441,6 +441,12 @@ struct ConvertOverviewPair: View {
             let recorded = plan.preset.recordsInterpolation
             let playedByDefault = plan.interpolationPlayed(for: item) ?? Interpolation.none
             let resultInterpolation: Interpolation? = recorded ? plan.interpolationPlayed(for: item) : (hearing ?? playedByDefault)
+            // The cycle Listen plays, derived here from this pass's table, result, interpolation,
+            // and slider, and handed to the engine whenever it differs: one path, so a change of
+            // table, the result arriving, or the Options cannot leave the engine on a stale
+            // cycle (handlers capturing an earlier pass's values did: Adam, 2026-10-26, the
+            // sound not following the selected table).
+            let playedCycle = cycleToPlay(source: source.frames, result: result, resultInterpolation: resultInterpolation)
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 16) {
                     ConvertOverview(frames: source.frames,
@@ -472,16 +478,11 @@ struct ConvertOverviewPair: View {
                                      hearingHelp: ConvertOverviewPair.hearingHelp(for: plan.preset),
                                      recordedNote: recorded && result != nil ? ConvertOverviewPair.recordedNote(for: plan.preset) : nil,
                                      recordedHelp: ConvertOverviewPair.recordedHelp(for: plan.preset),
-                                     cycle: { cycleToPlay(source: source.frames, result: result, resultInterpolation: resultInterpolation) })
+                                     cycle: { playedCycle })
             }
             .onChange(of: item.id) { _ in hearing = nil }
             .onChange(of: plan.preset) { _ in hearing = nil }
-            .onChange(of: position) { _ in updatePlaying(source: source.frames, result: result, resultInterpolation: resultInterpolation) }
-            .onChange(of: result) { (r: [[Float]]?) in updatePlaying(source: source.frames, result: r, resultInterpolation: resultInterpolation) }
-            // The Options' interpolation changes what plays between frames without changing
-            // the frames themselves, so it is watched on its own.
-            .onChange(of: resultInterpolation) { (i: Interpolation?) in updatePlaying(source: source.frames, result: result, resultInterpolation: i) }
-            .onChange(of: item.id) { _ in updatePlaying(source: source.frames, result: result, resultInterpolation: resultInterpolation) }
+            .onChange(of: playedCycle) { (cycle: [Float]) in preview.update(cycle) }
             .onDisappear { preview.stop() }
         }
     }
@@ -532,10 +533,6 @@ struct ConvertOverviewPair: View {
         return WavetableSketch.fullCycle(at: position, in: source, interpolation: item.table.interpolation)?.values ?? []
     }
 
-    private func updatePlaying(source: [[Float]], result: [[Float]]?, resultInterpolation: Interpolation?) {
-        guard preview.isPlaying else { return }
-        preview.update(cycleToPlay(source: source, result: result, resultInterpolation: resultInterpolation))
-    }
 }
 
 /// Under the pictures: the Frame slider, the Listen button, and the pitch pop-up (piano keys
