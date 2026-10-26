@@ -375,9 +375,16 @@ and played there; it goes back to the synth's default whenever the table or the 
 changes. For a format whose file records the interpolation, the **Interpolation** option under
 **Options** decides, and the preview says so in the pop-up's place.
 The **Frame** slider sweeps through the table and draws the cycle there large, input and result
-together. **Listen** plays that cycle, following the slider, at the pitch chosen beside it (a
-piano key and its frequency; A3, 220 Hz, to start), at the volume and through the device chosen
-under **Audio Output**, the speaker icon at the right of the toolbar.
+together; stored frames are magnetic, so the slider lands on them as it passes and the positions
+between stay reachable. **Listen** plays that cycle, following the slider, at the pitch chosen
+beside it (a piano key and its frequency; A3, 220 Hz, to start), at the volume and through the
+device chosen under **Audio Output**, the speaker icon at the right of the toolbar.
+Under the output's notes, two notes appear when they apply, since either makes the interpolation
+hard to hear: a caution, in orange, when a small table's frames are repeated to fill the
+destination's frame count (a synth that blends between frames, the 3rd Wave's wavetable smoothing
+among them, can then blend only where the frame changes; **Crossfade New Frames** under
+**Options** makes the sweep continuous), and a note when neighboring frames are much alike, so
+that stepping and blending sound nearly the same.
 
 #### Converting
 

@@ -83,6 +83,9 @@ The README, FORMATS.md, the documentation, and the app's text follow a few conve
   destination); nothing said twice in one view, report, or paragraph; counts that read naturally
   ("Both tables", "1 change", never "All 2 tables" or "1 changes"); labels that say exactly what
   they mean ("Xfer Records, Serum 2 User Guide", not "the maker's documentation").
+- In explanations, name the noun rather than a pronoun ("the file's length", not "its length"),
+  finish every statement ("frames of 128 samples", not "128"), and name the control a value was
+  set in ("selected in the Interpolation pop-up under Options"), never "asked for" alone.
 - AGENTS.md section 10 has the full list ("frame", never "wave", for a cycle in a table; P tables
   before U tables; quotation marks around words taken from synth documentation; and more).
 

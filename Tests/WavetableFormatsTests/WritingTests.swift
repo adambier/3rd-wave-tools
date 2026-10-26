@@ -168,7 +168,7 @@ final class WritingTests: XCTestCase {
         }
         notes(out, contain: "Frame count changed from 64 to 60")
         notes(out, contain: "standard waveforms")
-        notes(out, contain: "harmonic and above are dropped")
+        notes(out, contain: "harmonic and above, which frames of 128 samples can’t hold, are dropped")
     }
 
     // MARK: Serum-style WAVs
@@ -263,7 +263,11 @@ final class WritingTests: XCTestCase {
 
         let spectral = try write(t, .tonverk, OutputOptions(interpolation: .spectral))
         XCTAssertEqual(spectral.fileName, "Test Table_wt1024.wav")
-        notes(spectral, contain: "spectral morph asked for is left unmarked")
+        notes(spectral, contain: "spectral morph given as the interpolation option is left unmarked")
+        var spectralFile = t; spectralFile.interpolation = .spectral
+        let fromFile = try write(spectralFile, .tonverk)
+        XCTAssertEqual(fromFile.fileName, "Test Table_wt1024.wav")
+        notes(fromFile, contain: "The source file records a spectral morph, which a Tonverk file name cannot mark")
     }
 
     func testTonverkReplacesExistingTag() throws {

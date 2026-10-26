@@ -40,7 +40,7 @@ extension WavetableWriter {
             var notes = fit.changes.map(\.description)
             if out.isEmpty {
                 out = "Untitled"
-                notes.append("The table has no name, so it is called “Untitled”.")
+                notes.append("The table has no name and is called “Untitled”.")
             }
             return (out, notes)
         }

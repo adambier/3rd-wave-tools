@@ -407,6 +407,19 @@ No tests cover the SwiftUI views; a UI change is verified by building and using 
   or paragraph; counts that read naturally ("Both tables", "1 change"; see `CountWords`); labels
   that say exactly what they mean (name the company or document, not "the maker"); every distinct
   label actually different.
+- In explanations (the preview's Input and Output blocks, the writer's notes, the destination
+  pane), name the noun rather than a pronoun ("the file’s length", "the table", "Tonverk’s
+  manual"; not "its", "it", "them"): pronouns in dense technical text cost comprehension. Finish
+  every statement ("the file’s length also allows frames of 128 samples", not "… allows 128").
+  Where a value comes from a setting, name the control and where it is ("selected in the
+  Interpolation pop-up under Options"), never "asked for" or "chosen" alone: the reader does not
+  know the connection between a setting elsewhere and the sentence in front of them. If the owner
+  needs a sentence explained, users will too: rewrite the sentence rather than explain it (Adam,
+  2026-10-26).
+- Each sentence of an explanation is a short paragraph of its own (`ConvertSentences`,
+  `sentencesOfParagraph`), in the small system size, with half a line between sentences; a note
+  the reader must not miss gets an icon and a color (`ConvertSweepNoteView`: orange with the
+  warning triangle for a caution, the accent-colored info circle for information).
 - "Frame" for a cycle in a table, never "wave" (which is kept for the analog oscillator's waves,
   the PPG's four standard waveforms, and names: Wave Maker, the `WAVES` folder). Crossfade and
   spectral are interpolation methods; "none" is the absence of interpolation, not a method.

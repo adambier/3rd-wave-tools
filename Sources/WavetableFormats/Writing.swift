@@ -33,10 +33,10 @@ public enum WavetableWriter {
             throw WavetableError(.cannotConvert, "“\(table.name)” has no samples to convert.")
         }
         guard table.frames.allSatisfy({ $0.count == first.count }) else {
-            throw WavetableError(.cannotConvert, "The frames of “\(table.name)” are not all the same length, so it cannot be converted.")
+            throw WavetableError(.cannotConvert, "The frames of “\(table.name)” are not all the same length, so the table cannot be converted.")
         }
         guard table.frames.allSatisfy({ $0.allSatisfy(\.isFinite) }) else {
-            throw WavetableError(.cannotConvert, "“\(table.name)” contains values that are not numbers (infinite or NaN), so it cannot be converted.")
+            throw WavetableError(.cannotConvert, "“\(table.name)” contains values that are not numbers (infinite or NaN), so the table cannot be converted.")
         }
     }
 
@@ -115,7 +115,7 @@ public enum WavetableWriter {
             reshape()
             if preset == .miniFreak, plan.frameCountIn < 64 {
                 let n = plan.frameCountIn
-                notes.append("\(n) frame\(n == 1 ? "" : "s"), fewer than the 64 a MiniFreak stores; left as it is, since how MiniFreak V treats fewer than 64 is not documented.")
+                notes.append("\(n) frame\(n == 1 ? "" : "s"), fewer than the 64 a MiniFreak stores; the count is left at \(n), since how MiniFreak V treats fewer than 64 is not documented.")
             }
             if plan.scalesToFit { scaleToFit() } else { notePeakKept() }
             if plan.addsPPGWaves {
@@ -148,9 +148,15 @@ public enum WavetableWriter {
         mutating func tonverk() -> OutputFile {
             let stepped = plan.interpolationRecorded == Interpolation.none
             if interpolation == .spectral {
-                notes.append("A Tonverk file name can mark a table only as stepped (a trailing “r”) or not, so the spectral morph asked for is left unmarked: Tonverk plays it as a crossfade (its manual says “smooth”, taken here to mean a crossfade).")
+                // Spectral from the options or from the source file: say which. (Notes name
+                // where a value came from, never "asked for": Adam, 2026-10-26. The app never
+                // passes spectral for Tonverk; the first wording is for other callers.)
+                let plays = "Tonverk plays the table as a crossfade (Tonverk’s manual says “smooth”, taken here to mean a crossfade)."
+                notes.append(options.interpolation == .spectral
+                    ? "A Tonverk file name can mark a table only as stepped (a trailing “r”) or not, so the spectral morph given as the interpolation option is left unmarked: " + plays
+                    : "The source file records a spectral morph, which a Tonverk file name cannot mark (only stepped, with a trailing “r”, or not): " + plays)
             }
-            noteDefaultInterpolation(prefix: "", result: "so the file name carries no “r” and Tonverk plays the table as a crossfade (its manual says “smooth”, taken here to mean a crossfade)")
+            noteDefaultInterpolation(prefix: "", result: "so the file name carries no “r” and Tonverk plays the table as a crossfade (Tonverk’s manual says “smooth”, taken here to mean a crossfade)")
             let named = WavetableWriter.Names.fileStem(table.name)
             notes += named.notes
             let untagged = WavetableWriter.Names.removeTonverkTag(named.stem)
@@ -214,7 +220,7 @@ public enum WavetableWriter {
                 if size > from {
                     notes.append("Resized from \(grouped(from)) to \(grouped(size)) samples per frame; the waveform is unchanged (band-limited, no harmonics added).")
                 } else {
-                    notes.append("Resized from \(grouped(from)) to \(grouped(size)) samples per frame; the \(ordinal(size / 2 + 1)) harmonic and above are dropped, as \(grouped(size)) samples can’t hold them.")
+                    notes.append("Resized from \(grouped(from)) to \(grouped(size)) samples per frame; the \(ordinal(size / 2 + 1)) harmonic and above, which frames of \(grouped(size)) samples can’t hold, are dropped.")
                 }
             }
             if target > n { changeCount(to: target, reason: countReason) }
@@ -253,7 +259,7 @@ public enum WavetableWriter {
         mutating func notePeakKept() {
             let peak = currentPeak
             guard peak > 1 else { return }
-            notes.append("Peak \(Wavetable.peakText(peak)) kept, over full scale (±1): unless the synth turns the table down, it may clip the loudest parts, which adds a hard, buzzy edge.")
+            notes.append("Peak \(Wavetable.peakText(peak)) kept, over full scale (±1): unless the synth attenuates the table, the loudest parts may clip, which adds a hard, buzzy edge.")
         }
 
         /// For destinations that record the interpolation: says that the file records a
@@ -263,17 +269,20 @@ public enum WavetableWriter {
         mutating func noteDefaultInterpolation(prefix: String = "This format records whether and how a synth interpolates between frames. ",
                                                result: String = "so crossfade is saved") {
             if options.interpolation == nil && table.interpolation == nil {
-                notes.append("\(prefix)The source file says nothing about interpolation and no other choice was made, \(result).")
+                notes.append("\(prefix)The source file says nothing about interpolation, and none was selected in the Interpolation setting, \(result).")
             }
         }
 
-        /// For destinations whose files can't record the interpolation: says so when
-        /// the source or the options asked for one.
+        /// For destinations whose files can't record the interpolation: says so when the
+        /// options or the source file give one, naming which (the app passes none for these
+        /// destinations, so from the app only the source file's is reported).
         mutating func noteUnrecordedInterpolation() {
-            if let asked = options.interpolation ?? table.interpolation {
-                let who = preset.isThirdWave ? "the 3rd Wave" : "the synth"
-                let askedFor = asked == Interpolation.none ? "no interpolation" : asked.displayName.lowercased()
-                notes.append("This format doesn’t store the interpolation method (\(askedFor) asked for); \(who) sets how frames blend.")
+            let who = preset.isThirdWave ? "the 3rd Wave" : "the synth"
+            func words(_ i: Interpolation) -> String { i == Interpolation.none ? "no interpolation" : i.displayName.lowercased() }
+            if let given = options.interpolation {
+                notes.append("This format doesn’t store the interpolation method, so the interpolation option (\(words(given))) is not written; \(who) sets how frames blend.")
+            } else if let recorded = table.interpolation {
+                notes.append("This format doesn’t store the interpolation method, so what the source file records (\(words(recorded))) is not carried over; \(who) sets how frames blend.")
             }
         }
 
@@ -384,6 +393,9 @@ public struct WritePlan: Equatable, Sendable {
     public var changesCount: Bool { tableFrameCount != frameCountIn }
     /// Whether the table gets more frames (nil when the count does not change).
     public var frameCountGrows: Bool? { changesCount ? tableFrameCount > frameCountIn : nil }
+    /// Whether the table gets more frames by repeating its own (`.pickEvenly` with more frames
+    /// wanted), so that runs of identical frames follow one another in the file.
+    public var repeatsFrames: Bool { frameCountGrows == true && countPolicy == .pickEvenly }
     /// Whether the table is turned down to fit (`scaling` is `.certain`).
     public var scaledToFit: Bool { scaling == .certain }
     /// Whether the table may be turned down even though its own peak is within ±1 (`scaling`

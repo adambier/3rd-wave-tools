@@ -173,7 +173,7 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertEqual(item.sourceDescription, "WAV")
         XCTAssertEqual(item.sizeDescription, "Choose a frame size")
         XCTAssertEqual(item.sizeSource, .notStated)
-        XCTAssertEqual(item.basisDescription, "Unable to estimate a frame size from this file. Its length allows 256 (64 frames) or 2,048 (8 frames).")
+        XCTAssertEqual(item.basisDescription, "Unable to estimate a frame size from this file. The file’s length allows frames of 256 samples (64 frames) or 2,048 samples (8 frames).")
         XCTAssertFalse(plan.canConvert(item))
         XCTAssertTrue(plan.isIncluded(item))   // included, but not converted until a size is chosen
         XCTAssertEqual(plan.expectedResult(for: item), "Choose a frame size first")
@@ -220,7 +220,7 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertEqual(plan.expectedResult(for: u), "64 × 1,024")
         // What the page says when nothing changes: a 3rd Wave table going back to the 3rd Wave is
         // the same table (a U table's mipmap chain is recomputed); anything else changes format.
-        XCTAssertEqual(plan.unchangedWords(for: u), "The table is unchanged; its mipmap chain is recomputed.")
+        XCTAssertEqual(plan.unchangedWords(for: u), "The table is unchanged; the mipmap chain is recomputed.")
         XCTAssertEqual(plan.unchangedWords(for: big), "Only the file format changes.")
         plan.options.frameCountPolicy = .interpolate
         XCTAssertTrue(plan.expectedResult(for: big).contains("256 frames → 64, crossfaded"))
@@ -363,7 +363,7 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(p.items[0].frameCount, 24)
         XCTAssertEqual(p.items[0].sizeSource, .likely)
         XCTAssertEqual(p.items[0].sizeQualifier, "estimated")
-        XCTAssertEqual(p.items[0].basisDescription, "The file doesn’t specify a frame size; 1,024 samples per frame is the estimate, because frames of that size are alike from one to the next, as a wavetable’s are. Its length also allows 2,048, 512, and 4,096.")
+        XCTAssertEqual(p.items[0].basisDescription, "The file doesn’t specify a frame size. The estimate is 1,024 samples per frame, because frames of that size are alike from one to the next, as the frames of a wavetable are. The file’s length also allows frames of 2,048, 512, or 4,096 samples.")
         XCTAssertEqual(p.items[0].frameSizeChoices, [2048, 1024, 512, 4096])
         // A plain 2,048-period table: the fit confirms the convention.
         XCTAssertEqual(p.items[1].frameSize, 2048)
@@ -371,7 +371,7 @@ final class ConvertPlanStateTests: XCTestCase {
         // Choosing the convention is a choice; choosing the estimate again is none.
         p.chooseFrameSize(p.items[0].id, 2048)
         XCTAssertEqual(p.items[0].sizeSource, .setManually)
-        XCTAssertEqual(p.items[0].basisDescription, "Set manually; the file’s length suggested 2,048.")
+        XCTAssertEqual(p.items[0].basisDescription, "Set manually; the file’s length suggested 2,048 samples per frame.")
         p.chooseFrameSize(p.items[0].id, 1024)
         XCTAssertEqual(p.items[0].sizeSource, .likely)
     }
@@ -415,7 +415,7 @@ final class ConvertPlanStateTests: XCTestCase {
         p.chooseFrameSize(stated.id, 1024)
         XCTAssertEqual(p.items[0].frameSize, 1024)
         XCTAssertEqual(p.items[0].sizeSource, .setManually)
-        XCTAssertEqual(p.items[0].basisDescription, "Set manually; the file specifies 2,048.")
+        XCTAssertEqual(p.items[0].basisDescription, "Set manually; the file specifies 2,048 samples per frame.")
         XCTAssertEqual(p.items[0].frameSizeChoices, [2048, 64, 128, 256, 512, 1024, 4096])
         // Choosing the file's own size again clears the override.
         p.chooseFrameSize(stated.id, 2048)
@@ -443,7 +443,7 @@ final class ConvertPlanStateTests: XCTestCase {
         // A 2,048-period table: the samples confirm the convention, so the estimate is "likely".
         XCTAssertEqual(guess.sizeSource, .likely)
         XCTAssertEqual(guess.sizeSource.label, "Estimated")
-        XCTAssertEqual(guess.basisDescription, "The file doesn’t specify a frame size; 2,048 samples per frame is the estimate, because frames of that size are alike from one to the next, as a wavetable’s are. Its length also allows 1,024.")
+        XCTAssertEqual(guess.basisDescription, "The file doesn’t specify a frame size. The estimate is 2,048 samples per frame, because frames of that size are alike from one to the next, as the frames of a wavetable are. The file’s length also allows frames of 1,024 samples.")
         XCTAssertEqual(ready.sizeSource, .inFile)
         XCTAssertEqual(ready.basisDescription, "Clm chunk.")   // the reader’s own phrase, capitalized
 
@@ -467,7 +467,7 @@ final class ConvertPlanStateTests: XCTestCase {
         p.chooseFrameSize(guess.id, 1024)
         XCTAssertEqual(p.items[3].sizeSource, .setManually)
         XCTAssertFalse(p.items[3].isGuessed)
-        XCTAssertEqual(p.items[3].basisDescription, "Set manually; the file’s length suggested 2,048.")
+        XCTAssertEqual(p.items[3].basisDescription, "Set manually; the file’s length suggested 2,048 samples per frame.")
         XCTAssertEqual(p.items[3].sizeQualifier, "set manually")
         XCTAssertFalse(p.needsAttention(p.items[3]))
     }
@@ -481,7 +481,7 @@ final class ConvertPlanStateTests: XCTestCase {
                       table("Quiet", notes: [ReadNote(disagree, "The sizes differ; the clm chunk wins."),
                                              ReadNote(.highFrameCount(300, limit: 256), "300 frames.")])])
         let loud = p.itemNotes(for: p.items[0])
-        XCTAssertEqual(loud.warnings, ["Peak 1.23 is over full scale (±1); the table is attenuated to fit, so it plays a little quieter.", "Left channel read."])
+        XCTAssertEqual(loud.warnings, ["Peak 1.23 is over full scale (±1); the table is attenuated to fit, so the table plays a little quieter.", "Left channel read."])
         XCTAssertEqual(loud.information, [])
         XCTAssertEqual(p.notes(for: p.items[0]), loud.all)
         XCTAssertEqual(p.items[0].peak, 1.234, accuracy: 1e-5)
@@ -798,6 +798,55 @@ final class WavetableSketchInterpolationTests: XCTestCase {
         plan.preset = .wav2048
         XCTAssertEqual(plan.interpolationPlayed(for: plan.items[0]), .spectral)
     }
+
+    /// A small table that a fixed-count destination fills by repeating frames gets the
+    /// repeated-frames caution (and the report carries it); Crossfade New Frames, or a
+    /// destination that keeps the count, does not.
+    func testRepeatedFramesNote() {
+        let sine = (0..<2048).map { Float(sin(Double($0) * 2 * .pi / 2048)) * 0.5 }
+        let saw = (0..<2048).map { Float($0) / 1024 - 1 }
+        let t = FoundTable(name: "Two", fileName: "Two.wav", source: .wav, samples: sine + saw, frameSize: 2048, frameSizeBasis: "clm chunk")
+        var plan = ConvertPlan(preset: .thirdWaveU)
+        plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Two.wav"), table: t)], factory: FactoryLibrary())
+        let note = plan.repeatedFramesNote(for: plan.items[0])
+        XCTAssertEqual(note?.kind, .repeatedFrames)
+        XCTAssertEqual(note?.text, "The 2 frames are repeated to make 64, so the 3rd Wave’s wavetable smoothing can blend only where the frame changes; "
+                       + "the sweep is stepped whatever the interpolation. Crossfade New Frames, under Options, makes the sweep continuous.")
+        XCTAssertTrue(plan.convert().reports[0].notes.contains(note!.text))
+        plan.preset = .phasePlant   // exactly 256 frames
+        XCTAssertEqual(plan.repeatedFramesNote(for: plan.items[0])?.text.hasPrefix("The 2 frames are repeated to make 256, so a synth that blends between frames"), true)
+        plan.preset = .miniFreak    // up to 64 frames: a 2-frame table stays 2 frames
+        XCTAssertNil(plan.repeatedFramesNote(for: plan.items[0]))
+        plan.options.frameCountPolicy = .interpolate
+        XCTAssertNil(plan.repeatedFramesNote(for: plan.items[0]))
+        XCTAssertFalse(plan.convert().reports[0].notes.contains { $0.hasPrefix("The 2 frames are repeated") })
+        plan.options.frameCountPolicy = .pickEvenly
+        plan.preset = .wav2048   // up to 256 frames: the count is kept
+        XCTAssertNil(plan.repeatedFramesNote(for: plan.items[0]))
+    }
+
+    /// Neighboring frames that differ little earn the alike-frames note; repeated frames are
+    /// left out of the measure, so a repeated table is judged by its originals.
+    func testAlikeFramesNote() {
+        func sine(_ amplitude: Float) -> [Float] { (0..<1024).map { Float(sin(Double($0) * 2 * .pi / 1024)) * amplitude } }
+        let saw = (0..<1024).map { Float($0) / 512 - 1 }
+        // 64 sines whose level creeps from 0.50 to 0.53: a frame differs from the next by less than 1%.
+        let alike = (0..<64).map { sine(0.5 + Float($0) * 0.0005) }
+        XCTAssertLessThan(ConvertPlan.neighborDifference(alike)!, ConvertPlan.alikeThreshold)
+        XCTAssertEqual(ConvertPlan.alikeFramesNote(for: alike)?.kind, .alikeFrames)
+        // A sine next to a saw: about 0.4.
+        let apart = [sine(1), saw]
+        XCTAssertGreaterThan(ConvertPlan.neighborDifference(apart)!, 0.3)
+        XCTAssertNil(ConvertPlan.alikeFramesNote(for: apart))
+        // The same two frames repeated to 64: the identical pairs do not count, so it is still apart.
+        let repeated = (0..<32).map { _ in sine(1) } + (0..<32).map { _ in saw }
+        XCTAssertEqual(ConvertPlan.neighborDifference(repeated), ConvertPlan.neighborDifference(apart))
+        // Nothing to measure: one frame, all frames identical, silence, unequal lengths.
+        XCTAssertNil(ConvertPlan.neighborDifference([saw]))
+        XCTAssertNil(ConvertPlan.neighborDifference([saw, saw, saw]))
+        XCTAssertNil(ConvertPlan.neighborDifference([[Float](repeating: 0, count: 8), [Float](repeating: 0, count: 8)]))
+        XCTAssertNil(ConvertPlan.neighborDifference([saw, Array(saw.prefix(512))]))
+    }
 }
 
 
@@ -941,7 +990,7 @@ final class FrameSizeFitTests: XCTestCase {
         XCTAssertEqual(plan.items[0].sizeQualifier, "estimated")
         XCTAssertTrue(plan.items[0].isGuessed)
         XCTAssertEqual(plan.status(plan.items[0]), .ready)
-        XCTAssertEqual(plan.items[0].basisDescription, "The file doesn’t specify a frame size; 128 samples per frame is the estimate, because frames of that size are alike from one to the next, as a wavetable’s are. Its length also allows 2,048.")
+        XCTAssertEqual(plan.items[0].basisDescription, "The file doesn’t specify a frame size. The estimate is 128 samples per frame, because frames of that size are alike from one to the next, as the frames of a wavetable are. The file’s length also allows frames of 2,048 samples.")
         XCTAssertEqual(plan.items[0].frameSizeChoices, [128, 2048])
         plan.chooseFrameSize(plan.items[0].id, 2048)
         XCTAssertEqual(plan.items[0].sizeSource, .setManually)
@@ -1034,10 +1083,10 @@ final class ConvertExistingChoicesTests: XCTestCase {
         XCTAssertNil(stepped.caveat(for: .wav2048))
         // MiniFreak V and Phase Plant: only for tables with fewer frames than they expect.
         let two = pickerPlan(.miniFreak, [(nil, 2048), (nil, 2048)])
-        XCTAssertEqual(two.caveat(for: .miniFreak), "Both tables have fewer than 64 frames; what MiniFreak V does with them is not documented.")
+        XCTAssertEqual(two.caveat(for: .miniFreak), "Both tables have fewer than 64 frames; what MiniFreak V does with fewer frames is not documented.")
         XCTAssertEqual(two.caveat(for: .phasePlant), "Both tables have fewer than 256 frames; whether Phase Plant loads shorter tables is untested, so frames are added to reach 256.")
         let one = pickerPlan(.miniFreak, [(nil, 2048)])
-        XCTAssertEqual(one.caveat(for: .miniFreak), "1 table has fewer than 64 frames; what MiniFreak V does with it is not documented.")
+        XCTAssertEqual(one.caveat(for: .miniFreak), "1 table has fewer than 64 frames; what MiniFreak V does with fewer frames is not documented.")
         var tall = ConvertPlan(preset: .miniFreak)
         let wave = (0..<2048).map { Float(sin(Double($0) * 2 * .pi / 2048)) * 0.5 }
         let table = FoundTable(name: "Tall", fileName: "Tall.wav", source: .wav, samples: Array(Array(repeating: wave, count: 64).joined()),
@@ -1154,5 +1203,22 @@ final class ConvertPlanTonverkNumberingTests: XCTestCase {
         XCTAssertEqual(ConvertPlan.numbered("Pad_wt2048.wav") { $0 == "Pad_wt2048.wav" }, "Pad 2_wt2048.wav")
         // A name that merely ends in digits after "_wt" that aren't a Tonverk size is numbered as usual.
         XCTAssertEqual(ConvertPlan.numbered("KOMPLEXER_WT1.wav") { $0 == "KOMPLEXER_WT1.wav" }, "KOMPLEXER_WT1 2.wav")
+    }
+}
+
+/// Switching destinations drops a choice the new destination cannot take.
+final class ConvertPresetSwitchTests: XCTestCase {
+    func testSpectralChoiceIsDroppedOnTheWayToTonverk() {
+        var plan = ConvertPlan(preset: .wav2048)
+        plan.options.interpolation = .spectral
+        plan.preset = .miniFreak
+        XCTAssertEqual(plan.options.interpolation, .spectral, "MiniFreak V's files record a spectral morph")
+        plan.preset = .tonverk
+        XCTAssertNil(plan.options.interpolation, "a Tonverk file name cannot mark a spectral morph")
+        plan.options.interpolation = .crossfade
+        plan.preset = .phasePlant
+        XCTAssertEqual(plan.options.interpolation, .crossfade, "crossfade is kept between destinations that record it")
+        plan.preset = .thirdWaveU
+        XCTAssertNil(plan.options.interpolation, "a 3rd Wave table records no interpolation, and the Options box shows no pop-up")
     }
 }

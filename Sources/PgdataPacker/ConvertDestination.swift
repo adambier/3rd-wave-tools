@@ -51,7 +51,7 @@ struct ConvertDestinationPane: View {
             }
             if plan.preset.isThirdWave {
                 Divider()
-                Text("To load .wt files: copy the WAVES folder onto the 3rd Wave’s USB drive and use Global → “Bulk wavetable import”, or add them to the 3rd Wave Terminal app’s library and sync.")
+                Text("To load .wt files: copy the WAVES folder onto the 3rd Wave’s USB drive and use Global → “Bulk wavetable import”, or add the files to the 3rd Wave Terminal app’s library and sync.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -224,7 +224,7 @@ struct ConvertSourcesHeader: View {
         .popover(isPresented: $showing, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Sources").font(.headline)
-                Text("Each destination follows the documents or source code published for that synth. Click a destination’s book to see them, what they leave open, and whether a converted file has been tested in the synth.")
+                Text("Each destination follows the documents or source code published for that synth. Click a destination’s book to see those sources, what the sources leave open, and whether a converted file has been tested in the synth.")
                     .fixedSize(horizontal: false, vertical: true)
                 Label("A green seal marks a destination that has been tested.", systemImage: "checkmark.seal.fill")
                     .foregroundStyle(.secondary)
@@ -262,7 +262,7 @@ struct ConvertSourcesButton: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                 if let open = preset.caveat {
-                    Text("What they leave open").font(.subheadline).bold().padding(.top, 4)
+                    Text("What the sources leave open").font(.subheadline).bold().padding(.top, 4)
                     Text(open)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
@@ -344,8 +344,8 @@ struct ConvertInterpolationOption: View {
     private var tonverk: Bool { state.convertPlan.preset == .tonverk }
 
     private var tip: String {
-        tonverk ? "Tonverk reads it from the file name: a trailing \u{201C}r\u{201D} means stepped, otherwise crossfade (its manual says \u{201C}smooth\u{201D}, taken here to mean a crossfade)."
-                : "Serum and Vital read it from the WAV. Other synths set the interpolation method on the oscillator."
+        tonverk ? "Tonverk reads the interpolation from the file name: a trailing \u{201C}r\u{201D} means stepped, otherwise crossfade (Tonverk’s manual says \u{201C}smooth\u{201D}, taken here to mean a crossfade)."
+                : "Serum and Vital read the interpolation from the WAV. Other synths set the interpolation method on the oscillator."
     }
 
     /// The values the destination can record. Tonverk's name says stepped or smooth, nothing
@@ -373,7 +373,7 @@ struct ConvertInterpolationOption: View {
         if tonverk {
             lines.append("Crossfade is an interpolation method: each frame blends into the next. None is no interpolation: Tonverk steps from frame to frame, and the file name gets an \u{201C}r\u{201D}.")
         } else {
-            lines.append("Crossfade and spectral are interpolation methods: crossfade blends each frame into the next; spectral blends their harmonics (Serum’s and Vital’s spectral morph). None is no interpolation: the synth steps from frame to frame.")
+            lines.append("Crossfade and spectral are interpolation methods: crossfade blends each frame into the next; spectral blends the frames’ harmonics (Serum’s and Vital’s spectral morph). None is no interpolation: the synth steps from frame to frame.")
         }
         return lines.joined(separator: " ")
     }

@@ -218,23 +218,25 @@ public struct ConvertPlan: Equatable {
             case .guessed:
                 // 2,048 samples per frame is the size of Serum-style wavetables (WAVETABLES.md
                 // section 2); taken when the samples themselves point to no size.
-                return "The file doesn’t specify a frame size, and nothing in its samples points to one; \(ConvertPlan.formatCount(table.frameSize ?? 2048)) samples per frame, the size of Serum-style wavetables, is the estimate."
+                return "The file doesn’t specify a frame size, and nothing in the samples points to one. The estimate is \(ConvertPlan.formatCount(table.frameSize ?? 2048)) samples per frame, the size of Serum-style wavetables."
             case .likely:
                 // The other sizes the chooser offers: the file's own (when the length alone
                 // suggested one) and the rest its length allows.
+                // Each sentence finishes what it states ("frames of 128 samples", not "128") and
+                // names the noun rather than saying "it" (Adam, 2026-10-26).
                 let others = frameSizeChoices.filter { $0 != frameSize }.map(ConvertPlan.formatCount)
-                return "The file doesn’t specify a frame size; \(ConvertPlan.formatCount(frameSize ?? 0)) samples per frame is the estimate, because frames of that size are alike from one to the next, as a wavetable’s are."
-                    + (others.isEmpty ? "" : " Its length also allows \(ConvertPlan.listPhrase(others)).")
+                return "The file doesn’t specify a frame size. The estimate is \(ConvertPlan.formatCount(frameSize ?? 0)) samples per frame, because frames of that size are alike from one to the next, as the frames of a wavetable are."
+                    + (others.isEmpty ? "" : " The file’s length also allows frames of \(ConvertPlan.listPhrase(others, "or")) samples.")
             case .notStated:
                 // Unlike `.guessed` and `.likely`, nothing could be estimated: the file states no
                 // size, its length is not a Serum-style one, and no size makes its frames alike.
                 return "Unable to estimate a frame size from this file."
-                    + (table.candidateFrameSizes.isEmpty ? " Its length allows none of the sizes offered here (powers of two from 64 to 4,096)."
-                                                          : " Its length allows " + ConvertPlan.candidateList(table) + ".")
+                    + (table.candidateFrameSizes.isEmpty ? " The file’s length allows none of the frame sizes offered here (powers of two from 64 to 4,096 samples)."
+                                                          : " The file’s length allows frames of " + ConvertPlan.candidateList(table) + ".")
             case .setManually:
                 if let own = table.frameSize {
-                    return sizeIsStated ? "Set manually; the file specifies \(ConvertPlan.formatCount(own))."
-                                        : "Set manually; the file’s length suggested \(ConvertPlan.formatCount(own))."
+                    return sizeIsStated ? "Set manually; the file specifies \(ConvertPlan.formatCount(own)) samples per frame."
+                                        : "Set manually; the file’s length suggested \(ConvertPlan.formatCount(own)) samples per frame."
                 }
                 return "Set manually; the file doesn’t specify a frame size."
             }
@@ -406,8 +408,19 @@ public struct ConvertPlan: Equatable {
 
     /// The tables listed, in the order added.
     public var items: [Item] = []
-    /// The destination.
-    public var preset: OutputPreset
+    /// The destination. An interpolation chosen for another destination is dropped on the way
+    /// to one that cannot take it: a destination whose files record no interpolation (the
+    /// Options box shows no Interpolation pop-up there, so the choice would act unseen), or
+    /// Tonverk for a spectral choice, which a Tonverk file name cannot mark (the pop-up showed
+    /// Crossfade while the writer noted a spectral morph: Adam, 2026-10-26). The pop-up then
+    /// shows each table's own interpolation, or the default.
+    public var preset: OutputPreset {
+        didSet {
+            if !preset.recordsInterpolation || (preset == .tonverk && options.interpolation == .spectral) {
+                options.interpolation = nil
+            }
+        }
+    }
     /// The choices that apply to the conversion.
     public var options: OutputOptions
 
@@ -617,8 +630,8 @@ public struct ConvertPlan: Equatable {
         }
         if item.peak > 1 {
             warnings.insert("Peak \(Wavetable.peakText(item.peak)) is over full scale (±1); "
-                + (destinationScalesToFit ? "the table is attenuated to fit, so it plays a little quieter."
-                                          : "it is kept as it is, so unless the synth attenuates the table, it may clip the loudest parts, which adds a hard, buzzy edge."), at: 0)
+                + (destinationScalesToFit ? "the table is attenuated to fit, so the table plays a little quieter."
+                                          : "the table is kept as it is, so unless the synth attenuates the table, the loudest parts may clip, which adds a hard, buzzy edge."), at: 0)
         }
         if let slot = item.factorySlot {
             let label = "factory " + slot.label + (item.factoryName.map { " " + $0 } ?? "")
@@ -660,8 +673,8 @@ public struct ConvertPlan: Equatable {
         case .excluded: return "Left out by Convert All: a factory table your 3rd Wave already has. Convert Selected… takes it."
         case .needsFrameSize:
             return "Choose a frame size: none could be estimated from the file."
-                + (item.table.candidateFrameSizes.isEmpty ? " Its length allows none of the sizes offered here (powers of two from 64 to 4,096)."
-                                                           : " Its length allows \(Self.candidateList(item.table)).")
+                + (item.table.candidateFrameSizes.isEmpty ? " The file’s length allows none of the frame sizes offered here (powers of two from 64 to 4,096 samples)."
+                                                           : " The file’s length allows frames of \(Self.candidateList(item.table)).")
         case .cannotSplit:
             return "Can’t split into frames: \(Self.formatCount(item.table.samples.count)) samples don’t divide into frames of \(Self.formatCount(item.frameSize ?? 0))."
         }
@@ -692,10 +705,10 @@ public struct ConvertPlan: Equatable {
         switch item.table.source {
         case .thirdWaveWavetable(let isP):
             return preset.isThirdWave && isP == (preset == .thirdWaveP) && !isP
-                ? "The table is unchanged; its mipmap chain is recomputed."
+                ? "The table is unchanged; the mipmap chain is recomputed."
                 : (preset.isThirdWave ? "The table is unchanged." : "Only the file format changes.")
         case .unifiedProgram:
-            return preset.isThirdWave ? "The table is unchanged, written as its own .wt file." : "Only the file format changes."
+            return preset.isThirdWave ? "The table is unchanged, written out as a .wt file." : "Only the file format changes."
         case .wav, .flac, .surgeWavetable:
             return "Only the file format changes."
         }
@@ -755,7 +768,7 @@ public struct ConvertPlan: Equatable {
         case .miniFreak:
             let short = tables.filter { ($0.frameCount ?? 64) < 64 }.count
             guard short > 0 else { return nil }
-            return "\(Self.tablesHave(short, of: tables.count)) fewer than 64 frames; what MiniFreak V does with \(short == 1 ? "it" : "them") is not documented."
+            return "\(Self.tablesHave(short, of: tables.count)) fewer than 64 frames; what MiniFreak V does with fewer frames is not documented."
         case .phasePlant:
             let short = tables.filter { ($0.frameCount ?? 256) < 256 }.count
             guard short > 0 else { return nil }
@@ -1077,6 +1090,77 @@ public struct ConvertPlan: Equatable {
         }
     }
 
+    // MARK: Sweep notes
+
+    /// A note on what a sweep through the result sounds like, when it is not what the
+    /// interpolation choice suggests: shown set apart in the Output block (with an icon) and,
+    /// for a repeated-frames note, in the report after converting. The confusion these head
+    /// off: a listener switches between none and crossfade and hears no difference, because the
+    /// output's frames are repeated or because the table's frames differ little (Adam,
+    /// 2026-10-26).
+    public struct SweepNote: Equatable {
+        public enum Kind: Equatable {
+            /// The destination needs more frames than the source has and Original Frames Only
+            /// repeats them, so a synth that blends between frames blends only where the frame
+            /// changes: a caution, with the setting that changes it.
+            case repeatedFrames
+            /// Neighboring frames differ little, so stepping and blending between them sound
+            /// nearly the same: information, nothing to change.
+            case alikeFrames
+        }
+        public var kind: Kind
+        public var text: String
+    }
+
+    /// The repeated-frames note for an item, or nil when the output's frames are not repeated
+    /// (`WritePlan.repeatsFrames`).
+    public func repeatedFramesNote(for item: Item) -> SweepNote? {
+        guard let e = expected(for: item), e.repeatsFrames else { return nil }
+        let blender = preset.isThirdWave ? "the 3rd Wave’s wavetable smoothing" : "a synth that blends between frames"
+        return SweepNote(kind: .repeatedFrames, text:
+            "The \(Self.formatCount(e.frameCountIn)) frames are repeated to make \(Self.formatCount(e.tableFrameCount)), so \(blender) can blend only where the frame changes; "
+            + "the sweep is stepped whatever the interpolation. Crossfade New Frames, under Options, makes the sweep continuous.")
+    }
+
+    /// The alike-frames note for a table's frames (the result's, as the destination gets them),
+    /// or nil when neighboring frames differ enough to hear the steps. Repeated frames are left
+    /// out of the measure (`neighborDifference(_:)`), so a repeated table is judged by its
+    /// original frames and gets the repeated-frames note instead when it is alike as well.
+    public static func alikeFramesNote(for frames: [[Float]]) -> SweepNote? {
+        guard let d = neighborDifference(frames), d < alikeThreshold else { return nil }
+        return SweepNote(kind: .alikeFrames, text:
+            "Neighboring frames are much alike, so stepping and blending between frames sound nearly the same.")
+    }
+
+    /// Below this, neighboring frames are "much alike". A heuristic, set from four tables on
+    /// 2026-10-26: factory P03 measures 0.01 (no difference to be heard between stepping and
+    /// blending, apart from its last four frames), Bowed Lowed 0.03, factory Additive Bell 0.09
+    /// (a slight but real difference), All Waves 0.41.
+    public static let alikeThreshold: Float = 0.02
+
+    /// How much neighboring frames differ, as the median over the pairs that differ at all of
+    /// the RMS difference between a frame and the next, relative to the table's peak (0 for
+    /// identical, about 0.4 for a sine next to a saw). Nil for a table without two differing
+    /// frames of the same length, or a silent one.
+    public static func neighborDifference(_ frames: [[Float]]) -> Float? {
+        guard frames.count > 1, let n = frames.first?.count, n > 0, frames.allSatisfy({ $0.count == n }) else { return nil }
+        let peak = frames.reduce(Float(0)) { m, f in f.reduce(m) { max($0, abs($1)) } }
+        guard peak > 0 else { return nil }
+        var differences: [Float] = []
+        for (a, b) in zip(frames, frames.dropFirst()) {
+            var sum: Float = 0, same = true
+            for (x, y) in zip(a, b) {
+                let d = x - y
+                if same, abs(d) > 1e-6 { same = false }
+                sum += d * d
+            }
+            if !same { differences.append((sum / Float(n)).squareRoot() / peak) }
+        }
+        guard !differences.isEmpty else { return nil }
+        let sorted = differences.sorted()
+        return sorted[sorted.count / 2]
+    }
+
     // MARK: Preview
 
     /// Runs the writer for one item (whether Convert All takes it does not matter), so the preview can
@@ -1125,7 +1209,8 @@ public struct ConvertPlan: Equatable {
             do {
                 let f = try write(table, preset, options)
                 files.append(f); converted.append(item.id)
-                reports.append(ItemReport(name: item.name, notes: f.notes))
+                // The repeated-frames caution goes with the writer's notes: it is about the file.
+                reports.append(ItemReport(name: item.name, notes: f.notes + (repeatedFramesNote(for: item).map { [$0.text] } ?? [])))
             } catch {
                 errors.append("\(item.name): \(Self.describe(error))")
             }
@@ -1241,21 +1326,21 @@ public struct ConvertPlan: Equatable {
     }
 
     /// A list in words, with the serial comma: "A", "A and B", "A, B, and C".
-    public static func listPhrase(_ xs: [String]) -> String {
+    public static func listPhrase(_ xs: [String], _ conjunction: String = "and") -> String {
         switch xs.count {
         case 0: return ""
         case 1: return xs[0]
-        case 2: return xs[0] + " and " + xs[1]
-        default: return xs.dropLast().joined(separator: ", ") + ", and " + xs.last!
+        case 2: return xs[0] + " \(conjunction) " + xs[1]
+        default: return xs.dropLast().joined(separator: ", ") + ", \(conjunction) " + xs.last!
         }
     }
 
-    /// The frame sizes a table's length allows, with the frame count each gives:
-    /// "256 (64 frames) or 2,048 (8 frames)".
+    /// The frame sizes a table's length allows, with the frame count each gives, to follow
+    /// "frames of": "256 samples (64 frames) or 2,048 samples (8 frames)".
     static func candidateList(_ t: FoundTable) -> String {
         let parts = t.candidateFrameSizes.map { n -> String in
             let frames = n > 0 ? t.samples.count / n : 0
-            return "\(formatCount(n)) (\(frames) frame\(frames == 1 ? "" : "s"))"
+            return "\(formatCount(n)) samples (\(frames) frame\(frames == 1 ? "" : "s"))"
         }
         switch parts.count {
         case 0: return ""

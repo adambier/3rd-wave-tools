@@ -28,9 +28,10 @@ struct ConvertDetailPane: View {
     static let minimumHeight: CGFloat = 120
     /// The height the pane keeps whatever is selected, so it does not grow and shrink as the
     /// selection or the Frame slider changes the text in it (Adam, 2026-10-26): room for the
-    /// pictures with four lines of legend under them, and for the facts with three notes. Taller
-    /// content, which is rare, still grows it (or scrolls it in a short window).
-    static let preferredHeight: CGFloat = 320
+    /// pictures with four lines of legend under them, and for the facts with three notes and a
+    /// sweep note. Taller content, which is rare, still grows it (or scrolls it in a short
+    /// window).
+    static let preferredHeight: CGFloat = 340
 
     /// The selected rows the table shows (a row the filter hides stays selected out of sight,
     /// as in Pack).
@@ -130,7 +131,7 @@ struct ConvertSeveralFrameSize: View {
                 Text("\(CountWords.all(items.count, "tables")) take their frame size from the file.")
                     .font(.caption).foregroundStyle(.secondary)
             } else if sizes.isEmpty {
-                Text("No one frame size fits \(CountWords.all(adjustable.count, "tables").lowercased()) whose size is estimated; set them in the Input column.")
+                Text("No one frame size fits \(CountWords.all(adjustable.count, "tables").lowercased()) whose size is estimated; set each in the Input column.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
@@ -153,8 +154,8 @@ struct ConvertSeveralFrameSize: View {
                     .help("One frame size for the selected tables whose size is estimated (not stated in the file); only the sizes every one of their lengths allows are offered. Each table’s Input column shows the result and can still be changed on its own.")
                 }
                 if stated > 0 {
-                    Text(stated == 1 ? "1 table takes its frame size from the file and keeps it."
-                                     : "\(stated) tables take their frame size from the file and keep it.")
+                    Text(stated == 1 ? "1 table’s frame size comes from the file and is kept."
+                                     : "\(stated) tables’ frame sizes come from the file and are kept.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -260,12 +261,16 @@ struct ConvertPreviewFacts: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
 
-    /// The space between blocks (file, Input, Interpolation, Output) and, within a block,
-    /// between its lines: one rhythm for the whole column.
-    static let blockSpacing: CGFloat = 12
-    static let lineSpacing: CGFloat = 3
-    /// Between the sentences of a block's detail text (`ConvertSentences`).
-    static let sentenceSpacing: CGFloat = 4
+    /// One rhythm for the whole column (Adam, 2026-10-26: the blocks read as walls of small
+    /// text): blocks (file, Input, Interpolation, Output) stand well apart; within a block the
+    /// label sits close to the value, the explanation a little below the value, and each
+    /// sentence of the explanation is a paragraph of its own, set apart by about half a line,
+    /// in the small system size rather than the caption size.
+    static let blockSpacing: CGFloat = 18
+    static let lineSpacing: CGFloat = 2
+    static let detailSpacing: CGFloat = 6
+    static let sentenceSpacing: CGFloat = 7
+    static let detailFont: Font = .subheadline
 
     /// "64 frames × 2,048 samples", or what is missing.
     private var inputValue: String {
@@ -299,7 +304,7 @@ struct ConvertPreviewFacts: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 ConvertFactBlock(label: "Interpolation", value: item.interpolationDescription, detail: nil, alert: false)
                     .frame(width: 130, alignment: .topLeading)
-                    .help("Whether a synth interpolates between frames as the table is swept, and by which method: crossfade (it blends neighboring frames) or spectral (it blends their harmonics); none means no interpolation (it steps from frame to frame). Some files say which; most synths set it on the oscillator instead.")
+                    .help("Whether a synth interpolates between frames as the table is swept, and by which method: crossfade (a blend of neighboring frames) or spectral (a blend of the frames’ harmonics); none means no interpolation (it steps from frame to frame). Some files say which; most synths set it on the oscillator instead.")
             }
             ConvertWhatHappens(state: state, item: item)
         }
@@ -307,8 +312,8 @@ struct ConvertPreviewFacts: View {
     }
 }
 
-/// One block of the facts: a small label, the value, and the detail under it, a sentence to a
-/// line.
+/// One block of the facts: a small label, the value, and the explanation under it, a sentence
+/// to a paragraph.
 struct ConvertFactBlock: View {
     let label: String
     let value: String
@@ -324,28 +329,55 @@ struct ConvertFactBlock: View {
                 .fixedSize(horizontal: false, vertical: true)
             if let detail {
                 ConvertSentences(detail)
+                    .padding(.top, ConvertPreviewFacts.detailSpacing - ConvertPreviewFacts.lineSpacing)
             }
         }
     }
 }
 
-/// A paragraph of caption text with each sentence on its own line, a little apart from the
-/// next, so a block of small text is not a wall (Adam, 2026-10-26); the same splitting as the
-/// destination pane's descriptions (`sentencesOfParagraph`).
+/// A paragraph of explanation with each sentence as a short paragraph of its own, set apart
+/// from the next, so a block of small text is not a wall (Adam, 2026-10-26); the same
+/// splitting as the destination pane's descriptions (`sentencesOfParagraph`). Secondary by
+/// default; a sweep note passes its own color.
 struct ConvertSentences: View {
     let text: String
+    var color: Color? = nil
 
-    init(_ text: String) { self.text = text }
+    init(_ text: String, color: Color? = nil) { self.text = text; self.color = color }
 
     var body: some View {
         let sentences = sentencesOfParagraph(text)
         VStack(alignment: .leading, spacing: ConvertPreviewFacts.sentenceSpacing) {
             ForEach(0..<sentences.count, id: \.self) { (i: Int) in
                 Text(sentences[i])
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(ConvertPreviewFacts.detailFont)
+                    .foregroundStyle(color ?? Color.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+}
+
+/// A sweep note (`ConvertPlan.SweepNote`) under the Output block's notes, set apart with an
+/// icon and a color so it is not missed (Adam, 2026-10-26: a point of confusion): the
+/// repeated-frames caution in orange with the warning triangle, as the page's other cautions
+/// are; the alike-frames information in the text color with the info circle in the accent
+/// color.
+struct ConvertSweepNoteView: View {
+    let note: ConvertPlan.SweepNote
+
+    private var isCaution: Bool { note.kind == .repeatedFrames }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Image(systemName: isCaution ? "exclamationmark.triangle.fill" : "info.circle.fill")
+                .font(ConvertPreviewFacts.detailFont)
+                .foregroundStyle(isCaution ? Color.orange : Color.accentColor)
+            ConvertSentences(note.text, color: isCaution ? Color.orange : Color.primary)
+        }
+        .help(isCaution
+              ? "The destination needs more frames than the table has, and Original Frames Only fills the count by repeating frames. Blending can only act where one frame gives way to the next, so most of the sweep sounds the same whichever interpolation is chosen."
+              : "The frames of this table differ little from one to the next (measured as the typical difference between a frame and the next), so stepping and blending between them are hard to tell apart by ear. Nothing to change.")
     }
 }
 
@@ -433,7 +465,7 @@ struct ConvertOverviewPair: View {
                                      resultTitle: plan.preset.shortTitle, position: position)
                 }
                 .help("The table’s frames, front (first) to back (last): the input as read, and what the destination gets, read back from the file this page would write. Solid lines are the frames in the file (at most 64 are drawn, 24 when the interpolation is drawn between them, each reduced to the width of the picture). Colored lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum’s or Vital’s own morphs. The Frame slider below sweeps through the table; the third picture draws the cycle there.")
-                ConvertSweepControls(position: $position, preview: preview,
+                ConvertSweepControls(position: $position, frameCount: (result ?? source.frames).count, preview: preview,
                                      playing: result != nil ? "the \(plan.preset.shortTitle) output" : "the input",
                                      hearing: recorded || result == nil ? nil : $hearing,
                                      hearingDefault: playedByDefault,
@@ -483,7 +515,7 @@ struct ConvertOverviewPair: View {
 
     /// The Between frames pop-up's tip: what the choice is for, and what the synth itself does.
     static func hearingHelp(for preset: OutputPreset) -> String {
-        let common = "How the result is drawn and played between frames here; the file records no interpolation, so the synth decides when it plays the table. "
+        let common = "How the result is drawn and played between frames here; the file records no interpolation, so the synth decides as the table plays. "
         switch preset {
         case .thirdWaveU: return common + "On the 3rd Wave, wavetable smoothing is on by default for a U table (taken here to be a crossfade) and can be turned off in the program’s Wave Flow settings."
         case .thirdWaveP: return common + "On the 3rd Wave, wavetable smoothing is off by default for a P table and can be turned on in the program’s Wave Flow settings."
@@ -511,6 +543,8 @@ struct ConvertOverviewPair: View {
 /// gives the cycle to play when Listen is pressed.
 struct ConvertSweepControls: View {
     @Binding var position: Double
+    /// Frames in the table swept (the result's when there is one), for the slider to land on.
+    var frameCount: Int = 1
     @ObservedObject var preview: AudioPreview
     let playing: String
     /// For a destination whose file records no interpolation: the interpolation to draw and
@@ -527,6 +561,22 @@ struct ConvertSweepControls: View {
     var recordedHelp: String = ""
     let cycle: () -> [Float]
 
+    /// The slider's value with stored frames made magnetic: a position within `snapTolerance`
+    /// of a whole frame becomes that frame exactly, so the slider lands on frames as it is
+    /// dragged (Adam, 2026-10-26: it should periodically land on frames, not only at the ends)
+    /// while the positions between frames, where the interpolation shows and sounds, stay
+    /// reachable. The tolerance is a tenth of the gap between frames, and never less than 0.4%
+    /// of the slider (about a point of travel), so a 64-frame table still catches frames.
+    private var snappedPosition: Binding<Double> {
+        Binding(get: { position }, set: { (value: Double) in
+            let gaps = Double(max(1, frameCount - 1))
+            let p = value * gaps
+            let nearest = p.rounded()
+            let tolerance = max(0.1, 0.004 * gaps)
+            position = abs(p - nearest) <= tolerance ? min(max(nearest / gaps, 0), 1) : value
+        })
+    }
+
     var body: some View {
         // Two rows, each kept to the pictures' width: the slider alone on the first, so it has
         // the room; Listen, the pitch, and the between-frames choice on the second. Labels never
@@ -534,12 +584,12 @@ struct ConvertSweepControls: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 10) {
                 Text("Frame").font(.caption).foregroundStyle(.secondary).fixedSize()
-                Slider(value: $position, in: 0...1)
+                Slider(value: snappedPosition, in: 0...1)
                     .controlSize(.small)
                     .frame(minWidth: 80)
                     .accessibilityLabel("Frame")
                     .accessibilityValue(Text("\(Int((position * 100).rounded())) percent through the table"))
-                    .help("Sweep through the table: the frame at the slider is drawn in pink in the pictures and large in the third; Listen plays it")
+                    .help("Sweep through the table: the frame at the slider is drawn in pink in the pictures and large in the third; Listen plays that frame")
             }
             HStack(spacing: 10) {
                 Button {
@@ -733,7 +783,7 @@ struct ConvertOverviewLegend: View {
     private var storedWords: String {
         guard let mode = interpolation else { return "Frames in the file · " + unstated }
         guard mode == Interpolation.none else { return "Frames in the file" }
-        return "Frames in the file (the table steps between them" + (note.map { "; " + $0 } ?? "") + ")"
+        return "Frames in the file (the table steps from frame to frame" + (note.map { "; " + $0 } ?? "") + ")"
     }
 
     var body: some View {
@@ -969,7 +1019,8 @@ struct ConvertWhatHappens: View {
             if plan.canConvert(item) {
                 if let preview = state.convertPreview(item) {
                     if let file = preview.file {
-                        ConvertNoteList(file: file, output: plan.expected(for: item), unchanged: plan.unchangedWords(for: item))
+                        ConvertNoteList(file: file, output: plan.expected(for: item), unchanged: plan.unchangedWords(for: item),
+                                        sweepNotes: [plan.repeatedFramesNote(for: item), preview.frames.flatMap(ConvertPlan.alikeFramesNote(for:))].compactMap { $0 })
                     } else {
                         Label("The table can’t be converted; the report after converting says why.", systemImage: "xmark.octagon")
                             .foregroundStyle(.red)
@@ -990,13 +1041,15 @@ struct ConvertWhatHappens: View {
     }
 }
 
-/// The output's size and file, and the writer's notes as bullets, or that nothing but the
-/// format changes.
+/// The output's size and file, the writer's notes as bullets (or that nothing but the format
+/// changes), and the sweep notes, if any, set apart under them.
 struct ConvertNoteList: View {
     let file: OutputFile
     let output: ConvertPlan.ExpectedResult?
     /// What to say when the writer has no notes (`ConvertPlan.unchangedWords(for:)`).
     var unchanged: String = "Only the file format changes."
+    /// Notes on what a sweep through the result sounds like (`ConvertPlan.SweepNote`).
+    var sweepNotes: [ConvertPlan.SweepNote] = []
 
     /// "64 frames × 2,048 samples".
     private var sizeLine: String? {
@@ -1012,27 +1065,30 @@ struct ConvertNoteList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: ConvertPreviewFacts.lineSpacing) {
             if let sizeLine { Text(sizeLine) }
-            Text(fileLine)
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if file.notes.isEmpty {
-                Text(unchanged).font(.caption).foregroundStyle(.secondary)
-            } else if file.notes.count == 1 {
-                // One note is a paragraph, not a list of one.
-                ConvertSentences(file.notes[0])
-            } else {
-                // The writer's notes as bullets, each note's sentences a line apiece, with a
-                // little more air between notes than between sentences.
-                VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: ConvertPreviewFacts.sentenceSpacing) {
+                Text(fileLine)
+                    .font(ConvertPreviewFacts.detailFont).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if file.notes.isEmpty {
+                    Text(unchanged).font(ConvertPreviewFacts.detailFont).foregroundStyle(.secondary)
+                } else if file.notes.count == 1 {
+                    // One note is a paragraph, not a list of one.
+                    ConvertSentences(file.notes[0])
+                } else {
+                    // The writer's notes as bullets, each note's sentences a paragraph apiece.
                     ForEach(0..<file.notes.count, id: \.self) { (i: Int) in
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text("•").font(.caption).foregroundStyle(.secondary)
+                            Text("•").font(ConvertPreviewFacts.detailFont).foregroundStyle(.secondary)
                             ConvertSentences(file.notes[i])
                         }
                     }
                 }
-                .padding(.top, 2)
+                ForEach(0..<sweepNotes.count, id: \.self) { (i: Int) in
+                    ConvertSweepNoteView(note: sweepNotes[i])
+                        .padding(.top, 3)
+                }
             }
+            .padding(.top, ConvertPreviewFacts.detailSpacing - ConvertPreviewFacts.lineSpacing)
         }
     }
 }
