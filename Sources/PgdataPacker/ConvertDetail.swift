@@ -329,8 +329,8 @@ struct ConvertOverviewPair: View {
         if let source = item.table.wavetable(frameSize: item.frameSize) {
             // The result comes from the cache, or a moment later from the background queue (the
             // input is drawn at once; the result's place says it is being converted).
-            let preview = state.convertPreview(item)
-            let result = preview?.frames
+            let converted = state.convertPreview(item)
+            let result = converted?.frames
             let resultInterpolation = plan.interpolationRecorded(for: item)
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 16) {
@@ -347,7 +347,7 @@ struct ConvertOverviewPair: View {
                                         unstatedLegend: plan.preset.isThirdWave ? "the 3rd Wave sets the interpolation itself" : "interpolation set in the synth",
                                         tint: WavetableStackCanvas.resultColor,
                                         position: position)
-                    } else if preview == nil {
+                    } else if converted == nil {
                         ConvertPreviewPending(caption: plan.preset.shortTitle)
                     }
                     ConvertSweepView(source: source.frames, sourceInterpolation: item.table.interpolation,

@@ -377,7 +377,7 @@ struct ConvertTable: View {
         .onCommand(MenuActions.removeSelected, perform: visibleSelection.isEmpty ? nil : {
             state.removeConvertItems(visibleSelection); selection = []
         })
-        .onCommand(MenuActions.renameSelected, perform: visibleSelection.count == 1 ? { visibleSelection.first.map(rename) } : nil)
+        .onCommand(MenuActions.renameSelected, perform: visibleSelection.count == 1 ? { if let id = visibleSelection.first { rename(id) } } : nil)
         .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(items.map(\.id)) }
     }
 
