@@ -410,6 +410,9 @@ struct ConvertOverviewPair: View {
             }
             .onChange(of: position) { _ in updatePlaying(source: source.frames, result: result, resultInterpolation: resultInterpolation) }
             .onChange(of: result) { (r: [[Float]]?) in updatePlaying(source: source.frames, result: r, resultInterpolation: resultInterpolation) }
+            // The Options' interpolation changes what plays between frames without changing
+            // the frames themselves, so it is watched on its own.
+            .onChange(of: resultInterpolation) { (i: Interpolation?) in updatePlaying(source: source.frames, result: result, resultInterpolation: i) }
             .onChange(of: item.id) { _ in updatePlaying(source: source.frames, result: result, resultInterpolation: resultInterpolation) }
             .onDisappear { preview.stop() }
         }
