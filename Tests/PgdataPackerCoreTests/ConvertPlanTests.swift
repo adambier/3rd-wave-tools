@@ -830,7 +830,8 @@ final class WavetableSketchInterpolationTests: XCTestCase {
     func testAlikeFramesNote() {
         func sine(_ amplitude: Float) -> [Float] { (0..<1024).map { Float(sin(Double($0) * 2 * .pi / 1024)) * amplitude } }
         let saw = (0..<1024).map { Float($0) / 512 - 1 }
-        // 64 sines whose level creeps from 0.50 to 0.53: a frame differs from the next by less than 1%.
+        // 64 sines whose level creeps from 0.50 to 0.53: a frame differs from the next by less
+        // than 1% (the threshold is a few percent).
         let alike = (0..<64).map { sine(0.5 + Float($0) * 0.0005) }
         XCTAssertLessThan(ConvertPlan.neighborDifference(alike)!, ConvertPlan.alikeThreshold)
         XCTAssertEqual(ConvertPlan.alikeFramesNote(for: alike)?.kind, .alikeFrames)

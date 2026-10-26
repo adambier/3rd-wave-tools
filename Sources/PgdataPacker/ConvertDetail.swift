@@ -302,8 +302,8 @@ struct ConvertPreviewFacts: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
-                ConvertFactBlock(label: "Interpolation", value: item.interpolationDescription, detail: nil, alert: false)
-                    .frame(width: 130, alignment: .topLeading)
+                ConvertFactBlock(label: "Interpolation in the file", value: item.interpolationDescription, detail: nil, alert: false)
+                    .frame(width: 150, alignment: .topLeading)
                     .help("Whether a synth interpolates between frames as the table is swept, and by which method: crossfade (a blend of neighboring frames) or spectral (a blend of the frames’ harmonics); none means no interpolation (it steps from frame to frame). Some files say which; most synths set it on the oscillator instead.")
             }
             ConvertWhatHappens(state: state, item: item)
@@ -423,7 +423,7 @@ struct ConvertOverviewPair: View {
     /// The slider's place through the table, 0 (first frame) to 1 (last).
     @State private var position: Double = 0
     /// For a destination whose file records no interpolation, what the result is drawn and
-    /// played with instead of the synth's default (the Between frames pop-up); nil for the default. Back
+    /// played with instead of the synth's default (the Interpolation pop-up); nil for the default. Back
     /// to the default whenever the table or the destination changes (Adam, 2026-10-26).
     @State private var hearing: Interpolation?
 
@@ -437,7 +437,7 @@ struct ConvertOverviewPair: View {
             // What the destination's synth plays, for the result's in-betweens and Listen: what
             // the file records; else the 3rd Wave's wavetable smoothing by default (a U table
             // blends, a P table steps), or nothing for a synth whose default is not known; and
-            // for those formats, the Between frames pop-up's choice over the default.
+            // for those formats, the Interpolation pop-up's choice over the default.
             let recorded = plan.preset.recordsInterpolation
             let playedByDefault = plan.interpolationPlayed(for: item) ?? Interpolation.none
             let resultInterpolation: Interpolation? = recorded ? plan.interpolationPlayed(for: item) : (hearing ?? playedByDefault)
@@ -487,11 +487,11 @@ struct ConvertOverviewPair: View {
     }
 
     /// Why the result is drawn and played with its interpolation when its file records none:
-    /// the Between frames pop-up's choice, or for the 3rd Wave what its wavetable smoothing does by
+    /// the Interpolation pop-up's choice, or for the 3rd Wave what its wavetable smoothing does by
     /// default (checked on an 8M; FORMATS.md section 5.1; `ConvertPlan.interpolationPlayed(for:)`).
     /// Nil for the others' defaults, which are not known.
     static func interpolationNote(for preset: OutputPreset, chosen: Bool) -> String? {
-        if chosen { return "chosen under Between frames" }
+        if chosen { return "chosen in the Interpolation pop-up" }
         switch preset {
         case .thirdWaveU: return "the 3rd Wave’s wavetable smoothing, on by default"
         case .thirdWaveP: return "the 3rd Wave’s wavetable smoothing is off by default"
@@ -503,7 +503,7 @@ struct ConvertOverviewPair: View {
     /// where to change it, so the preview and Listen follow. Short enough for the controls row at
     /// the default window size (the tip says the rest).
     static func recordedNote(for preset: OutputPreset) -> String {
-        "Between frames: set under Options"
+        "Interpolation: set under Options"
     }
 
     /// The note's tip: where the format records the interpolation.
@@ -513,7 +513,7 @@ struct ConvertOverviewPair: View {
             + "so the Interpolation setting under Options in the Convert to pane decides what the file says and what is drawn and played here."
     }
 
-    /// The Between frames pop-up's tip: what the choice is for, and what the synth itself does.
+    /// The Interpolation pop-up's tip: what the choice is for, and what the synth itself does.
     static func hearingHelp(for preset: OutputPreset) -> String {
         let common = "How the result is drawn and played between frames here; the file records no interpolation, so the synth decides as the table plays. "
         switch preset {
@@ -614,8 +614,10 @@ struct ConvertSweepControls: View {
                 if let hearing {
                     // What plays between frames, for a format whose file leaves that to the
                     // synth. The default is the synth's own where it is known.
-                    Text("Between frames").font(.caption).foregroundStyle(.secondary).fixedSize()
-                    Picker("Between frames", selection: Binding<Interpolation>(
+                    // "Interpolation", not "Between frames" (Adam, 2026-10-26: unclear); the facts
+                    // block calls the file's own value "Interpolation in the file" to keep the two apart.
+                    Text("Interpolation").font(.caption).foregroundStyle(.secondary).fixedSize()
+                    Picker("Interpolation", selection: Binding<Interpolation>(
                         get: { hearing.wrappedValue ?? hearingDefault },
                         set: { (value: Interpolation) in hearing.wrappedValue = value == hearingDefault ? nil : value })) {
                         ForEach([Interpolation.none, .crossfade, .spectral], id: \.self) { (value: Interpolation) in

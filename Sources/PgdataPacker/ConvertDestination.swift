@@ -385,8 +385,10 @@ struct ConvertInterpolationOption: View {
         // file states any, the writer's default; neither is marked unless it is "existing".
         let unmarkedDefault = shared ?? plan.defaultInterpolationItem
         VStack(alignment: .leading, spacing: 4) {
-            Text(tonverk ? "Interpolation marked in the file name" : "Interpolation saved in the file")
-            Picker(tonverk ? "Interpolation marked in the file name" : "Interpolation saved in the file", selection: selection) {
+            // "To be saved": the setting is about the output, not what the input says (Adam,
+            // 2026-10-26); the preview's "Interpolation in the file" is the input's.
+            Text(tonverk ? "Interpolation to be marked in the output file name" : "Interpolation to be saved in the output file")
+            Picker(tonverk ? "Interpolation to be marked in the output file name" : "Interpolation to be saved in the output file", selection: selection) {
                 if let own = plan.eachTablesOwnInterpolationLabel {
                     choiceText(own).tag(Optional<Interpolation>.none)
                 }

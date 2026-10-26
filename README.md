@@ -354,10 +354,11 @@ Shown when a choice applies to the destination and the tables (the captions coun
   spaced originals (the first and last among them) for fewer frames and repeats each original in
   order for more, making no new waveforms; **Crossfade New Frames** makes each new frame by
   crossfading its neighbors.
-- **Interpolation**, for formats whose file records it: an interpolation method, crossfade or
-  spectral, or none (no interpolation: the destination steps from frame to frame). The preview
-  shows what each table's own file specifies; by default each table keeps that, and a table
-  whose file says nothing gets crossfade.
+- **Interpolation to be saved in the output file** (for Tonverk, marked in the output file
+  name), for formats whose file records it: an interpolation method, crossfade or spectral, or
+  none (no interpolation: the destination steps from frame to frame). The preview shows what each
+  table's own input file specifies; by default each table keeps that, and a table whose file says
+  nothing gets crossfade.
 - Tonverk's frame size, and the PPG's four standard waveforms for P tables.
 - For a 3rd Wave destination, **Also add the .wt files to the Pack page**, to embed them in
   programs; both Convert buttons honor it.
@@ -370,10 +371,10 @@ size and what that rests on, its interpolation, and what converting changes. A 3
 drawn and played the way the 3rd Wave plays it by default: a U table with wavetable smoothing on,
 blending between frames (drawn as a crossfade, an inference from the manual's description), and a
 P table with it off, stepping from frame to frame. For these and the other formats whose file
-records no interpolation (Surge XT, WaveEdit), a **Between frames** pop-up chooses what is drawn
+records no interpolation (Surge XT, WaveEdit), an **Interpolation** pop-up under the pictures chooses what is drawn
 and played there; it goes back to the synth's default whenever the table or the destination
-changes. For a format whose file records the interpolation, the **Interpolation** option under
-**Options** decides, and the preview says so in the pop-up's place.
+changes. For a format whose file records the interpolation, the **Interpolation to be saved in
+the output file** option under **Options** decides, and the preview says so in the pop-up's place.
 The **Frame** slider sweeps through the table and draws the cycle there large, input and result
 together; stored frames are magnetic, so the slider lands on them as it passes and the positions
 between stay reachable. **Listen** plays that cycle, following the slider, at the pitch chosen

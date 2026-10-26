@@ -14,7 +14,8 @@ iconutil writes (icp4, icp5, ic07–ic14), so no macOS tool is needed.
 
 Two candidates share the tile and differ in the glyph:
 
-- box (the icon): a stack of three morphing frames rising out of an open box.
+- box (the icon): three morphing frames, cyan, white, and pink, a sine leaning more toward a saw
+  from back to front, rising out of an open box; the composition sits high on the tile.
 - stack: the frames alone, as filled sheets stacked in perspective.
 
 The tile follows Apple's macOS icon grid for a flattened icon: an 824-point rounded square
@@ -47,14 +48,25 @@ def squircle_path(x, y, w, h, n=5.0, steps=96):
     return "M" + " L".join("%.2f,%.2f" % p for p in pts) + " Z"
 
 def wave(t, x):
-    """One frame of the table: a sine at t = 0 morphing towards a saw at t = 1 (five
-    harmonics with Lanczos smoothing, so the shape stays clean at small sizes)."""
+    """One frame of the table: a sine at t = 0 morphing smoothly toward a saw at t = 1 (five
+    harmonics with Lanczos smoothing, so the shape stays clean at small sizes). Used by the
+    stack variant."""
     v = 0.0
     for k in range(1, 6):
         sigma = 1.0 if k == 1 else math.sin(math.pi * k / 6) / (math.pi * k / 6)
         weight = 1.0 if k == 1 else t ** 1.3
         v += weight * sigma * math.sin(k * x) / k
     return v / (1 + 0.55 * t)
+
+def leaned_sine(a, x):
+    """A sine leaned like a saw by phase distortion: the rise takes (1 + a) / 2 of the cycle and
+    the fall the rest, with no corners. a = 0 is a sine; a = 0.55 is clearly saw-like. The
+    three frames of the box icon are a = 0, 0.3, and 0.55, back to front, so the morph between
+    them is visible at any size the shapes survive (Adam, 2026-10-26: highlight the morphing)."""
+    p = (x / (2 * math.pi)) % 1.0
+    r = 0.5 * (1 + a)
+    u = (p / r) * 0.5 if p < r else 0.5 + (p - r) / (1 - r) * 0.5
+    return math.sin(2 * math.pi * u)
 
 def wave_points(cx, base, width, amp, t, n=120):
     pts = []
@@ -63,37 +75,48 @@ def wave_points(cx, base, width, amp, t, n=120):
         pts.append((cx - width / 2 + x * width, base - amp * wave(t, x * 2 * math.pi)))
     return pts
 
+def shape_points(fn, cx, base, width, amp, n=200):
+    """The points of one frame, `fn` over a cycle, scaled so every frame has the same height."""
+    raw = [fn(j / n * 2 * math.pi) for j in range(n + 1)]
+    peak = max(abs(v) for v in raw) or 1
+    return [(cx - width / 2 + j / n * width, base - amp * raw[j] / peak) for j in range(n + 1)]
+
 def path_d(pts, close=False):
     return "M" + " L".join("%.1f,%.1f" % p for p in pts) + (" Z" if close else "")
 
 # Colors. The tile's blue is the one the icon has always had.
 BLUE_TOP, BLUE_BOTTOM = "#4b7ccf", "#2444a6"
 AMBER_TOP, AMBER_BOTTOM = "#f7bd5c", "#d8862a"
-FRAME_COLORS = ("#9fc4ff", "#d6e7ff", "#ffffff")      # back to front
+# The box icon's frames, back to front: cyan, white, pink, so the three read as three even at
+# 32 px, where their shapes no longer do.
+FRAME_COLORS = ("#7fdcff", "#ffffff", "#ff5fae")
+FRAME_LEANS = (0.0, 0.3, 0.55)
 
 def glyph_box(detail):
-    """A stack of frames rising out of an open box. detail: 2 (small sizes), 3 (64 px), 4 (full)."""
+    """Three morphing frames rising out of an open box. detail: 2 (small sizes), 3 (64 px),
+    4 (full). The composition sits high on the tile, the back frame near the top and the box
+    ending 790 down, so the heavy box does not weigh the bottom half (Adam, 2026-10-26); the
+    front frame's trough dips behind the box front, so it rises out of the box."""
     bx, bw = 252, 520                      # the box front: x and width
-    back, front, bottom = 556, 616, 832    # y of the opening's back edge, its front edge, the box bottom
+    bottom, front = 790, 620               # y of the box bottom and the opening's front edge
+    back = front - 60                      # y of the opening's back edge
     inset = 50
     out = []
     # The box's inside, behind the frames.
     out.append(f'<path d="M{bx+inset},{back} L{bx+bw-inset},{back} L{bx+bw},{front} L{bx},{front} Z" fill="#6a3b0b"/>')
-    # The frames, back to front, evenly stacked; the front one's trough dips into the box.
-    count = 2 if detail <= 2 else 3
-    for i in range(count):
-        t = i / (count - 1)
-        depth = 1 - t
-        width = lerp(450, 370, depth)
-        cx = S / 2 + lerp(0, 26, depth)
-        base = lerp(538, 318, depth) if count == 3 else lerp(538, 390, depth)
-        amp = lerp(96, 78, depth)
-        stroke = lerp(66, 46, depth) if detail >= 3 else lerp(86, 66, depth)
-        color = FRAME_COLORS[i + (3 - count)]
-        opacity = lerp(1.0, 0.68, depth)
-        shape = 0.6 * depth                 # a clean sine in front, sharper frames behind
-        out.append(f'<path d="{path_d(wave_points(cx, base, width, amp, shape))}" fill="none" stroke="{color}" '
-                   f'stroke-width="{stroke:.0f}" stroke-linecap="round" stroke-linejoin="round" opacity="{opacity:.2f}"/>')
+    # The frames, back to front; at the small sizes only the back and front ones, heavier.
+    indices = [0, 2] if detail <= 2 else [0, 1, 2]
+    for i in indices:
+        depth = 1 - i / 2
+        cx = S / 2 + lerp(0, 24, depth)
+        base = lerp(548, 250, depth) if len(indices) == 3 else lerp(548, 330, depth)
+        amp = lerp(100, 80, depth)
+        width = (380, 420, 460)[i]
+        stroke = (50, 60, 66)[i] if detail >= 3 else (70, 0, 86)[i]
+        opacity = (0.85, 0.95, 1.0)[i]
+        pts = shape_points(lambda x, a=FRAME_LEANS[i]: leaned_sine(a, x), cx, base, width, amp)
+        out.append(f'<path d="{path_d(pts)}" fill="none" stroke="{FRAME_COLORS[i]}" stroke-width="{stroke}" '
+                   f'stroke-linecap="round" stroke-linejoin="round" opacity="{opacity:.2f}"/>')
     # Side flaps, hinged on the opening's front corners and folded outwards.
     if detail >= 3:
         out.append(f'<path d="M{bx},{front} L{bx+inset},{back} L{bx-40},{back-52} L{bx-96},{front-36} Z" fill="#f0b355"/>')

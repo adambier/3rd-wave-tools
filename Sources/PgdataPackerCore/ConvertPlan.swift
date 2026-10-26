@@ -1132,11 +1132,12 @@ public struct ConvertPlan: Equatable {
             "Neighboring frames are much alike, so stepping and blending between frames sound nearly the same.")
     }
 
-    /// Below this, neighboring frames are "much alike". A heuristic, set from four tables on
-    /// 2026-10-26: factory P03 measures 0.01 (no difference to be heard between stepping and
-    /// blending, apart from its last four frames), Bowed Lowed 0.03, factory Additive Bell 0.09
-    /// (a slight but real difference), All Waves 0.41.
-    public static let alikeThreshold: Float = 0.02
+    /// Below this, neighboring frames are "much alike". A heuristic, set by Adam's ear on
+    /// 2026-10-26: factory P03 measures 0.01 and FM Crush (U48) 0.025, and he hears no
+    /// difference between stepping and blending on either; Bowed Lowed measures 0.03, Metal
+    /// Bubbles (U26) 0.04, P00 0.06, Additive Bell (U00) 0.09 (a slight but real difference),
+    /// All Waves 0.41. First set at 0.02, raised when FM Crush got no note.
+    public static let alikeThreshold: Float = 0.05
 
     /// How much neighboring frames differ, as the median over the pairs that differ at all of
     /// the RMS difference between a frame and the next, relative to the table's peak (0 for
