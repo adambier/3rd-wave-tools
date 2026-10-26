@@ -751,7 +751,10 @@ struct ConvertChangesCell: View {
                 if words.changes.isEmpty && words.warnings.isEmpty {
                     Text("—").foregroundStyle(.secondary).help(unchanged + "\n" + tip)
                 } else {
-                    line(words).lineLimit(2).help(tip)
+                    // One line, truncated: SwiftUI's Table on macOS 13 does not keep row heights
+                    // in step with wrapped cells, and rows overlapped (Adam, 2026-10-26); the tip
+                    // and the preview's Output block carry the whole list.
+                    line(words).lineLimit(1).truncationMode(.tail).help(tip)
                 }
             } else {
                 Text("—").foregroundStyle(.secondary).help(tip)
