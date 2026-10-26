@@ -551,7 +551,7 @@ struct ConvertSizePopover: View {
         switch item.frameSizeFit {
         case .likely(let n):
             if item.sizeSource == .likely { return nil }
-            return "The likely size, \(ConvertPlan.formatCount(n)), is the one whose frames are alike from one to the next, as a wavetable’s are. A suggestion, not a certainty."
+            return "The likely size, \(ConvertPlan.formatCount(n)), is the one whose frames are alike from one to the next, as a wavetable’s are."
         case .tie:
             return "The sizes fit the samples equally well; nothing here settles it."
         case .unclear:
