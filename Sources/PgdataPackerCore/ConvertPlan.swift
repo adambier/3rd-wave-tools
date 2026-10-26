@@ -136,7 +136,7 @@ public struct ConvertPlan: Equatable {
         /// A word or two after the size in the Input column, saying where the size comes from,
         /// so every row shows how much to trust it: "in the file" (a chunk or header states
         /// it, or the format fixes it), "in the name" (a Tonverk tag), "in the .txt" (a Serum
-        /// sidecar), "from markers" (cue or loop markers), "guessed" (from the length alone),
+        /// sidecar), "from markers" (cue or loop markers), "assumed" (from the length alone),
         /// or "set manually" (the user chose it); nil when there is no size yet. The full
         /// reason is `basisDescription`.
         public var sizeQualifier: String? {
@@ -145,7 +145,7 @@ public struct ConvertPlan: Equatable {
             case .fileName: return "in the name"
             case .sidecar: return "in the .txt"
             case .markers: return "from markers"
-            case .guessed: return "guessed"
+            case .guessed: return "assumed"
             case .setManually: return "set manually"
             case .notStated: return nil
             }
@@ -184,10 +184,11 @@ public struct ConvertPlan: Equatable {
             case .inFile, .fileName, .sidecar: return file + "."
             case .markers: return file + "; less certain than a frame size the file states."
             case .guessed:
-                return "Nothing in the file says, so the usual \(ConvertPlan.formatCount(table.frameSize ?? 2048)) is assumed. If it sounds wrong, choose another size in the Input column."
+                // 2,048 samples per frame is the size of Serum-style wavetables (WAVETABLES.md section 2).
+                return "Nothing in the file says; \(ConvertPlan.formatCount(table.frameSize ?? 2048)) samples per frame is assumed, the size of Serum-style wavetables."
             case .notStated:
                 return "The file doesn’t say how long each wave is."
-                    + (table.candidateFrameSizes.isEmpty ? " Its length allows none of the usual sizes."
+                    + (table.candidateFrameSizes.isEmpty ? " Its length allows none of the sizes offered here (powers of two from 64 to 4,096)."
                                                           : " Its length allows " + ConvertPlan.candidateList(table) + ".")
             case .setManually:
                 if let suggested = table.frameSize {
@@ -226,14 +227,14 @@ public struct ConvertPlan: Equatable {
         /// The user chose a size.
         case setManually
 
-        /// A word or two for the tooltips ("In file", "Guessed", "Set manually").
+        /// A word or two for the tooltips ("In file", "Assumed", "Set manually").
         public var label: String {
             switch self {
             case .inFile: return "In file"
             case .fileName: return "File name"
             case .sidecar: return "Serum .txt"
             case .markers: return "Markers"
-            case .guessed: return "Guessed"
+            case .guessed: return "Assumed"
             case .notStated: return "Not stated"
             case .setManually: return "Set manually"
             }
@@ -551,7 +552,7 @@ public struct ConvertPlan: Equatable {
         case .excluded: return "Not marked to convert; left out."
         case .needsFrameSize:
             return "Choose a frame size: the file doesn’t say how long each wave is."
-                + (item.table.candidateFrameSizes.isEmpty ? " Its length allows none of the usual sizes."
+                + (item.table.candidateFrameSizes.isEmpty ? " Its length allows none of the sizes offered here (powers of two from 64 to 4,096)."
                                                            : " Its length allows \(Self.candidateList(item.table)).")
         case .cannotSplit:
             return "Can’t split into frames: \(Self.formatCount(item.table.samples.count)) samples don’t divide into frames of \(Self.formatCount(item.frameSize ?? 0))."
@@ -559,7 +560,7 @@ public struct ConvertPlan: Equatable {
     }
 
     /// Whether an item marked to convert can't be converted yet (the filter above the table).
-    /// Guessed frame sizes and warnings do not count: those items are converted.
+    /// Assumed frame sizes and warnings do not count: those items are converted.
     public func needsAttention(_ item: Item) -> Bool { status(item).isBlocked }
 
     /// The items marked to convert that cannot convert yet (see `needsAttention`).
@@ -662,12 +663,15 @@ public struct ConvertPlan: Equatable {
     // MARK: Existing choices (the Options pickers)
 
     // The Interpolation and Tonverk frame size pickers list every value the destination can take
-    // and mark the one the tables to convert already have: "Crossfade — existing" when they all
-    // agree (that item stands for no override, `options.interpolation == nil`), or a first item
-    // "Each table's own — existing: 3 stepped, 2 crossfade" when they differ. Tables that cannot
+    // and mark the one the tables to convert already have: "Crossfade — existing" when every
+    // table states that value (that item stands for no override, `options.interpolation == nil`),
+    // or a first item "Each table’s own — existing: 3 stepped, 2 crossfade; 4 not stated" when
+    // they differ or some files say nothing. A file that says nothing has no existing value: it
+    // is saved with the writer's default (crossfade; Tonverk's smooth), and when no file says
+    // anything the default item simply stands for no override, unmarked. Tables that cannot
     // convert yet are left out of the counts.
 
-    /// A picker item's words in two parts: the value ("Crossfade", "Each table's own") and, set
+    /// A picker item's words in two parts: the value ("Crossfade", "Each table’s own") and, set
     /// apart after a dash and in a second style, what the tables already have ("existing",
     /// "existing: 3 stepped, 2 crossfade").
     public struct ChoiceLabel: Equatable {
@@ -683,17 +687,21 @@ public struct ConvertPlan: Equatable {
         public var text: String { existing.map { value + " — " + $0 } ?? value }
     }
 
-    /// The interpolation each table to convert would be saved with when none is chosen
-    /// (`options.interpolation` nil): the table's own, or crossfade when its file doesn't say
-    /// (the writer's default); for Tonverk, whose name can say only stepped or smooth, spectral
-    /// counts as crossfade. Keyed by interpolation, with the number of tables. Empty when the
-    /// destination's files record no interpolation, or no table to convert can convert yet.
+    /// The interpolation the writer records when a file says nothing and nothing is chosen
+    /// (`WavetableWriter`'s default; Tonverk's name calls it smooth).
+    public static let defaultInterpolation: Interpolation = .crossfade
+
+    /// The interpolations the tables to convert state in their files, as the destination would
+    /// record them (for Tonverk, whose name can say only stepped or smooth, spectral counts as
+    /// crossfade), keyed by interpolation with the number of tables. Files that say nothing are
+    /// not counted (see `unstatedInterpolationCount`). Empty when the destination's files record
+    /// no interpolation, or no table to convert can convert yet.
     public func existingInterpolations() -> [Interpolation: Int] {
         guard preset.recordsInterpolation else { return [:] }
         var unchosen = options
         unchosen.interpolation = nil
         var counts: [Interpolation: Int] = [:]
-        for item in selectedItems where canConvert(item) {
+        for item in selectedItems where canConvert(item) && item.table.interpolation != nil {
             if let i = WavetableWriter.interpolationRecorded(for: preset, source: item.table.interpolation, options: unchosen) {
                 counts[i, default: 0] += 1
             }
@@ -701,21 +709,40 @@ public struct ConvertPlan: Equatable {
         return counts
     }
 
-    /// The one interpolation every table to convert would be saved with (see
-    /// `existingInterpolations`); nil when they differ or there is none.
-    public var sharedExistingInterpolation: Interpolation? { Self.shared(existingInterpolations()) }
+    /// The tables to convert whose files say nothing about interpolation (saved with
+    /// `defaultInterpolation` unless one is chosen); 0 when the destination records none.
+    public var unstatedInterpolationCount: Int {
+        guard preset.recordsInterpolation else { return 0 }
+        return selectedItems.filter { canConvert($0) && $0.table.interpolation == nil }.count
+    }
 
-    /// The Interpolation picker's first item when the tables to convert differ, or there are
-    /// none: "Each table's own — existing: 3 stepped, 2 crossfade" (for Tonverk, "smooth" for
-    /// crossfade). Nil when they all agree: that value's own item is then marked existing.
+    /// The one interpolation every table to convert states (see `existingInterpolations`); nil
+    /// when they differ, when any file says nothing, or when there is none.
+    public var sharedExistingInterpolation: Interpolation? {
+        unstatedInterpolationCount == 0 ? Self.shared(existingInterpolations()) : nil
+    }
+
+    /// The value the picker's unmarked default item stands for when no file states an
+    /// interpolation: `defaultInterpolation`. Nil when some file does (the existing value, or
+    /// the "Each table’s own" item, then stands for no override).
+    public var defaultInterpolationItem: Interpolation? {
+        existingInterpolations().isEmpty ? Self.defaultInterpolation : nil
+    }
+
+    /// The Interpolation picker's first item when the tables to convert state different
+    /// interpolations, or some state one and others say nothing: "Each table’s own — existing:
+    /// 3 stepped, 2 crossfade; 4 not stated" (for Tonverk, "smooth" for crossfade). Nil when
+    /// they all state one value (that value's item is then marked existing) and when no file
+    /// states any (the default's item then stands for no override).
     public var eachTablesOwnInterpolationLabel: ChoiceLabel? {
         let counts = existingInterpolations()
-        if counts.count == 1 { return nil }
-        if counts.isEmpty { return ChoiceLabel(value: "Each table’s own") }
-        let parts = [Interpolation.none, .crossfade, .spectral].compactMap { (i: Interpolation) -> String? in
+        if counts.isEmpty || sharedExistingInterpolation != nil { return nil }
+        var parts = [Interpolation.none, .crossfade, .spectral].compactMap { (i: Interpolation) -> String? in
             counts[i].map { "\($0) \(existingWord(i))" }
-        }
-        return ChoiceLabel(value: "Each table’s own", existing: "existing: " + parts.joined(separator: ", "))
+        }.joined(separator: ", ")
+        let unstated = unstatedInterpolationCount
+        if unstated > 0 { parts += "; \(unstated) not stated" }
+        return ChoiceLabel(value: "Each table’s own", existing: "existing: " + parts)
     }
 
     /// The word for an interpolation in the existing counts: "stepped", "crossfade", or
@@ -847,8 +874,9 @@ public struct ConvertPlan: Equatable {
     /// tables, which it already has, do not count), since the 3rd Wave will then offer to
     /// overwrite; nil otherwise, and for other destinations. The note states the facts: how
     /// many tables a 3rd Wave holds (64 U, 48 P), how many of them are Groove Synthesis's
-    /// (U00–U55, P00–P35), and that with no slot free it offers to overwrite its last slots
-    /// (observed for one table, which went to U63; see section 7 of FORMATS.md).
+    /// (U00–U55, P00–P35), and that with no slot free it offers to overwrite the last slot
+    /// (observed once, for one table, which went to U63; what several would take is untested;
+    /// see section 7 of FORMATS.md).
     public func thirdWaveCapacityNote(for preset: OutputPreset) -> String? {
         guard preset.isThirdWave else { return nil }
         let own = selectedItems.filter { canConvert($0) && $0.factorySlot == nil }.count
@@ -857,7 +885,7 @@ public struct ConvertPlan: Equatable {
         let factory = isP ? SourceRef.factoryPCount : SourceRef.factoryUCount
         guard own > total - factory else { return nil }
         let kind = isP ? "P" : "U"
-        return "\(own) \(kind) tables to convert. A 3rd Wave holds \(total) \(kind) tables, \(factory) of them Groove Synthesis’s (\(kind)00–\(kind)\(factory - 1)); with no slot free, it offers to overwrite its last slots, \(kind)\(total - 1) first."
+        return "\(own) \(kind) tables to convert. A 3rd Wave holds \(total) \(kind) tables, \(factory) of them Groove Synthesis’s (\(kind)00–\(kind)\(factory - 1)); with no slot free, it offers to overwrite the last slot (\(kind)\(total - 1)); which slots several tables would take has not been tested."
     }
 
     /// What the Changes column says for an item: short words for each change the destination

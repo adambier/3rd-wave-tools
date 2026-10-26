@@ -318,15 +318,38 @@ struct ConvertInterpolationOption: View {
         tonverk ? [Interpolation.none, .crossfade] : [Interpolation.none, .crossfade, .spectral]
     }
 
-    /// The menu's words for a value: its `displayName`, except Tonverk's "Smooth" for crossfade
-    /// (what its file name says).
+    /// The menu's words for a value: its `displayName`, except Tonverk's "Smooth (crossfade)"
+    /// for crossfade (Tonverk's word, with the one the rest of the page uses).
     private func label(_ value: Interpolation) -> String {
-        value == .crossfade && tonverk ? "Smooth" : value.displayName
+        value == .crossfade && tonverk ? "Smooth (crossfade)" : value.displayName
+    }
+
+    /// What the choices mean, and what "existing" means when the menu says it. One sentence
+    /// each, nothing the menu already says.
+    private var caption: String {
+        let plan = state.convertPlan
+        var lines: [String] = []
+        if plan.sharedExistingInterpolation != nil || plan.eachTablesOwnInterpolationLabel != nil {
+            var sentence = "\u{201C}Existing\u{201D} is the interpolation a table’s file states"
+            if plan.unstatedInterpolationCount > 0 {
+                sentence += "; a file that says nothing is saved as \(tonverk ? "smooth" : "crossfade")"
+            }
+            lines.append(sentence + ".")
+        }
+        if tonverk {
+            lines.append("Smooth blends each frame into the next; None (stepped) jumps between them and adds \u{201C}r\u{201D} to the file name.")
+        } else {
+            lines.append("Crossfade blends each frame into the next; spectral blends their harmonics (Serum’s and Vital’s spectral morph); None (stepped) jumps between them.")
+        }
+        return lines.joined(separator: " ")
     }
 
     var body: some View {
         let plan = state.convertPlan
         let shared = plan.sharedExistingInterpolation
+        // The item that stands for no override (nil): the value every file states, or, when no
+        // file states any, the writer's default; neither is marked unless it is "existing".
+        let unmarkedDefault = shared ?? plan.defaultInterpolationItem
         VStack(alignment: .leading, spacing: 4) {
             Text("Interpolation saved in the file")
             Picker("Interpolation saved in the file", selection: selection) {
@@ -334,33 +357,36 @@ struct ConvertInterpolationOption: View {
                     choiceText(own).tag(Optional<Interpolation>.none)
                 }
                 ForEach(choices, id: \.self) { (value: Interpolation) in
-                    // The value the tables already have stands for no override (nil).
                     choiceText(ConvertPlan.ChoiceLabel(value: label(value), existing: value == shared ? "existing" : nil))
-                        .tag(value == shared ? Optional<Interpolation>.none : Optional<Interpolation>.some(value))
+                        .tag(value == unmarkedDefault ? Optional<Interpolation>.none : Optional<Interpolation>.some(value))
                 }
             }
             .labelsHidden()
             .frame(maxWidth: 260)
             .help(tip)
-            Text(tonverk ? "\u{201C}Existing\u{201D} is the interpolation the tables already have; a file that doesn’t say counts as smooth. None (stepped) adds \u{201C}r\u{201D} to the file name."
-                         : "\u{201C}Existing\u{201D} is the interpolation the tables already have; a file that doesn’t say counts as crossfade.")
+            Text(caption)
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    /// The menu's selection: nil (no override) for the item marked existing, which the option
-    /// also maps to when it equals the value every table has (set before the tables agreed);
-    /// for Tonverk, a spectral choice reads as Smooth and choosing Smooth stores crossfade.
+    /// The menu's selection: nil (no override) for the item that stands for it (the existing
+    /// value, or the default when no file states one), which the option also maps to when it
+    /// equals that value; for Tonverk, a spectral choice reads as smooth and choosing smooth
+    /// stores crossfade.
     private var selection: Binding<Interpolation?> {
         Binding(
             get: {
-                var value = state.convertPlan.options.interpolation
+                let plan = state.convertPlan
+                var value = plan.options.interpolation
                 if tonverk, value == .spectral { value = .crossfade }
-                return value == state.convertPlan.sharedExistingInterpolation ? nil : value
+                let unmarkedDefault = plan.sharedExistingInterpolation ?? plan.defaultInterpolationItem
+                return value == unmarkedDefault ? nil : value
             },
             set: { (value: Interpolation?) in
-                state.convertPlan.options.interpolation = value == state.convertPlan.sharedExistingInterpolation ? nil : value
+                let plan = state.convertPlan
+                let unmarkedDefault = plan.sharedExistingInterpolation ?? plan.defaultInterpolationItem
+                state.convertPlan.options.interpolation = value == unmarkedDefault ? nil : value
             }
         )
     }

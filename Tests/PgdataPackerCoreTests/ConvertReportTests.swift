@@ -97,6 +97,12 @@ final class ConvertReportTests: XCTestCase {
             + "\n\nAlready in the folder, so written under a new name (nothing was replaced):\n• WAVES/Pad.wt → WAVES/Pad 2.wt"
             + "\n\nWritten to WAVES:\n• Pad 2.wt\n• Lead.wt")
         XCTAssertEqual(ReportText.plain(r.message).components(separatedBy: "\n")[3], "• Broken — The table is empty.")
+        // A heading's single item loses its bullet in the plain text (a list of one is not a list).
+        XCTAssertEqual(ReportText.plain("Not written:\n• Lead.wt\tNo permission."), "Not written:\nLead.wt — No permission.")
+        XCTAssertEqual(ReportText.plain(r.message).components(separatedBy: "\n\n")[2], "Not written:\n/Users/me/Desktop/output/WAVES/Lead.wt — You don’t have permission to save the file.")
+        XCTAssertTrue(ReportText.isSingleItem(["Written:", "• A.wt"]))
+        XCTAssertFalse(ReportText.isSingleItem(["Written:", "• A.wt", "• B.wt"]))
+        XCTAssertFalse(ReportText.isSingleItem(["• A.wt"]))
     }
 
     func testCapacityNoteFollowsTheNotes() {
@@ -111,7 +117,7 @@ final class ConvertReportTests: XCTestCase {
         plan.add((0..<9).map(table), factory: FactoryLibrary())
         let names = plan.items.map(\.name)
         let c = conversion(names, notes: names.map { _ in ["Resized from 128 to 1,024 samples per frame."] })
-        let note = "9 U tables to convert. A 3rd Wave holds 64 U tables, 56 of them Groove Synthesis’s (U00–U55); with no slot free, it offers to overwrite its last slots, U63 first."
+        let note = "9 U tables to convert. A 3rd Wave holds 64 U tables, 56 of them Groove Synthesis’s (U00–U55); with no slot free, it offers to overwrite the last slot (U63); which slots several tables would take has not been tested."
         let r = make(plan, c, written(names.map { "WAVES/\($0).wt" }))
         XCTAssertEqual(plan.thirdWaveCapacityNote, note)
         XCTAssertTrue(r.message.hasSuffix("What converting did:\n• All 9 tables\tResized from 128 to 1,024 samples per frame.\n\n" + note), r.message)

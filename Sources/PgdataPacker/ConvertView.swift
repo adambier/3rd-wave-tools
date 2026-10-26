@@ -233,7 +233,7 @@ struct ConvertTable: View {
             TableColumn("") { (item: ConvertPlan.Item) in ConvertStatusCell(status: plan.status(item), tip: plan.statusDescription(item)) }
                 .width(22)
             TableColumn("Name") { (item: ConvertPlan.Item) in ConvertNameCell(state: st, item: item, renaming: $renaming) }
-                .width(min: 140, ideal: 260)
+                .width(min: 140, ideal: 210)
             // Input and Output are both frames × samples per frame: the headers say the unit (a
             // Table header takes no tooltip on macOS 13), the cells spell it out on hover. The
             // widths fit the headers and the longest cells ("256 × 2,048  from markers" with its
@@ -438,7 +438,7 @@ struct ConvertBadge: View {
 }
 
 /// The input as frames × samples per frame, with a word or two after it on where the size
-/// comes from ("in the file", "guessed", "set manually"; `Item.sizeQualifier`). When the file
+/// comes from ("in the file", "assumed", "set manually"; `Item.sizeQualifier`). When the file
 /// allows other sizes, the cell is a button that opens the size chooser and selects the row,
 /// so the preview below shows the table; when the size is still open, it is red.
 struct ConvertFrameSizeCell: View {
@@ -533,17 +533,24 @@ struct ConvertFramesBySize: View {
     }
 }
 
-/// The size chooser: what a frame size is and how to judge one, what the file says, a button
-/// per size the file allows with the first wave drawn at that size, and which size the
-/// samples suggest (see `FrameSizeFit`), marked "likely" but never applied by itself.
+/// The size chooser: where the size comes from, a button per size the file's length allows with
+/// the first wave drawn at that size, and what the "likely" mark means (see `FrameSizeFit`; a
+/// suggestion, never applied by itself).
 struct ConvertSizePopover: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
 
+    /// Three buttons to a row, with the popover's padding.
+    private static let width: CGFloat = 3 * ConvertSizeButton.width + 2 * 8 + 24
+    /// The width the sentences wrap at (the popover's, less its padding). Set on each Text: in a
+    /// popover a Text left to size itself was cut to one line instead of wrapping.
+    private static let textWidth: CGFloat = width - 24
+
+    /// What the “likely” mark on a button means, or that nothing stands out.
     private var fitLine: String? {
         switch item.frameSizeFit {
         case .likely(let n):
-            return "The samples suggest \(ConvertPlan.formatCount(n)): frames of that size are alike from one to the next, as a wavetable’s are. A suggestion, not a certainty."
+            return "\u{201C}Likely\u{201D}: frames of \(ConvertPlan.formatCount(n)) are alike from one to the next, as a wavetable’s are. A suggestion, not a certainty."
         case .tie:
             return "The sizes fit the samples equally well; nothing here settles it."
         case .unclear:
@@ -552,13 +559,12 @@ struct ConvertSizePopover: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Frame size").font(.headline)
-            Text("The frame size says where each wave starts and ends; a wrong size cuts every wave in the wrong place. The right size usually shows one complete cycle that joins at both ends; a size that is too large repeats it, too small cuts it off.")
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            // Where the size comes from; the pictures below show each size the length allows.
             Text(item.basisDescription)
                 .font(.caption)
+                .frame(width: Self.textWidth, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
             // Three buttons to a row, each wide enough for its result on two lines; a length
             // that allows more sizes gets more rows rather than narrower buttons. Plain stacks,
@@ -578,12 +584,12 @@ struct ConvertSizePopover: View {
             if let fitLine {
                 Text(fitLine)
                     .font(.caption).foregroundStyle(.secondary)
+                    .frame(width: Self.textWidth, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(12)
-        // Three buttons, their two gaps, and the padding.
-        .frame(width: 3 * ConvertSizeButton.width + 2 * 8 + 24, alignment: .leading)
+        .frame(width: Self.width, alignment: .leading)
     }
 }
 

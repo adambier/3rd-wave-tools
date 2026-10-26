@@ -15,8 +15,21 @@ public enum ReportText {
         guard let r = line.range(of: ": ") else { return item(line) }
         return item(String(line[..<r.lowerBound]), String(line[r.upperBound...]))
     }
-    /// The text as the log and the clipboard carry it: the tab before an explanation as a dash.
-    public static func plain(_ s: String) -> String { s.replacingOccurrences(of: "\t", with: " — ") }
+    /// The text as the log and the clipboard carry it: the tab before an explanation as a dash,
+    /// and a heading's single item without its bullet (a list of one is not a list).
+    public static func plain(_ s: String) -> String {
+        let paragraphs = s.components(separatedBy: "\n\n").map { (paragraph: String) -> String in
+            let lines = paragraph.components(separatedBy: "\n")
+            guard isSingleItem(lines) else { return paragraph }
+            return lines[0] + "\n" + String(lines[1].dropFirst(2))
+        }
+        return paragraphs.joined(separator: "\n\n").replacingOccurrences(of: "\t", with: " — ")
+    }
+    /// Whether a paragraph's lines are a heading and one item under it, which is shown without
+    /// a bullet.
+    public static func isSingleItem(_ lines: [String]) -> Bool {
+        lines.count == 2 && lines[0].hasSuffix(":") && lines[1].hasPrefix("• ")
+    }
     /// "Not used: …" → "not used: …" for an explanation that follows a dash; a label such as "U50 …"
     /// is left alone.
     public static func lowerFirst(_ s: String) -> String {

@@ -152,32 +152,60 @@ struct ConvertPreviewFacts: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
 
-    /// "Input: 64 frames × 2,048 samples." (the line under it says where the size comes from).
-    private var frameSizeLine: String {
+    /// The space between blocks (file, Input, Interpolation, Output) and, within a block,
+    /// between its lines: one rhythm for the whole column.
+    static let blockSpacing: CGFloat = 12
+    static let lineSpacing: CGFloat = 3
+
+    /// "64 frames × 2,048 samples", or what is missing.
+    private var inputValue: String {
         guard let n = item.frameSize, let frames = item.frameCount else {
-            return item.frameSize == nil ? "Input: frame size not stated. Choose one in the Input column." : "Input: " + item.sizeDescription + "."
+            return item.frameSize == nil ? "Frame size not stated. Choose one in the Input column." : item.sizeDescription
         }
-        return "Input: \(frames) frame\(frames == 1 ? "" : "s") × \(ConvertPlan.formatCount(n)) samples."
+        return "\(frames) frame\(frames == 1 ? "" : "s") × \(ConvertPlan.formatCount(n)) samples"
+    }
+
+    /// Where the size comes from; for an assumed size, also where to change it.
+    private var inputDetail: String {
+        item.sizeSource == .guessed
+            ? item.basisDescription + " If it sounds wrong, choose another size in the Input column."
+            : item.basisDescription
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Self.blockSpacing) {
             Text("\(item.sourceDescription) · \(item.location.url.path)")
                 .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 .help(([item.location.url.path] + item.alsoIn.map { "Also: " + $0.url.path }).joined(separator: "\n"))
-            Text(frameSizeLine)
-                .foregroundStyle(item.frameSize == nil ? Color.red : Color.primary)
-            Text(item.basisDescription)
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 6) {
-                Text("Interpolation:").foregroundStyle(.secondary)
-                Text(item.interpolationDescription)
-            }
-            .help("How a synth moves from one frame to the next as the table is swept: none (it steps from frame to frame), crossfade (it blends neighbours), or spectral (it blends their harmonics). Some files say which; most synths set it on the oscillator instead.")
+            ConvertFactBlock(label: "Input", value: inputValue, detail: inputDetail, alert: item.frameSize == nil)
+            ConvertFactBlock(label: "Interpolation", value: item.interpolationDescription, detail: nil, alert: false)
+                .help("How a synth moves from one frame to the next as the table is swept: none (it steps from frame to frame), crossfade (it blends neighbours), or spectral (it blends their harmonics). Some files say which; most synths set it on the oscillator instead.")
             ConvertWhatHappens(state: state, item: item)
         }
         .textSelection(.enabled)
+    }
+}
+
+/// One block of the facts: a small label, the value, and a line of detail under it.
+struct ConvertFactBlock: View {
+    let label: String
+    let value: String
+    let detail: String?
+    /// Whether the value is a problem to act on (drawn in red).
+    let alert: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: ConvertPreviewFacts.lineSpacing) {
+            Text(label).font(.caption).foregroundStyle(.secondary)
+            Text(value)
+                .foregroundStyle(alert ? Color.red : Color.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let detail {
+                Text(detail)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }
 
@@ -519,7 +547,8 @@ struct ConvertWhatHappens: View {
 
     var body: some View {
         let plan = state.convertPlan
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: ConvertPreviewFacts.lineSpacing) {
+            Text("Output").font(.caption).foregroundStyle(.secondary)
             if plan.canConvert(item) {
                 if let file = state.convertPreviews.preview(item, in: plan) {
                     ConvertNoteList(file: file, output: plan.expected(for: item))
@@ -528,16 +557,15 @@ struct ConvertWhatHappens: View {
                         .foregroundStyle(.red)
                 }
             } else if plan.status(item) == .needsFrameSize {
-                // The facts above already say, in red, that the size is not stated and where to
+                // The Input block already says, in red, that the size is not stated and where to
                 // choose one, and what the file's length allows; here only what that means.
-                Text("Output: none until a frame size is chosen.").foregroundStyle(.secondary)
+                Text("None until a frame size is chosen.").foregroundStyle(.secondary)
             } else {
                 Label(plan.statusDescription(item), systemImage: "exclamationmark.octagon.fill")
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.top, 4)
     }
 }
 
@@ -547,24 +575,33 @@ struct ConvertNoteList: View {
     let file: OutputFile
     let output: ConvertPlan.ExpectedResult?
 
+    /// "64 frames × 2,048 samples, “Pad.wav” in WAVES".
     private var outputLine: String {
         let size = output.map { "\($0.frameCountOut) frame\($0.frameCountOut == 1 ? "" : "s") × \(ConvertPlan.formatCount($0.frameSizeOut)) samples, " } ?? ""
-        return "Output: " + size + "\u{201C}\(file.fileName)\u{201D}" + (file.folder.map { " in \($0)" } ?? "") + "."
+        return size + "\u{201C}\(file.fileName)\u{201D}" + (file.folder.map { " in \($0)" } ?? "")
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: ConvertPreviewFacts.lineSpacing) {
             Text(outputLine).fixedSize(horizontal: false, vertical: true)
             if file.notes.isEmpty {
-                Text("Only the file format changes.").foregroundStyle(.secondary)
+                Text("Only the file format changes.").font(.caption).foregroundStyle(.secondary)
+            } else if file.notes.count == 1 {
+                // One note is a sentence, not a list of one.
+                Text(file.notes[0]).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
-                ForEach(0..<file.notes.count, id: \.self) { (i: Int) in
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text("•")
-                        Text(file.notes[i]).fixedSize(horizontal: false, vertical: true)
+                // The writer's notes, one to a paragraph, with a little air between them.
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(0..<file.notes.count, id: \.self) { (i: Int) in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("•")
+                            Text(file.notes[i]).fixedSize(horizontal: false, vertical: true)
+                        }
+                        .font(.caption).foregroundStyle(.secondary)
                     }
-                    .foregroundStyle(.secondary)
                 }
+                .padding(.top, 2)
             }
         }
     }

@@ -316,7 +316,10 @@ enum AlertPresenter {
         let heading = NSFont.systemFont(ofSize: size, weight: .semibold)
         let out = NSMutableAttributedString()
         for paragraph in text.components(separatedBy: "\n\n") {
-            for line in paragraph.components(separatedBy: "\n") {
+            let lines = paragraph.components(separatedBy: "\n")
+            // A heading's single item is set like the items of a list, but without the bullet.
+            let single = ReportText.isSingleItem(lines)
+            for line in lines {
                 let para = NSMutableParagraphStyle()
                 para.paragraphSpacingBefore = out.string.isEmpty ? 0 : 14   // before a paragraph or heading
                 if !out.string.isEmpty { out.append(NSAttributedString(string: "\n")) }
@@ -324,13 +327,15 @@ enum AlertPresenter {
                     // A list item: bullet in a hanging indent, then the name and its explanation,
                     // half a line below the previous line.
                     para.paragraphSpacingBefore = 8
-                    para.firstLineHeadIndent = 10
+                    para.firstLineHeadIndent = single ? 24 : 10
                     para.headIndent = 24
                     para.tabStops = [NSTextTab(textAlignment: .left, location: 24)]
                     para.defaultTabInterval = 24
                     let parts = line.dropFirst(2).components(separatedBy: "\t")
-                    out.append(NSAttributedString(string: "•\t", attributes: [
-                        .font: body, .foregroundColor: NSColor.labelColor, .paragraphStyle: para]))
+                    if !single {
+                        out.append(NSAttributedString(string: "•\t", attributes: [
+                            .font: body, .foregroundColor: NSColor.labelColor, .paragraphStyle: para]))
+                    }
                     out.append(NSAttributedString(string: parts[0], attributes: [
                         .font: heading, .foregroundColor: NSColor.labelColor, .paragraphStyle: para]))
                     if parts.count > 1 {

@@ -299,7 +299,7 @@ converting to it has not yet been tested (none has), and anything its sources le
 the tables to convert bring about; the book icon beside each row (under the heading **Sources**)
 opens its sources, and a green seal in its place marks a destination that has been tested. The
 destination and its options apply to every table marked to convert. Each row's Input column says
-where its frame size comes from (in the file, in the name, from markers, guessed, or set
+where its frame size comes from (in the file, in the name, from markers, assumed, or set
 manually), and the Interpolation column what its file says about moving between frames. The
 preview below the table is read-only and shows one table: the source and the result stacked frame
 by frame (with the interpolation drawn between frames where a file records one), its file, its

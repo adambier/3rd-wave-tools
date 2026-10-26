@@ -214,7 +214,7 @@ final class FLACTests: XCTestCase {
         XCTAssertEqual(t.source, .flac)
         XCTAssertEqual(t.frameSize, 2048)
         XCTAssertEqual(t.frameSizeEvidence, .length)
-        XCTAssertEqual(t.frameSizeBasis, "file length only (2,048 per frame, the usual size; the file does not say)")
+        XCTAssertEqual(t.frameSizeBasis, "file length only (2,048 per frame assumed, the Serum-style size; the file does not say)")
         XCTAssertEqual(t.candidateFrameSizes, [64, 128, 256, 512, 1024, 4096])
         XCTAssertEqual(t.samples.count, 6 * 2048)
         XCTAssertEqual(t.notes, [])

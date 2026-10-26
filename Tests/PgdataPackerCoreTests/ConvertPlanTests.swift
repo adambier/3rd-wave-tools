@@ -345,8 +345,8 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(p.status(guess), .ready)
         XCTAssertTrue(guess.isGuessed)
         XCTAssertEqual(guess.sizeSource, .guessed)
-        XCTAssertEqual(guess.sizeSource.label, "Guessed")
-        XCTAssertTrue(guess.basisDescription.contains("the usual 2,048 is assumed"))
+        XCTAssertEqual(guess.sizeSource.label, "Assumed")
+        XCTAssertEqual(guess.basisDescription, "Nothing in the file says; 2,048 samples per frame is assumed, the size of Serum-style wavetables.")
         XCTAssertEqual(ready.sizeSource, .inFile)
         XCTAssertEqual(ready.basisDescription, "Clm chunk.")   // the reader’s own phrase, capitalised
 
@@ -357,7 +357,7 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertFalse(p.needsAttention(guess))
         XCTAssertFalse(p.needsAttention(loud))
         XCTAssertEqual(p.attentionCount, 2)
-        XCTAssertEqual(guess.sizeQualifier, "guessed")
+        XCTAssertEqual(guess.sizeQualifier, "assumed")
         XCTAssertEqual(ready.sizeQualifier, "in the file")
         XCTAssertNil(open.sizeQualifier)
         XCTAssertNil(ready.originBadge)
@@ -838,7 +838,7 @@ final class ConvertOptionsTextTests: XCTestCase {
         // Small tables: the note counts them, whatever their size.
         var tables = (0..<9).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
         var p = plan(tables, preset: .thirdWaveU)
-        XCTAssertEqual(p.thirdWaveCapacityNote, "9 U tables to convert. A 3rd Wave holds 64 U tables, 56 of them Groove Synthesis’s (U00–U55); with no slot free, it offers to overwrite its last slots, U63 first.")
+        XCTAssertEqual(p.thirdWaveCapacityNote, "9 U tables to convert. A 3rd Wave holds 64 U tables, 56 of them Groove Synthesis’s (U00–U55); with no slot free, it offers to overwrite the last slot (U63); which slots several tables would take has not been tested.")
         p.setSelected(p.items[0].id, false)
         XCTAssertNil(p.thirdWaveCapacityNote, "8 fit")
         p.preset = .wav2048
@@ -847,7 +847,7 @@ final class ConvertOptionsTextTests: XCTestCase {
         XCTAssertNil(p.thirdWaveCapacityNote, "12 P slots")
         tables += (9..<13).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
         p = plan(tables, preset: .thirdWaveP)
-        XCTAssertEqual(p.thirdWaveCapacityNote, "13 P tables to convert. A 3rd Wave holds 48 P tables, 36 of them Groove Synthesis’s (P00–P35); with no slot free, it offers to overwrite its last slots, P47 first.")
+        XCTAssertEqual(p.thirdWaveCapacityNote, "13 P tables to convert. A 3rd Wave holds 48 P tables, 36 of them Groove Synthesis’s (P00–P35); with no slot free, it offers to overwrite the last slot (P47); which slots several tables would take has not been tested.")
 
         // A factory table does not count: the 3rd Wave already has it.
         let lib = FactoryLibrary.builtIn
@@ -931,36 +931,49 @@ final class ConvertExistingChoicesTests: XCTestCase {
         XCTAssertNil(ConvertPlan(preset: .miniFreak).caveat(for: .miniFreak))
     }
 
-    func testExistingInterpolationsCountWhatTheFileWouldRecord() {
-        // A file that doesn't say counts as crossfade, the writer's default.
+    func testExistingInterpolationsCountOnlyWhatFilesState() {
+        // A file that says nothing has no existing value; it is counted apart and saved as the default.
         var plan = pickerPlan(.wav2048, [(.crossfade, 2048), (nil, 2048), (Interpolation.none, 2048), (.spectral, 2048), (Interpolation.none, 2048)])
-        XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 2, Interpolation.none: 2, .spectral: 1])
+        XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 1, Interpolation.none: 2, .spectral: 1])
+        XCTAssertEqual(plan.unstatedInterpolationCount, 1)
         XCTAssertNil(plan.sharedExistingInterpolation)
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped, 2 crossfade, 1 spectral")
+        XCTAssertNil(plan.defaultInterpolationItem, "something is stated, so the default item is not the unmarked one")
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped, 1 crossfade, 1 spectral; 1 not stated")
         // An override does not change what the tables have.
         plan.options.interpolation = .spectral
-        XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 2, Interpolation.none: 2, .spectral: 1])
+        XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 1, Interpolation.none: 2, .spectral: 1])
         plan.options.interpolation = nil
-        // Tables not marked to convert are left out; when the rest agree, that value is shared.
+        // Tables not marked to convert are left out; when the rest all state one value, it is shared.
         for item in plan.items where item.table.interpolation != Interpolation.none { plan.setSelected(item.id, false) }
         XCTAssertEqual(plan.existingInterpolations(), [Interpolation.none: 2])
         XCTAssertEqual(plan.sharedExistingInterpolation, Interpolation.none)
         XCTAssertNil(plan.eachTablesOwnInterpolationLabel)
-        // Nothing to convert: no counts, and a first item without a parenthetical.
+        // One stated value plus a file that says nothing: not shared, and the label says so.
+        for item in plan.items where item.table.interpolation == nil { plan.setSelected(item.id, true) }
+        XCTAssertNil(plan.sharedExistingInterpolation)
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped; 1 not stated")
+        // Nothing stated at all: no counts, no "existing"; the default (crossfade) is the unmarked item.
         for item in plan.items { plan.setSelected(item.id, false) }
         XCTAssertEqual(plan.existingInterpolations(), [:])
         XCTAssertNil(plan.sharedExistingInterpolation)
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel, ConvertPlan.ChoiceLabel(value: "Each table’s own"))
+        XCTAssertNil(plan.eachTablesOwnInterpolationLabel)
+        XCTAssertEqual(plan.defaultInterpolationItem, .crossfade)
+        let unstated = pickerPlan(.wav2048, [(nil, 2048), (nil, 2048)])
+        XCTAssertEqual(unstated.existingInterpolations(), [:])
+        XCTAssertEqual(unstated.unstatedInterpolationCount, 2)
+        XCTAssertNil(unstated.eachTablesOwnInterpolationLabel)
+        XCTAssertEqual(unstated.defaultInterpolationItem, .crossfade)
         // A destination whose files record no interpolation has nothing to count.
         for item in plan.items { plan.setSelected(item.id, true) }
         plan.preset = .thirdWaveU
         XCTAssertEqual(plan.existingInterpolations(), [:])
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel, ConvertPlan.ChoiceLabel(value: "Each table’s own"))
+        XCTAssertEqual(plan.unstatedInterpolationCount, 0)
+        XCTAssertNil(plan.eachTablesOwnInterpolationLabel)
         // Tonverk: spectral counts as smooth, and the words are Tonverk's.
         plan.preset = .tonverk
-        XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 3, Interpolation.none: 2])
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped, 3 smooth")
-        let smooth = pickerPlan(.tonverk, [(.spectral, 2048), (nil, 1024)])
+        XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 2, Interpolation.none: 2])
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped, 2 smooth; 1 not stated")
+        let smooth = pickerPlan(.tonverk, [(.spectral, 2048), (.crossfade, 1024)])
         XCTAssertEqual(smooth.sharedExistingInterpolation, .crossfade)
         XCTAssertNil(smooth.eachTablesOwnInterpolationLabel)
     }
