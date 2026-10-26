@@ -12,7 +12,7 @@ import Foundation
 /// these fixes are not reproduced. See docs/FORMATS.md section 6.5.
 ///
 /// A .pgdata import converts an old layout's structure but skips several of these value changes:
-/// a W3_PROG_3 program packed unconverted has been observed to play silently on a 3rd Wave synth.
+/// a W3_PROG_3 program packed unconverted has been observed to play silently on the 3rd Wave.
 /// See section 6 of FORMATS.md for the conversion step by step.
 public enum ProgramConverter {
     /// The 3rd Wave whose Import program the result reproduces. `.twentyFour` (24K or 24M) keeps
@@ -215,7 +215,7 @@ public enum ProgramConverter {
     /// W3_PROG_4 (true of every file seen). 181 with fewer than 136 floats was written as both
     /// W3_PROG_4 and W3_PROG_5; the two differ only in how event records name parts, so (looking at
     /// note and automation records only) a part mask above 3 means W3_PROG_5, else a part index 0
-    /// means W3_PROG_4 (an inference from the files, not checked on a 3rd Wave synth). Without either,
+    /// means W3_PROG_4 (an inference from the files, not checked on the 3rd Wave). Without either,
     /// W3_PROG_5 is assumed. Nil when the layout is current or unknown.
     public static func inferredFormat(_ p: ProgramFile) -> Int? {
         guard let l = layout(of: p), l != current else { return nil }

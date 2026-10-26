@@ -16,6 +16,11 @@ extension Resampling {
         /// The highest harmonic present.
         var top: Int { re.count - 1 }
 
+        /// Harmonics given directly (as ``Resampling/CycleSpectrum/blend(_:_:t:)`` makes them).
+        init(re: [Double], im: [Double]) {
+            self.re = re; self.im = im
+        }
+
         /// The harmonics of a cycle of any length ≥ 1: by FFT for a power of two, otherwise by
         /// Bluestein's algorithm, also O(n log n).
         init(of cycle: [Float]) {

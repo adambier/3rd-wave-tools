@@ -106,7 +106,10 @@ struct PackView: View {
                     ProgramRow(state: st, item: item).tag(item.id)
                 }
             }
-            .onDeleteCommand { state.removePrograms(visibleSelection); selection = [] }
+            .onCommand(MenuActions.removeSelected) { state.removePrograms(visibleSelection); selection = [] }
+            // Edit › Select All (⌘A) selects every program shown (the list's own handling, when
+            // it has the focus, does the same).
+            .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(shownPrograms.map(\.id)) }
             .overlay {
                 if state.programs.isEmpty {
                     ListPlaceholder(text: "No programs yet. Drop .pro files onto this page, or click Add Files or Folders…")

@@ -127,6 +127,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 /// (see the `controls` of PackView, UnpackView, and ConvertView) or while a pack, unpack, or
 /// conversion is running.
 final class MenuActions: NSObject, NSMenuItemValidation {
+    /// Edit › Remove Selected's action, sent down the responder chain; the pages' lists answer
+    /// it with `.onCommand(MenuActions.removeSelected)`.
+    static let removeSelected = NSSelectorFromString("removeSelected:")
     private let appState: AppState
 
     init(appState: AppState) {
@@ -224,9 +227,12 @@ final class MenuActions: NSObject, NSMenuItemValidation {
 /// (which the View menu also sets) and sets it.
 final class ToolbarController: NSObject, NSToolbarDelegate {
     private static let pageItem = NSToolbarItem.Identifier("page")
+    private static let outputItem = NSToolbarItem.Identifier("audioOutput")
     private let appState: AppState
     private weak var control: NSSegmentedControl?
+    private weak var outputPopUp: NSPopUpButton?
     private var cancellable: AnyCancellable?
+    private var outputCancellable: AnyCancellable?
 
     init(appState: AppState) {
         self.appState = appState
@@ -245,16 +251,21 @@ final class ToolbarController: NSObject, NSToolbarDelegate {
         return toolbar
     }
 
+    // The page switcher in the centre; at the trailing end, the audio output for the Wavetables
+    // page's Listen control. The output pop-up is there on every page: a toolbar whose items
+    // come and go with the page is what the HIG advises against, and the device is one setting
+    // for the app.
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, Self.pageItem, .flexibleSpace]
+        [.flexibleSpace, Self.pageItem, .flexibleSpace, Self.outputItem]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, Self.pageItem]
+        [.flexibleSpace, Self.pageItem, Self.outputItem]
     }
 
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        if itemIdentifier == Self.outputItem { return makeOutputItem() }
         guard itemIdentifier == Self.pageItem else { return nil }
         let sections = AppState.Section.allCases
         let control = NSSegmentedControl(labels: sections.map(\.rawValue), trackingMode: .selectOne,
@@ -279,6 +290,56 @@ final class ToolbarController: NSObject, NSToolbarDelegate {
         let sections = AppState.Section.allCases
         guard sections.indices.contains(sender.selectedSegment) else { return }
         appState.section = sections[sender.selectedSegment]
+    }
+
+    // MARK: Audio output
+
+    /// A pop-up of the output devices, "System Default" first, that follows `AudioPreview`'s
+    /// list as devices come and go.
+    private func makeOutputItem() -> NSToolbarItem {
+        let popUp = NSPopUpButton(frame: .zero, pullsDown: false)
+        popUp.bezelStyle = .texturedRounded
+        popUp.target = self
+        popUp.action = #selector(outputChosen(_:))
+        popUp.setAccessibilityLabel("Audio Output")
+        // A set width, so the toolbar does not shift as device names come and go.
+        popUp.translatesAutoresizingMaskIntoConstraints = false
+        popUp.widthAnchor.constraint(equalToConstant: 200).isActive = true
+        outputPopUp = popUp
+        fillOutputMenu()
+        outputCancellable = AudioPreview.shared.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.fillOutputMenu() }
+        let item = NSToolbarItem(itemIdentifier: Self.outputItem)
+        item.view = popUp
+        item.label = "Audio Output"
+        item.paletteLabel = "Audio Output"
+        item.toolTip = "The device the Wavetables page’s Listen control plays through"
+        return item
+    }
+
+    private func fillOutputMenu() {
+        guard let popUp = outputPopUp else { return }
+        let preview = AudioPreview.shared
+        let menu = NSMenu()
+        let defaultItem = NSMenuItem(title: "System Default", action: nil, keyEquivalent: "")
+        defaultItem.image = NSImage(systemSymbolName: "speaker.wave.2", accessibilityDescription: nil)
+        menu.addItem(defaultItem)
+        if !preview.outputDevices.isEmpty { menu.addItem(.separator()) }
+        for device in preview.outputDevices {
+            let item = NSMenuItem(title: device.name, action: nil, keyEquivalent: "")
+            item.representedObject = device.uid
+            item.toolTip = device.name
+            menu.addItem(item)
+        }
+        // Rebuilt only when the list changed, so the open menu is not pulled from under the pointer.
+        if popUp.menu?.items.map(\.title) != menu.items.map(\.title) { popUp.menu = menu }
+        let chosen = preview.effectiveOutputDevice
+        popUp.selectItem(at: chosen.flatMap { device in popUp.menu?.items.firstIndex { ($0.representedObject as? String) == device.uid } } ?? 0)
+    }
+
+    @objc private func outputChosen(_ sender: NSPopUpButton) {
+        AudioPreview.shared.outputDeviceUID = sender.selectedItem?.representedObject as? String
     }
 }
 
@@ -332,10 +393,11 @@ private func buildMainMenu(appDelegate: AppDelegate, menuActions: MenuActions) -
     editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
     editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
     editMenu.addItem(.separator())
-    // To the first responder: the pages' lists answer it (`onDeleteCommand`) by removing the
-    // selected rows. The key equivalent is the Delete key alone.
-    let deleteItem = editMenu.addItem(withTitle: "Delete", action: NSSelectorFromString("delete:"), keyEquivalent: "\u{8}")
-    deleteItem.keyEquivalentModifierMask = []
+    // To the first responder: the pages' lists answer it (`.onCommand(MenuActions.removeSelected)`)
+    // by removing their selected rows. ⌘⌫, as Finder's Move to Trash, not the Delete key alone,
+    // which is too easily hit while moving through a list with the arrow keys. In a text field
+    // nothing answers it, so ⌘⌫ keeps its text meaning there.
+    editMenu.addItem(withTitle: "Remove Selected", action: MenuActions.removeSelected, keyEquivalent: "\u{8}")
     editMenuItem.submenu = editMenu
     mainMenu.addItem(editMenuItem)
 

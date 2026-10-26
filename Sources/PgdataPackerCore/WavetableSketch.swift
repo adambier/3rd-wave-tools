@@ -71,17 +71,28 @@ public extension WavetableSketch {
     /// `columns` values (``reduceCycle(_:to:)``), enough for a picture, so a spectral blend of
     /// long frames stays quick. Nil for an empty table.
     static func cycle(at position: Double, in frames: [[Float]], interpolation: Interpolation?, columns: Int = 256) -> SweepPoint? {
+        cycle(at: position, in: frames, interpolation: interpolation) { reduceCycle($0, to: columns) }
+    }
+
+    /// The cycle at `position` (see ``cycle(at:in:interpolation:columns:)``) at the frames' own
+    /// length, for playing it rather than drawing it.
+    static func fullCycle(at position: Double, in frames: [[Float]], interpolation: Interpolation?) -> SweepPoint? {
+        cycle(at: position, in: frames, interpolation: interpolation) { $0 }
+    }
+
+    private static func cycle(at position: Double, in frames: [[Float]], interpolation: Interpolation?,
+                              prepare: ([Float]) -> [Float]) -> SweepPoint? {
         guard !frames.isEmpty else { return nil }
         let last = frames.count - 1
         let p = min(max(position, 0), 1) * Double(last)
         let lower = min(Int(p.rounded(.down)), last)
         let fraction = Float(p - Double(lower))
-        let a = reduceCycle(frames[lower], to: columns)
+        let a = prepare(frames[lower])
         let between = interpolation == .crossfade || interpolation == .spectral
         guard between, lower < last, fraction > 0.001 else {
             return SweepPoint(values: a, lower: lower, upper: lower, fraction: 0)
         }
-        let b = reduceCycle(frames[lower + 1], to: columns)
+        let b = prepare(frames[lower + 1])
         let values = interpolation == .crossfade ? blend(a, b, t: fraction) : spectralBlend(a, b, t: fraction)
         return SweepPoint(values: values, lower: lower, upper: lower + 1, fraction: fraction)
     }
@@ -119,7 +130,7 @@ public extension WavetableSketch {
         var out: [(position: Double, values: [Float])] = []
         out.reserveCapacity((frames.count - 1) * perGap)
         // For spectral blends, each frame's spectrum is taken once, not once per in-between.
-        let spectra: [(magnitude: [Double], phase: [Double])] = mode == .spectral ? frames.map(spectrum) : []
+        let spectra: [Resampling.CycleSpectrum] = mode == .spectral ? frames.map { Resampling.CycleSpectrum($0) } : []
         for g in 0..<(frames.count - 1) {
             for j in 1...perGap {
                 let t = Float(j) / Float(perGap + 1)
@@ -127,7 +138,7 @@ public extension WavetableSketch {
                 if mode == .crossfade {
                     values = blend(frames[g], frames[g + 1], t: t)
                 } else {
-                    values = synthesize(blendSpectra(spectra[g], spectra[g + 1], t: t), count: frames[g].count)
+                    values = Resampling.CycleSpectrum.blend(spectra[g], spectra[g + 1], t: t).cycle(size: frames[g].count)
                 }
                 out.append((Double(g) + Double(t), values))
             }
@@ -140,70 +151,10 @@ public extension WavetableSketch {
         (0..<min(a.count, b.count)).map { a[$0] + (b[$0] - a[$0]) * t }
     }
 
-    /// A spectral blend: each harmonic's magnitude moves linearly from `a`'s to `b`'s, and its
-    /// phase along the shorter arc between them. This stands in for the spectral morphs of
-    /// Serum and Vital, whose exact methods are not published, so it is an approximation. Two
-    /// identical cycles give that cycle back (to rounding). The cycles must be the same length.
+    /// A spectral blend, `Resampling.spectralBlend(_:_:t:)`: each harmonic's amplitude moves
+    /// linearly from `a`'s to `b`'s and its phase along the shorter arc between them. An
+    /// approximation of the spectral morphs of Serum and Vital, whose methods are not published.
     static func spectralBlend(_ a: [Float], _ b: [Float], t: Float) -> [Float] {
-        let n = min(a.count, b.count)
-        guard n > 1 else { return blend(a, b, t: t) }
-        let blended = blendSpectra(spectrum(Array(a.prefix(n))), spectrum(Array(b.prefix(n))), t: t)
-        return synthesize(blended, count: n)
-    }
-
-    /// The harmonics of a blend between two spectra (see ``spectralBlend(_:_:t:)``).
-    static func blendSpectra(_ sa: (magnitude: [Double], phase: [Double]), _ sb: (magnitude: [Double], phase: [Double]), t: Float)
-        -> (magnitude: [Double], phase: [Double]) {
-        let bins = min(sa.magnitude.count, sb.magnitude.count)
-        var magnitude = [Double](repeating: 0, count: bins), phase = magnitude
-        let tt = Double(t)
-        let silent = 1e-6
-        for k in 0..<bins {
-            magnitude[k] = sa.magnitude[k] + (sb.magnitude[k] - sa.magnitude[k]) * tt
-            // A harmonic one frame lacks has no phase there: keep the other frame's.
-            if sa.magnitude[k] < silent { phase[k] = sb.phase[k]; continue }
-            if sb.magnitude[k] < silent { phase[k] = sa.phase[k]; continue }
-            let d = atan2(sin(sb.phase[k] - sa.phase[k]), cos(sb.phase[k] - sa.phase[k]))
-            phase[k] = sa.phase[k] + d * tt
-        }
-        return (magnitude, phase)
-    }
-
-    /// The real cycle of `count` samples with the given harmonics (the inverse of `spectrum`).
-    static func synthesize(_ spectrum: (magnitude: [Double], phase: [Double]), count n: Int) -> [Float] {
-        synthesize(magnitude: spectrum.magnitude, phase: spectrum.phase, count: n)
-    }
-
-    /// The magnitudes and phases of harmonics 0 … n/2 of a real cycle (a plain DFT: the cycles
-    /// here are a few dozen values, so no FFT is needed).
-    static func spectrum(_ x: [Float]) -> (magnitude: [Double], phase: [Double]) {
-        let n = x.count
-        let bins = n / 2 + 1
-        var magnitude = [Double](repeating: 0, count: bins), phase = magnitude
-        for k in 0..<bins {
-            var re = 0.0, im = 0.0
-            for j in 0..<n {
-                let angle = 2 * Double.pi * Double(j * k) / Double(n)
-                re += Double(x[j]) * cos(angle)
-                im -= Double(x[j]) * sin(angle)
-            }
-            magnitude[k] = (re * re + im * im).squareRoot()
-            phase[k] = atan2(im, re)
-        }
-        return (magnitude, phase)
-    }
-
-    /// The real cycle of `count` samples with the given harmonics (the inverse of `spectrum`).
-    static func synthesize(magnitude: [Double], phase: [Double], count n: Int) -> [Float] {
-        let bins = min(magnitude.count, phase.count)
-        return (0..<n).map { j in
-            var v = 0.0
-            for k in 0..<bins {
-                // Bins 0 and n/2 (for even n) occur once; every other harmonic has a mirror.
-                let weight: Double = (k == 0 || (n % 2 == 0 && k == n / 2)) ? 1 : 2
-                v += weight * magnitude[k] * cos(2 * Double.pi * Double(j * k) / Double(n) + phase[k])
-            }
-            return Float(v / Double(n))
-        }
+        Resampling.spectralBlend(a, b, t: t)
     }
 }

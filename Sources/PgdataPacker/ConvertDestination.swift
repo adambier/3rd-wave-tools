@@ -51,7 +51,7 @@ struct ConvertDestinationPane: View {
             if plan.preset.isThirdWave {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("To load .wt files: copy the WAVES folder onto the 3rd Wave’s USB drive, then Global → Bulk wavetable import; or add them to the 3rd Wave Terminal app’s library and send them from there. A 3rd Wave synth holds 64 U tables and 48 P tables; its factory tables fill U00–U55 and P00–P35, leaving U56–U63 and P36–P47.")
+                    Text("To load .wt files: copy the WAVES folder onto the 3rd Wave’s USB drive, then Global → Bulk wavetable import; or add them to the 3rd Wave Terminal app’s library and sync. The 3rd Wave holds 48 P tables and 64 U tables; its factory tables fill P00–P35 and U00–U55, leaving P36–P47 and U56–U63 initially available for user tables.")
                     Text("Send to Pack also adds the .wt files to the Pack page.")
                 }
                 .font(.caption).foregroundStyle(.secondary)
@@ -276,8 +276,8 @@ private func choiceText(_ label: ConvertPlan.ChoiceLabel) -> Text {
     return Text(label.value) + Text(" — " + existing).italic()
 }
 
-/// Keep original frames or crossfade new ones; shown when some table to convert gains or loses
-/// frames for the destination.
+/// Original frames only (picked evenly or repeated) or crossfade new ones; shown when some
+/// table to convert gains or loses frames for the destination.
 struct ConvertFrameCountOption: View {
     @ObservedObject var state: AppState
 
@@ -286,12 +286,12 @@ struct ConvertFrameCountOption: View {
             Text("The destination needs more or fewer frames")
             // The pickers' titles name them for VoiceOver; the text above each shows the words.
             Picker("If the destination needs more or fewer frames", selection: $state.convertPlan.options.frameCountPolicy) {
-                Text("Keep Original Frames").tag(FrameCountPolicy.pickEvenly)
+                Text("Original Frames Only").tag(FrameCountPolicy.pickEvenly)
                 Text("Crossfade New Frames").tag(FrameCountPolicy.interpolate)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .help("Keep original frames: uses evenly spaced frames, including the first and last; adds no new frames (adding frames repeats some).\nCrossfade new frames: makes each new frame by crossfading its two neighbours. This happens once, when converting; it is separate from the interpolation saved in the file, which is how the synth moves between frames as it plays.")
+            .help("Original frames only: no new waveforms are made. Fewer frames keeps evenly spaced originals, the first and last among them (256 → 64 keeps about every 4th); more frames repeats each original in order (16 → 64 repeats each about 4 times).\nCrossfade new frames: makes each new frame by crossfading its two neighbours. This happens once, when converting; it is separate from the interpolation saved in the file, which is how the synth moves between frames as it plays.")
             Text(state.convertPlan.frameCountCaption)
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

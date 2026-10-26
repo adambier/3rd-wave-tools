@@ -42,9 +42,10 @@ final class ReviewFixPlanTests: XCTestCase {
         XCTAssertNil(plan.items[0].chosenFrameSize)
     }
 
-    /// A size the file's contents state is not offered for change; one the app estimated (a
-    /// tag in the file name, markers, a .txt, the length) is the default of a choice among the
-    /// sizes the length allows; a 3rd Wave table's format fixes its size.
+    /// A size the file's contents state is not offered for change in the Input column (the
+    /// preview's override, `frameSizeAlternatives`, is tested in ConvertPlanTests); one the app
+    /// estimated (a tag in the file name, markers, a .txt, the length) is the default of a choice
+    /// among the sizes the length allows; a 3rd Wave table's format fixes its size.
     func testOnlyEstimatedSizesAreOfferedForChange() {
         var plan = ConvertPlan()
         let stated = FoundTable(name: "T", fileName: "t.wav", source: .wav, samples: Array(repeating: 0, count: 8192),
@@ -53,8 +54,8 @@ final class ReviewFixPlanTests: XCTestCase {
         XCTAssertFalse(plan.items[0].sizeIsEstimate)
         XCTAssertEqual(plan.items[0].frameSizeChoices, [])
         XCTAssertEqual(plan.items[0].sizeQualifier, "in the file")
-        plan.chooseFrameSize(plan.items[0].id, 1024)
-        XCTAssertEqual(plan.items[0].frameSize, 2048, "not offered, so not taken")
+        plan.chooseFrameSize(plan.items[0].id, 3000)
+        XCTAssertEqual(plan.items[0].frameSize, 2048, "not a size the length allows, so not taken")
 
         let tagged = FoundTable(name: "Pad_wt1024", fileName: "Pad_wt1024.wav", source: .wav, samples: Array(repeating: 0, count: 8192),
                                 frameSize: 1024, frameSizeBasis: "Tonverk tag in the file name", frameSizeEvidence: .fileName)

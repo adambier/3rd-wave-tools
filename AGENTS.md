@@ -94,7 +94,7 @@ over real exports: every unmodified file must come back identical.
 
 - It matches wavetables and multisamples **by content**, not name: an identical table already loaded
   is reused and the file's name ignored; the slot in a file is only a label, and new content goes
-  into a free slot (U56–U63, P36–P47 for tables), with an offer to overwrite the last ones when none
+  into a free slot (P36–P47, U56–U63 for tables), with an offer to overwrite the last ones when none
   is free.
 - Imports come from the USB drive (volume `THIRDWAVE`): `PROGRAMS` for `.pro` and `.pgdata`, `WAVES`
   for `.wt`, `AUDIO` for `.bin` and `.wav`. **Import unified program data file** takes files without
@@ -197,7 +197,7 @@ Do:
   (currently complete in both); document new public API in `PgdataPackerCore` too (coverage there
   is partial today).
 - Put any new or changed claim about what the 3rd Wave does in `docs/FORMATS.md` with its evidence
-  (a test on a 3rd Wave synth with model and OS version, a Groove Synthesis document, or a count of files),
+  (a test on the 3rd Wave with model and OS version, a Groove Synthesis document, or a count of files),
   and mark inferences as inferences, in the code comment as well as the document.
 - For a new wavetable destination, set `OutputPreset.basis` to its sources and leave `testedIn`
   empty until someone has tested it in that synth (`docs/WAVETABLES.md` carries the sources).
@@ -267,17 +267,22 @@ PgdataPackerCore (`Sources/PgdataPackerCore/`):
 | `NameCleaner` | `NameCleaner.swift` | Clean Up Names proposals |
 | `OutputPreset` display extensions | `DestinationInfo.swift` | What the Wavetables page says about each destination: `Group` (with `title`, `presets`), `group`, `shortTitle`, `specLine`, `distinction` |
 | `ConvertReport`, `ReportText` | `ConvertReport.swift` | The Wavetables page's report after converting (alert title and text, log text); the item-line form every report uses |
-| `FrameSizeFit`, `WavetableSketch`, `CountWords` | own files | Frame-size heuristic ("likely", never applied alone), preview thumbnails, report phrasing |
+| `FrameSizeFit`, `WavetableSketch`, `CountWords`, `PianoKey` | own files | Frame-size heuristic ("likely"; assumed only when nothing states a size), preview pictures and the cycle at a sweep position, report phrasing, the Listen control's piano keys |
 
 App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle, Help links),
 `AppState.swift` (all state, `ObservableObject`, main thread; `Section` = Pack, Unpack, Wavetables),
 `ContentView.swift`, `PackView.swift`, `UnpackView.swift`, `ConvertView.swift`,
 `ConvertDestination.swift`, `ConvertDetail.swift`, `RepointSheet.swift`, `NameCleanupSheet.swift`,
 `Panels.swift` (AppKit open/save panels, confirmations and the overwrite choice as sheets, background
-writing with progress), `SearchField.swift` (an `NSSearchField` for SwiftUI). `main.swift` also holds
-`MenuActions` (the File and View menus' targets and validation) and `ToolbarController` (the unified
-toolbar whose segmented control switches pages). Scroll bars follow the system setting; menus carry
-the shortcuts (⌘O, ⇧⌘E, ⌘1–⌘3, ⌥⌘L, ⌫); the Info.plist declares the file types with
+writing with progress), `SearchField.swift` (an `NSSearchField` for SwiftUI), `AudioPreview.swift`
+(the Listen control's engine: `AVAudioEngine` with a source node, band-limiting through
+`Resampling.bandLimitedCycle`, and the CoreAudio output-device list). `main.swift` also holds
+`MenuActions` (the File and View menus' targets and validation; Edit › Remove Selected ⌘⌫ reaches
+the lists through `.onCommand`) and `ToolbarController` (the unified toolbar whose segmented control
+switches pages, with the audio output pop-up at its trailing end on every page). The Wavetables page
+carries an orange under-development notice while `ConvertPlan.conversionUnderDevelopment` is true
+(any `OutputPreset.testedIn` empty). Scroll bars follow the system setting; menus carry
+the shortcuts (⌘O, ⇧⌘E, ⌘1–⌘3, ⌥⌘L, ⌘⌫, ⌘A); the Info.plist declares the file types with
 `LSHandlerRank` None, so files open by Dock-icon drop without the app claiming any type.
 
 ## 8. Where to look (task to files)
@@ -342,8 +347,8 @@ No tests cover the SwiftUI views; a UI change is verified by building and using 
 ## 10. House style for text (README, docs, DocC, app strings)
 
 - "3rd Wave", never "Third Wave"; "Groove Synthesis" in full; "the 3rd Wave" or "your 3rd Wave",
-  not "the synth"; with the indefinite article, "a 3rd Wave synth", never "a 3rd Wave" standing
-  alone (as an adjective, "a 3rd Wave program" is fine).
+  not "the synth" and never "a 3rd Wave" standing alone ("tests on the 3rd Wave", not "on a 3rd
+  Wave"; as an adjective, "a 3rd Wave program" is fine).
 - Standing behaviour in the present tense; single observations as "has been observed to …";
   inferences said to be inferences; never claim more than the evidence supports.
 - The serial (Oxford) comma. "e.g.," or "for example" before parenthetical examples.
@@ -418,7 +423,7 @@ credentials that are not in the repository.
   its synth through this project. WAVETABLES.md "Open questions" lists what each test would settle.
 - The mipmap chain written for U tables uses ideal spectral cut-offs; the factory filter is unknown
   (the 3rd Wave identifies a table by its first 65,536 values, so the chain need not match).
-- `fixtures/` exercise structure, not sound, and have not been loaded on a 3rd Wave synth.
+- `fixtures/` exercise structure, not sound, and have not been loaded on the 3rd Wave.
 - The app is macOS-only; CI compiles it but has no tests for it. A Linux or Windows front end would
   build on `PgdataPackerCore`, whose API may change between versions more than `PgdataFormats`'s.
 - `WavetableFormats` is provisional in 1.1: its API may change until a 1.1.x release, once its

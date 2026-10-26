@@ -104,12 +104,12 @@ struct ConvertView: View {
 /// been tested in its synth (`OutputPreset.testedIn`).
 struct ConvertDevelopmentNotice: View {
     var body: some View {
-        Label("Wavetable conversion under development.", systemImage: "exclamationmark.triangle")
+        Label("Wavetable conversion under development; some output formats remain untested.", systemImage: "exclamationmark.triangle")
             .font(.callout)
             .foregroundStyle(.orange)
             .frame(maxWidth: .infinity)
             .padding(.top, 8)
-            .help("Converting has not yet been tested in every destination’s synth; the Sources beside each destination say whether it has been there. The notice goes when all have.")
+            .help("The Sources beside each destination say whether converting to it has been tested in its synth. This notice goes when every destination has been.")
     }
 }
 
@@ -227,7 +227,7 @@ struct ConvertSummaryStrip: View {
             Text("\(total) table\(total == 1 ? "" : "s") · \(marked) to convert")
                 .monospacedDigit()
             ConvertBlockedCount(count: plan.needsFrameSizeCount, one: "needs a frame size", many: "need frame sizes",
-                                help: "Tables marked to convert whose file doesn’t specify a frame size: choose one in the Input column. Click to go to the first.") {
+                                help: "Tables marked to convert for which no frame size could be estimated: choose one in the Input column. Click to go to the first.") {
                 jump(.needsFrameSize)
             }
             ConvertBlockedCount(count: plan.cannotSplitCount, one: "can’t be split", many: "can’t be split",
@@ -332,7 +332,8 @@ struct ConvertTable: View {
         } primaryAction: { (ids: Set<UUID>) in
             if ids.count == 1, let id = ids.first { rename(id) }
         }
-        .onDeleteCommand { state.removeConvertItems(selection); selection = [] }
+        .onCommand(MenuActions.removeSelected) { state.removeConvertItems(selection); selection = [] }
+        .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(items.map(\.id)) }
     }
 
     /// Starts editing the row's name, with the row selected so the preview below shows the table.
@@ -528,7 +529,7 @@ struct ConvertFrameSizeCell: View {
             }
             .buttonStyle(.bordered)
             .help(item.needsFrameSize
-                  ? "The file doesn’t specify a frame size. Click to choose one of the sizes its length allows (frames × samples per frame)."
+                  ? "Unable to estimate a frame size from this file. Click to choose one of the sizes its length allows (frames × samples per frame)."
                   : "Input: " + item.sizeDescription + " (frames × samples per frame). " + item.basisDescription + " Click to choose another size.")
             .popover(isPresented: $choosing, arrowEdge: .bottom) {
                 ConvertSizePopover(state: state, item: item)
@@ -593,11 +594,17 @@ struct ConvertFramesBySize: View {
 }
 
 /// The size chooser: where the size comes from, a button per size the file's length allows with
-/// the first frame drawn at that size, and what the "likely" mark means (see `FrameSizeFit`; a
-/// suggestion, never applied by itself).
+/// the first frame drawn at that size, and what the "likely" mark means (see `FrameSizeFit`).
+/// By default the sizes are the Input column's (`Item.frameSizeChoices`) and the sentence the
+/// item's `basisDescription`; the preview's override (`ConvertSizeOverrideLink`) passes the
+/// alternatives to a stated size and its own sentence.
 struct ConvertSizePopover: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
+    var sizes: [Int]? = nil
+    var basis: String? = nil
+
+    private var choices: [Int] { sizes ?? item.frameSizeChoices }
 
     /// Three buttons to a row, with the popover's padding.
     private static let width: CGFloat = 3 * ConvertSizeButton.width + 2 * 8 + 24
@@ -622,7 +629,7 @@ struct ConvertSizePopover: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Frame size").font(.headline)
             // Where the size comes from; the pictures below show each size the length allows.
-            Text(item.basisDescription)
+            Text(basis ?? item.basisDescription)
                 .font(.caption)
                 .frame(width: Self.textWidth, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
@@ -631,9 +638,9 @@ struct ConvertSizePopover: View {
             // not a LazyVGrid: in a popover's VStack the lazy grid took all the height and left
             // every sentence around it one truncated line.
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(Array(stride(from: 0, to: item.frameSizeChoices.count, by: 3)), id: \.self) { (start: Int) in
+                ForEach(Array(stride(from: 0, to: choices.count, by: 3)), id: \.self) { (start: Int) in
                     HStack(alignment: .top, spacing: 8) {
-                        ForEach(item.frameSizeChoices[start..<min(start + 3, item.frameSizeChoices.count)], id: \.self) { (size: Int) in
+                        ForEach(choices[start..<min(start + 3, choices.count)], id: \.self) { (size: Int) in
                             ConvertSizeButton(state: state, item: item, size: size,
                                               likely: FrameSizeFit.likelySize(item.frameSizeFit) == size)
                                 .frame(width: ConvertSizeButton.width)

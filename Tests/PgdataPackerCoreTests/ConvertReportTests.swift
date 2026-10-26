@@ -117,7 +117,7 @@ final class ConvertReportTests: XCTestCase {
         plan.add((0..<9).map(table), factory: FactoryLibrary())
         let names = plan.items.map(\.name)
         let c = conversion(names, notes: names.map { _ in ["Resized from 128 to 1,024 samples per frame."] })
-        let note = "9 U tables to convert. A 3rd Wave synth holds 64 U tables, 56 of them Groove Synthesis’s (U00–U55); with no slot free, it offers to overwrite the last slot (U63); which slots several tables would take has not been tested."
+        let note = "9 U tables to convert. The 3rd Wave holds 64 U tables, 56 of them Groove Synthesis’s (U00–U55); with no slot free, it offers to overwrite the last slot (U63); which slots several tables would take has not been tested."
         let r = make(plan, c, written(names.map { "WAVES/\($0).wt" }))
         XCTAssertEqual(plan.thirdWaveCapacityNote, note)
         XCTAssertTrue(r.message.hasSuffix("What converting did:\n• All 9 tables\tResized from 128 to 1,024 samples per frame.\n\n" + note), r.message)
@@ -127,7 +127,7 @@ final class ConvertReportTests: XCTestCase {
         plan.setSelected(plan.items[0].id, false)
         XCTAssertNil(plan.thirdWaveCapacityNote)
         let fits = make(plan, c, written(names.map { "WAVES/\($0).wt" }), pack: [folder.appendingPathComponent("WAVES/T1.wt")])
-        XCTAssertFalse(fits.message.contains("a 3rd Wave synth holds"))
+        XCTAssertFalse(fits.message.contains("the 3rd Wave holds"))
         XCTAssertTrue(fits.message.hasSuffix("samples per frame.\n\nThe .wt file is added to the Pack page."), fits.message)
     }
 

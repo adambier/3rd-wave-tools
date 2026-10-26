@@ -52,7 +52,7 @@ for checking an implementation.
 **How sure each statement is.** A plain statement describes what every file examined does; the
 test is that every file reads and writes back byte for byte (section
 [9](#9-how-this-was-established)). A statement that rests on more than the files has a footnote
-saying where it comes from: a test on a 3rd Wave synth, or Groove Synthesis's own documents and files.
+saying where it comes from: a test on the 3rd Wave, or Groove Synthesis's own documents and files.
 Where something is reasoning that has not been checked, the text says so in words ("probably",
 "not yet checked").
 
@@ -320,7 +320,7 @@ the format number, which a `.pgdata` does not carry, so it has to be read from t
 *S* = 181 with *F* below 136 was written by both `W3_PROG_4` and `W3_PROG_5`, which differ only in
 how event records name parts (section 3.4), so look at the note and automation records (types 1
 and 2): a target above 3 means `W3_PROG_5`; otherwise a target 0 means `W3_PROG_4`; with neither,
-assume `W3_PROG_5`. This rule is an inference from the files, not checked on a 3rd Wave synth. The same rule serves a `.pro` whose tag disagrees with its layout
+assume `W3_PROG_5`. This rule is an inference from the files, not checked on the 3rd Wave. The same rule serves a `.pro` whose tag disagrees with its layout
 (a `W3_PROG_5` tag on a 173-value layout, as an unpacker that does not convert would write): go by
 the layout, except that a 181-integer layout with fewer than 136 floats keeps a tag of 4 or 5.
 
@@ -341,7 +341,7 @@ tables).
 - The 3rd Wave's exports are always in the current program layout.
 
 *How this was established:* the layout reads and rewrites byte for byte 221 files from Groove
-Synthesis, third parties, and a 3rd Wave synth's own exports. Files that the library builds
+Synthesis, third parties, and the 3rd Wave's own exports. Files that the library builds
 import correctly.[^both]
 
 ## 5. Wavetable (.wt) and multisample (.bin)

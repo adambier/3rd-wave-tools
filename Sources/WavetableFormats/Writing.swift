@@ -405,7 +405,7 @@ public extension OutputPreset {
     var basis: String {
         switch self {
         case .thirdWaveU:
-            return "Groove Synthesis, 3rd Wave User Manual v1.9 (Wave Maker) and MIDI CC + SysEx Spec v2a; the factory .wt files; tests on a 3rd Wave synth (FORMATS.md 5.1)"
+            return "Groove Synthesis, 3rd Wave User Manual v1.9 (Wave Maker) and MIDI CC + SysEx Spec v2a; the factory .wt files; tests on the 3rd Wave (FORMATS.md 5.1)"
         case .thirdWaveP:
             return "Groove Synthesis, 3rd Wave User Manual v1.9; the factory .wt files (FORMATS.md 5.1)"
         case .wav2048:

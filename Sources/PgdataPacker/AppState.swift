@@ -356,7 +356,7 @@ final class AppState: ObservableObject {
     }
 
     /// A slot to offer for an unassigned wavetable file: the first user slot of the right kind
-    /// (U56–U63, P36–P47) that no other added file is assigned to. The user can change it.
+    /// (P36–P47, U56–U63) that no other added file is assigned to. The user can change it.
     func suggestedSlot(for file: ContentFile, alsoTaken: Set<SourceRef> = []) -> SourceRef? {
         guard !file.isSample else { return nil }
         let taken = Set(contentFiles.compactMap { $0.id == file.id ? nil : $0.slot }).union(alsoTaken)
@@ -750,8 +750,8 @@ final class AppState: ObservableObject {
             return
         }
         guard marked.contains(where: plan.canConvert) else {
-            alertMessage = (marked.count == 1 ? "The table marked to convert can’t be converted yet: its file doesn’t specify a frame size."
-                                              : "None of the tables marked to convert can be converted yet: their files don’t specify a frame size.")
+            alertMessage = (marked.count == 1 ? "The table marked to convert can’t be converted yet: a frame size could not be estimated from its file."
+                                              : "None of the tables marked to convert can be converted yet: frame sizes could not be estimated from their files.")
                 + "\n\nChoose a frame size in the Input column first."
             return
         }

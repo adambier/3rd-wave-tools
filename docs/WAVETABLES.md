@@ -200,8 +200,9 @@ is turned down to fit, which the report says.
 
 When a destination needs a different number of frames, you choose how:
 
-- **Keep Original Frames** uses evenly spaced frames, the first and last among them. It adds no
-  new frames. Bringing a table *up* to more frames this way repeats frames.
+- **Original Frames Only** makes no new waveforms. Bringing a table down to fewer frames keeps
+  evenly spaced originals, the first and last among them (256 → 64 keeps about every 4th);
+  bringing it up to more repeats each original in order (16 → 64 repeats each about 4 times).
 - **Crossfade New Frames** makes each new frame by crossfading its two neighbours, once, when
   converting. This is separate from the interpolation a file records, which is how the synth
   moves between frames as it plays.

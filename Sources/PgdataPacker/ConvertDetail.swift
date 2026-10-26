@@ -161,7 +161,7 @@ struct ConvertPreviewFacts: View {
     /// "64 frames × 2,048 samples", or what is missing.
     private var inputValue: String {
         guard let n = item.frameSize, let frames = item.frameCount else {
-            return item.frameSize == nil ? "Frame size not stated. Choose one in the Input column." : item.sizeDescription
+            return item.frameSize == nil ? "No frame size. Choose one in the Input column." : item.sizeDescription
         }
         return "\(frames) frame\(frames == 1 ? "" : "s") × \(ConvertPlan.formatCount(n)) samples"
     }
@@ -178,7 +178,12 @@ struct ConvertPreviewFacts: View {
             Text("\(item.sourceDescription) · \(item.location.url.path)")
                 .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 .help(([item.location.url.path] + item.alsoIn.map { "Also: " + $0.url.path }).joined(separator: "\n"))
-            ConvertFactBlock(label: "Input", value: inputValue, detail: inputDetail, alert: item.frameSize == nil)
+            VStack(alignment: .leading, spacing: Self.lineSpacing) {
+                ConvertFactBlock(label: "Input", value: inputValue, detail: inputDetail, alert: item.frameSize == nil)
+                if item.sizeIsStated && !item.frameSizeAlternatives.isEmpty {
+                    ConvertSizeOverrideLink(state: state, item: item)
+                }
+            }
             ConvertFactBlock(label: "Interpolation", value: item.interpolationDescription, detail: nil, alert: false)
                 .help("How a synth moves from one frame to the next as the table is swept: none (it steps from frame to frame), crossfade (it blends neighbours), or spectral (it blends their harmonics). Some files say which; most synths set it on the oscillator instead.")
             ConvertWhatHappens(state: state, item: item)
@@ -210,45 +215,142 @@ struct ConvertFactBlock: View {
     }
 }
 
-/// The table's frames stacked front to back, as the synths draw them: the source as read, with
-/// its own interpolation, and beside it what the destination gets (the preview read back from
-/// the bytes the writer made), with the interpolation the file records. Moving the pointer
-/// across either picture sweeps through the table: the frame under the pointer lights up in
-/// both stacks, and a third picture draws that cycle large, source and result together (see
-/// `ConvertSweepView`). The pictures share the width they are given, however narrow, and have
-/// a set height (see `ConvertOverview`).
-struct ConvertOverviewPair: View {
+/// "Change…" under the Input block when the file states its frame size: the override, which the
+/// Input column does not offer for a stated size (it is rarely right), opens the same chooser
+/// with the file's own size first and a sentence on when another is the right one. Once a size
+/// is chosen, the column's chooser is active too, and choosing the file's own size again clears
+/// the override.
+struct ConvertSizeOverrideLink: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
-    /// Where the pointer is across a picture, 0 (first frame) to 1 (last); nil when it is not
-    /// over one.
-    @State private var sweep: Double?
+    @State private var choosing = false
+
+    private var basis: String {
+        let own = item.table.frameSize.map(ConvertPlan.formatCount) ?? "?"
+        return "The file specifies \(own) samples per frame. Choose another size only if each frame shows more than one cycle, or part of one; the file's own size is right for nearly every file."
+    }
+
+    var body: some View {
+        Button("Change…") { choosing.toggle() }
+            .buttonStyle(.link)
+            .font(.caption)
+            .help("Override the frame size the file specifies (rarely needed)")
+            .popover(isPresented: $choosing, arrowEdge: .bottom) {
+                ConvertSizePopover(state: state, item: item, sizes: item.frameSizeAlternatives, basis: basis)
+            }
+    }
+}
+
+/// The table's frames stacked front to back, as the synths draw them: the input as read, with
+/// its own interpolation, and beside it what the destination gets (the preview read back from
+/// the bytes the writer made), with the interpolation the file records. The Frame slider under
+/// them sweeps through the table: the frame at the slider lights up in both stacks, and a third
+/// picture draws that cycle large, input and result together (see `ConvertSweepView`); moving
+/// the pointer across a picture moves the slider too. Listen plays the cycle at the slider
+/// (`AudioPreview`) at the pitch beside it. The pictures share the width they are given, however
+/// narrow, and have a set height (see `ConvertOverview`).
+struct ConvertOverviewPair: View {
+    @ObservedObject var state: AppState
+    @ObservedObject private var preview = AudioPreview.shared
+    let item: ConvertPlan.Item
+    /// The slider's place through the table, 0 (first frame) to 1 (last).
+    @State private var position: Double = 0
 
     var body: some View {
         let plan = state.convertPlan
         if let source = item.table.wavetable(frameSize: item.frameSize) {
             let result = state.convertPreviews.resultFrames(item, in: plan)
             let resultInterpolation = plan.interpolationRecorded(for: item)
-            HStack(alignment: .top, spacing: 16) {
-                ConvertOverview(frames: source.frames,
-                                caption: "Input · \(source.frameCount) × \(ConvertPlan.formatCount(source.frameSize))",
-                                interpolation: item.table.interpolation,
-                                unstatedLegend: "interpolation not stated",
-                                tint: WavetableStackCanvas.sourceColor,
-                                sweep: $sweep)
-                if let result, let first = result.first {
-                    ConvertOverview(frames: result,
-                                    caption: "\(plan.preset.shortTitle) · \(result.count) × \(ConvertPlan.formatCount(first.count))",
-                                    interpolation: resultInterpolation,
-                                    unstatedLegend: "interpolation not stored in the file",
-                                    tint: WavetableStackCanvas.resultColor,
-                                    sweep: $sweep)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 16) {
+                    ConvertOverview(frames: source.frames,
+                                    caption: "Input · \(source.frameCount) × \(ConvertPlan.formatCount(source.frameSize))",
+                                    interpolation: item.table.interpolation,
+                                    unstatedLegend: "interpolation not stated",
+                                    tint: WavetableStackCanvas.sourceColor,
+                                    position: $position)
+                    if let result, let first = result.first {
+                        ConvertOverview(frames: result,
+                                        caption: "\(plan.preset.shortTitle) · \(result.count) × \(ConvertPlan.formatCount(first.count))",
+                                        interpolation: resultInterpolation,
+                                        unstatedLegend: "interpolation not stored in the file",
+                                        tint: WavetableStackCanvas.resultColor,
+                                        position: $position)
+                    }
+                    ConvertSweepView(source: source.frames, sourceInterpolation: item.table.interpolation,
+                                     result: result, resultInterpolation: resultInterpolation,
+                                     resultTitle: plan.preset.shortTitle, position: position)
                 }
-                ConvertSweepView(source: source.frames, sourceInterpolation: item.table.interpolation,
-                                 result: result, resultInterpolation: resultInterpolation,
-                                 resultTitle: plan.preset.shortTitle, position: sweep)
+                .help("The table’s frames, front (first) to back (last): the input as read, and what the destination gets, read back from the file this page would write. Solid lines are the frames in the file (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum’s or Vital’s own morphs. The Frame slider below, or the pointer over a picture, sweeps through the table; the third picture draws the cycle there.")
+                ConvertSweepControls(position: $position, preview: preview,
+                                     playing: result != nil ? "the \(plan.preset.shortTitle) output" : "the input")
             }
-            .help("The table’s frames, front (first) to back (last): the input as read, and what the destination gets, read back from the file this page would write. Solid lines are the frames in the file (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum’s or Vital’s own morphs. Move the pointer across a picture to sweep through the table; the third picture draws the cycle at the pointer.")
+            .onChange(of: position) { _ in updatePlaying(source: source.frames, result: result, resultInterpolation: resultInterpolation) }
+            .onChange(of: result) { (r: [[Float]]?) in updatePlaying(source: source.frames, result: r, resultInterpolation: resultInterpolation) }
+            .onChange(of: item.id) { _ in updatePlaying(source: source.frames, result: result, resultInterpolation: resultInterpolation) }
+            .onChange(of: preview.isPlaying) { (playing: Bool) in
+                if playing { preview.play(cycleToPlay(source: source.frames, result: result, resultInterpolation: resultInterpolation)) }
+            }
+            .onDisappear { preview.stop() }
+        }
+    }
+
+    /// The cycle Listen plays: the result's at the slider when there is a result (what the
+    /// destination gets), else the input's.
+    private func cycleToPlay(source: [[Float]], result: [[Float]]?, resultInterpolation: Interpolation?) -> [Float] {
+        if let result, let point = WavetableSketch.fullCycle(at: position, in: result, interpolation: resultInterpolation) {
+            return point.values
+        }
+        return WavetableSketch.fullCycle(at: position, in: source, interpolation: item.table.interpolation)?.values ?? []
+    }
+
+    private func updatePlaying(source: [[Float]], result: [[Float]]?, resultInterpolation: Interpolation?) {
+        guard preview.isPlaying else { return }
+        preview.update(cycleToPlay(source: source, result: result, resultInterpolation: resultInterpolation))
+    }
+}
+
+/// Under the pictures: the Frame slider, the Listen button, and the pitch pop-up (piano keys
+/// with their numbers and frequencies). `playing` names what Listen plays, for its tip.
+struct ConvertSweepControls: View {
+    @Binding var position: Double
+    @ObservedObject var preview: AudioPreview
+    let playing: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 10) {
+                Text("Frame").font(.caption).foregroundStyle(.secondary)
+                Slider(value: $position, in: 0...1)
+                    .controlSize(.small)
+                    .frame(minWidth: 80)
+                    .accessibilityLabel("Frame")
+                    .accessibilityValue(Text("\(Int((position * 100).rounded())) percent through the table"))
+                    .help("Sweep through the table: the frame here is drawn in pink in the pictures and large in the third; Listen plays it")
+                Button {
+                    // The toggle only flips the state; ConvertOverviewPair hands the cycle over
+                    // when it sees `isPlaying` change, so the two stay in step.
+                    if preview.isPlaying { preview.stop() } else { preview.play([]) }
+                } label: {
+                    Label(preview.isPlaying ? "Stop" : "Listen", systemImage: preview.isPlaying ? "stop.fill" : "play.fill")
+                        .frame(minWidth: 58)
+                }
+                .controlSize(.small)
+                .help(preview.isPlaying ? "Stop playing" : "Play the cycle at the slider from \(playing), at the pitch chosen, until stopped")
+                Picker("Pitch", selection: $preview.pitch) {
+                    ForEach(AudioPreview.pitches) { (key: PianoKey) in
+                        Text(key.label).tag(key)
+                    }
+                }
+                .pickerStyle(.menu)
+                .controlSize(.small)
+                .fixedSize()
+                .help("The pitch Listen plays at: a piano key with its number (A4 = key 49 = 440 Hz) and frequency")
+            }
+            if let problem = preview.problem {
+                Text(problem).font(.caption).foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }
@@ -256,7 +358,7 @@ struct ConvertOverviewPair: View {
 /// One stacked-frames picture, its caption, and a legend with colour swatches for its lines.
 /// The picture is 130 points high (the pane scrolls when that is too much) and as wide as it
 /// is given; the caption and legend wrap rather than being cut off. The pointer's place across
-/// the picture, left (first frame) to right (last), is reported through `sweep`.
+/// the picture, left (first frame) to right (last), moves `position`.
 struct ConvertOverview: View {
     let frames: [[Float]]
     let caption: String
@@ -267,22 +369,20 @@ struct ConvertOverview: View {
     /// The table's colour: the source's (`WavetableStackCanvas.sourceColor`) or the result's
     /// (`resultColor`), the same in the cycle picture beside them.
     let tint: Color
-    @Binding var sweep: Double?
+    /// The Frame slider's place, 0…1; the pointer over the picture moves it and it stays.
+    @Binding var position: Double
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            WavetableStackCanvas(frames: frames, interpolation: interpolation, tint: tint, highlight: sweep)
+            WavetableStackCanvas(frames: frames, interpolation: interpolation, tint: tint, highlight: position)
                 .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
                 .overlay(
                     GeometryReader { (geo: GeometryProxy) in
                         Color.clear
                             .contentShape(Rectangle())
                             .onContinuousHover { (phase: HoverPhase) in
-                                switch phase {
-                                case .active(let point):
-                                    sweep = geo.size.width > 0 ? min(max(point.x / geo.size.width, 0), 1) : nil
-                                case .ended:
-                                    sweep = nil
+                                if case .active(let point) = phase, geo.size.width > 0 {
+                                    position = min(max(point.x / geo.size.width, 0), 1)
                                 }
                             }
                     }
@@ -303,40 +403,26 @@ struct ConvertOverview: View {
 /// colour and the result's over it in the accent colour, both to one scale (full scale, or the
 /// louder of the two when a table goes beyond it, so a table that was turned down shows
 /// smaller). Under it, which frames each comes from ("Frame 12 of 64"; "Between frames 12 and
-/// 13 (crossfade)"), from `WavetableSketch.cycle(at:in:interpolation:)`. With the pointer
-/// elsewhere, the first frame, with what to do written over it. (The pink line in the stacks marks
-/// where the pointer is; here the two tables need two colours of their own.)
+/// 13 (crossfade)"), from `WavetableSketch.cycle(at:in:interpolation:)`. (The pink line in the
+/// stacks marks the slider's place; here the two tables need two colours of their own.)
 struct ConvertSweepView: View {
     let source: [[Float]]
     let sourceInterpolation: Interpolation?
     let result: [[Float]]?
     let resultInterpolation: Interpolation?
     let resultTitle: String
-    let position: Double?
+    /// The Frame slider's place, 0…1.
+    let position: Double
 
     var body: some View {
-        let at = position ?? 0
-        let sourcePoint = WavetableSketch.cycle(at: at, in: source, interpolation: sourceInterpolation)
-        let resultPoint = result.flatMap { WavetableSketch.cycle(at: at, in: $0, interpolation: resultInterpolation) }
+        let sourcePoint = WavetableSketch.cycle(at: position, in: source, interpolation: sourceInterpolation)
+        let resultPoint = result.flatMap { WavetableSketch.cycle(at: position, in: $0, interpolation: resultInterpolation) }
         VStack(alignment: .leading, spacing: 3) {
             SweepCycleCanvas(source: sourcePoint?.values ?? [], result: resultPoint?.values)
                 .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
-                // Until the pointer is over a picture, the instruction sits on the drawing
-                // itself, where it is seen; the caption alone was missed.
-                .overlay {
-                    if position == nil {
-                        Label("Move the pointer across a picture to see each frame", systemImage: "hand.point.up.left")
-                            .font(.caption)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 8).padding(.vertical, 5)
-                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
-                            .padding(8)
-                            .allowsHitTesting(false)
-                    }
-                }
                 // The lines under it say which frames are drawn; VoiceOver gets those.
                 .accessibilityHidden(true)
-            Text(position == nil ? "Cycle · the first frame" : "Cycle at the pointer")
+            Text("Cycle at the slider")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 2) {
@@ -571,8 +657,8 @@ struct ConvertWhatHappens: View {
                         .foregroundStyle(.red)
                 }
             } else if plan.status(item) == .needsFrameSize {
-                // The Input block already says, in red, that the size is not stated and where to
-                // choose one, and what the file's length allows; here only what that means.
+                // The Input block already says, in red, that no size could be estimated and where
+                // to choose one, and what the file's length allows; here only what that means.
                 Text("None until a frame size is chosen.").foregroundStyle(.secondary)
             } else {
                 Label(plan.statusDescription(item), systemImage: "exclamationmark.octagon.fill")

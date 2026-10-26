@@ -96,18 +96,40 @@ public struct ConvertPlan: Equatable {
         /// make likely when the file leaves the size open (`FrameSizeFit`; assumed, and said to
         /// be). Nil when nothing settles it.
         public var frameSize: Int? { chosenFrameSize ?? table.frameSize ?? FrameSizeFit.likelySize(frameSizeFit) }
-        /// The sizes the user can choose from, when the size is open or an estimate
-        /// (`sizeIsEstimate`): the file's own first, then the other sizes its length allows
-        /// (`WavetableReader.fittingFrameSizes`). Empty when the file's contents state the
-        /// size (a chunk or header, or a format that fixes it): there is nothing to choose.
+        /// The sizes the Input column offers, when the size is open, an estimate
+        /// (`sizeIsEstimate`), or overridden (`chosenFrameSize`): the file's own first, then the
+        /// other sizes its length allows (`WavetableReader.fittingFrameSizes`). Empty when the
+        /// file's contents state the size (a chunk or header, or a format that fixes it) and
+        /// nothing has been chosen over it: the column then has nothing to choose, and the
+        /// preview's Change… offers `frameSizeAlternatives` instead.
         public var frameSizeChoices: [Int] {
             let own = table.frameSize.map { [$0] } ?? []
             var others = table.candidateFrameSizes
-            if others.isEmpty, table.frameSize != nil, sizeIsEstimate {
+            if others.isEmpty, table.frameSize != nil, sizeIsEstimate || chosenFrameSize != nil {
                 others = WavetableReader.fittingFrameSizes(table.samples.count)
             }
             let choices = own + others.filter { $0 != table.frameSize }
             return choices.count > 1 || table.frameSize == nil ? choices : []
+        }
+        /// Every size the file could be cut at: its own first (when it has one), then the other
+        /// sizes its length allows. For overriding a size a WAV or FLAC states in a chunk, which
+        /// is rarely right but sometimes needed (a chunk saying 2,048 over frames of 1,024
+        /// divides fine and shows two cycles in every frame). Empty for the formats whose layout
+        /// fixes the size (3rd Wave and Surge tables), and when there is nothing to choose
+        /// between.
+        public var frameSizeAlternatives: [Int] {
+            guard table.source == .wav || table.source == .flac else { return [] }
+            let own = table.frameSize.map { [$0] } ?? []
+            var others = table.candidateFrameSizes
+            if others.isEmpty { others = WavetableReader.fittingFrameSizes(table.samples.count) }
+            let all = own + others.filter { $0 != table.frameSize }
+            return all.count > 1 ? all : []
+        }
+        /// Whether the size is one the file's contents state, so that choosing another is an
+        /// override (offered from the preview, not the Input column).
+        public var sizeIsStated: Bool {
+            if case .statedInFile = table.frameSizeEvidence { return table.frameSize != nil }
+            return false
         }
         /// Whether the size is the app's estimate rather than something the file's contents
         /// state: from a tag in the file name (files get renamed), a .txt beside the file,
@@ -195,12 +217,15 @@ public struct ConvertPlan: Equatable {
                 return "The file doesn’t specify a frame size; \(ConvertPlan.formatCount(frameSize ?? 0)) samples per frame is assumed because frames of that size are alike from one to the next, as a wavetable’s are."
                     + (others.isEmpty ? "" : " Its length also allows \(ConvertPlan.listPhrase(others)).")
             case .notStated:
-                return "The file doesn’t specify a frame size."
+                // Unlike `.guessed` and `.likely`, nothing could be assumed: the file states no
+                // size, its length is not a Serum-style one, and no size makes its frames alike.
+                return "Unable to estimate a frame size from this file."
                     + (table.candidateFrameSizes.isEmpty ? " Its length allows none of the sizes offered here (powers of two from 64 to 4,096)."
                                                           : " Its length allows " + ConvertPlan.candidateList(table) + ".")
             case .setManually:
-                if let suggested = table.frameSize {
-                    return "Set manually; the file’s length suggested \(ConvertPlan.formatCount(suggested))."
+                if let own = table.frameSize {
+                    return sizeIsStated ? "Set manually; the file specifies \(ConvertPlan.formatCount(own))."
+                                        : "Set manually; the file’s length suggested \(ConvertPlan.formatCount(own))."
                 }
                 return "Set manually; the file doesn’t specify a frame size."
             }
@@ -501,7 +526,7 @@ public struct ConvertPlan: Equatable {
     /// clears the choice. Other sizes are ignored.
     public mutating func chooseFrameSize(_ id: UUID, _ size: Int?) {
         guard let i = items.firstIndex(where: { $0.id == id }) else { return }
-        if let size, !items[i].frameSizeChoices.contains(size) { return }
+        if let size, !items[i].frameSizeAlternatives.contains(size), !items[i].frameSizeChoices.contains(size) { return }
         // The file's own size, or the one assumed from the samples, is no choice at all.
         let assumed = items[i].table.frameSize ?? FrameSizeFit.likelySize(items[i].frameSizeFit)
         items[i].chosenFrameSize = size == assumed ? nil : size
@@ -563,7 +588,7 @@ public struct ConvertPlan: Equatable {
         case .ready: return "Ready to convert."
         case .excluded: return "Not marked to convert; left out."
         case .needsFrameSize:
-            return "Choose a frame size: the file doesn’t specify one."
+            return "Choose a frame size: none could be estimated from the file."
                 + (item.table.candidateFrameSizes.isEmpty ? " Its length allows none of the sizes offered here (powers of two from 64 to 4,096)."
                                                            : " Its length allows \(Self.candidateList(item.table)).")
         case .cannotSplit:
@@ -620,7 +645,7 @@ public struct ConvertPlan: Equatable {
     /// - MiniFreak V: some table has fewer than 64 frames, which it is not documented to handle.
     /// - Phase Plant: some table has fewer than the 256 frames its documentation asks for, so
     ///   frames are added.
-    /// - U table, P table: more of the user's own tables than a 3rd Wave synth holds at a time
+    /// - U table, P table: more of the user's own tables than the 3rd Wave holds at a time
     ///   (`thirdWaveCapacityNote(for:)`).
     public func caveat(for preset: OutputPreset) -> String? {
         let tables = selectedItems.filter(canConvert)
@@ -890,14 +915,14 @@ public struct ConvertPlan: Equatable {
     }
 
     /// For the chosen 3rd Wave destination: a warning when more of the user's own tables are to
-    /// be converted than a 3rd Wave synth holds at a time (see `thirdWaveCapacityNote(for:)`).
+    /// be converted than the 3rd Wave holds at a time (see `thirdWaveCapacityNote(for:)`).
     public var thirdWaveCapacityNote: String? { thirdWaveCapacityNote(for: preset) }
 
     /// For a 3rd Wave destination: a warning when more of the user's own tables are to be
-    /// converted than the slots its factory tables leave free (U56–U63, P36–P47; factory
+    /// converted than the slots its factory tables leave free (P36–P47, U56–U63; factory
     /// tables, which it already has, do not count), since the 3rd Wave will then offer to
     /// overwrite; nil otherwise, and for other destinations. The note states the facts: how
-    /// many tables a 3rd Wave synth holds (64 U, 48 P), how many of them are Groove Synthesis's
+    /// many tables the 3rd Wave holds (64 U, 48 P), how many of them are Groove Synthesis's
     /// (U00–U55, P00–P35), and that with no slot free it offers to overwrite the last slot
     /// (observed once, for one table, which went to U63; what several would take is untested;
     /// see section 7 of FORMATS.md).
@@ -909,7 +934,7 @@ public struct ConvertPlan: Equatable {
         let factory = isP ? SourceRef.factoryPCount : SourceRef.factoryUCount
         guard own > total - factory else { return nil }
         let kind = isP ? "P" : "U"
-        return "\(own) \(kind) tables to convert. A 3rd Wave synth holds \(total) \(kind) tables, \(factory) of them Groove Synthesis’s (\(kind)00–\(kind)\(factory - 1)); with no slot free, it offers to overwrite the last slot (\(kind)\(total - 1)); which slots several tables would take has not been tested."
+        return "\(own) \(kind) tables to convert. The 3rd Wave holds \(total) \(kind) tables, \(factory) of them Groove Synthesis’s (\(kind)00–\(kind)\(factory - 1)); with no slot free, it offers to overwrite the last slot (\(kind)\(total - 1)); which slots several tables would take has not been tested."
     }
 
     /// What the Changes column says for an item: short words for each change the destination

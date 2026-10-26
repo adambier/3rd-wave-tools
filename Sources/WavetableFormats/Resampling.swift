@@ -26,6 +26,81 @@ public enum Resampling {
         return Harmonics(of: cycle).synthesize(size: size)
     }
 
+    /// Resizes one periodic cycle to `size` samples keeping only its mean and harmonics
+    /// 1…`maxHarmonic` (and, as ``resizeCycle(_:to:)`` does, the cosine part of a harmonic
+    /// exactly at the new Nyquist when `size` is even and `maxHarmonic` allows it).
+    ///
+    /// This is a cycle as a band-limited oscillator would play it: at a pitch of f Hz and a
+    /// sample rate of r Hz, every harmonic above r / (2f) would alias, so a player keeps
+    /// `maxHarmonic` = ⌊r / (2f)⌋ − 1 or so. A `maxHarmonic` of 0 leaves the mean alone, and a
+    /// negative one is treated as 0. Returns an empty array when `size` is 0 or less, and silence
+    /// when the cycle is empty.
+    public static func bandLimitedCycle(_ cycle: [Float], to size: Int, maxHarmonic: Int) -> [Float] {
+        guard size > 0 else { return [] }
+        guard !cycle.isEmpty else { return [Float](repeating: 0, count: size) }
+        return Harmonics(of: cycle).synthesize(size: size, maxHarmonic: Swift.max(0, maxHarmonic))
+    }
+
+    /// A blend of two cycles by spectrum: each harmonic's amplitude moves linearly from `a`'s
+    /// to `b`'s (`t` = 0 gives `a`, 1 gives `b`) and its phase along the shorter arc between
+    /// them; a harmonic one cycle lacks keeps the other's phase. This stands in for the spectral
+    /// morphs of Serum and Vital, whose exact methods are not published, so it is an
+    /// approximation; two identical cycles give that cycle back (to rounding). The cycles should
+    /// be the same length; the result has the shorter one's. Empty when either is empty.
+    public static func spectralBlend(_ a: [Float], _ b: [Float], t: Float) -> [Float] {
+        let n = Swift.min(a.count, b.count)
+        guard n > 0 else { return [] }
+        return CycleSpectrum.blend(CycleSpectrum(Array(a.prefix(n))), CycleSpectrum(Array(b.prefix(n))), t: t).cycle(size: n)
+    }
+
+    /// One cycle as its harmonics, for blending cycles by spectrum (``spectralBlend(_:_:t:)``
+    /// does one blend; taking each frame's spectrum once, then blending pairs, is quicker when
+    /// several blends are wanted between the same frames) and for synthesising it again at any
+    /// size, band-limited.
+    public struct CycleSpectrum {
+        var harmonics: Harmonics
+
+        /// The spectrum of a cycle of at least one sample.
+        public init(_ cycle: [Float]) {
+            harmonics = Harmonics(of: cycle.isEmpty ? [0] : cycle)
+        }
+
+        /// The blend described under ``Resampling/spectralBlend(_:_:t:)``, over the harmonics
+        /// both have.
+        public static func blend(_ a: CycleSpectrum, _ b: CycleSpectrum, t: Float) -> CycleSpectrum {
+            let bins = Swift.min(a.harmonics.re.count, b.harmonics.re.count)
+            var re = [Double](repeating: 0, count: bins), im = re
+            let tt = Double(t)
+            // Below this an amplitude counts as absent (amplitudes here are normalised; a cycle
+            // with values within ±1 has harmonics within ±1).
+            let silent = 1e-7
+            for k in 0..<bins {
+                let ar = a.harmonics.re[k], ai = a.harmonics.im[k], br = b.harmonics.re[k], bi = b.harmonics.im[k]
+                let am = (ar * ar + ai * ai).squareRoot(), bm = (br * br + bi * bi).squareRoot()
+                let magnitude = am + (bm - am) * tt
+                let phase: Double
+                if am < silent { phase = atan2(bi, br) }
+                else if bm < silent { phase = atan2(ai, ar) }
+                else {
+                    let pa = atan2(ai, ar), pb = atan2(bi, br)
+                    phase = pa + atan2(sin(pb - pa), cos(pb - pa)) * tt
+                }
+                re[k] = magnitude * cos(phase); im[k] = magnitude * sin(phase)
+            }
+            im[0] = 0
+            var out = a
+            out.harmonics = Harmonics(re: re, im: im)
+            return out
+        }
+
+        /// The cycle at `size` samples, keeping harmonics up to `maxHarmonic` that lie below the
+        /// new Nyquist (as ``Resampling/bandLimitedCycle(_:to:maxHarmonic:)`` does).
+        public func cycle(size: Int, maxHarmonic: Int = .max) -> [Float] {
+            guard size > 0 else { return [] }
+            return harmonics.synthesize(size: size, maxHarmonic: Swift.max(0, maxHarmonic))
+        }
+    }
+
     /// Brings a table to `count` frames by the given policy; unchanged when it already has them.
     ///
     /// With `count` m and n source frames, output frame i sits at source position
@@ -72,7 +147,7 @@ public enum Resampling {
     /// The filters are ideal (spectral) cut-offs. The factory chains show cut-offs of about these
     /// proportions, but their exact filter is not known: they carry small gain changes and, in
     /// tables made from recorded audio, a constant phase shift, so a real filter was presumably
-    /// used. Tests on a 3rd Wave synth (FORMATS.md section 5.1) found that it
+    /// used. Tests on the 3rd Wave (FORMATS.md section 5.1) found that it
     /// identifies a table by its first 65,536 values only and plays a table the same with its chain
     /// zeroed, so the chain does not need to match the factory's; it is written because the 3rd
     /// Wave's own tables carry one. A low-pass can raise a frame's peak (Gibbs overshoot); a level whose

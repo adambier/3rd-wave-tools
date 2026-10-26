@@ -9,7 +9,7 @@ the format reference is as appreciated as code.
   wavetables, [`docs/WAVETABLES.md`](docs/WAVETABLES.md), including a test of one of the
   Wavetables page's destinations in the synth it is for. If something there is
   wrong, incomplete, or still listed as unknown, and you know better, please say so, whether you
-  found out on a 3rd Wave synth or another instrument, from its maker's documents, or from files.
+  found out on the 3rd Wave or another instrument, from its maker's documents, or from files.
 - **Bug reports** for the app, the libraries, or `tw3pg`, with the files that show the problem if
   you can share them.
 - **Word of what you build.** If you write a tool that reads or writes the 3rd Wave's files, open
@@ -19,7 +19,7 @@ the format reference is as appreciated as code.
 
 The format reference says what each statement rests on, and a contribution to it should too:
 
-- **A test on a 3rd Wave synth:** the model (8M, 24K, or 24M), the OS version, the steps, what the
+- **A test on the 3rd Wave:** the model (8M, 24K, or 24M), the OS version, the steps, what the
   3rd Wave did, and, where possible, the files before and after (for example, a file you imported
   and what the 3rd Wave exported again).
 - **Groove Synthesis's documents:** which document, version, and section.
@@ -72,8 +72,8 @@ bank 3"), or share only your own programs and exports.
 The README, FORMATS.md, the documentation, and the app's text follow a few conventions:
 
 - "3rd Wave", never "Third Wave"; "Groove Synthesis" in full.
-- "the 3rd Wave" or "your 3rd Wave", not "the synth"; "a 3rd Wave synth", never "a 3rd Wave"
-  standing alone.
+- "the 3rd Wave" or "your 3rd Wave", not "the synth" and never "a 3rd Wave" standing alone
+  ("a 3rd Wave program" is fine).
 - Standing behaviour in the present tense; single observations as "has been observed to …".
 - Inferences said to be inferences.
 - The serial (Oxford) comma.

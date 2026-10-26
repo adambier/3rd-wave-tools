@@ -51,7 +51,8 @@ struct UnpackView: View {
                             .tag(u.id)
                         }
                     }
-                    .onDeleteCommand { state.removeUnpacks(selection); selection = [] }
+                    .onCommand(MenuActions.removeSelected) { state.removeUnpacks(selection); selection = [] }
+                    .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(state.unpacks.map(\.id)) }
                     .frame(minWidth: 230, idealWidth: 270, maxWidth: 420)
                     .onChange(of: selection) { s in
                         if let cur = state.selectedUnpack, s.contains(cur) { return }
@@ -144,6 +145,7 @@ struct UnpackDetail: View {
                     } primaryAction: { (ids: Set<UUID>) in
                         rename(ids)
                     }
+                    .onCommand(#selector(NSResponder.selectAll(_:))) { tableSelection = Set(rows.map(\.id)) }
                 } else {
                     Table(rows, selection: $tableSelection) {
                         TableColumn("Write") { (r: Row) in WriteToggleCell(state: st, unpackID: r.unpackID, file: r.file) }
@@ -157,6 +159,7 @@ struct UnpackDetail: View {
                     } primaryAction: { (ids: Set<UUID>) in
                         rename(ids)
                     }
+                    .onCommand(#selector(NSResponder.selectAll(_:))) { tableSelection = Set(rows.map(\.id)) }
                 }
             }
             .frame(minHeight: 140, maxHeight: .infinity)

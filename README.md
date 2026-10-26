@@ -77,7 +77,7 @@ Synthesis's factory `.wt` files; only names and fingerprints are stored). It use
 - treat an added file that is identical to the factory table of its slot as that table (listed,
   not embedded), for example a table unpacked from the 3rd Wave's own export, which carries every
   table a program uses;
-- leave factory tables out of the free-slot estimate, since a 3rd Wave synth that has them reuses them;
+- leave factory tables out of the free-slot estimate, since the 3rd Wave reuses them when it has them;
 - skip, when unpacking, tables identical to the factory table in their slot, and never offer
   factory tables for renaming.
 
@@ -98,7 +98,7 @@ block has fewer than 544 values. Every program saved since OS 1.9 that has been 
 more (544 from OS 1.9, as in Groove Synthesis's factory banks from August 2025; 548 from OS 2.0);
 every older set has fewer. The file carries no date, so this is an inference from the layout.
 
-A table from a user slot (U56–U63, P36–P47) or a multisample that a program uses is always
+A table from a user slot (P36–P47, U56–U63) or a multisample that a program uses is always
 embedded from a file you add, because whoever loads the file will not have the same user slots or
 sample memory.
 
@@ -301,21 +301,24 @@ opens its sources, and a green seal in its place marks a destination that has be
 destination and its options apply to every table marked to convert. Each row's Input column says
 where its frame size comes from (in the file, in the name, from markers, assumed, or set
 manually), and the Interpolation column what its file says about moving between frames. The
-preview below the table is read-only and shows one table: the source and the result stacked frame
-by frame (with the interpolation drawn between frames where a file records one), its file, its
-frame size and what that rests on, and what converting changes; moving the pointer across a
-picture sweeps through the table and draws the cycle at that point large, source and result
-together. Names are edited in the table (double-click a row). A frame size the file's contents state (a chunk, a
-header, or a format that fixes it) is taken as it is; one the page estimated (from a tag in the
+preview below the table shows one table: the input and the result stacked frame by frame (with
+the interpolation drawn between frames where a file records one), its file, its frame size and
+what that rests on, and what converting changes. The **Frame** slider under the pictures (or the
+pointer over one) sweeps through the table and draws the cycle there large, input and result
+together; **Listen** plays that cycle, following the slider, at the pitch chosen beside it (a
+piano key with its number; A3, 220 Hz, to start) through the output device chosen in the toolbar.
+Names are edited in the table (double-click a row). A frame size the file's contents state (a chunk, a
+header, or a format that fixes it) is taken as it is (a **Change…** link in the preview overrides
+it, for the rare WAV whose chunk is wrong); one the page estimated (from a tag in the
 file name, a `.txt` beside the file, or markers) is the default of a choice in the Input column,
 where every size the length allows is drawn so the one that cuts the frames in the right place
 is visible. When the file states nothing, the page assumes a size and says so: 2,048 samples per
 frame, the Serum-style size, when the length allows it, otherwise the size whose frames are most
 alike from one to the next, marked "likely" in the chooser; a size nothing settles must be chosen
 there. When a destination needs a different number of frames, **Options** lets you choose how
-to get there: **Keep Original Frames** (evenly spaced frames, the first and last among them,
-adding no new frames) or **Crossfade New Frames** (each new frame is a crossfade of its
-neighbours). It also sets the interpolation saved in the file where the format records one,
+to get there: **Original Frames Only** (fewer frames keeps evenly spaced originals, the first
+and last among them; more frames repeats each original in order; no new waveforms) or
+**Crossfade New Frames** (each new frame is a crossfade of its neighbours). It also sets the interpolation saved in the file where the format records one,
 Tonverk's frame size, and the PPG standard waveforms for P tables. **Clean Up Names…** works as on the
 Pack page. **Convert…** writes the files into a folder you choose (3rd Wave tables into a `WAVES`
 folder inside it) and reports everything it changed; it never replaces an existing file. For a
@@ -326,10 +329,10 @@ The page converts existing wavetables; it does not make wavetables from other au
 what the 3rd Wave's **Wave Maker** does. Wave Maker also imports a Serum wavetable directly; this
 page adds other formats and frame sizes, many tables at once, and Send to Pack. To load the `.wt`
 files it writes, copy the `WAVES` folder onto the 3rd Wave's USB drive and use Global → **Bulk
-wavetable import**, or add them to the 3rd Wave Terminal app's library and send them from there
-over USB. A 3rd Wave synth holds 64 U tables and 48 P tables; its factory tables fill U00–U55 and
-P00–P35, leaving U56–U63 and P36–P47, and the page warns when more tables are to be converted than
-those slots hold, since the 3rd Wave then offers to overwrite its last slots.
+wavetable import**, or add them to the 3rd Wave Terminal app's library and sync. The 3rd Wave
+holds 48 P tables and 64 U tables; its factory tables fill P00–P35 and U00–U55, leaving P36–P47 and
+U56–U63 initially available for user tables, and the page warns when more tables are to be converted
+than those slots hold, since the 3rd Wave then offers to overwrite its last slots.
 [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes what each destination expects, with sources.
 
 ## On the 3rd Wave
@@ -377,10 +380,10 @@ in any language. Everything here is open source under the MIT licence.
   Wave behaves when it imports them. It is enough to read, write, pack, unpack, convert, and rename
   programs, wavetables, and multisamples. **What most of a program's values mean is not yet
   known:** fewer than 60 of a program's roughly 1,450 values have an identified meaning, so it does
-  not yet support tools that create sounds or edit a program's settings. Footnotes give the evidence for each statement (a test on a 3rd Wave synth, or
+  not yet support tools that create sounds or edit a program's settings. Footnotes give the evidence for each statement (a test on the 3rd Wave, or
   Groove Synthesis's own documents), and what is still unknown is listed at the end.
 - **Test files.** [`fixtures/`](fixtures/) holds a small file of each kind, each with a JSON file
-  of what it should parse to, so a new reader or writer can be checked without a 3rd Wave synth at hand.
+  of what it should parse to, so a new reader or writer can be checked without the 3rd Wave at hand.
   They are synthetic, so they can be used freely.
 - **A Swift library.** `PgdataFormats` reads and writes every format byte for byte, packs and
   unpacks `.pgdata` files, converts older programs as the 3rd Wave does, and recognises Groove
@@ -413,7 +416,7 @@ in any language. Everything here is open source under the MIT licence.
   build), where each kind of change goes, and how to verify it. Claude Code reads it through
   `CLAUDE.md`; other tools read `AGENTS.md` directly or can be pointed at it.
 - **Contributions.** Corrections to the format reference are the most valuable contribution,
-  whether from tests on a 3rd Wave synth or from knowing better; so are bug reports with the files that
+  whether from tests on the 3rd Wave or from knowing better; so are bug reports with the files that
   show them, and word of tools built on this. [`CONTRIBUTING.md`](CONTRIBUTING.md) explains how.
 
 ## Formats

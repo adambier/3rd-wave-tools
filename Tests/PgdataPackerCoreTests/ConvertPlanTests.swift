@@ -171,7 +171,7 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertEqual(item.sourceDescription, "WAV")
         XCTAssertEqual(item.sizeDescription, "Choose a frame size")
         XCTAssertEqual(item.sizeSource, .notStated)
-        XCTAssertEqual(item.basisDescription, "The file doesn’t specify a frame size. Its length allows 256 (64 frames) or 2,048 (8 frames).")
+        XCTAssertEqual(item.basisDescription, "Unable to estimate a frame size from this file. Its length allows 256 (64 frames) or 2,048 (8 frames).")
         XCTAssertFalse(plan.canConvert(item))
         XCTAssertTrue(plan.isSelected(item))   // ticked, but not converted until a size is chosen
         XCTAssertEqual(plan.expectedResult(for: item), "Choose a frame size first")
@@ -338,6 +338,33 @@ final class ConvertPlanStateTests: XCTestCase {
         p.add(tables.map { ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/" + $0.fileName), table: $0) },
               factory: FactoryLibrary())
         return p
+    }
+
+    func testOverridingAStatedFrameSize() {
+        // A WAV whose chunk states 2,048: the Input column offers no choice, the preview's
+        // Change… offers every size the length allows, the file's own first.
+        let surgeTable = FoundTable(name: "Surge", fileName: "Surge.wt", source: .surgeWavetable,
+                                    samples: [Float](repeating: 0, count: 8192), frameSize: 2048, frameSizeBasis: "Surge header")
+        var p = plan([table("Stated", frames: 4, size: 2048), surgeTable])
+        let stated = p.items[0], surge = p.items[1]
+        XCTAssertTrue(stated.sizeIsStated)
+        XCTAssertEqual(stated.frameSizeChoices, [])
+        XCTAssertEqual(stated.frameSizeAlternatives, [2048, 64, 128, 256, 512, 1024, 4096])
+        // Formats whose layout fixes the size offer nothing.
+        XCTAssertEqual(surge.frameSizeAlternatives, [])
+        // Overriding: the size is the user's, said so, and the column's chooser is active.
+        p.chooseFrameSize(stated.id, 1024)
+        XCTAssertEqual(p.items[0].frameSize, 1024)
+        XCTAssertEqual(p.items[0].sizeSource, .setManually)
+        XCTAssertEqual(p.items[0].basisDescription, "Set manually; the file specifies 2,048.")
+        XCTAssertEqual(p.items[0].frameSizeChoices, [2048, 64, 128, 256, 512, 1024, 4096])
+        // Choosing the file's own size again clears the override.
+        p.chooseFrameSize(stated.id, 2048)
+        XCTAssertEqual(p.items[0].sizeSource, .inFile)
+        XCTAssertEqual(p.items[0].frameSizeChoices, [])
+        // A size the length does not allow is refused.
+        p.chooseFrameSize(stated.id, 3000)
+        XCTAssertEqual(p.items[0].frameSize, 2048)
     }
 
     func testStatusAndAttention() {
@@ -861,7 +888,7 @@ final class ConvertOptionsTextTests: XCTestCase {
         // Small tables: the note counts them, whatever their size.
         var tables = (0..<9).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
         var p = plan(tables, preset: .thirdWaveU)
-        XCTAssertEqual(p.thirdWaveCapacityNote, "9 U tables to convert. A 3rd Wave synth holds 64 U tables, 56 of them Groove Synthesis’s (U00–U55); with no slot free, it offers to overwrite the last slot (U63); which slots several tables would take has not been tested.")
+        XCTAssertEqual(p.thirdWaveCapacityNote, "9 U tables to convert. The 3rd Wave holds 64 U tables, 56 of them Groove Synthesis’s (U00–U55); with no slot free, it offers to overwrite the last slot (U63); which slots several tables would take has not been tested.")
         p.setSelected(p.items[0].id, false)
         XCTAssertNil(p.thirdWaveCapacityNote, "8 fit")
         p.preset = .wav2048
@@ -870,7 +897,7 @@ final class ConvertOptionsTextTests: XCTestCase {
         XCTAssertNil(p.thirdWaveCapacityNote, "12 P slots")
         tables += (9..<13).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
         p = plan(tables, preset: .thirdWaveP)
-        XCTAssertEqual(p.thirdWaveCapacityNote, "13 P tables to convert. A 3rd Wave synth holds 48 P tables, 36 of them Groove Synthesis’s (P00–P35); with no slot free, it offers to overwrite the last slot (P47); which slots several tables would take has not been tested.")
+        XCTAssertEqual(p.thirdWaveCapacityNote, "13 P tables to convert. The 3rd Wave holds 48 P tables, 36 of them Groove Synthesis’s (P00–P35); with no slot free, it offers to overwrite the last slot (P47); which slots several tables would take has not been tested.")
 
         // A factory table does not count: the 3rd Wave already has it.
         let lib = FactoryLibrary.builtIn
@@ -950,7 +977,7 @@ final class ConvertExistingChoicesTests: XCTestCase {
         }
         let nine = pickerPlan(.thirdWaveU, Array(repeating: (Interpolation?.none, 2048), count: 9))
         XCTAssertEqual(nine.caveat(for: .thirdWaveU), nine.thirdWaveCapacityNote)
-        XCTAssertEqual(nine.caveat(for: .thirdWaveU)?.hasPrefix("9 U tables to convert. A 3rd Wave synth holds 64 U tables"), true)
+        XCTAssertEqual(nine.caveat(for: .thirdWaveU)?.hasPrefix("9 U tables to convert. The 3rd Wave holds 64 U tables"), true)
         XCTAssertNil(nine.caveat(for: .thirdWaveP), "12 P slots")
         // A table that cannot convert yet does not count.
         XCTAssertNil(ConvertPlan(preset: .miniFreak).caveat(for: .miniFreak))

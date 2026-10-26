@@ -80,6 +80,40 @@ final class ResamplingTests: XCTestCase {
         assertClose(Resampling.resizeCycle(cycle, to: 128), rich(128, harmonics: 40), 1e-5)
     }
 
+    func testBandLimitingKeepsOnlyTheHarmonicsAsked() {
+        // Harmonics 1…40 in; only 1…5 out, at the new size, with the mean kept.
+        let cycle = rich(2048, harmonics: 40).map { $0 + 0.1 }
+        assertClose(Resampling.bandLimitedCycle(cycle, to: 1024, maxHarmonic: 5),
+                    rich(1024, harmonics: 5).map { $0 + 0.1 }, 1e-5)
+        // 0 (or less) keeps the mean alone; the same size is fine; an empty cycle gives silence.
+        assertClose(Resampling.bandLimitedCycle(cycle, to: 2048, maxHarmonic: 0), [Float](repeating: 0.1, count: 2048), 1e-5)
+        assertClose(Resampling.bandLimitedCycle(cycle, to: 64, maxHarmonic: -3), [Float](repeating: 0.1, count: 64), 1e-5)
+        XCTAssertEqual(Resampling.bandLimitedCycle([], to: 8, maxHarmonic: 4), [Float](repeating: 0, count: 8))
+        XCTAssertEqual(Resampling.bandLimitedCycle(cycle, to: 0, maxHarmonic: 4), [])
+        // Asking for more harmonics than the new size holds is the plain resize.
+        assertClose(Resampling.bandLimitedCycle(cycle, to: 128, maxHarmonic: 1000), Resampling.resizeCycle(cycle, to: 128), 1e-6)
+    }
+
+    func testSpectralBlendKeepsLevelWhereACrossfadeWouldCancel() {
+        let a = sine(1024), b = sine(1024, phase: .pi)
+        // Halfway, the crossfade is silence; the spectral blend keeps the amplitude and turns the
+        // phase a quarter turn (to a cosine).
+        assertClose(Resampling.spectralBlend(a, b, t: 0.5), sine(1024, phase: .pi / 2), 1e-5)
+        // The ends are the cycles themselves, and a cycle blended with itself is unchanged.
+        assertClose(Resampling.spectralBlend(a, b, t: 0), a, 1e-5)
+        assertClose(Resampling.spectralBlend(a, b, t: 1), b, 1e-5)
+        let r = rich(2048, harmonics: 30)
+        assertClose(Resampling.spectralBlend(r, r, t: 0.3), r, 1e-5)
+        // A harmonic one cycle lacks fades in at its own phase; amplitudes move linearly.
+        let third = sine(512, amplitude: 0.4, phase: 1, harmonic: 3)
+        assertClose(Resampling.spectralBlend(sine(512), (0..<512).map { sine(512)[$0] + third[$0] }, t: 0.25),
+                    (0..<512).map { sine(512)[$0] + 0.25 * third[$0] }, 1e-5)
+        // Taking the spectra once and blending them gives the same as the one-shot blend.
+        let sa = Resampling.CycleSpectrum(a), sb = Resampling.CycleSpectrum(b)
+        assertClose(Resampling.CycleSpectrum.blend(sa, sb, t: 0.5).cycle(size: 1024), Resampling.spectralBlend(a, b, t: 0.5), 1e-6)
+        XCTAssertEqual(Resampling.spectralBlend([], a, t: 0.5), [])
+    }
+
     // MARK: Sizes that are not powers of two
 
     func testNonPowerOfTwoUp() {
