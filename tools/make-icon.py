@@ -12,10 +12,11 @@ fewer and heavier shapes at 32 px and below), and the .icns is assembled here, w
 iconutil writes (icp4, icp5, ic07–ic14), so no macOS tool is needed.
 
 The glyph: three frames of a wavetable, cyan, white, and pink, rising out of an open box
-(settled with Adam on 2026-10-26). At 128 px and above they are the oscillator's waveforms drawn
-exactly, two cycles each: a sine, a triangle, and a sawtooth, back to front (Adam, 2026-10-26: at
-the large sizes the waveforms should be accurate, not squiggles). At 64 px and below, where exact
-shapes would not survive, they are heavier single-cycle sines leaning toward a saw.
+(settled with Adam on 2026-10-26). At 64 px and above they are the oscillator's waveforms drawn
+exactly, two cycles each: a sine, a triangle, and a sawtooth, back to front, in strokes heavier
+at 64 px (Adam, 2026-10-26: accurate waveforms, not squiggles, wherever they stay legible, the
+Dock included). At 32 px and below, where exact shapes would not survive, they are two heavier
+single-cycle sines, the front one leaning toward a saw.
 
 The tile follows Apple's macOS icon grid for a flattened icon: an 824-point rounded square
 centered on a 1024-point canvas, with a soft shadow, as macOS 13 to 15 draw it. Its corners are a
@@ -48,7 +49,7 @@ def squircle_path(x, y, w, h, n=5.0, steps=96):
 
 def leaned_sine(a, x):
     """A sine leaned like a saw by phase distortion: the rise takes (1 + a) / 2 of the cycle and
-    the fall the rest, with no corners. a = 0 is a sine; a = 0.55 is clearly saw-like. At 64 px
+    the fall the rest, with no corners. a = 0 is a sine; a = 0.55 is clearly saw-like. At 32 px
     and below the box icon's frames are a = 0 and 0.55, back and front, so the morph between
     them is visible where exact shapes would not be (Adam, 2026-10-26: highlight the morphing)."""
     p = (x / (2 * math.pi)) % 1.0
@@ -88,11 +89,12 @@ AMBER_TOP, AMBER_BOTTOM = "#f7bd5c", "#d8862a"
 # 32 px, where their shapes no longer do.
 FRAME_COLORS = ("#7fdcff", "#ffffff", "#ff5fae")
 FRAME_LEANS = (0.0, 0.3, 0.55)        # the leaned sines of the small sizes
-FRAME_CYCLES = 2                      # cycles per frame at 128 px and above
+FRAME_CYCLES = 2                      # cycles per frame at 64 px and above
 
 def glyph_box(detail):
-    """Three frames rising out of an open box. detail: 2 (small sizes), 3 (64 px), 4 (128 px
-    and above: the exact waveforms, two cycles each, in thinner strokes). The glyph is centered
+    """Three frames rising out of an open box. detail: 2 (32 px and below), 3 (64 px: the exact
+    waveforms in heavy strokes, and the flaps), 4 (128 px and above: the exact waveforms, two
+    cycles each, in thinner strokes, and the box's details). The glyph is centered
     on the tile: about 85 points above the back frame's crest and below the box (Adam,
     2026-10-26: neither the box weighing the bottom half nor the back frame crowding the top);
     the front frame's troughs dip behind the box front, so it rises out of the box."""
@@ -112,13 +114,13 @@ def glyph_box(detail):
         amp = lerp(100, 80, depth)
         width = (380, 420, 460)[i]
         opacity = (0.85, 0.95, 1.0)[i]
-        if detail >= 4:
-            stroke = (28, 32, 36)[i]
+        if detail >= 3:
+            stroke = (28, 32, 36)[i] if detail >= 4 else (44, 50, 56)[i]
             if i == 0: pts = shape_points(math.sin, cx, base, width, amp, cycles=FRAME_CYCLES)
             elif i == 1: pts = triangle_points(cx, base, width, amp, FRAME_CYCLES)
             else: pts = sawtooth_points(cx, base, width, amp, FRAME_CYCLES)
         else:
-            stroke = (50, 60, 66)[i] if detail >= 3 else (70, 0, 86)[i]
+            stroke = (70, 0, 86)[i]
             pts = shape_points(lambda x, a=FRAME_LEANS[i]: leaned_sine(a, x), cx, base, width, amp)
         out.append(f'<path d="{path_d(pts)}" fill="none" stroke="{FRAME_COLORS[i]}" stroke-width="{stroke}" '
                    f'stroke-linecap="round" stroke-linejoin="round" opacity="{opacity:.2f}"/>')
