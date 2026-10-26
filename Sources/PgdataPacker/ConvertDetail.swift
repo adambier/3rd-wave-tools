@@ -185,7 +185,7 @@ struct ConvertPreviewFacts: View {
                 }
             }
             ConvertFactBlock(label: "Interpolation", value: item.interpolationDescription, detail: nil, alert: false)
-                .help("How a synth moves from one frame to the next as the table is swept: none (it steps from frame to frame), crossfade (it blends neighbours), or spectral (it blends their harmonics). Some files say which; most synths set it on the oscillator instead.")
+                .help("Whether a synth interpolates between frames as the table is swept, and how: crossfade (it blends neighbouring frames), spectral (it blends their harmonics), or none (no interpolation: it steps from frame to frame). Some files say which; most synths set it on the oscillator instead.")
             ConvertWhatHappens(state: state, item: item)
         }
         .textSelection(.enabled)

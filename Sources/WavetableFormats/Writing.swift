@@ -250,7 +250,7 @@ public enum WavetableWriter {
         /// crossfade (or, for Tonverk, no stepped mark) because the source file doesn't specify
         /// the interpolation and no other choice was made. `prefix` opens the note (a sentence
         /// and a space, or nothing); `result` closes it, after "so".
-        mutating func noteDefaultInterpolation(prefix: String = "This format records how a synth moves between frames. ",
+        mutating func noteDefaultInterpolation(prefix: String = "This format records whether and how a synth interpolates between frames. ",
                                                result: String = "so crossfade is saved") {
             if options.interpolation == nil && table.interpolation == nil {
                 notes.append("\(prefix)The source file doesn’t specify the interpolation and no other choice was made, \(result).")

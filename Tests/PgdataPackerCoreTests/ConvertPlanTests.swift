@@ -518,7 +518,7 @@ final class ConvertPlanStateTests: XCTestCase {
             XCTAssertFalse(p.distinction.isEmpty, "\(p)")
             XCTAssertEqual(p.group == .thirdWave, p.isThirdWave, "\(p)")
         }
-        XCTAssertEqual(OutputPreset.Group.thirdWave.presets, [.thirdWaveU, .thirdWaveP])
+        XCTAssertEqual(OutputPreset.Group.thirdWave.presets, [.thirdWaveP, .thirdWaveU])
         XCTAssertEqual(OutputPreset.Group.otherSynths.presets.count, 6)
         XCTAssertEqual(OutputPreset.Group.thirdWave.title, "3rd Wave")
         XCTAssertEqual(OutputPreset.Group.otherSynths.title, "Other Synths", "a group heading: title case")

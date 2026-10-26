@@ -337,9 +337,9 @@ struct ConvertInterpolationOption: View {
             lines.append(sentence + ".")
         }
         if tonverk {
-            lines.append("Crossfade blends each frame into the next; None jumps between them and adds \u{201C}r\u{201D} to the file name.")
+            lines.append("Crossfade blends each frame into the next. None is no interpolation: Tonverk jumps from frame to frame, and the file name gets an \u{201C}r\u{201D}.")
         } else {
-            lines.append("Crossfade blends each frame into the next; spectral blends their harmonics (Serum’s and Vital’s spectral morph); None jumps between them.")
+            lines.append("Crossfade blends each frame into the next; spectral blends their harmonics (Serum’s and Vital’s spectral morph). None is no interpolation: the synth jumps from frame to frame.")
         }
         return lines.joined(separator: " ")
     }

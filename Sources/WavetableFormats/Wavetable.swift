@@ -12,7 +12,7 @@ public struct Wavetable: Equatable, Sendable {
     public var name: String
     /// The frames, in order; each holds one cycle of `frameSize` samples, nominally within ±1.
     public var frames: [[Float]]
-    /// How the source asks to move between frames, when it says.
+    /// Whether and how the source asks a synth to interpolate between frames, when it says.
     public var interpolation: Interpolation?
 
     /// Creates a wavetable from its name, frames, and interpolation, if known.
@@ -189,7 +189,7 @@ public struct FoundTable: Equatable, Sendable {
     public var candidateFrameSizes: [Int]
     /// What `frameSize` rests on.
     public var frameSizeEvidence: FrameSizeEvidence
-    /// How the file asks to move between frames, when it says.
+    /// Whether and how the file asks a synth to interpolate between frames, when it says.
     public var interpolation: Interpolation?
     /// For a table from a 3rd Wave `.wt` or `.pgdata`: the content fingerprint pgdata Packer's
     /// factory library uses (FNV-1a 64 of all the file's values as float32), so factory tables can
@@ -229,10 +229,12 @@ public struct FoundTable: Equatable, Sendable {
 
 /// A destination for a converted wavetable.
 public enum OutputPreset: String, Equatable, Sendable, CaseIterable {
-    /// A 3rd Wave U table `.wt`: 64 frames of 1,024 samples, plus a band-limited mipmap chain.
-    case thirdWaveU
+    // The 3rd Wave's two kinds first, P before U as the 3rd Wave orders them; `allCases` is the
+    // order the Wavetables page lists destinations in.
     /// A 3rd Wave P table `.wt`: 64 frames of 128 samples, each stored with its differences.
     case thirdWaveP
+    /// A 3rd Wave U table `.wt`: 64 frames of 1,024 samples, plus a band-limited mipmap chain.
+    case thirdWaveU
     /// A 32-bit float WAV of 2,048-sample frames with a `clm ` chunk, up to 256 frames (Serum,
     /// Vital, Pigments, and others).
     case wav2048

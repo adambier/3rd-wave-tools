@@ -645,7 +645,7 @@ public struct ConvertPlan: Equatable {
     /// - MiniFreak V: some table has fewer than 64 frames, which it is not documented to handle.
     /// - Phase Plant: some table has fewer than the 256 frames its documentation asks for, so
     ///   frames are added.
-    /// - U table, P table: more of the user's own tables than the 3rd Wave holds at a time
+    /// - P table, U table: more of the user's own tables than the 3rd Wave holds at a time
     ///   (`thirdWaveCapacityNote(for:)`).
     public func caveat(for preset: OutputPreset) -> String? {
         let tables = selectedItems.filter(canConvert)
@@ -922,8 +922,8 @@ public struct ConvertPlan: Equatable {
     /// converted than the slots its factory tables leave free (P36–P47, U56–U63; factory
     /// tables, which it already has, do not count), since the 3rd Wave will then offer to
     /// overwrite; nil otherwise, and for other destinations. The note states the facts: how
-    /// many tables the 3rd Wave holds (64 U, 48 P), how many of them are Groove Synthesis's
-    /// (U00–U55, P00–P35), and that with no slot free it offers to overwrite the last slot
+    /// many tables the 3rd Wave holds (48 P, 64 U), how many of them are Groove Synthesis's
+    /// (P00–P35, U00–U55), and that with no slot free it offers to overwrite the last slot
     /// (observed once, for one table, which went to U63; what several would take is untested;
     /// see section 7 of FORMATS.md).
     public func thirdWaveCapacityNote(for preset: OutputPreset) -> String? {

@@ -45,8 +45,8 @@ chunk.[^vital] Most other synths set interpolation on the oscillator, not in the
 | Phase Plant | Exactly 256 frames of 2,048, with a `clm ` chunk | [^phaseplant] |
 | Surge XT | A Surge `.wt` (binary, below) | [^surge-code] |
 | WaveEdit, E370 | Mono 16-bit WAV, 44.1 kHz, 64 frames of 256, no extra chunk | [^waveedit] |
-| 3rd Wave U table | A `.wt`: 64 frames of 1,024, then the mipmap chain | [FORMATS.md](FORMATS.md) 5.1 |
 | 3rd Wave P table | A `.wt`: 64 frames of 128, each sample stored with the difference to the next | [FORMATS.md](FORMATS.md) 5.1 |
+| 3rd Wave U table | A `.wt`: 64 frames of 1,024, then the mipmap chain | [FORMATS.md](FORMATS.md) 5.1 |
 
 Notes on each:
 
@@ -204,8 +204,8 @@ When a destination needs a different number of frames, you choose how:
   evenly spaced originals, the first and last among them (256 → 64 keeps about every 4th);
   bringing it up to more repeats each original in order (16 → 64 repeats each about 4 times).
 - **Crossfade New Frames** makes each new frame by crossfading its two neighbours, once, when
-  converting. This is separate from the interpolation a file records, which is how the synth
-  moves between frames as it plays.
+  converting. This is separate from the interpolation a file records, which is whether and how
+  the synth interpolates between frames as it plays.
 
 The report after converting says what was done to each table.
 

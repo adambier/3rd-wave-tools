@@ -372,7 +372,7 @@ final class WritingTests: XCTestCase {
             XCTAssertFalse(p.basis.isEmpty)
             XCTAssertLessThanOrEqual(p.requiredFrameCount ?? 0, p.maxFrameCount)
         }
-        XCTAssertEqual(OutputPreset.allCases.filter(\.isThirdWave), [.thirdWaveU, .thirdWaveP])
+        XCTAssertEqual(OutputPreset.allCases.filter(\.isThirdWave), [.thirdWaveP, .thirdWaveU])
         XCTAssertEqual(OutputPreset.thirdWaveU.frameSize, 1024)
         XCTAssertEqual(OutputPreset.phasePlant.requiredFrameCount, 256)
         XCTAssertNil(OutputPreset.tonverk.frameSize)
@@ -444,7 +444,7 @@ final class WritingTests: XCTestCase {
         XCTAssertEqual(WavetableWriter.interpolationRecorded(for: .wav2048, source: .spectral), .spectral)
         XCTAssertEqual(WavetableWriter.interpolationRecorded(for: .wav2048, source: .spectral, options: OutputOptions(interpolation: Interpolation.none)),
                        Interpolation.none)
-        XCTAssertEqual(OutputPreset.allCases.filter(\.scalesToFit), [.thirdWaveU, .thirdWaveP, .waveEdit])
+        XCTAssertEqual(OutputPreset.allCases.filter(\.scalesToFit), [.thirdWaveP, .thirdWaveU, .waveEdit])
     }
 
     /// The writer does what its plan says, for every preset and several shapes of table, with

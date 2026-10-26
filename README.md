@@ -27,7 +27,7 @@ the app wherever you like, for example to your Applications folder. The app is s
 Developer ID and notarized by Apple, so it opens like any other app, on Apple Silicon and Intel
 Macs. Requires macOS 13 or later.
 
-From 1.0.4, the app updates itself, using [Sparkle](https://sparkle-project.org): on its second
+The app updates itself, using [Sparkle](https://sparkle-project.org): on its second
 launch it asks whether to check automatically, and **Check for Updates…** in the app menu checks
 at any time. In the Help menu, **pgdata Packer Help** opens this page and **File Format Reference**
 the format reference; **Release Notes** opens the notes for the version you have.
@@ -285,8 +285,8 @@ Then choose a destination:
 
 | Destination | What the Wavetables page writes |
 |---|---|
+| 3rd Wave P table | a `.wt` of 64 frames of 128 samples, optionally with the PPG's four standard waveforms at 60–63 |
 | 3rd Wave U table | a `.wt` of 64 frames of 1,024 samples, with its mipmap chain |
-| 3rd Wave P table | a `.wt` of 64 frames of 128 samples, optionally with the PPG's four standard waves at 60–63 |
 | Serum, Vital, Pigments | a 32-bit float WAV of up to 256 frames of 2,048, recording the interpolation |
 | MiniFreak V | the same, with at most 64 frames, for MiniFreak V to send to a MiniFreak |
 | Elektron Tonverk | a 32-bit float WAV of up to 64 frames, its frame size and interpolation in its name |
@@ -300,7 +300,8 @@ the tables to convert bring about; the book icon beside each row (under the head
 opens its sources, and a green seal in its place marks a destination that has been tested. The
 destination and its options apply to every table marked to convert. Each row's Input column says
 where its frame size comes from (in the file, in the name, from markers, assumed, or set
-manually), and the Interpolation column what its file says about moving between frames. The
+manually), and the Interpolation column whether its file specifies an interpolation (crossfade or
+spectral) or none. The
 preview below the table shows one table: the input and the result stacked frame by frame (with
 the interpolation drawn between frames where a file records one), its file, its frame size and
 what that rests on, and what converting changes. The **Frame** slider under the pictures (or the

@@ -366,8 +366,8 @@ struct ConvertInterpolationCell: View {
             .lineLimit(1)
             .foregroundStyle(interpolation == nil || !included ? Color.secondary : Color.primary)
             .help(interpolation == nil
-                  ? "The file does not say how to move between frames; most synths set this on the oscillator, and a destination whose file records it saves crossfade unless the Options say otherwise."
-                  : "How the file asks a synth to move between frames: none (it steps from frame to frame), crossfade (it blends neighbours), or spectral (it blends their harmonics).")
+                  ? "The file doesn’t specify the interpolation; most synths set it on the oscillator, and a destination whose file records it saves crossfade unless the Options say otherwise."
+                  : "Whether the file asks a synth to interpolate between frames, and how: crossfade (it blends neighbouring frames), spectral (it blends their harmonics), or none (no interpolation: it steps from frame to frame).")
     }
 }
 
