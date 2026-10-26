@@ -21,8 +21,7 @@ Why might you want to use this app?
 
 
 Not affiliated with or endorsed by Groove Synthesis. Everything here was worked out from files and
-checked on an 8M and a 24M, both running OS 2.0d. The Formats and Tests sections say what was
-confirmed on the 3rd Wave and what is inferred.
+checked on an 8M and a 24M, both running OS 2.0d.
 
 **Building something for the 3rd Wave?** The file formats are (unofficially) documented as far as
 they're understood, and the libraries behind this app, test files, and a developer tool are free to
