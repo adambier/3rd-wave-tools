@@ -77,7 +77,7 @@ extension WavetableReader {
                        chunkWord: String) throws -> [FoundTable] {
         let stem = fileStem(fileName)
         let tag = tonverkTag(in: stem)
-        if wav.chunks["srgo"] != nil { return [] }   // Surge's one-shot sample marker
+        if wav.chunks["srgo"] != nil { return [] }   // Surge’s one-shot sample marker
         let count = wav.samples.count
         guard count > 0 else { return [] }
 
@@ -118,7 +118,7 @@ extension WavetableReader {
                 offer(n, source: .clmChunk, basis: "Serum-style tag inside the file (clm \(chunkWord))", subject: subject)
             } else {
                 notes.append(ReadNote(.sizeTagUnreadable(source: .clmChunk),
-                                      "The file's wavetable tag (clm \(chunkWord)) does not give a readable frame size; it is ignored."))
+                                      "The file’s wavetable tag (clm \(chunkWord)) does not give a readable frame size; it is ignored."))
             }
             if let i = parsed.interpolation { interps.append(InterpolationClaim(value: i, source: .clmChunk, subject: subject)) }
         }
@@ -130,7 +130,7 @@ extension WavetableReader {
                       subject: "the Surge tag inside the file (srge \(chunkWord))")
             } else {
                 notes.append(ReadNote(.sizeTagUnreadable(source: .srgeChunk),
-                                      "The file's Surge tag (srge \(chunkWord)) is too short to give a frame size; it is ignored."))
+                                      "The file’s Surge tag (srge \(chunkWord)) is too short to give a frame size; it is ignored."))
             }
         }
         // 3. uhWT (u-he). Surge reads it as 2,048 only. In the 76 files of Hive's library the chunk
@@ -220,7 +220,7 @@ extension WavetableReader {
         } else if count == 8192 {
             // The 3rd Wave's Wave Maker reads this length as a 64 × 128 PPG table, while Serum,
             // Pigments, and Tonverk read 4 × 2,048 (Tonverk's own factory library has one), so ask.
-            basis = "not stated: 8,192 samples is 64 frames of 128 (a PPG-style table, as the 3rd Wave's Wave Maker reads it) or 4 frames of 2,048"
+            basis = "not stated: 8,192 samples is 64 frames of 128 (a PPG-style table, as the 3rd Wave’s Wave Maker reads it) or 4 frames of 2,048"
             candidates = [128, 2048]
         } else if count == 16_384 {
             basis = "not stated: 16,384 samples is 64 frames of 256 (a WaveEdit bank) or 8 frames of 2,048"
@@ -309,7 +309,7 @@ extension WavetableReader {
         guard let data = dataRange else { throw WavetableError(.damaged, "\(damaged) it has no audio data (data chunk); it is damaged.") }
         var tag = Int(le16(fmt, 0))
         let channels = Int(le16(fmt, 2)), blockAlign = Int(le16(fmt, 12)), bits = Int(le16(fmt, 14))
-        if tag == 0xFFFE {   // WAVE_FORMAT_EXTENSIBLE: the real format is the subformat GUID's first two bytes
+        if tag == 0xFFFE {   // WAVE_FORMAT_EXTENSIBLE: the real format is the subformat GUID’s first two bytes
             guard fmt.count >= 26 else {
                 throw WavetableError(.damaged, "\(damaged) its format description (an extensible fmt chunk) is cut short; it is damaged.")
             }

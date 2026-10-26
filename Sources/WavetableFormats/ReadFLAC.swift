@@ -51,11 +51,11 @@ extension WavetableReader {
                 if chunks["clm "] == nil {
                     chunks["clm "] = Array(value.utf8)
                     notes.append(ReadNote(.tagInComment(key: key),
-                                          "The Serum-style tag was found in the file's comments (\(key)), not in a block of its own."))
+                                          "The Serum-style tag was found in the file’s comments (\(key)), not in a block of its own."))
                 }
             } else if ["FRAME", "CYCLE", "WAVETABLE"].contains(where: { key.uppercased().contains($0) }) {
                 notes.append(ReadNote(.commentMentionsFrames(key: key, value: value),
-                                      "The file's comments say \"\(key)=\(value)\"; a frame size is not taken from a comment."))
+                                      "The file’s comments say \"\(key)=\(value)\"; a frame size is not taken from a comment."))
             }
         }
         let info = decoded.info
@@ -155,7 +155,7 @@ enum FLACDecoder {
                                    bitsPerSample: Int((x >> 36) & 31) + 1, totalSamples: Int(x & ((1 << 36) - 1)),
                                    md5: Array(s[18..<34]))
                 guard (4...32).contains(i.bitsPerSample) else {
-                    throw WavetableError(.damaged, "\(what) its stream description says \(i.bitsPerSample)-bit samples, outside FLAC's 4 to 32; it is damaged.")
+                    throw WavetableError(.damaged, "\(what) its stream description says \(i.bitsPerSample)-bit samples, outside FLAC’s 4 to 32; it is damaged.")
                 }
                 guard i.maxBlockSize >= 1 else { throw WavetableError(.damaged, "\(what) its stream description gives no block size; it is damaged.") }
                 info = i

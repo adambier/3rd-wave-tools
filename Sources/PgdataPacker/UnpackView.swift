@@ -21,7 +21,7 @@ struct UnpackView: View {
                     state.add(urls: Panels.chooseFiles(message: "Choose .pgdata files to unpack", allowedExtensions: ["pgdata"]))
                 }
                 Toggle("Skip factory wavetables", isOn: $state.skipFactoryDuplicates)
-                    .help("Leave out wavetables that are identical to the factory table in their slot. The 3rd Wave's own exports embed factory tables too; a repack lists the factory slot instead. Any table can still be checked.")
+                    .help("Leave out wavetables that are identical to the factory table in their slot. The 3rd Wave’s own exports embed factory tables too; a repack lists the factory slot instead. Any table can still be checked.")
                 Spacer()
                 Button("Remove Selected") { state.removeUnpacks(selection); selection = [] }
                     .disabled(selection.isEmpty || state.isWorking)
@@ -123,7 +123,7 @@ struct UnpackDetail: View {
                 }
             }
             BeforeImportBox(items: items)
-            Text(several ? "Files These Will Produce" : "Files This Will Produce").font(.headline)
+            Text(several ? "Files these will produce" : "Files this will produce").font(.headline)
             // Write first (ticks in one line at the left), Contents last (the widest column). The
             // Program column only with several files; macOS 13 has no conditional table columns,
             // so there are two tables. A double-click on a row (or Rename File in its context
@@ -184,7 +184,7 @@ struct BeforeImportBox: View {
         if !lines.isEmpty {
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(items.count > 1 ? "What These Programs Need on Your 3rd Wave" : "What This Program Needs on Your 3rd Wave")
+                    Text(items.count > 1 ? "What these programs need on your 3rd Wave" : "What this program needs on your 3rd Wave")
                         .font(.headline)
                     ForEach(Array(lines.enumerated()), id: \.offset) { _, m in
                         line(m.text, warning: m.warning)

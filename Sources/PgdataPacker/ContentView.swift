@@ -223,7 +223,7 @@ struct PlanSummary: View {
             let list = refs.map(\.label)
             let joined = list.count == 1 ? list[0] : list.count == 2 ? list[0] + " and " + list[1]
                 : list.dropLast().joined(separator: ", ") + ", and " + list.last!
-            return "Can't pack yet: \(joined) need\(list.count == 1 ? "s" : "") a file"
+            return "Can’t pack yet: \(joined) need\(list.count == 1 ? "s" : "") a file"
         case .factoryOnly:
             return "Factory tables only, nothing to embed: \(PackPlan.formatBytes(plan.estimatedBytes))"
         case .embedsContent:
@@ -260,7 +260,7 @@ extension PackPlan.Verdict {
     var tint: Color {
         switch self {
         case .factoryOnly: return .secondary
-        case .embedsContent: return .blue
+        case .embedsContent: return .accentColor   // the user’s accent, not system blue
         case .blocked: return .red
         }
     }

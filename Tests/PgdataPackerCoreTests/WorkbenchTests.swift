@@ -120,13 +120,13 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertNil(u48.choice)
         XCTAssertEqual(u48.options, [.reference])          // the factory table, only if chosen
         guard case .missing(let why) = u48.status else { return XCTFail() }
-        XCTAssertTrue(why.hasPrefix("Probably the author's own wavetable"))
+        XCTAssertTrue(why.hasPrefix("Probably the author’s own wavetable"))
         XCTAssertTrue(u48.wasUserSlot)
         let note = try XCTUnwrap(plan.userSlotNote)
-        XCTAssertEqual(note.title, "U48 probably held the author's own wavetable, which is not included")
+        XCTAssertEqual(note.title, "U48 probably held the author’s own wavetable, which is not included")
         XCTAssertTrue(note.body.contains("it is in the W3_PROG_4 format, older than the W3_PROG_5"))
         XCTAssertTrue(note.body.contains("U48 \u{201C}FM_Crush\u{201D}"))
-        XCTAssertEqual(plan.missingSummary, "needs U48: probably the author's own wavetable from before 2025")
+        XCTAssertEqual(plan.missingSummary, "needs U48: probably the author’s own wavetable from before 2025")
         XCTAssertEqual(plan.rows.first { $0.ref == .u(7) }!.choice, .reference)   // older factory slots unaffected
         XCTAssertEqual(plan.verdict, .blocked([.u(48)]))
 
@@ -155,8 +155,8 @@ final class WorkbenchTests: XCTestCase {
         let two = makeProgram(sources: [2041, 2043, 42] + Array(repeating: 42, count: 9), version: "W3_PROG_4", floats: 520)
         let lib3 = FactoryLibrary([.u(48): .init(name: "FM_Crush", fingerprint: 1), .u(50): .init(name: "Dub Grind", fingerprint: 3)])
         let p2 = PackPlan.make(program: two, files: [], factory: lib3)
-        XCTAssertEqual(p2.userSlotNote?.title, "U48 and U50 probably held the author's own wavetables, which are not included")
-        XCTAssertEqual(p2.missingSummary, "needs U48, U50: probably the author's own wavetables from before 2025")
+        XCTAssertEqual(p2.userSlotNote?.title, "U48 and U50 probably held the author’s own wavetables, which are not included")
+        XCTAssertEqual(p2.missingSummary, "needs U48, U50: probably the author’s own wavetables from before 2025")
 
         // An added file identical to the factory table: listed, not embedded.
         obx.slot = .u(48)
@@ -184,7 +184,7 @@ final class WorkbenchTests: XCTestCase {
         let lib = FactoryLibrary([.u(7): .init(name: "Knob Grotto 6", fingerprint: cf.fingerprint)])
         var fac = cf; fac.slot = .u(7)
         let p3 = PackPlan.make(program: makeProgram(sources: [2000] + Array(repeating: 42, count: 11)), files: [fac], factory: lib)
-        XCTAssertEqual(PackPlan.unusedFiles([fac], plans: [p3], factory: lib)[fac.id], "Identical to factory U07; the 3rd Wave's own copy is used, so it is not embedded")
+        XCTAssertEqual(PackPlan.unusedFiles([fac], plans: [p3], factory: lib)[fac.id], "Identical to factory U07; the 3rd Wave’s own copy is used, so it is not embedded")
         XCTAssertTrue(p3.content(files: []).isEmpty || p3.content(files: [])[.u(7)] == .reference)   // no crash without the file
     }
 

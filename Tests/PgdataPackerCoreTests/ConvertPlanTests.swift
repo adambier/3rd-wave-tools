@@ -171,7 +171,7 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertEqual(item.sourceDescription, "WAV")
         XCTAssertEqual(item.sizeDescription, "Choose a frame size")
         XCTAssertEqual(item.sizeSource, .notStated)
-        XCTAssertEqual(item.basisDescription, "The file doesn't say how long each wave is. Its length allows 256 (64 frames) or 2,048 (8 frames).")
+        XCTAssertEqual(item.basisDescription, "The file doesn’t say how long each wave is. Its length allows 256 (64 frames) or 2,048 (8 frames).")
         XCTAssertFalse(plan.canConvert(item))
         XCTAssertTrue(plan.isSelected(item))   // ticked, but not converted until a size is chosen
         XCTAssertEqual(plan.expectedResult(for: item), "Choose a frame size first")
@@ -230,7 +230,7 @@ final class ConvertPlanTests: XCTestCase {
 
         plan.preset = .thirdWaveP
         plan.options.appendPPGStandardWaves = true
-        XCTAssertEqual(plan.expectedResult(for: u), "64 × 128; resized from 1,024 samples per frame; 64 frames → 60, crossfaded; the PPG's four standard waves at 60–63")
+        XCTAssertEqual(plan.expectedResult(for: u), "64 × 128; resized from 1,024 samples per frame; 64 frames → 60, crossfaded; the PPG’s four standard waves at 60–63")
     }
 
     // MARK: Converting and writing
@@ -303,7 +303,7 @@ final class ConvertPlanRenameTests: XCTestCase {
         _ = plan.convert { table, _, _ in seen.append(table.name); return OutputFile(fileName: table.name + ".wav", data: Data()) }
         XCTAssertEqual(seen, [NameCleaner().clean("SAW_STACK_01")])
         XCTAssertNotEqual(seen.first, "SAW_STACK_01")
-        plan.rename(id, to: "SAW_STACK_01")   // back to the file's own name
+        plan.rename(id, to: "SAW_STACK_01")   // back to the file’s own name
         XCTAssertFalse(plan.anyRenamed)
         plan.rename(id, to: "X"); plan.undoRenames()
         XCTAssertEqual(plan.items.first?.name, "SAW_STACK_01")
@@ -340,15 +340,15 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(p.status(ready), .ready)
         XCTAssertEqual(p.status(open), .needsFrameSize)
         XCTAssertEqual(p.status(odd), .cannotSplit)
-        XCTAssertEqual(odd.sizeDescription, "Can't split into frames")
-        XCTAssertTrue(p.statusDescription(odd).hasPrefix("Can't split into frames: 2,500 samples"))
+        XCTAssertEqual(odd.sizeDescription, "Can’t split into frames")
+        XCTAssertTrue(p.statusDescription(odd).hasPrefix("Can’t split into frames: 2,500 samples"))
         XCTAssertEqual(p.status(guess), .ready)
         XCTAssertTrue(guess.isGuessed)
         XCTAssertEqual(guess.sizeSource, .guessed)
         XCTAssertEqual(guess.sizeSource.label, "Guessed")
         XCTAssertTrue(guess.basisDescription.contains("the usual 2,048 is assumed"))
         XCTAssertEqual(ready.sizeSource, .inFile)
-        XCTAssertEqual(ready.basisDescription, "Clm chunk.")   // the reader's own phrase, capitalised
+        XCTAssertEqual(ready.basisDescription, "Clm chunk.")   // the reader’s own phrase, capitalised
 
         // Only blockers count: a guessed size and a warning convert, so they need no attention.
         XCTAssertFalse(p.needsAttention(ready))
@@ -377,7 +377,7 @@ final class ConvertPlanStateTests: XCTestCase {
         p.chooseFrameSize(guess.id, 1024)
         XCTAssertEqual(p.items[3].sizeSource, .setManually)
         XCTAssertFalse(p.items[3].isGuessed)
-        XCTAssertEqual(p.items[3].basisDescription, "Set manually; the file's length suggested 2,048.")
+        XCTAssertEqual(p.items[3].basisDescription, "Set manually; the file’s length suggested 2,048.")
         XCTAssertEqual(p.items[3].sizeQualifier, "set manually")
         XCTAssertFalse(p.needsAttention(p.items[3]))
     }
@@ -838,7 +838,7 @@ final class ConvertOptionsTextTests: XCTestCase {
         // Small tables: the note counts them, whatever their size.
         var tables = (0..<9).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
         var p = plan(tables, preset: .thirdWaveU)
-        XCTAssertEqual(p.thirdWaveCapacityNote, "9 U tables to convert. A 3rd Wave holds 64 U tables, 56 of them Groove Synthesis's (U00–U55); with no slot free, it offers to overwrite its last slots, U63 first.")
+        XCTAssertEqual(p.thirdWaveCapacityNote, "9 U tables to convert. A 3rd Wave holds 64 U tables, 56 of them Groove Synthesis’s (U00–U55); with no slot free, it offers to overwrite its last slots, U63 first.")
         p.setSelected(p.items[0].id, false)
         XCTAssertNil(p.thirdWaveCapacityNote, "8 fit")
         p.preset = .wav2048
@@ -847,7 +847,7 @@ final class ConvertOptionsTextTests: XCTestCase {
         XCTAssertNil(p.thirdWaveCapacityNote, "12 P slots")
         tables += (9..<13).map { table("T\($0)", frames: 4, size: 128, peak: 0.1 + Float($0) * 0.05) }
         p = plan(tables, preset: .thirdWaveP)
-        XCTAssertEqual(p.thirdWaveCapacityNote, "13 P tables to convert. A 3rd Wave holds 48 P tables, 36 of them Groove Synthesis's (P00–P35); with no slot free, it offers to overwrite its last slots, P47 first.")
+        XCTAssertEqual(p.thirdWaveCapacityNote, "13 P tables to convert. A 3rd Wave holds 48 P tables, 36 of them Groove Synthesis’s (P00–P35); with no slot free, it offers to overwrite its last slots, P47 first.")
 
         // A factory table does not count: the 3rd Wave already has it.
         let lib = FactoryLibrary.builtIn
@@ -936,7 +936,7 @@ final class ConvertExistingChoicesTests: XCTestCase {
         var plan = pickerPlan(.wav2048, [(.crossfade, 2048), (nil, 2048), (Interpolation.none, 2048), (.spectral, 2048), (Interpolation.none, 2048)])
         XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 2, Interpolation.none: 2, .spectral: 1])
         XCTAssertNil(plan.sharedExistingInterpolation)
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table's own — existing: 2 stepped, 2 crossfade, 1 spectral")
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped, 2 crossfade, 1 spectral")
         // An override does not change what the tables have.
         plan.options.interpolation = .spectral
         XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 2, Interpolation.none: 2, .spectral: 1])
@@ -950,16 +950,16 @@ final class ConvertExistingChoicesTests: XCTestCase {
         for item in plan.items { plan.setSelected(item.id, false) }
         XCTAssertEqual(plan.existingInterpolations(), [:])
         XCTAssertNil(plan.sharedExistingInterpolation)
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel, ConvertPlan.ChoiceLabel(value: "Each table's own"))
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel, ConvertPlan.ChoiceLabel(value: "Each table’s own"))
         // A destination whose files record no interpolation has nothing to count.
         for item in plan.items { plan.setSelected(item.id, true) }
         plan.preset = .thirdWaveU
         XCTAssertEqual(plan.existingInterpolations(), [:])
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel, ConvertPlan.ChoiceLabel(value: "Each table's own"))
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel, ConvertPlan.ChoiceLabel(value: "Each table’s own"))
         // Tonverk: spectral counts as smooth, and the words are Tonverk's.
         plan.preset = .tonverk
         XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 3, Interpolation.none: 2])
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table's own — existing: 2 stepped, 3 smooth")
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped, 3 smooth")
         let smooth = pickerPlan(.tonverk, [(.spectral, 2048), (nil, 1024)])
         XCTAssertEqual(smooth.sharedExistingInterpolation, .crossfade)
         XCTAssertNil(smooth.eachTablesOwnInterpolationLabel)
@@ -986,19 +986,19 @@ final class ConvertExistingChoicesTests: XCTestCase {
         // Two sizes Tonverk takes.
         plan = pickerPlan(.tonverk, [(nil, 2048), (nil, 1024), (nil, 2048)])
         XCTAssertNil(plan.sharedTonverkFrameSize)
-        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel?.text, "Each table's own — existing: 1,024 and 2,048")
+        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel?.text, "Each table’s own — existing: 1,024 and 2,048")
         // A size Tonverk doesn't take is written at 2,048 (the writer's rule), and the label says so.
         plan = pickerPlan(.tonverk, [(nil, 2048), (nil, 600), (nil, 600), (nil, 1024)])
-        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel?.text, "Each table's own — existing: 1,024 and 2,048; 2,048 for 2 tables of 600, which Tonverk doesn't take")
+        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel?.text, "Each table’s own — existing: 1,024 and 2,048; 2,048 for 2 tables of 600, which Tonverk doesn’t take")
         plan = pickerPlan(.tonverk, [(nil, 600)])
         XCTAssertNil(plan.sharedTonverkFrameSize, "one size, but not one Tonverk takes")
-        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel?.text, "Each table's own — existing: 2,048 for 1 table of 600, which Tonverk doesn't take")
+        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel?.text, "Each table’s own — existing: 2,048 for 1 table of 600, which Tonverk doesn’t take")
         plan = pickerPlan(.tonverk, [(nil, 600), (nil, 1000), (nil, 1000)])
-        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel?.text, "Each table's own — existing: 2,048 for 3 tables of 600 and 1,000, which Tonverk doesn't take")
+        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel?.text, "Each table’s own — existing: 2,048 for 3 tables of 600 and 1,000, which Tonverk doesn’t take")
         // Nothing to convert.
         for item in plan.items { plan.setSelected(item.id, false) }
         XCTAssertEqual(plan.existingFrameSizes(), [:])
-        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel, ConvertPlan.ChoiceLabel(value: "Each table's own"))
+        XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel, ConvertPlan.ChoiceLabel(value: "Each table’s own"))
         // The label's rule is the writer's: what each of those tables is written at.
         for n in [2048, 600, 1024] {
             XCTAssertEqual(WavetableWriter.frameSize(for: .tonverk, source: n), WavetableWriter.tonverkFrameSizes.contains(n) ? n : 2048)

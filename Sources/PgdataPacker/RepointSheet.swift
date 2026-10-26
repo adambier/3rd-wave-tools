@@ -104,7 +104,7 @@ struct RepointSheet: View {
 
     @ViewBuilder private var oscillatorList: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("1  Oscillators to Change").font(.headline)
+            Text("1  Oscillators to change").font(.headline)
             if let item {
                 let current = item.effectiveProgram.sources
                 let original = item.program.sources
@@ -188,7 +188,7 @@ struct RepointSheet: View {
 
     private var targetList: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("2  What They Should Play").font(.headline)
+            Text("2  What they should play").font(.headline)
             List(selection: $selectedID) {
                 targetSection("Files You Added", fileTargets.filter(matches))
                 targetSection("Factory Slots", slotTargets.filter(matches))

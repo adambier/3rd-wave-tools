@@ -1,6 +1,6 @@
 import Foundation
 #if canImport(PgdataFormats)
-import PgdataFormats   // SwiftPM build; absent in the app's single-module swiftc build
+import PgdataFormats   // SwiftPM build; absent in the app’s single-module swiftc build
 #endif
 
 // Decision logic behind pgdata Packer, kept free of UI code so it can be unit-tested and reused by
@@ -34,7 +34,7 @@ public struct ContentFile: Identifiable, Equatable {
         case let .wavetable(w):
             fingerprint = w.fingerprint
             let peak = w.peak
-            problems = peak > 1.0001 ? ["its samples reach ±\(String(format: "%.2f", peak)); the 3rd Wave's own tables stay within ±1, so the file may be damaged or not normalised"] : []
+            problems = peak > 1.0001 ? ["its samples reach ±\(String(format: "%.2f", peak)); the 3rd Wave’s own tables stay within ±1, so the file may be damaged or not normalised"] : []
         case let .multisample(m):
             fingerprint = m.fingerprint
             problems = m.problems
@@ -173,7 +173,7 @@ public struct PackPlan {
         if !other.isEmpty { parts.append(other.map(\.label).joined(separator: ", ")) }
         if !old.isEmpty {
             parts.append(old.map(\.label).joined(separator: ", ")
-                         + ": probably the author's own wavetable\(old.count == 1 ? "" : "s") from before 2025")
+                         + ": probably the author’s own wavetable\(old.count == 1 ? "" : "s") from before 2025")
         }
         return "needs " + parts.joined(separator: "; ")
     }
@@ -219,7 +219,7 @@ public struct PackPlan {
             warnings.append("The file has \(program.excessValues) values beyond the \(trimmed.values.count) its header declares, probably left "
                             + "over from a longer file it was exported onto. Only the declared values are packed.")
         } else if program.layoutWarning == nil, ProgramConverter.layout(of: program) == nil, let declared = program.declaredCount {
-            warnings.append("The program's header declares \(declared) values but the file has \(program.values.count). It is packed as it "
+            warnings.append("The program’s header declares \(declared) values but the file has \(program.values.count). It is packed as it "
                             + "is; the 3rd Wave may not read it.")
         }
         let packed: ProgramFile
@@ -326,8 +326,8 @@ public struct PackPlan {
                 brief = keepsFactory ? "Factory table; the added file is not used" : "Factory table (not embedded)"
             case .builtIn?: status = .ok("Built-in analog wave; nothing to embed"); brief = "Built-in analog wave"
             case nil where wasUserSlot:
-                status = .missing("Probably the author's own wavetable; see the note above")
-                brief = "Missing: the author's table (see note)"
+                status = .missing("Probably the author’s own wavetable; see the note above")
+                brief = "Missing: the author’s table (see note)"
             case nil:
                 status = .missing(ref.isSample
                     ? "Needs the multisample for \(ref.label): add its .bin file"
@@ -364,12 +364,12 @@ public struct PackPlan {
                 return "\(what) has line breaks or other control characters; they are written as spaces."
             case let .accentsRemoved(from, to):
                 let pairs = zip(from, to).map { "\u{201C}\($0)\u{201D} → \u{201C}\($1)\u{201D}" }.joined(separator: ", ")
-                return "\(what) has \(from.count == 1 ? "a letter" : "letters") the 3rd Wave's name fields cannot hold; \(from.count == 1 ? "it is" : "they are") written without accents: \(pairs)."
+                return "\(what) has \(from.count == 1 ? "a letter" : "letters") the 3rd Wave’s name fields cannot hold; \(from.count == 1 ? "it is" : "they are") written without accents: \(pairs)."
             case let .replacedWithQuestionMark(chars):
                 let list = chars.map { "\u{201C}\($0)\u{201D}" }.joined(separator: ", ")
-                return "\(what) has \(chars.count == 1 ? "a character" : "characters") the 3rd Wave's name fields cannot hold (\(list)); \(chars.count == 1 ? "it is" : "they are") written as \u{201C}?\u{201D}."
+                return "\(what) has \(chars.count == 1 ? "a character" : "characters") the 3rd Wave’s name fields cannot hold (\(list)); \(chars.count == 1 ? "it is" : "they are") written as \u{201C}?\u{201D}."
             case let .shortened(from, to):
-                return "\(what) is \(from) characters; the 3rd Wave's name fields hold \(NameField.displayLimit), so it is shortened to \u{201C}\(to)\u{201D}."
+                return "\(what) is \(from) characters; the 3rd Wave’s name fields hold \(NameField.displayLimit), so it is shortened to \u{201C}\(to)\u{201D}."
             }
         }
     }
@@ -409,8 +409,8 @@ public struct PackPlan {
         let list = and(slots.map(\.label))
         let first = slots[0]
         let title = one
-            ? "\(list) probably held the author's own wavetable, which is not included"
-            : "\(list) probably held the author's own wavetables, which are not included"
+            ? "\(list) probably held the author’s own wavetable, which is not included"
+            : "\(list) probably held the author’s own wavetables, which are not included"
         let factoryList = and(slots.map { "\($0.label) \(fname($0))" })
         let body = """
         This program was most likely made before 2025: \(layoutReason(program)). The file itself carries no date, so this is an inference.
@@ -418,9 +418,9 @@ public struct PackPlan {
         Until 2025, U48–U55 were user slots, where people loaded their own wavetables. Groove Synthesis then made them factory slots. Loaded as it is, this program would play the factory \(one ? "table" : "tables") \(factoryList) instead of the \(one ? "one" : "ones") the author used.
 
         To fix it, do one of these:
-        • Add the author's wavetable \(one ? "file" : "files") for \(list). Program sets that use these slots usually include them, often named with the slot (for example \u{201C}\(first.label) Name.wt\u{201D}). A file whose name starts with the slot is assigned to it automatically; otherwise, use Choose What to Play… in the slot's Plays menu and pick the file. \(one ? "The table is" : "The tables are") then included in the .pgdata, and the 3rd Wave stores \(one ? "it in a free slot" : "them in free slots") when it imports the file.
-        • Point the oscillators to a different wavetable you have: Choose What to Play… in the slot's Plays menu.
-        • Use the factory \(one ? "table" : "tables") anyway: \(one ? "in the slot's Plays menu, choose Factory table — \(factory.name(first) ?? "")" : "in each slot's Plays menu, choose its factory table (Factory table — \(factory.name(first) ?? "") for \(first.label), and so on)"). Choose this if you know the program was made for \(one ? "it" : "them"), or you accept a different sound.
+        • Add the author’s wavetable \(one ? "file" : "files") for \(list). Program sets that use these slots usually include them, often named with the slot (for example \u{201C}\(first.label) Name.wt\u{201D}). A file whose name starts with the slot is assigned to it automatically; otherwise, use Choose What to Play… in the slot’s Plays menu and pick the file. \(one ? "The table is" : "The tables are") then included in the .pgdata, and the 3rd Wave stores \(one ? "it in a free slot" : "them in free slots") when it imports the file.
+        • Point the oscillators to a different wavetable you have: Choose What to Play… in the slot’s Plays menu.
+        • Use the factory \(one ? "table" : "tables") anyway: \(one ? "in the slot’s Plays menu, choose Factory table — \(factory.name(first) ?? "")" : "in each slot’s Plays menu, choose its factory table (Factory table — \(factory.name(first) ?? "") for \(first.label), and so on)"). Choose this if you know the program was made for \(one ? "it" : "them"), or you accept a different sound.
         """
         return Note(title: title, body: body)
     }
@@ -437,7 +437,7 @@ public struct PackPlan {
             guard let slot = f.slot else { out[f.id] = "Not used by any \(programs) program"; continue }
             let slotUsed = plans.contains { $0.rows.contains { $0.ref == slot } }
             if !slotUsed { out[f.id] = "Not used by any \(programs) program" }
-            else if factory.tables[slot]?.fingerprint == f.fingerprint { out[f.id] = "Identical to factory \(slot.label); the 3rd Wave's own copy is used, so it is not embedded" }
+            else if factory.tables[slot]?.fingerprint == f.fingerprint { out[f.id] = "Identical to factory \(slot.label); the 3rd Wave’s own copy is used, so it is not embedded" }
             else if plans.contains(where: { $0.rows.contains { $0.ref == slot && $0.heldBack.contains(f.id) } }) {
                 out[f.id] = "Not used: the \(programs) programs that use \(slot.label) are from after it became a factory slot, so they use the factory table"
             }
@@ -554,7 +554,7 @@ public struct UnpackPlan {
             let peak = w.peak
             items.append(Item(ref: ref, fileName: name, data: w.serialized(), description: "",
                               isFactoryDuplicate: false, write: true, defaultFileName: name, fingerprint: fp, contentName: w.name,
-                              problem: peak > 1.0001 ? "samples reach ±\(String(format: "%.2f", peak)), beyond the ±1 of the 3rd Wave's own tables" : nil))
+                              problem: peak > 1.0001 ? "samples reach ±\(String(format: "%.2f", peak)), beyond the ±1 of the 3rd Wave’s own tables" : nil))
         }
         for (ref, m) in up.multisamples {
             let secs = m.samples.reduce(0.0) { $0 + Double($1.length) / Double(max($1.sampleRate, 1)) }

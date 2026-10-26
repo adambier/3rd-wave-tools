@@ -461,8 +461,8 @@ final class AppState: ObservableObject {
         if !missing.isEmpty {
             let ok = items.count - missing.count
             if ok == 0 {
-                alertMessage = (items.count == 1 ? "This program can't be packed yet: it needs files that aren't here."
-                                                 : "None of these programs can be packed yet: they need files that aren't here.")
+                alertMessage = (items.count == 1 ? "This program can’t be packed yet: it needs files that aren’t here."
+                                                 : "None of these programs can be packed yet: they need files that aren’t here.")
                     + "\n\n" + missing.joined(separator: "\n")
                     + (items.count == 1 ? "\n\nAdd the .wt or .bin files it needs." : "\n\nAdd the .wt or .bin files they need.")
                     + (oldTables ? " For wavetables from before 2025, the note with each program explains the choices." : "")
@@ -470,8 +470,8 @@ final class AppState: ObservableObject {
             }
             let n = missing.count
             Panels.confirm(
-                title: "\(n) of \(items.count) programs can't be packed yet",
-                message: "\(n == 1 ? "It needs files that aren't here and" : "They need files that aren't here and") will be left out. Pack the other \(ok == 1 ? "one" : String(ok))?",
+                title: "\(n) of \(items.count) programs can’t be packed yet",
+                message: "\(n == 1 ? "It needs files that aren’t here and" : "They need files that aren’t here and") will be left out. Pack the other \(ok == 1 ? "one" : String(ok))?",
                 details: missing.joined(separator: "\n"),
                 ok: "Pack \(ok)") { [weak self] (confirmed: Bool) in
                 guard confirmed else { return }
@@ -553,14 +553,14 @@ final class AppState: ObservableObject {
             if !failed.isEmpty { msg += "\n\nNot packed:\n" + failed.joined(separator: "\n") }
             // When every packed program was converted (a whole older bank), one line says so instead
             // of a list as long as the bank.
-            let howConverted = "in the same way the 3rd Wave's \u{201C}Import program\u{201D} function handles older programs"
+            let howConverted = "in the same way the 3rd Wave’s \u{201C}Import program\u{201D} function handles older programs"
             if !converted.isEmpty && converted.count == written {
                 msg += "\n\n" + (written == 1 ? "The program was" : CountWords.all(written, "programs") + " were") + " converted from an older format, \(howConverted)."
             } else if !converted.isEmpty {
                 msg += "\n\nConverted from an older format, \(howConverted):\n" + converted.joined(separator: "\n")
             }
             if !replaced.isEmpty { msg += "\n\nFactory tables replaced by added files (check these are meant):\n" + replaced.joined(separator: "\n") }
-            if !unfamiliar.isEmpty { msg += "\n\nPacked, but check these on the 3rd Wave (see each program's notes):\n" + unfamiliar.joined(separator: "\n") }
+            if !unfamiliar.isEmpty { msg += "\n\nPacked, but check these on the 3rd Wave (see each program’s notes):\n" + unfamiliar.joined(separator: "\n") }
             // Files none of the packed programs use (other added programs may use them).
             let unused = PackPlan.unusedFiles(files, plans: packedPlans, factory: self.factory, programs: "packed")
             if !unused.isEmpty {
@@ -750,8 +750,8 @@ final class AppState: ObservableObject {
             return
         }
         guard marked.contains(where: plan.canConvert) else {
-            alertMessage = (marked.count == 1 ? "The table marked to convert can't be converted yet: its file doesn't say how long each wave is."
-                                              : "None of the tables marked to convert can be converted yet: their files don't say how long each wave is.")
+            alertMessage = (marked.count == 1 ? "The table marked to convert can’t be converted yet: its file doesn’t say how long each wave is."
+                                              : "None of the tables marked to convert can be converted yet: their files don’t say how long each wave is.")
                 + "\n\nChoose a frame size in the Input column first."
             return
         }

@@ -1,6 +1,6 @@
 import Foundation
 #if canImport(WavetableFormats)
-import WavetableFormats   // SwiftPM build; absent in the app's single-module swiftc build
+import WavetableFormats   // SwiftPM build; absent in the app’s single-module swiftc build
 #endif
 
 /// Reduces a wavetable to what a small picture of it needs: a few dozen frames, each a few

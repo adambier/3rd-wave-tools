@@ -280,12 +280,12 @@ final class FLACTests: XCTestCase {
         XCTAssertEqual(c.frameSizeEvidence, .statedInFile)
         XCTAssertEqual(c.interpolation, Interpolation.none)
         XCTAssertEqual(c.wavetable()?.frameCount, 2)
-        XCTAssertEqual(c.notes, ["The Serum-style tag was found in the file's comments (COMMENT), not in a block of its own."])
+        XCTAssertEqual(c.notes, ["The Serum-style tag was found in the file’s comments (COMMENT), not in a block of its own."])
         // A comment that only mentions frames is reported, not used.
         let f = try XCTUnwrap(WavetableReader.read(try resource("comment_frames_only.flac"), fileName: "f.flac").first)
         XCTAssertEqual(f.frameSize, 2048)
         XCTAssertEqual(f.frameSizeEvidence, .length)
-        XCTAssertEqual(f.notes, ["The file's comments say \"FRAMES=3\"; a frame size is not taken from a comment."])
+        XCTAssertEqual(f.notes, ["The file’s comments say \"FRAMES=3\"; a frame size is not taken from a comment."])
     }
 
     func testWastedBitsAndVariableBlocksReadAsOneTable() throws {

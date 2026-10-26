@@ -180,16 +180,16 @@ struct ConvertSummaryStrip: View {
             Text("\(total) table\(total == 1 ? "" : "s") · \(marked) to convert")
                 .monospacedDigit()
             ConvertBlockedCount(count: plan.needsFrameSizeCount, one: "needs a frame size", many: "need frame sizes",
-                                help: "Tables marked to convert whose file doesn't say how long each wave is: choose a size in the Input column")
-            ConvertBlockedCount(count: plan.cannotSplitCount, one: "can't be split", many: "can't be split",
-                                help: "Tables marked to convert whose samples don't divide into frames of the size given")
+                                help: "Tables marked to convert whose file doesn’t say how long each wave is: choose a size in the Input column")
+            ConvertBlockedCount(count: plan.cannotSplitCount, one: "can’t be split", many: "can’t be split",
+                                help: "Tables marked to convert whose samples don’t divide into frames of the size given")
             Spacer()
-            Toggle("Show only tables that can't be converted yet", isOn: $state.convertOnlyAttention)
+            Toggle("Show only tables that can’t be converted yet", isOn: $state.convertOnlyAttention)
                 .toggleStyle(.checkbox).font(.caption)
                 .disabled(plan.blockedCount == 0)
                 .help(plan.blockedCount == 0
                       ? "Every table marked to convert can be converted"
-                      : "Show only the tables marked to convert that still need a frame size, or whose samples don't divide into frames")
+                      : "Show only the tables marked to convert that still need a frame size, or whose samples don’t divide into frames")
         }
         .frame(height: 28)
         .padding(.horizontal, 12)
@@ -323,7 +323,7 @@ struct ConvertStatusCell: View {
                 .accessibilityLabel("Needs a frame size")
         case .cannotSplit:
             Image(systemName: "xmark.octagon.fill").foregroundStyle(.red).help(tip)
-                .accessibilityLabel("Can't be split into frames")
+                .accessibilityLabel("Can’t be split into frames")
         case .ready:
             Image(systemName: "checkmark.circle").foregroundStyle(.secondary).help(tip)
                 .accessibilityLabel("Ready to convert")
@@ -402,7 +402,7 @@ struct ConvertNameField: View {
                 .lineLimit(1)
                 .foregroundStyle(included ? Color.primary : Color.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .help(item.newName == nil ? "The table's name; double-click the row to edit it. The name goes on the converted file (and inside a 3rd Wave table); the source file is not changed."
+                .help(item.newName == nil ? "The table’s name; double-click the row to edit it. The name goes on the converted file (and inside a 3rd Wave table); the source file is not changed."
                                           : "Was \u{201C}\(item.table.name)\u{201D}; double-click the row to edit")
         }
     }
@@ -454,7 +454,7 @@ struct ConvertFrameSizeCell: View {
             ConvertSizeText(item: item, included: included, plain: true)
                 .help("Input: " + item.sizeDescription + " (frames × samples per frame). " + item.basisDescription)
         } else if choices.isEmpty {
-            Label("Can't split", systemImage: "xmark.octagon.fill").foregroundStyle(.red).lineLimit(1)
+            Label("Can’t split", systemImage: "xmark.octagon.fill").foregroundStyle(.red).lineLimit(1)
                 .help(state.convertPlan.statusDescription(item))
         } else {
             Button { selection = [item.id]; choosing.toggle() } label: {
@@ -469,7 +469,7 @@ struct ConvertFrameSizeCell: View {
             }
             .buttonStyle(.bordered)
             .help(item.needsFrameSize
-                  ? "The file doesn't say how long each wave is. Click to choose one of the sizes its length allows (frames × samples per frame)."
+                  ? "The file doesn’t say how long each wave is. Click to choose one of the sizes its length allows (frames × samples per frame)."
                   : "Input: " + item.sizeDescription + " (frames × samples per frame). " + item.basisDescription + " Click to choose another size.")
             .popover(isPresented: $choosing, arrowEdge: .bottom) {
                 ConvertSizePopover(state: state, item: item)
@@ -543,7 +543,7 @@ struct ConvertSizePopover: View {
     private var fitLine: String? {
         switch item.frameSizeFit {
         case .likely(let n):
-            return "The samples suggest \(ConvertPlan.formatCount(n)): frames of that size are alike from one to the next, as a wavetable's are. A suggestion, not a certainty."
+            return "The samples suggest \(ConvertPlan.formatCount(n)): frames of that size are alike from one to the next, as a wavetable’s are. A suggestion, not a certainty."
         case .tie:
             return "The sizes fit the samples equally well; nothing here settles it."
         case .unclear:

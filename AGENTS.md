@@ -273,7 +273,12 @@ App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle
 `AppState.swift` (all state, `ObservableObject`, main thread; `Section` = Pack, Unpack, Wavetables),
 `ContentView.swift`, `PackView.swift`, `UnpackView.swift`, `ConvertView.swift`,
 `ConvertDestination.swift`, `ConvertDetail.swift`, `RepointSheet.swift`, `NameCleanupSheet.swift`,
-`Panels.swift` (AppKit open/save panels), `VisibleScrollers.swift`.
+`Panels.swift` (AppKit open/save panels, confirmations and the overwrite choice as sheets, background
+writing with progress), `SearchField.swift` (an `NSSearchField` for SwiftUI). `main.swift` also holds
+`MenuActions` (the File and View menus' targets and validation) and `ToolbarController` (the unified
+toolbar whose segmented control switches pages). Scroll bars follow the system setting; menus carry
+the shortcuts (⌘O, ⇧⌘E, ⌘1–⌘3, ⌥⌘L, ⌫); the Info.plist declares the file types with
+`LSHandlerRank` None, so files open by Dock-icon drop without the app claiming any type.
 
 ## 8. Where to look (task to files)
 

@@ -98,7 +98,7 @@ struct PackView: View {
             Toggle("Show only programs needing attention", isOn: $state.onlyAttention)
                 .toggleStyle(.checkbox).font(.caption)
                 .padding(.horizontal, 10).padding(.bottom, 4)
-                .help("Programs that can't be packed yet, or that carry a warning")
+                .help("Programs that can’t be packed yet, or that carry a warning")
             PackSummaryLine(state: st, shown: shownPrograms.count)
             Divider()
             List(selection: $selection) {
@@ -152,9 +152,9 @@ struct PackSummaryLine: View {
             Text(shown == total ? "\(total) program\(total == 1 ? "" : "s")" : "\(shown) of \(total) programs shown")
                 .monospacedDigit()
             if blocked > 0 {
-                Label("\(blocked) can't be packed yet", systemImage: "exclamationmark.octagon.fill")
+                Label("\(blocked) can’t be packed yet", systemImage: "exclamationmark.octagon.fill")
                     .foregroundStyle(.red)
-                    .help("Programs that need a file that isn't here; select one to see which slot")
+                    .help("Programs that need a file that isn’t here; select one to see which slot")
             }
             Spacer()
         }
@@ -172,7 +172,7 @@ struct ProgramRow: View {
         switch verdict {
         case .factoryOnly: return "Factory tables only, nothing to embed"
         case .embedsContent: return "Embeds wavetables or multisamples"
-        case .blocked: return "Can't be packed yet"
+        case .blocked: return "Can’t be packed yet"
         }
     }
 
@@ -266,7 +266,7 @@ struct UserSlotNoteBox: View {
                 HStack(alignment: .firstTextBaseline) {
                     Label(note.title, systemImage: "questionmark.circle").font(.headline)
                     Spacer()
-                    Button(expanded ? "Hide" : "Why, and What to Do") { withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() } }
+                    Button(expanded ? "Hide" : "Why, and what to do") { withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() } }
                         .buttonStyle(.link).font(.callout)
                 }
                 if expanded {

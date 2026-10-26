@@ -38,7 +38,7 @@ final class ReviewFixPlanTests: XCTestCase {
         XCTAssertEqual(plan.items[0].frameSize, 1024)
         XCTAssertEqual(plan.items[0].frameCount, 64)
         XCTAssertTrue(plan.items[0].basisDescription.hasPrefix("Set manually"))
-        plan.chooseFrameSize(id, 2048)   // back to the file's own
+        plan.chooseFrameSize(id, 2048)   // back to the file’s own
         XCTAssertNil(plan.items[0].chosenFrameSize)
     }
 
@@ -66,7 +66,7 @@ final class ReviewFixPlanTests: XCTestCase {
         plan.chooseFrameSize(plan.items[1].id, 2048)
         XCTAssertEqual(plan.items[1].frameSize, 2048)
         XCTAssertEqual(plan.items[1].sizeQualifier, "set manually")
-        plan.chooseFrameSize(plan.items[1].id, 1024)   // back to the tag's
+        plan.chooseFrameSize(plan.items[1].id, 1024)   // back to the tag’s
         XCTAssertNil(plan.items[1].chosenFrameSize)
 
         let u = FoundTable(name: "U", fileName: "u.wt", source: .thirdWaveWavetable(isP: false),

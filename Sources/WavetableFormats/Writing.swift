@@ -1,6 +1,6 @@
 import Foundation
 #if canImport(PgdataFormats)
-import PgdataFormats   // SwiftPM build; absent in the app's single-module swiftc build
+import PgdataFormats   // SwiftPM build; absent in the app’s single-module swiftc build
 #endif
 
 /// Writes a wavetable for a destination.
@@ -116,7 +116,7 @@ public enum WavetableWriter {
             if plan.scalesToFit { scaleToFit() } else { notePeakKept() }
             if plan.addsPPGWaves {
                 frames += PPGStandardWaves.frames
-                notes.append("The PPG's four standard waves (triangle, narrow pulse, square, and sawtooth) were added at positions 60–63.")
+                notes.append("The PPG’s four standard waves (triangle, narrow pulse, square, and sawtooth) were added at positions 60–63.")
             }
             switch preset {
             case .thirdWaveU:
@@ -152,7 +152,7 @@ public enum WavetableWriter {
             let untagged = WavetableWriter.Names.removeTonverkTag(named.stem)
             let tag = "_wt\(plan.frameSizeOut)" + (stepped ? "r" : "")
             if let old = untagged.removed {
-                notes.append("The name's own Tonverk tag “\(old)” was replaced by “\(tag)”.")
+                notes.append("The name’s own Tonverk tag “\(old)” was replaced by “\(tag)”.")
             }
             let data = WavetableWriter.Bytes.wav(samples: frames.flatMap { $0 }, sampleRate: 48_000, format: .float32, clm: nil)
             return OutputFile(fileName: untagged.stem + tag + "." + plan.fileExtension, data: data, notes: notes)
@@ -186,10 +186,10 @@ public enum WavetableWriter {
         var countReason: String {
             switch preset {
             case .thirdWaveU: return "a 3rd Wave U table has exactly 64"
-            case .thirdWaveP: return plan.addsPPGWaves ? "the PPG's standard waves take the last 4 of 64" : "a 3rd Wave P table has exactly 64"
+            case .thirdWaveP: return plan.addsPPGWaves ? "the PPG’s standard waves take the last 4 of 64" : "a 3rd Wave P table has exactly 64"
             case .wav2048: return "Serum and Pigments take at most 256"
             case .miniFreak: return "a MiniFreak stores 64"
-            case .phasePlant: return "Phase Plant's documentation asks for exactly 256"
+            case .phasePlant: return "Phase Plant’s documentation asks for exactly 256"
             case .tonverk: return "Tonverk takes at most 64"
             case .surge: return "Surge takes at most 512"
             case .waveEdit: return "a WaveEdit bank has exactly 64"
@@ -210,7 +210,7 @@ public enum WavetableWriter {
                 if size > from {
                     notes.append("Resized from \(grouped(from)) to \(grouped(size)) samples per frame; the waveform is unchanged (band-limited, no harmonics added).")
                 } else {
-                    notes.append("Resized from \(grouped(from)) to \(grouped(size)) samples per frame; the \(ordinal(size / 2 + 1)) harmonic and above are dropped, as \(grouped(size)) samples can't hold them.")
+                    notes.append("Resized from \(grouped(from)) to \(grouped(size)) samples per frame; the \(ordinal(size / 2 + 1)) harmonic and above are dropped, as \(grouped(size)) samples can’t hold them.")
                 }
             }
             if target > n { changeCount(to: target, reason: countReason) }
@@ -236,7 +236,7 @@ public enum WavetableWriter {
             guard peak > 1 else { return }
             let g = 1 / peak
             frames = frames.map { $0.map { $0 * g } }
-            let reason = preset.isThirdWave ? "the 3rd Wave's own tables stay within ±1" : "16-bit samples cannot go beyond full scale"
+            let reason = preset.isThirdWave ? "the 3rd Wave’s own tables stay within ±1" : "16-bit samples cannot go beyond full scale"
             notes.append("Turned down to fit (peak was \(Wavetable.peakText(peak)), \(decimal(20 * log10(Double(g)), 1)) dB); plays a little quieter: \(reason).")
         }
 
@@ -250,7 +250,7 @@ public enum WavetableWriter {
         /// Tonverk's smooth) was chosen because nothing said otherwise.
         mutating func noteDefaultInterpolation(as words: String = "saved as crossfade") {
             if options.interpolation == nil && table.interpolation == nil {
-                notes.append("Interpolation \(words); the source doesn't say.")
+                notes.append("Interpolation \(words); the source doesn’t say.")
             }
         }
 
@@ -259,7 +259,7 @@ public enum WavetableWriter {
         mutating func noteUnrecordedInterpolation() {
             if let asked = options.interpolation ?? table.interpolation {
                 let who = preset.isThirdWave ? "the 3rd Wave" : "the synth"
-                notes.append("This format doesn't store the interpolation (\(asked.displayName.lowercased()) asked for); \(who) sets how frames blend.")
+                notes.append("This format doesn’t store the interpolation (\(asked.displayName.lowercased()) asked for); \(who) sets how frames blend.")
             }
         }
 
@@ -406,7 +406,7 @@ public extension OutputPreset {
         case .thirdWaveP:
             return "Groove Synthesis, 3rd Wave User Manual v1.9; the factory .wt files (FORMATS.md 5.1)"
         case .wav2048:
-            return "Xfer Records, Serum 2 User Guide, p. 38; Vital Audio, Vital's public source code; Arturia, Pigments User Manual 7.0, §8.12"
+            return "Xfer Records, Serum 2 User Guide, p. 38; Vital Audio, Vital’s public source code; Arturia, Pigments User Manual 7.0, §8.12"
         case .miniFreak:
             return "Arturia, MiniFreak V User Manual 5.1.0, pp. 30–31"
         case .tonverk:
@@ -416,7 +416,7 @@ public extension OutputPreset {
         case .surge:
             return "Surge Synth Team, Surge XT source code (WT fileformat.txt, Wavetable.h)"
         case .waveEdit:
-            return "Synthesis Technology, E370 Quick Start 1.4; WaveEdit's source code (WaveEdit.hpp, bank.cpp)"
+            return "Synthesis Technology, E370 Quick Start 1.4; WaveEdit’s source code (WaveEdit.hpp, bank.cpp)"
         }
     }
 
@@ -427,7 +427,7 @@ public extension OutputPreset {
     var caveat: String? {
         switch self {
         case .wav2048:
-            return "Vital's behaviour is taken from its public source code; the current release may differ. Pigments reads no metadata, so the interpolation saved in the file does not reach it."
+            return "Vital’s behaviour is taken from its public source code; the current release may differ. Pigments reads no metadata, so the interpolation saved in the file does not reach it."
         case .miniFreak:
             return "How MiniFreak V reduces 2,048-sample frames to 512, and how it treats fewer than 64 frames, is not documented."
         case .phasePlant:

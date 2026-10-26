@@ -148,7 +148,7 @@ two parts when it imports it.
 
 #### Changing what oscillators play
 
-**Play something else…** in the Plays menu (or **Choose what to play…**, the first choice when a
+**Play Something Else…** in the Plays menu (or **Choose What to Play…**, the first choice when a
 wavetable is missing) opens a sheet. Check the oscillators to change, then pick what they should
 play:
 
@@ -256,7 +256,8 @@ files to see everything they will produce in one list, with the program each fil
 
 ![The Unpack page with five .pgdata files selected: the multisamples to import first, the factory slots their programs play from your 3rd Wave, and each file they will produce with its program, file name, and contents](docs/unpack-window.png)
 
-Uncheck anything you don't want, or rename it, before **Unpack Selected…** or **Unpack All…**.
+Uncheck anything you don't want, or rename it (double-click the file name), before **Unpack
+Selected…** or **Unpack All…**.
 Wavetables identical to the factory table in their slot are skipped by default (**Skip factory
 wavetables**): the 3rd Wave's own
 export embeds factory tables too, and a repack lists them anyway. Unpacked names are kept as they
@@ -304,7 +305,7 @@ preview below the table is read-only and shows one table: the source and the res
 by frame (with the interpolation drawn between frames where a file records one), its file, its
 frame size and what that rests on, and what converting changes; moving the pointer across a
 picture sweeps through the table and draws the cycle at that point large, source and result
-together. Names are edited in the table. A frame size the file's contents state (a chunk, a
+together. Names are edited in the table (double-click a row). A frame size the file's contents state (a chunk, a
 header, or a format that fixes it) is taken as it is; one the page estimated (from a tag in the
 file name, a `.txt` beside the file, markers, or the length alone) is the default of a choice in
 the Input column, where every size the length allows is drawn so the one that cuts the wave in

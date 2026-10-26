@@ -1,6 +1,6 @@
 import Foundation
 #if canImport(WavetableFormats)
-import WavetableFormats   // SwiftPM build; absent in the app's single-module swiftc build
+import WavetableFormats   // SwiftPM build; absent in the app’s single-module swiftc build
 #endif
 
 // What the Wavetables page shows about each destination: the group it is listed under, a short
@@ -64,7 +64,7 @@ public extension OutputPreset {
     var distinction: String {
         switch self {
         case .thirdWaveU:
-            return "The 3rd Wave's main set: 64 waves of 1,024. Choose this for Serum-style and other 2,048-sample tables."
+            return "The 3rd Wave’s main set: 64 waves of 1,024. Choose this for Serum-style and other 2,048-sample tables."
         case .thirdWaveP:
             return "PPG-style: 64 waves of 128. With \u{201C}use upper wavetable\u{201D} off, the 3rd Wave sweeps positions 0–59 only (60–63 are reached by the wave offset); the PPG waves option fills 60–63 the way the PPG-derived factory tables do."
         case .wav2048:
@@ -74,9 +74,9 @@ public extension OutputPreset {
         case .tonverk:
             return "Up to 64 frames; Tonverk reads the frame size and stepping from the file name."
         case .phasePlant:
-            return "The same WAV, but exactly 256 frames, as Phase Plant's documentation asks; a table of any other length is brought to 256."
+            return "The same WAV, but exactly 256 frames, as Phase Plant’s documentation asks; a table of any other length is brought to 256."
         case .surge:
-            return "Surge's own .wt; keeps the source's frame size when it is a power of two up to 4,096 (otherwise 2,048)."
+            return "Surge’s own .wt; keeps the source’s frame size when it is a power of two up to 4,096 (otherwise 2,048)."
         case .waveEdit:
             return "16-bit, 64 waves of 256: the bank format the E370 and E352 read."
         }

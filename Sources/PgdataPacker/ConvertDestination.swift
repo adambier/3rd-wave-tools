@@ -51,7 +51,7 @@ struct ConvertDestinationPane: View {
             if plan.preset.isThirdWave {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("To load .wt files: copy the WAVES folder onto the 3rd Wave's USB drive, then Global → Bulk wavetable import. A 3rd Wave holds 64 U tables and 48 P tables; its factory tables fill U00–U55 and P00–P35, leaving U56–U63 and P36–P47.")
+                    Text("To load .wt files: copy the WAVES folder onto the 3rd Wave’s USB drive, then Global → Bulk wavetable import. A 3rd Wave holds 64 U tables and 48 P tables; its factory tables fill U00–U55 and P00–P35, leaving U56–U63 and P36–P47.")
                     Text("Send to Pack also adds the .wt files to the Pack page.")
                 }
                 .font(.caption).foregroundStyle(.secondary)
@@ -191,7 +191,7 @@ struct ConvertSourcesHeader: View {
         .popover(isPresented: $showing, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Sources").font(.headline)
-                Text("Each destination follows the documents or source code published for that synth. Click a destination's book to see them, what they leave open, and whether a converted file has been tested in the synth.")
+                Text("Each destination follows the documents or source code published for that synth. Click a destination’s book to see them, what they leave open, and whether a converted file has been tested in the synth.")
                     .fixedSize(horizontal: false, vertical: true)
                 Label("A green seal marks a destination that has been tested.", systemImage: "checkmark.seal.fill")
                     .foregroundStyle(.secondary)
@@ -342,8 +342,8 @@ struct ConvertInterpolationOption: View {
             .labelsHidden()
             .frame(maxWidth: 260)
             .help(tip)
-            Text(tonverk ? "\u{201C}Existing\u{201D} is the interpolation the tables already have; a file that doesn't say counts as smooth. None (stepped) adds \u{201C}r\u{201D} to the file name."
-                         : "\u{201C}Existing\u{201D} is the interpolation the tables already have; a file that doesn't say counts as crossfade.")
+            Text(tonverk ? "\u{201C}Existing\u{201D} is the interpolation the tables already have; a file that doesn’t say counts as smooth. None (stepped) adds \u{201C}r\u{201D} to the file name."
+                         : "\u{201C}Existing\u{201D} is the interpolation the tables already have; a file that doesn’t say counts as crossfade.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -390,7 +390,7 @@ struct ConvertTonverkSizeOption: View {
             }
             .labelsHidden()
             .frame(maxWidth: 260)
-            .help("\u{201C}Existing\u{201D} is the frame size the tables already have; Tonverk takes 64 to 4,096 (powers of two), and a table of another size is written at 2,048. Any other choice resamples every table to that size. The size goes into the file name as a _wt tag (the preview shows each table's); a trailing \u{201C}r\u{201D} marks a stepped table.")
+            .help("\u{201C}Existing\u{201D} is the frame size the tables already have; Tonverk takes 64 to 4,096 (powers of two), and a table of another size is written at 2,048. Any other choice resamples every table to that size. The size goes into the file name as a _wt tag (the preview shows each table’s); a trailing \u{201C}r\u{201D} marks a stepped table.")
         }
     }
 
@@ -414,8 +414,8 @@ struct ConvertPPGOption: View {
     @ObservedObject var state: AppState
 
     var body: some View {
-        Toggle("Add the PPG's standard waves at 60–63", isOn: $state.convertPlan.options.appendPPGStandardWaves)
+        Toggle("Add the PPG’s standard waves at 60–63", isOn: $state.convertPlan.options.appendPPGStandardWaves)
             .toggleStyle(.checkbox)
-            .help("Triangle, narrow pulse, square, and sawtooth, as in the 3rd Wave's PPG-derived P tables. Your table is fitted into frames 0–59, the part the 3rd Wave sweeps when \u{201C}use upper wavetable\u{201D} is off.")
+            .help("Triangle, narrow pulse, square, and sawtooth, as in the 3rd Wave’s PPG-derived P tables. Your table is fitted into frames 0–59, the part the 3rd Wave sweeps when \u{201C}use upper wavetable\u{201D} is off.")
     }
 }

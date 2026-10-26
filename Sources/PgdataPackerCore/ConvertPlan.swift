@@ -1,6 +1,6 @@
 import Foundation
 #if canImport(PgdataFormats)
-import PgdataFormats   // SwiftPM build; absent in the app's single-module swiftc build
+import PgdataFormats   // SwiftPM build; absent in the app’s single-module swiftc build
 #endif
 #if canImport(WavetableFormats)
 import WavetableFormats
@@ -127,7 +127,7 @@ public struct ConvertPlan: Equatable {
         /// split into frames").
         public var sizeDescription: String {
             if let n = frameSize, let c = frameCount { return "\(c) × \(ConvertPlan.formatCount(n))" }
-            if frameSize != nil { return "Can't split into frames" }
+            if frameSize != nil { return "Can’t split into frames" }
             return "Choose a frame size"
         }
         /// Whether the frame size rests on the file's length alone (an assumption the user may
@@ -186,14 +186,14 @@ public struct ConvertPlan: Equatable {
             case .guessed:
                 return "Nothing in the file says, so the usual \(ConvertPlan.formatCount(table.frameSize ?? 2048)) is assumed. If it sounds wrong, choose another size in the Input column."
             case .notStated:
-                return "The file doesn't say how long each wave is."
+                return "The file doesn’t say how long each wave is."
                     + (table.candidateFrameSizes.isEmpty ? " Its length allows none of the usual sizes."
                                                           : " Its length allows " + ConvertPlan.candidateList(table) + ".")
             case .setManually:
                 if let suggested = table.frameSize {
-                    return "Set manually; the file's length suggested \(ConvertPlan.formatCount(suggested))."
+                    return "Set manually; the file’s length suggested \(ConvertPlan.formatCount(suggested))."
                 }
-                return "Set manually; the file doesn't say."
+                return "Set manually; the file doesn’t say."
             }
         }
         /// The interpolation the source asks for: None (stepped), Crossfade, Spectral, or Not stated.
@@ -550,11 +550,11 @@ public struct ConvertPlan: Equatable {
         case .ready: return "Ready to convert."
         case .excluded: return "Not marked to convert; left out."
         case .needsFrameSize:
-            return "Choose a frame size: the file doesn't say how long each wave is."
+            return "Choose a frame size: the file doesn’t say how long each wave is."
                 + (item.table.candidateFrameSizes.isEmpty ? " Its length allows none of the usual sizes."
                                                            : " Its length allows \(Self.candidateList(item.table)).")
         case .cannotSplit:
-            return "Can't split into frames: \(Self.formatCount(item.table.samples.count)) samples don't divide into frames of \(Self.formatCount(item.frameSize ?? 0))."
+            return "Can’t split into frames: \(Self.formatCount(item.table.samples.count)) samples don’t divide into frames of \(Self.formatCount(item.frameSize ?? 0))."
         }
     }
 
@@ -711,11 +711,11 @@ public struct ConvertPlan: Equatable {
     public var eachTablesOwnInterpolationLabel: ChoiceLabel? {
         let counts = existingInterpolations()
         if counts.count == 1 { return nil }
-        if counts.isEmpty { return ChoiceLabel(value: "Each table's own") }
+        if counts.isEmpty { return ChoiceLabel(value: "Each table’s own") }
         let parts = [Interpolation.none, .crossfade, .spectral].compactMap { (i: Interpolation) -> String? in
             counts[i].map { "\($0) \(existingWord(i))" }
         }
-        return ChoiceLabel(value: "Each table's own", existing: "existing: " + parts.joined(separator: ", "))
+        return ChoiceLabel(value: "Each table’s own", existing: "existing: " + parts.joined(separator: ", "))
     }
 
     /// The word for an interpolation in the existing counts: "stepped", "crossfade", or
@@ -753,7 +753,7 @@ public struct ConvertPlan: Equatable {
     public var eachTablesOwnFrameSizeLabel: ChoiceLabel? {
         let counts = existingFrameSizes()
         if sharedTonverkFrameSize != nil { return nil }
-        if counts.isEmpty { return ChoiceLabel(value: "Each table's own") }
+        if counts.isEmpty { return ChoiceLabel(value: "Each table’s own") }
         let sizes = counts.keys.sorted()
         let taken = sizes.filter { WavetableWriter.tonverkFrameSizes.contains($0) }
         let notTaken = sizes.filter { !WavetableWriter.tonverkFrameSizes.contains($0) }
@@ -761,9 +761,9 @@ public struct ConvertPlan: Equatable {
         if !taken.isEmpty { parts.append(Self.listPhrase(taken.map(Self.formatCount))) }
         if !notTaken.isEmpty {
             let n = notTaken.reduce(0) { $0 + (counts[$1] ?? 0) }
-            parts.append("2,048 for \(n) table\(n == 1 ? "" : "s") of \(Self.listPhrase(notTaken.map(Self.formatCount))), which Tonverk doesn't take")
+            parts.append("2,048 for \(n) table\(n == 1 ? "" : "s") of \(Self.listPhrase(notTaken.map(Self.formatCount))), which Tonverk doesn’t take")
         }
-        return ChoiceLabel(value: "Each table's own", existing: "existing: " + parts.joined(separator: "; "))
+        return ChoiceLabel(value: "Each table’s own", existing: "existing: " + parts.joined(separator: "; "))
     }
 
     /// The one key of a count, when there is exactly one.
@@ -788,7 +788,7 @@ public struct ConvertPlan: Equatable {
     public func expectedResult(for item: Item) -> String {
         guard let size = item.frameSize else { return "Choose a frame size first" }
         guard let e = expected(for: item) else {
-            return "Can't split into frames: the samples don't divide into frames of \(Self.formatCount(size))"
+            return "Can’t split into frames: the samples don’t divide into frames of \(Self.formatCount(size))"
         }
         var parts = ["\(e.frameCountOut) × \(Self.formatCount(e.frameSizeOut))"]
         if e.resizes { parts.append("resized from \(Self.formatCount(e.frameSizeIn)) samples per frame") }
@@ -797,7 +797,7 @@ public struct ConvertPlan: Equatable {
         }
         if e.scaledToFit { parts.append("turned down to fit (peak \(Wavetable.peakText(e.peak)))") }
         else if e.mayScaleToFit { parts.append("may be turned down a little to fit after resizing") }
-        if e.addsPPGWaves { parts.append("the PPG's four standard waves at 60–63") }
+        if e.addsPPGWaves { parts.append("the PPG’s four standard waves at 60–63") }
         return parts.joined(separator: "; ")
     }
 
@@ -857,7 +857,7 @@ public struct ConvertPlan: Equatable {
         let factory = isP ? SourceRef.factoryPCount : SourceRef.factoryUCount
         guard own > total - factory else { return nil }
         let kind = isP ? "P" : "U"
-        return "\(own) \(kind) tables to convert. A 3rd Wave holds \(total) \(kind) tables, \(factory) of them Groove Synthesis's (\(kind)00–\(kind)\(factory - 1)); with no slot free, it offers to overwrite its last slots, \(kind)\(total - 1) first."
+        return "\(own) \(kind) tables to convert. A 3rd Wave holds \(total) \(kind) tables, \(factory) of them Groove Synthesis’s (\(kind)00–\(kind)\(factory - 1)); with no slot free, it offers to overwrite its last slots, \(kind)\(total - 1) first."
     }
 
     /// What the Changes column says for an item: short words for each change the destination
@@ -949,7 +949,7 @@ public struct ConvertPlan: Equatable {
             guard var table = item.table.wavetable(frameSize: item.frameSize) else {
                 errors.append("\(item.name): " + (item.frameSize == nil
                     ? "choose a frame size first"
-                    : "can't split into frames of \(Self.formatCount(item.frameSize ?? 0))"))
+                    : "can’t split into frames of \(Self.formatCount(item.frameSize ?? 0))"))
                 continue
             }
             table.name = item.name

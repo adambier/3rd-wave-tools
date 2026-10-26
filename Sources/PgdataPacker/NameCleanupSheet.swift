@@ -176,15 +176,15 @@ struct NameLengthNote: View {
             switch change {
             case let .shortened(from, to):
                 Label("Too long: shortened to \(NameField.displayLimit)", systemImage: "xmark.octagon").foregroundStyle(.red)
-                    .help("The 3rd Wave's name fields hold \(NameField.displayLimit) characters. This name is \(from); it is shortened to \u{201C}\(to)\u{201D}.")
+                    .help("The 3rd Wave’s name fields hold \(NameField.displayLimit) characters. This name is \(from); it is shortened to \u{201C}\(to)\u{201D}.")
             case let .accentsRemoved(from, to):
                 let pairs = zip(from, to).map { "\u{201C}\($0)\u{201D} → \($1)" }
                 Label(pairs.joined(separator: " "), systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
-                    .help("The 3rd Wave's name fields cannot hold \(from.count == 1 ? "this letter" : "these letters"), so \(from.count == 1 ? "it is" : "they are") written without accents: \(pairs.joined(separator: ", ")). Edit the name to choose other letters.")
+                    .help("The 3rd Wave’s name fields cannot hold \(from.count == 1 ? "this letter" : "these letters"), so \(from.count == 1 ? "it is" : "they are") written without accents: \(pairs.joined(separator: ", ")). Edit the name to choose other letters.")
             case let .replacedWithQuestionMark(chars):
                 let list = chars.map { "\u{201C}\($0)\u{201D}" }
                 Label("\(list.joined(separator: " ")) → ?", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
-                    .help("The 3rd Wave's name fields cannot hold \(chars.count == 1 ? "this character" : "these characters"), so \(chars.count == 1 ? "it is" : "they are") written as \u{201C}?\u{201D}: \(list.joined(separator: ", ")). Replace \(chars.count == 1 ? "it" : "them") with plain equivalents (e.g., a hyphen for a dash, straight quotes) to keep the name as you typed it.")
+                    .help("The 3rd Wave’s name fields cannot hold \(chars.count == 1 ? "this character" : "these characters"), so \(chars.count == 1 ? "it is" : "they are") written as \u{201C}?\u{201D}: \(list.joined(separator: ", ")). Replace \(chars.count == 1 ? "it" : "them") with plain equivalents (e.g., a hyphen for a dash, straight quotes) to keep the name as you typed it.")
             case .controlCharactersReplaced:
                 Label("Line breaks → spaces", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
                     .help("Line breaks and other control characters in the name are written as spaces.")

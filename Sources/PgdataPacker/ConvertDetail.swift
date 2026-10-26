@@ -83,7 +83,7 @@ struct ConvertSeveralSummary: View {
             return e.resizes || e.changesCount || e.scaledToFit
         }.count
         if blocked > 0 {
-            Label("\(blocked) can't be converted yet (see the Input column)", systemImage: "exclamationmark.octagon.fill")
+            Label("\(blocked) can’t be converted yet (see the Input column)", systemImage: "exclamationmark.octagon.fill")
                 .foregroundStyle(.red)
         }
         Text(ConvertSeveralSummary.changeSentence(changed: changed, of: items.count))
@@ -219,7 +219,7 @@ struct ConvertOverviewPair: View {
                                  result: result, resultInterpolation: resultInterpolation,
                                  resultTitle: plan.preset.shortTitle, position: sweep)
             }
-            .help("The table's frames, front (first) to back (last): the source as read, and what the destination gets, read back from the file this page would write. Solid lines are stored frames (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum's or Vital's own morphs. Move the pointer across a picture to sweep through the table; the third picture draws the cycle at the pointer.")
+            .help("The table’s frames, front (first) to back (last): the source as read, and what the destination gets, read back from the file this page would write. Solid lines are stored frames (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum’s or Vital’s own morphs. Move the pointer across a picture to sweep through the table; the third picture draws the cycle at the pointer.")
         }
     }
 }
@@ -524,7 +524,7 @@ struct ConvertWhatHappens: View {
                 if let file = state.convertPreviews.preview(item, in: plan) {
                     ConvertNoteList(file: file, output: plan.expected(for: item))
                 } else {
-                    Label("The table can't be converted; the report after converting says why.", systemImage: "xmark.octagon")
+                    Label("The table can’t be converted; the report after converting says why.", systemImage: "xmark.octagon")
                         .foregroundStyle(.red)
                 }
             } else if plan.status(item) == .needsFrameSize {
