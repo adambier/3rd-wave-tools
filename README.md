@@ -519,8 +519,11 @@ in any language. Everything here is open source under the MIT license.
   Linux, can use it to behave exactly like pgdata Packer. Its API may change between versions more
   than `PgdataFormats`'s.
 - **A command-line tool.** `tw3pg` (in `Sources/tw3pg`) inspects files, checks that they round
-  trip, unpacks and repacks `.pgdata` files, converts older programs, and lists what the
-  Wavetables page would find in a folder of wavetable files: `swift run tw3pg inspect <file>`.
+  trip, unpacks and repacks `.pgdata` files, converts older programs, lists what the
+  Wavetables page would find in a folder of wavetable files, converts wavetables as the page
+  does without the app (`wtconvert`), and identifies 3rd Wave `.wt` files by content
+  (`wtmatch`, for checking what the 3rd Wave exports against what was imported):
+  `swift run tw3pg inspect <file>`.
 - **Using an AI coding tool?** Give it [`AGENTS.md`](AGENTS.md): a terse map of the code, the
   rules it must keep (byte-exact round trips, Foundation-only libraries, the single-module app
   build), where each kind of change goes, and how to verify it. Claude Code reads it through
@@ -610,8 +613,9 @@ Sources/PgdataPackerCore/   the app's own decision logic, no UI (the package's P
 Sources/PgdataPacker/       the app (SwiftUI)
 Sources/tw3pg/              developer tool: inspect, roundtrip, unpack, repack, compare, wtcheck,
                             wtscan, wtdump, sweep (records what Listen plays through a table),
-                            factory-catalog, pack, convert, convertcheck, and the 3rd Wave-test
-                            builders
+                            wtconvert (the Wavetables page's conversion without the app), wtmatch
+                            (identifies 3rd Wave .wt files by content), factory-catalog, pack,
+                            convert, convertcheck, and the test-file builders
 Tests/                      unit tests, one target per library (./run-tests.sh)
 fixtures/                   test files with what each parses to, for other implementers
 Resources/                  app icon, drawn by tools/make-icon.py (needs cairosvg and Pillow)

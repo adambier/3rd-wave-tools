@@ -122,7 +122,7 @@ in their synths (`OutputPreset.testedIn`).
 | `Sources/WavetableFormats/` | Library: other synths' wavetable formats; reading, resizing, writing; Foundation and PgdataFormats only |
 | `Sources/PgdataPackerCore/` | Library: the app's decisions without UI (pack, unpack, and convert plans, file names, Clean Up Names) |
 | `Sources/PgdataPacker/` | The macOS app (SwiftUI, AppKit); declared in `Package.swift` only on macOS |
-| `Sources/tw3pg/main.swift` | Developer command-line tool: inspect, round-trip, pack, unpack, repack, compare, convert, checks, sweep recordings of what Listen plays, test-file builders |
+| `Sources/tw3pg/main.swift` | Developer command-line tool: inspect, round-trip, pack, unpack, repack, compare, convert, checks, sweep recordings of what Listen plays, the Wavetables page's conversion without the app (`wtconvert`), identifying `.wt` files by content (`wtmatch`), test-file builders |
 | `Tests/PgdataFormatsTests/` | Tests for PgdataFormats (`FormatTests.swift` with `SourceRefTests`, `ProgramTests`, `PackTests`, and `MultisampleTests`; `RobustnessTests`, `ConverterTests`, `FactoryLibraryTests`, `FixtureTests`, …) |
 | `Tests/WavetableFormatsTests/` | Tests for WavetableFormats; `Resources/FLAC/` holds synthetic FLAC files read by path |
 | `Tests/PgdataPackerCoreTests/` | Tests for PgdataPackerCore: `WorkbenchTests`, `PlanRobustnessTests`, `ConvertPlanTests.swift` (several classes: `ConvertPlanTests`, `ConvertPlanStateTests`, `ConvertChangeWordsTests`, `ConvertExistingChoicesTests`, `ConvertOptionsTextTests`, `WavetableSketchTests`, `FrameSizeFitTests`, …), `ConvertReportTests`, `ReviewFixPlanTests`, `PianoKeyTests`, and `NameFittingTests` (the Pack page and the Wavetables page's writer give the same 3rd Wave name); `TestPrograms.swift` repeats the program builders of `FormatTests.swift` |
@@ -377,7 +377,14 @@ Other checks:
   table (converted and read back when a preset is given), one WAV per interpolation, with the
   difference between consecutive cycles, so the three interpolations can be compared by ear and
   by analysis (the same code path as the app: `WavetableSketch.fullCycle`,
-  `Resampling.bandLimitedCycle`, a 480-sample crossfade into each new cycle).
+  `Resampling.bandLimitedCycle`, a 480-sample crossfade into each new cycle);
+  `tw3pg wtconvert <out dir> [--preset <name>] [options] <files or dirs>` converts as the
+  Wavetables page's Convert All does, through `ConvertPlan` itself (the Options box's choices as
+  flags), so a destination can be tested in its synth without the app; `tw3pg wtmatch <expected>
+  -- <files>` identifies 3rd Wave `.wt` files by content (the 64 frames, and a U table's mipmap
+  chain separately), for checking **Export Wavetable**'s `01.wt`, `02.wt`, … against the files
+  imported; `tw3pg makewavetests <out dir>` writes three synthetic tables recognizable by ear
+  (a sine-to-square morph, four shapes, harmonics added frame by frame) for such tests.
 - **Fixtures**: `FixtureTests` runs with the suite; regenerate after a deliberate change with
   `PGDATA_TESTS=1 PGDATA_REGENERATE_FIXTURES=1 swift test --filter FixtureTests` and commit the files.
 - **Documentation**: `PGDATA_DOCS=1 swift package --disable-sandbox preview-documentation --target PgdataFormats`
