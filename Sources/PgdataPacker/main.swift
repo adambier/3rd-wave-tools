@@ -405,11 +405,11 @@ final class ToolbarController: NSObject, NSToolbarDelegate, NSMenuDelegate {
         return item
     }
 
-    /// The volume slider in the menu, made once so a drag is not interrupted by the menu being
-    /// filled again (the menu follows every change of the audio state).
-    private lazy var volumeView = VolumeMenuView(volume: AudioPreview.shared.volume) { AudioPreview.shared.volume = $0 }
     /// Whether the menu is open: it is not filled again meanwhile (dragging the volume slider
-    /// changes the audio state on every tick), only once it closes.
+    /// changes the audio state on every tick), only once it closes. The volume row is a new
+    /// view each time the menu is filled: a view that has been shown in a menu and is then
+    /// given to a new item came back as a sliver of slider (Adam, 2026-10-26: the slider went
+    /// after the first Listen, which changes the device list and so refills the menu).
     private var outputMenuIsOpen = false
     private var outputMenuNeedsFilling = false
 
@@ -433,8 +433,7 @@ final class ToolbarController: NSObject, NSToolbarDelegate, NSMenuDelegate {
         menu.addItem(header)
         // The level, as the system's Sound menu has it: a slider between two speaker icons.
         let volumeItem = NSMenuItem()
-        volumeView.volume = preview.volume
-        volumeItem.view = volumeView
+        volumeItem.view = VolumeMenuView(volume: preview.volume) { AudioPreview.shared.volume = $0 }
         menu.addItem(volumeItem)
         menu.addItem(.separator())
         let defaultItem = NSMenuItem(title: "System Default", action: #selector(outputChosen(_:)), keyEquivalent: "")
@@ -469,9 +468,12 @@ final class VolumeMenuView: NSView {
     private let loud = NSImageView(image: NSImage(systemSymbolName: "speaker.wave.3.fill", accessibilityDescription: nil) ?? NSImage())
     private let changed: (Float) -> Void
 
-    /// Where a menu item's title begins: the check-mark column's width.
-    private static let titleInset: CGFloat = 21
-    private static let rightMargin: CGFloat = 12
+    /// Where a menu item's title begins, so "Volume" lines up with the titles under it: 32
+    /// points on macOS 14 and later (14 of menu padding and an 18-point check-mark column,
+    /// measured on Adam's display, 2026-10-26), 21 on macOS 13's menus. The right margin is
+    /// the menu's padding.
+    private static var titleInset: CGFloat { if #available(macOS 14, *) { return 32 } else { return 21 } }
+    private static var rightMargin: CGFloat { if #available(macOS 14, *) { return 14 } else { return 12 } }
     private static let height: CGFloat = 28
 
     /// The slider's position, set from the audio state when the menu is filled.
