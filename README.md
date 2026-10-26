@@ -11,7 +11,7 @@ those of other synths.
 
 Why you might want to use it:
 
-- You have programs, your own or downloaded, whose wavetables or samples come as separate files,
+- You have 3rd Wave programs you created or downloaded, whose wavetables or samples come as separate files,
   and you'd like each bundled into one file, for archiving, for import into the 3rd Wave Terminal
   app, and for sharing.
 - You'd like to check a set of programs for the wavetables or samples they need and don't have,
