@@ -10,12 +10,12 @@ import WavetableFormats
 import PgdataPackerCore
 #endif
 
-/// The top of the Wavetables page's right pane, where Pack and Unpack show the selection's
-/// detail: a read-only preview of the selected table, on the under-page background so it reads
-/// as output rather than as a place to edit. The source and the result are drawn frame by
-/// frame, then come where the table came from, its frame size and interpolation, and what
-/// converting it does. Names and frame sizes are edited in the table; the destination and its
-/// options, below the preview, apply to every table converted.
+/// Under the Wavetables table, across the left side: a read-only preview of the selected table,
+/// on the under-page background so it reads as output rather than as a place to edit. The
+/// source and the result are drawn frame by frame on the left; on the right, where the table
+/// came from, its frame size and interpolation, and what converting it does. Names and frame
+/// sizes are edited in the table above; the destination and its options, in the right pane,
+/// apply to every table converted.
 struct ConvertDetailPane: View {
     @EnvironmentObject var state: AppState
     let selection: Set<UUID>
@@ -209,7 +209,8 @@ struct ConvertPreviewHeading: View {
     }
 }
 
-/// One table: its name, then the pictures with the Frame slider under them, then the facts.
+/// One table: its name, then the pictures with the Frame slider under them on the left and the
+/// facts on the right.
 struct ConvertItemPreview: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
@@ -226,17 +227,22 @@ struct ConvertItemPreview: View {
                 Button("Show Input File in Finder") { Panels.reveal(item.location.url) }.buttonStyle(.link)
                     .help("Show the file this table was read from in the Finder")
             }
-            // The pictures share the pane's width, three abreast, and the facts follow below
-            // them at full width; the pane scrolls (see ConvertDetailPane) when that is taller
-            // than it. A table that can't be drawn yet (no frame size) has no pictures, and its
-            // facts then say what to do.
+            // The pictures take the width that is left after the facts column (up to 460
+            // points, down to 300 in a narrow window), three abreast; side by side the preview
+            // stays short, and the pane scrolls (see ConvertDetailPane) only in a short window.
+            // A table that can't be drawn yet (no frame size) has no pictures, and its facts,
+            // which then say what to do, take the whole width.
             if item.table.wavetable(frameSize: item.frameSize) != nil {
-                ConvertOverviewPair(state: state, item: item)
+                HStack(alignment: .top, spacing: 24) {
+                    ConvertOverviewPair(state: state, item: item)
+                        .frame(minWidth: 240, maxWidth: .infinity, alignment: .topLeading)
+                    ConvertPreviewFacts(state: state, item: item)
+                        .frame(minWidth: 300, idealWidth: 420, maxWidth: 460, alignment: .topLeading)
+                }
+            } else {
+                ConvertPreviewFacts(state: state, item: item)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .padding(.bottom, 4)
             }
-            ConvertPreviewFacts(state: state, item: item)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }

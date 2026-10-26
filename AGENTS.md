@@ -280,16 +280,16 @@ App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle
 writing with progress), `SearchField.swift` (an `NSSearchField` for SwiftUI), `AudioPreview.swift`
 (the Listen control's engine: `AVAudioEngine` with a source node whose `Voice` owns three fixed
 buffers, band-limiting through `Resampling.bandLimitedCycle`, and the CoreAudio output-device list).
-The Wavetables page is laid out as the other two: the table on the left (status, Name, Input,
-Output, Changes; what a file states about interpolation is in the preview and the Options box's
-"existing" marks), and on the right the selected table's preview (`ConvertDetailPane`, as tall as
-its content up to what leaves the destination `ConvertDestinationPane.minimumHeight`, with a fade
-when it must scroll) over the destination pane; its buttons are Pack's (Remove Selected, Remove
-All…, **Convert Selected…**, **Convert All…**, the last two through `AppState.convertTables(_:)`),
-and the 3rd Wave options' checkbox "Also add the .wt files to the Pack page"
-(`AppState.convertAddsToPack`) is honored by both. The pages are laid out to give their best at
-the default window size, which fits a 13-inch display (1,440 × 860; `main.swift`), the table
-giving way to the right pane. `ConvertView.swift` also holds `TableReveal` (scrolls the Wavetables
+The Wavetables page: the table (status, Name, Input, Output, Changes; what a file states about
+interpolation is in the preview and the Options box's "existing" marks) with the selected
+table's preview under it across the left side (`ConvertDetailPane`, as tall as its content up to
+45% of the height, pictures and facts side by side, with a fade when it must scroll), and the
+destination pane on the right, narrow, one line per destination (Adam, 2026-10-26: the table
+needs the width, the preview and destination should not scroll); its buttons are Pack's (Remove
+Selected, Remove All…, **Convert Selected…**, **Convert All…**, the last two through
+`AppState.convertTables(_:)`), and the 3rd Wave options' checkbox "Also add the .wt files to the
+Pack page" (`AppState.convertAddsToPack`) is honored by both. The pages are laid out to give their
+best at the default window size, which fits a 13-inch display (1,440 × 860; `main.swift`). `ConvertView.swift` also holds `TableReveal` (scrolls the Wavetables
 table to a row through the `NSTableView` behind SwiftUI's `Table`; the summary strip's blocked
 counts jump to `ConvertPlan.firstItem(with:)`); `ConvertDetail.swift` holds the preview:
 `ConvertSweepControls`

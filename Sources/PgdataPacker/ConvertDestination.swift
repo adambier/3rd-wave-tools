@@ -10,14 +10,11 @@ import WavetableFormats
 import PgdataPackerCore
 #endif
 
-/// The lower part of the Wavetables page's right pane, under the preview: the destinations in
-/// two groups, a line on what they rest on, and the options that apply to the one chosen.
+/// The Wavetables page's right pane, narrow: the destinations in two groups, one line each, a
+/// line on what they rest on, and the options that apply to the one chosen. Laid out to fit
+/// without scrolling at the default window size; it scrolls in a shorter window.
 struct ConvertDestinationPane: View {
     @EnvironmentObject var state: AppState
-
-    /// What the pane keeps when the preview above it is tall: its heading and the first rows
-    /// (the rest scrolls).
-    static let minimumHeight: CGFloat = 260
 
     var body: some View {
         let plan = state.convertPlan
@@ -142,8 +139,11 @@ struct ConvertPresetRowLabel: View {
                 Image(systemName: "circle").foregroundStyle(Color.secondary).padding(.top, 1)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(preset.shortTitle)
-                Text(preset.specLine).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                // Title and size on one line, so the nine destinations fit the pane's height.
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(preset.shortTitle)
+                    Text(preset.specLine).font(.caption).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
+                }
                 if chosen {
                     Text(preset.distinction)
                         .font(.caption)

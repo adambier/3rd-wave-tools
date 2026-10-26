@@ -11,11 +11,13 @@ import WavetableFormats
 import PgdataPackerCore
 #endif
 
-/// The Wavetables page, laid out as Pack and Unpack are: the list on the left (here the table of
-/// wavetables found in the files added) and, on the right, the selection's detail (a read-only
-/// preview of the selected table) over the destination with its options, which apply to every
-/// table converted. The decisions are in `ConvertPlan`; the preview is in ConvertDetail.swift
-/// and the destination pane in ConvertDestination.swift.
+/// The Wavetables page: the table of wavetables found in the files added, with a read-only
+/// preview of the selected table under it across the full width (the table takes the width, as
+/// its columns need it, and gives up height, which it scrolls anyway; the preview below the
+/// selection reads in order and, laid out wide, needs no scrolling), and on the right, narrow,
+/// the destination with its options, which apply to every table converted. The decisions are in
+/// `ConvertPlan`; the preview is in ConvertDetail.swift and the destination pane in
+/// ConvertDestination.swift.
 struct ConvertView: View {
     @EnvironmentObject var state: AppState
     @State private var selection = Set<UUID>()
@@ -32,23 +34,22 @@ struct ConvertView: View {
                           detail: "Add WAV and FLAC wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table is then listed with its size (frames × samples per frame) and what converting changes, and previewed on the right; to edit a name, double-click its row or select it and press Return. This page converts existing wavetables between formats; it does not make wavetables from other audio.")
             } else {
                 HSplitView {
-                    // The table gives way first: it scrolls anyway, and the right pane's
-                    // preview and destination are what the page is read from.
-                    ConvertTablesPane(selection: $selection)
-                        .frame(minWidth: 520, idealWidth: 800, maxWidth: .infinity, maxHeight: .infinity)
                     // The preview takes the height its content needs (a status display, not a
-                    // pane to resize), up to what leaves the destination its minimum; the
-                    // destination scrolls below it.
+                    // pane to resize or scroll), up to a share of the height that leaves the
+                    // table its rows; laid out across the whole left side, it is short.
                     GeometryReader { (geo: GeometryProxy) in
                         VStack(spacing: 0) {
-                            ConvertDetailPane(selection: selection,
-                                              maxHeight: max(ConvertDetailPane.minimumHeight, geo.size.height - ConvertDestinationPane.minimumHeight))
-                            Divider()
-                            ConvertDestinationPane()
+                            ConvertTablesPane(selection: $selection)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            Divider()
+                            ConvertDetailPane(selection: selection,
+                                              maxHeight: max(ConvertDetailPane.minimumHeight, geo.size.height * 0.45))
                         }
                     }
-                    .frame(minWidth: 480, idealWidth: 600, maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(minWidth: 660, maxWidth: .infinity, maxHeight: .infinity)
+                    // Narrow: one line per destination, the options under them.
+                    ConvertDestinationPane()
+                        .frame(minWidth: 300, idealWidth: 340, maxWidth: 420, maxHeight: .infinity)
                 }
             }
         }

@@ -362,10 +362,9 @@ Shown when a choice applies to the destination and the tables (the captions coun
 
 #### Preview
 
-The pane at the top right shows the selected table, as the Pack and Unpack pages show their
-selection: the input and the result stacked frame by frame, with the interpolation drawn between
-frames where a file records one; its file, its frame size and what that rests on, its
-interpolation, and what converting changes. The **Frame** slider
+The pane under the table shows the selected table: the input and the result stacked frame by
+frame, with the interpolation drawn between frames where a file records one; its file, its frame
+size and what that rests on, its interpolation, and what converting changes. The **Frame** slider
 sweeps through the table and draws the cycle there large, input and result together. **Listen** plays that cycle, following the slider, at the pitch chosen
 beside it (a piano key and its frequency; A3, 220 Hz, to start) through the device chosen under
 **Audio Output**, the speaker icon at the right of the toolbar.
