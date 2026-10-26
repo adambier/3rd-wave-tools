@@ -417,7 +417,9 @@ No tests cover the SwiftUI views; a UI change is verified by building and using 
   needs a sentence explained, users will too: rewrite the sentence rather than explain it (Adam,
   2026-10-26).
 - Each sentence of an explanation is a short paragraph of its own (`ConvertSentences`,
-  `sentencesOfParagraph`), in the small system size, with half a line between sentences; a note
+  `sentencesOfParagraph`: the preview's Input and Output blocks, the Options box's captions, the
+  chosen destination's description), in the small system size, with half a line between
+  sentences; a note
   the reader must not miss gets an icon and a color (`ConvertSweepNoteView`: orange with the
   warning triangle for a caution, the accent-colored info circle for information).
 - "Frame" for a cycle in a table, never "wave" (which is kept for the analog oscillator's waves,

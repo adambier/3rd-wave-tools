@@ -154,9 +154,6 @@ struct ConvertPresetRowLabel: View {
     let chosen: Bool
     let caveat: String?
 
-    /// The distinction's sentences, one paragraph each (see `sentencesOfParagraph`).
-    static func sentences(of text: String) -> [String] { sentencesOfParagraph(text) }
-
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             // Two views rather than one image whose name changes, so the radio always redraws.
@@ -173,14 +170,9 @@ struct ConvertPresetRowLabel: View {
                 }
                 if chosen {
                     // One sentence per paragraph, a little apart, rather than a block of small
-                    // type (Adam, 2026-10-26).
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(Array(ConvertPresetRowLabel.sentences(of: preset.distinction).enumerated()), id: \.offset) { (pair: (offset: Int, element: String)) in
-                            Text(pair.element).fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .font(.caption)
-                    .padding(.top, 2)
+                    // type (Adam, 2026-10-26), as the preview's explanations are set.
+                    ConvertSentences(preset.distinction, color: .primary)
+                        .padding(.top, 2)
                     if let caveat { ConvertCaution(text: caveat) }
                     // While the page carries its under-development notice, the row does not say
                     // "untested" a second time; the Sources popover still does.
@@ -326,9 +318,7 @@ struct ConvertFrameCountOption: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .help("Original frames only: no new waveforms are made. Fewer frames keeps evenly spaced originals, the first and last among them (256 → 64 keeps about every 4th); more frames repeats each original in order (16 → 64 repeats each about 4 times).\nCrossfade new frames: makes each new frame by crossfading its two neighbors. This happens once, when converting; it is separate from the interpolation saved in the file, which is how the synth moves between frames as it plays.")
-            Text(state.convertPlan.frameCountCaption)
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            ConvertSentences(state.convertPlan.frameCountCaption)
         }
     }
 }
@@ -402,9 +392,9 @@ struct ConvertInterpolationOption: View {
             // The "Each table's own — existing: …" item can be longer than the pop-up; its tip
             // carries the full text.
             .help((plan.eachTablesOwnInterpolationLabel.map { $0.text + "\n" } ?? "") + tip)
-            Text(caption)
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            // The caption's sentences a paragraph apiece, as the preview's explanations (Adam,
+            // 2026-10-26: a wall of text).
+            ConvertSentences(caption)
         }
     }
 
