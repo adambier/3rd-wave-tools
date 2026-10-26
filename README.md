@@ -372,7 +372,8 @@ blending between frames (drawn as a crossfade, an inference from the manual's de
 P table with it off, stepping from frame to frame. For these and the other formats whose file
 records no interpolation (Surge XT, WaveEdit), a **Between frames** pop-up chooses what is drawn
 and played there; it goes back to the synth's default whenever the table or the destination
-changes.
+changes. For a format whose file records the interpolation, the **Interpolation** option under
+**Options** decides, and the preview says so in the pop-up's place.
 The **Frame** slider sweeps through the table and draws the cycle there large, input and result
 together. **Listen** plays that cycle, following the slider, at the pitch chosen beside it (a
 piano key and its frequency; A3, 220 Hz, to start), at the volume and through the device chosen

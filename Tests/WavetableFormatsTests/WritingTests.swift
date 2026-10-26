@@ -411,6 +411,9 @@ final class WritingTests: XCTestCase {
         XCTAssertEqual(shrinks.scaling, .possible)
         let square = Wavetable(name: "Square", frames: (0..<64).map { _ in (0..<2048).map { $0 < 1024 ? Float(1) : Float(-1) } })
         notes(try write(square, .thirdWaveP), contain: "Attenuated by")
+        // A peak just over 1 is attenuated by less than 0.05 dB; the note does not say "0.0 dB".
+        let barely = Wavetable(name: "Barely", frames: (0..<64).map { _ in (0..<1024).map { Float(1.00001) * sin(Float($0) * 2 * .pi / 1024) } })
+        notes(try write(barely, .thirdWaveU), contain: "Attenuated by less than 0.1 dB to fit within ±1 (the peak was just over 1)")
         // A change of frame count alone cannot raise the peak.
         XCTAssertEqual(WavetableWriter.plan(frameSize: 1024, frameCount: 256, peak: 1, interpolation: nil, preset: .thirdWaveU).scaling, .none)
 

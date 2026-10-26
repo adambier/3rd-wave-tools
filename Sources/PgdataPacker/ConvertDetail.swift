@@ -264,6 +264,8 @@ struct ConvertPreviewFacts: View {
     /// between its lines: one rhythm for the whole column.
     static let blockSpacing: CGFloat = 12
     static let lineSpacing: CGFloat = 3
+    /// Between the sentences of a block's detail text (`ConvertSentences`).
+    static let sentenceSpacing: CGFloat = 4
 
     /// "64 frames × 2,048 samples", or what is missing.
     private var inputValue: String {
@@ -305,7 +307,8 @@ struct ConvertPreviewFacts: View {
     }
 }
 
-/// One block of the facts: a small label, the value, and a line of detail under it.
+/// One block of the facts: a small label, the value, and the detail under it, a sentence to a
+/// line.
 struct ConvertFactBlock: View {
     let label: String
     let value: String
@@ -320,7 +323,25 @@ struct ConvertFactBlock: View {
                 .foregroundStyle(alert ? Color.red : Color.primary)
                 .fixedSize(horizontal: false, vertical: true)
             if let detail {
-                Text(detail)
+                ConvertSentences(detail)
+            }
+        }
+    }
+}
+
+/// A paragraph of caption text with each sentence on its own line, a little apart from the
+/// next, so a block of small text is not a wall (Adam, 2026-10-26); the same splitting as the
+/// destination pane's descriptions (`sentencesOfParagraph`).
+struct ConvertSentences: View {
+    let text: String
+
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        let sentences = sentencesOfParagraph(text)
+        VStack(alignment: .leading, spacing: ConvertPreviewFacts.sentenceSpacing) {
+            ForEach(0..<sentences.count, id: \.self) { (i: Int) in
+                Text(sentences[i])
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -418,6 +439,7 @@ struct ConvertOverviewPair: View {
                                      hearingDefault: playedByDefault,
                                      hearingHelp: ConvertOverviewPair.hearingHelp(for: plan.preset),
                                      recordedNote: recorded && result != nil ? ConvertOverviewPair.recordedNote(for: plan.preset) : nil,
+                                     recordedHelp: ConvertOverviewPair.recordedHelp(for: plan.preset),
                                      cycle: { cycleToPlay(source: source.frames, result: result, resultInterpolation: resultInterpolation) })
             }
             .onChange(of: item.id) { _ in hearing = nil }
@@ -446,10 +468,17 @@ struct ConvertOverviewPair: View {
     }
 
     /// In the pop-up's place when the destination's file (or file name) records the interpolation:
-    /// where to change it, so the preview and Listen follow.
+    /// where to change it, so the preview and Listen follow. Short enough for the controls row at
+    /// the default window size (the tip says the rest).
     static func recordedNote(for preset: OutputPreset) -> String {
-        preset == .tonverk ? "Between frames: as marked in the file name, set under Options"
-                           : "Between frames: as saved in the file, set under Options"
+        "Between frames: set under Options"
+    }
+
+    /// The note's tip: where the format records the interpolation.
+    static func recordedHelp(for preset: OutputPreset) -> String {
+        (preset == .tonverk ? "Tonverk reads whether the table steps or blends between frames from the file name, "
+                            : "This format saves the interpolation in the file, ")
+            + "so the Interpolation setting under Options in the Convert to pane decides what the file says and what is drawn and played here."
     }
 
     /// The Between frames pop-up's tip: what the choice is for, and what the synth itself does.
@@ -494,6 +523,8 @@ struct ConvertSweepControls: View {
     /// For a format whose file records the interpolation: the words in the pop-up's place
     /// pointing to the Options box, which sets it (and so what plays).
     var recordedNote: String? = nil
+    /// The note's tip.
+    var recordedHelp: String = ""
     let cycle: () -> [Float]
 
     var body: some View {
@@ -547,8 +578,8 @@ struct ConvertSweepControls: View {
                     .fixedSize()
                     .help(hearingHelp)
                 } else if let recordedNote {
-                    Text(recordedNote).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        .help("This format records the interpolation, so the Interpolation setting under Options in the Convert to pane decides what the file says and what plays here.")
+                    Text(recordedNote).font(.caption).foregroundStyle(.secondary).fixedSize()
+                        .help(recordedHelp)
                 }
             }
             if let problem = preview.problem {
@@ -987,18 +1018,17 @@ struct ConvertNoteList: View {
             if file.notes.isEmpty {
                 Text(unchanged).font(.caption).foregroundStyle(.secondary)
             } else if file.notes.count == 1 {
-                // One note is a sentence, not a list of one.
-                Text(file.notes[0]).font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                // One note is a paragraph, not a list of one.
+                ConvertSentences(file.notes[0])
             } else {
-                // The writer's notes, one to a paragraph, with a little air between them.
-                VStack(alignment: .leading, spacing: 6) {
+                // The writer's notes as bullets, each note's sentences a line apiece, with a
+                // little more air between notes than between sentences.
+                VStack(alignment: .leading, spacing: 7) {
                     ForEach(0..<file.notes.count, id: \.self) { (i: Int) in
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text("•")
-                            Text(file.notes[i]).fixedSize(horizontal: false, vertical: true)
+                            Text("•").font(.caption).foregroundStyle(.secondary)
+                            ConvertSentences(file.notes[i])
                         }
-                        .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 .padding(.top, 2)
