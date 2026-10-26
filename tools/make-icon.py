@@ -3,7 +3,6 @@
 Resources/AppIcon.icns.
 
     python3 tools/make-icon.py                       # the icon: Resources/AppIcon.icns and AppIcon.png
-    python3 tools/make-icon.py --variant stack       # the other candidate instead
     python3 tools/make-icon.py --png out.png         # one 1024 px render somewhere else, nothing in Resources
     python3 tools/make-icon.py --sheet sheet.png     # a contact sheet: 1024 to 16 px on light and dark
 
@@ -12,11 +11,8 @@ each size the .icns holds (16, 32, 64, 128, 256, 512, and 1024 px, each drawn at
 fewer and heavier shapes at 32 px and below), and the .icns is assembled here, with the entry types
 iconutil writes (icp4, icp5, ic07–ic14), so no macOS tool is needed.
 
-Two candidates share the tile and differ in the glyph:
-
-- box (the icon): three morphing frames, cyan, white, and pink, a sine leaning more toward a saw
-  from back to front, rising out of an open box.
-- stack: the frames alone, as filled sheets stacked in perspective.
+The glyph: three morphing frames, cyan, white, and pink, a sine leaning more toward a saw from
+back to front, rising out of an open box (settled with Adam on 2026-10-26).
 
 The tile follows Apple's macOS icon grid for a flattened icon: an 824-point rounded square
 centered on a 1024-point canvas, with a soft shadow, as macOS 13 to 15 draw it. Its corners are a
@@ -47,17 +43,6 @@ def squircle_path(x, y, w, h, n=5.0, steps=96):
                     cy + ry * math.copysign(abs(s) ** (2 / n), s)))
     return "M" + " L".join("%.2f,%.2f" % p for p in pts) + " Z"
 
-def wave(t, x):
-    """One frame of the table: a sine at t = 0 morphing smoothly toward a saw at t = 1 (five
-    harmonics with Lanczos smoothing, so the shape stays clean at small sizes). Used by the
-    stack variant."""
-    v = 0.0
-    for k in range(1, 6):
-        sigma = 1.0 if k == 1 else math.sin(math.pi * k / 6) / (math.pi * k / 6)
-        weight = 1.0 if k == 1 else t ** 1.3
-        v += weight * sigma * math.sin(k * x) / k
-    return v / (1 + 0.55 * t)
-
 def leaned_sine(a, x):
     """A sine leaned like a saw by phase distortion: the rise takes (1 + a) / 2 of the cycle and
     the fall the rest, with no corners. a = 0 is a sine; a = 0.55 is clearly saw-like. The
@@ -67,13 +52,6 @@ def leaned_sine(a, x):
     r = 0.5 * (1 + a)
     u = (p / r) * 0.5 if p < r else 0.5 + (p - r) / (1 - r) * 0.5
     return math.sin(2 * math.pi * u)
-
-def wave_points(cx, base, width, amp, t, n=120):
-    pts = []
-    for j in range(n + 1):
-        x = j / n
-        pts.append((cx - width / 2 + x * width, base - amp * wave(t, x * 2 * math.pi)))
-    return pts
 
 def shape_points(fn, cx, base, width, amp, n=200):
     """The points of one frame, `fn` over a cycle, scaled so every frame has the same height."""
@@ -129,30 +107,8 @@ def glyph_box(detail):
         out.append(f'<rect x="{S/2-38}" y="{front}" width="76" height="{bottom-front}" fill="#c97a22" opacity="0.55"/>')
     return "\n".join(out)
 
-def glyph_stack(detail):
-    """The frames alone: filled ribbons stacked in perspective, back to front, as a wavetable
-    is usually pictured."""
-    count = 3 if detail <= 2 else 4
-    out = []
-    for i in range(count):
-        t = i / (count - 1)
-        depth = 1 - t
-        width = lerp(540, 420, depth)
-        cx = S / 2 + lerp(0, 30, depth)
-        base = lerp(690, 330, depth) if count == 4 else lerp(690, 400, depth)
-        amp = lerp(120, 84, depth)
-        thickness = lerp(88, 64, depth) if detail >= 3 else lerp(110, 90, depth)
-        top = wave_points(cx, base, width, amp, 0.6 * depth)   # a clean sine in front, sharper frames behind
-        ribbon = top + [(x, y + thickness) for x, y in reversed(top)]
-        shade = ("#8fb9ff", "#b9d5ff", "#dfecff", "#ffffff")[i + (4 - count)]
-        opacity = lerp(1.0, 0.66, depth)
-        out.append(f'<path d="{path_d(ribbon, close=True)}" fill="{shade}" opacity="{opacity:.2f}" '
-                   f'stroke="{shade}" stroke-width="12" stroke-linejoin="round"/>')
-    return "\n".join(out)
 
-GLYPHS = {"box": glyph_box, "stack": glyph_stack}
-
-def svg(variant, size=S):
+def svg(size=S):
     x, y, w, h = TILE
     detail = 4 if size >= 128 else 3 if size >= 64 else 2
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{S}" height="{S}" viewBox="0 0 {S} {S}">
@@ -171,12 +127,12 @@ def svg(variant, size=S):
 <g clip-path="url(#tile)">
   <rect x="{x}" y="{y}" width="{w}" height="{h}" fill="url(#bg)"/>
   <rect x="{x}" y="{y}" width="{w}" height="{h}" fill="url(#glow)"/>
-  {GLYPHS[variant](detail)}
+  {glyph_box(detail)}
 </g>
 </svg>'''
 
-def render(variant, size=S):
-    png = cairosvg.svg2png(bytestring=svg(variant, size).encode(), output_width=size, output_height=size)
+def render(size=S):
+    png = cairosvg.svg2png(bytestring=svg(size).encode(), output_width=size, output_height=size)
     art = Image.open(io.BytesIO(png)).convert("RGBA")
     # The soft shadow under the tile that macOS 13 to 15 expect in the icon itself.
     scale = size / S
@@ -215,17 +171,16 @@ def read_icns(path):
         out.append((kind.decode("latin-1"), length)); o += length
     return out
 
-def contact_sheet(variants, path):
-    """Each variant at 1024 (shown at 512), 512 (at 256), 128, 64, 32, and 16 px, on light and dark."""
+def contact_sheet(path):
+    """The icon at 1024 (shown at 512), 512 (at 256), 128, 64, 32, and 16 px, on light and dark."""
     sizes = [(1024, 512), (512, 256), (128, 128), (64, 64), (32, 32), (16, 16)]
     gap, pad = 36, 40
     row_w = pad + sum(shown + gap for _, shown in sizes) + pad
     row_h = 512 + 2 * pad
-    sheet = Image.new("RGBA", (row_w, row_h * 2 * len(variants)), (0, 0, 0, 0))
-    for v, variant in enumerate(variants):
-        renders = {px: render(variant, px) for px, _ in sizes}
-        for b, bgcolor in enumerate(((238, 238, 240, 255), (30, 30, 34, 255))):
-            top = (2 * v + b) * row_h
+    sheet = Image.new("RGBA", (row_w, row_h * 2), (0, 0, 0, 0))
+    renders = {px: render(px) for px, _ in sizes}
+    for b, bgcolor in enumerate(((238, 238, 240, 255), (30, 30, 34, 255))):
+            top = b * row_h
             sheet.paste(Image.new("RGBA", (row_w, row_h), bgcolor), (0, top))
             xo = pad
             for px, shown in sizes:
@@ -236,16 +191,15 @@ def contact_sheet(variants, path):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Draws the pgdata Packer app icon.")
-    ap.add_argument("--variant", choices=sorted(GLYPHS), default="box")
     ap.add_argument("--png", metavar="FILE", help="write one 1024 px render here and nothing to Resources")
-    ap.add_argument("--sheet", metavar="FILE", help="write a contact sheet of every variant here and nothing to Resources")
+    ap.add_argument("--sheet", metavar="FILE", help="write a contact sheet of the icon at every size here and nothing to Resources")
     args = ap.parse_args()
     if args.sheet:
-        contact_sheet(sorted(GLYPHS), args.sheet); print("wrote", args.sheet); sys.exit()
+        contact_sheet(args.sheet); print("wrote", args.sheet); sys.exit()
     if args.png:
-        render(args.variant).save(args.png); print("wrote", args.png); sys.exit()
+        render().save(args.png); print("wrote", args.png); sys.exit()
     os.makedirs(OUT, exist_ok=True)
-    images = {px: render(args.variant, px) for px in (16, 32, 64, 128, 256, 512, 1024)}
+    images = {px: render(px) for px in (16, 32, 64, 128, 256, 512, 1024)}
     images[1024].save(os.path.join(OUT, "AppIcon.png"))
     icns = os.path.join(OUT, "AppIcon.icns")
     write_icns(images, icns)
