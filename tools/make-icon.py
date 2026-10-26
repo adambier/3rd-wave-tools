@@ -15,7 +15,7 @@ iconutil writes (icp4, icp5, ic07–ic14), so no macOS tool is needed.
 Two candidates share the tile and differ in the glyph:
 
 - box (the icon): three morphing frames, cyan, white, and pink, a sine leaning more toward a saw
-  from back to front, rising out of an open box; the composition sits high on the tile.
+  from back to front, rising out of an open box.
 - stack: the frames alone, as filled sheets stacked in perspective.
 
 The tile follows Apple's macOS icon grid for a flattened icon: an 824-point rounded square
@@ -94,11 +94,12 @@ FRAME_LEANS = (0.0, 0.3, 0.55)
 
 def glyph_box(detail):
     """Three morphing frames rising out of an open box. detail: 2 (small sizes), 3 (64 px),
-    4 (full). The composition sits high on the tile, the back frame near the top and the box
-    ending 790 down, so the heavy box does not weigh the bottom half (Adam, 2026-10-26); the
-    front frame's trough dips behind the box front, so it rises out of the box."""
+    4 (full). The glyph is centered on the tile: about 85 points above the back frame's crest
+    and below the box (Adam, 2026-10-26: neither the box weighing the bottom half nor the back
+    frame crowding the top); the front frame's trough dips behind the box front, so it rises
+    out of the box."""
     bx, bw = 252, 520                      # the box front: x and width
-    bottom, front = 790, 620               # y of the box bottom and the opening's front edge
+    bottom, front = 830, 660               # y of the box bottom and the opening's front edge
     back = front - 60                      # y of the opening's back edge
     inset = 50
     out = []
@@ -109,7 +110,7 @@ def glyph_box(detail):
     for i in indices:
         depth = 1 - i / 2
         cx = S / 2 + lerp(0, 24, depth)
-        base = lerp(548, 250, depth) if len(indices) == 3 else lerp(548, 330, depth)
+        base = lerp(588, 290, depth) if len(indices) == 3 else lerp(588, 370, depth)
         amp = lerp(100, 80, depth)
         width = (380, 420, 460)[i]
         stroke = (50, 60, 66)[i] if detail >= 3 else (70, 0, 86)[i]
