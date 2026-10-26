@@ -314,7 +314,8 @@ stands out. With several tables selected, the preview offers one frame size for 
 is assumed or estimated, from the sizes all of them allow (⌘A selects every table). For the rare
 WAV or FLAC whose chunk states the wrong size, **Override Frame Size…** in the preview opens the
 same chooser. The counts above the table jump to the first table that still needs a size or cannot
-be split into frames; **Show only tables that can't be converted yet** filters to them.
+be split into frames; **Show only tables that can't be converted yet** filters to them, and the
+filter field above the table narrows the list by name or file, as on the Pack page.
 
 #### Destinations
 

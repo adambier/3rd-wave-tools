@@ -65,6 +65,9 @@ struct ConvertView: View {
     }
 
     // The keyboard shortcuts (Open, Convert) are the File menu's; see main.swift.
+    /// The selection without rows the filter hides.
+    private var visibleSelection: Set<UUID> { selection.intersection(state.convertShownItems.map(\.id)) }
+
     private var controls: some View {
         let plan = state.convertPlan
         let marked = plan.selectedItems.count
@@ -78,8 +81,10 @@ struct ConvertView: View {
                 .help("Propose tidier names for the tables listed (e.g., slot numbers removed, title case), used for the converted files. Factory wavetables keep their names.")
                 .sheet(isPresented: $showNameCleanup) { NameCleanupSheet(state: state, page: .convert) }
             Spacer()
-            Button("Remove Selected") { state.removeConvertItems(selection); selection = [] }
-                .disabled(selection.isEmpty || state.isWorking)
+            // Rows the filter hides stay selected out of sight, as in Pack; only the visible
+            // ones are removed.
+            Button("Remove Selected") { state.removeConvertItems(visibleSelection); selection = [] }
+                .disabled(visibleSelection.isEmpty || state.isWorking)
                 .help("Remove the selected tables from this list (the files are not touched)")
             Button("Remove All…") { state.removeAllConvert() }
                 .disabled(plan.items.isEmpty || state.isWorking)
@@ -166,12 +171,9 @@ struct ConvertTablesPane: View {
     @EnvironmentObject var state: AppState
     @Binding var selection: Set<UUID>
 
-    /// The rows shown: every table, or only those that can't be converted yet.
-    private var shown: [ConvertPlan.Item] {
-        let plan = state.convertPlan
-        guard state.convertOnlyAttention, plan.blockedCount > 0 else { return plan.items }
-        return plan.items.filter(plan.needsAttention)
-    }
+    /// The rows shown (`AppState.convertShownItems`): every table, those matching the filter
+    /// field, or only those that can't be converted yet, as the Pack page's list filters.
+    private var shown: [ConvertPlan.Item] { state.convertShownItems }
 
     var body: some View {
         let st = state
@@ -187,6 +189,11 @@ struct ConvertTablesPane: View {
                 }
             }
             ConvertTable(state: st, items: rows, selection: $selection)
+                .overlay {
+                    if rows.isEmpty, !st.convertPlan.items.isEmpty {
+                        ListPlaceholder(text: "No tables match the filter.")
+                    }
+                }
         }
     }
 }
@@ -223,27 +230,37 @@ struct ConvertSummaryStrip: View {
         let plan = state.convertPlan
         let total = plan.items.count
         let marked = plan.selectedItems.count
-        HStack(spacing: 12) {
-            Text("\(total) table\(total == 1 ? "" : "s") · \(marked) to convert")
-                .monospacedDigit()
-            ConvertBlockedCount(count: plan.needsFrameSizeCount, one: "needs a frame size", many: "need frame sizes",
-                                help: "Tables marked to convert for which no frame size could be estimated: choose one in the Input column. Click to go to the first.") {
-                jump(.needsFrameSize)
+        VStack(spacing: 0) {
+            // The filter field and the filter checkbox above the summary line, as on the Pack
+            // page, so the three pages' lists start the same way.
+            HStack(spacing: 12) {
+                SearchField(text: $state.convertFilter, placeholder: "Filter by name or file")
+                    .frame(maxWidth: 360)
+                Spacer()
+                Toggle("Show only tables that can’t be converted yet", isOn: $state.convertOnlyAttention)
+                    .toggleStyle(.checkbox).font(.caption)
+                    .disabled(plan.blockedCount == 0)
+                    .help(plan.blockedCount == 0
+                          ? "Every table marked to convert can be converted"
+                          : "Show only the tables marked to convert that still need a frame size, or whose samples don’t divide into frames")
             }
-            ConvertBlockedCount(count: plan.cannotSplitCount, one: "can’t be split", many: "can’t be split",
-                                help: "Tables marked to convert whose samples don’t divide into frames of the size given. Click to go to the first.") {
-                jump(.cannotSplit)
+            .padding(.horizontal, 12).padding(.top, 6)
+            HStack(spacing: 12) {
+                Text("\(total) table\(total == 1 ? "" : "s") · \(marked) to convert")
+                    .monospacedDigit()
+                ConvertBlockedCount(count: plan.needsFrameSizeCount, one: "needs a frame size", many: "need frame sizes",
+                                    help: "Tables marked to convert for which no frame size could be estimated: choose one in the Input column. Click to go to the first.") {
+                    jump(.needsFrameSize)
+                }
+                ConvertBlockedCount(count: plan.cannotSplitCount, one: "can’t be split", many: "can’t be split",
+                                    help: "Tables marked to convert whose samples don’t divide into frames of the size given. Click to go to the first.") {
+                    jump(.cannotSplit)
+                }
+                Spacer()
             }
-            Spacer()
-            Toggle("Show only tables that can’t be converted yet", isOn: $state.convertOnlyAttention)
-                .toggleStyle(.checkbox).font(.caption)
-                .disabled(plan.blockedCount == 0)
-                .help(plan.blockedCount == 0
-                      ? "Every table marked to convert can be converted"
-                      : "Show only the tables marked to convert that still need a frame size, or whose samples don’t divide into frames")
+            .frame(height: 28)
+            .padding(.horizontal, 12)
         }
-        .frame(height: 28)
-        .padding(.horizontal, 12)
     }
 }
 
@@ -333,7 +350,7 @@ struct ConvertTable: View {
         } primaryAction: { (ids: Set<UUID>) in
             if ids.count == 1, let id = ids.first { rename(id) }
         }
-        .onCommand(MenuActions.removeSelected) { state.removeConvertItems(selection); selection = [] }
+        .onCommand(MenuActions.removeSelected) { state.removeConvertItems(selection.intersection(items.map(\.id))); selection = [] }
         .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(items.map(\.id)) }
     }
 

@@ -146,6 +146,21 @@ final class AppState: ObservableObject {
     @Published var convertPlan = ConvertPlan() { didSet { saveSettings() } }
     /// Show only the Wavetables page's tables that can't be converted yet (`ConvertPlan.needsAttention`).
     @Published var convertOnlyAttention = false
+    /// The Wavetables page's filter by name (as `programFilter` is the Pack page's).
+    @Published var convertFilter = ""
+
+    /// The Wavetables page's rows as shown: every table, those matching `convertFilter` (by name
+    /// or file name), and, with `convertOnlyAttention`, only those that can't be converted yet.
+    var convertShownItems: [ConvertPlan.Item] {
+        let plan = convertPlan
+        let needle = convertFilter.trimmingCharacters(in: .whitespaces)
+        let blocked = convertOnlyAttention && plan.blockedCount > 0
+        return plan.items.filter { (item: ConvertPlan.Item) -> Bool in
+            (!blocked || plan.needsAttention(item))
+                && (needle.isEmpty || item.name.localizedCaseInsensitiveContains(needle)
+                    || item.location.url.lastPathComponent.localizedCaseInsensitiveContains(needle))
+        }
+    }
     /// The height of the Wavetables page's preview pane, which the user drags; remembered between
     /// sessions (see `ConvertPaneDivider`).
     @Published var convertPreviewHeight: CGFloat = 320 { didSet { saveSettings() } }
