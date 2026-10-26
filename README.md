@@ -553,8 +553,9 @@ Sources/PgdataPackerCore/   the app's own decision logic, no UI (the package's P
                             Clean Up Names, the Wavetables page's report
 Sources/PgdataPacker/       the app (SwiftUI)
 Sources/tw3pg/              developer tool: inspect, roundtrip, unpack, repack, compare, wtcheck,
-                            wtscan, wtdump, factory-catalog, pack, convert, convertcheck, and the
-                            3rd Wave-test builders
+                            wtscan, wtdump, sweep (records what Listen plays through a table),
+                            factory-catalog, pack, convert, convertcheck, and the 3rd Wave-test
+                            builders
 Tests/                      unit tests, one target per library (./run-tests.sh)
 fixtures/                   test files with what each parses to, for other implementers
 Resources/                  app icon, drawn by tools/make-icon.py (needs cairosvg and Pillow)

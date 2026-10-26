@@ -76,8 +76,12 @@ public extension WavetableSketch {
         cycle(at: position, in: frames, interpolation: interpolation) { reduceCycle($0, to: columns) }
     }
 
-    /// The cycle at `position` (see ``cycle(at:in:interpolation:columns:)``) at the frames' own
-    /// length, for playing it rather than drawing it.
+    /// The cycle at `position`, 0 for the first frame to 1 for the last, through `frames`, at
+    /// the frames' own length, for playing it rather than drawing it: the stored frame at a whole
+    /// position; between two, a linear crossfade for `.crossfade`, a spectral blend
+    /// (``spectralBlend(_:_:t:)``) for `.spectral`, and the stored frame before the position for
+    /// `.none` or nil. Nil for an empty table. What the Wavetables page's Listen plays (and
+    /// `tw3pg sweep` records).
     static func fullCycle(at position: Double, in frames: [[Float]], interpolation: Interpolation?) -> SweepPoint? {
         cycle(at: position, in: frames, interpolation: interpolation) { $0 }
     }

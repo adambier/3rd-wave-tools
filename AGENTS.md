@@ -122,7 +122,7 @@ in their synths (`OutputPreset.testedIn`).
 | `Sources/WavetableFormats/` | Library: other synths' wavetable formats; reading, resizing, writing; Foundation and PgdataFormats only |
 | `Sources/PgdataPackerCore/` | Library: the app's decisions without UI (pack, unpack, and convert plans, file names, Clean Up Names) |
 | `Sources/PgdataPacker/` | The macOS app (SwiftUI, AppKit); declared in `Package.swift` only on macOS |
-| `Sources/tw3pg/main.swift` | Developer command-line tool: inspect, round-trip, pack, unpack, repack, compare, convert, checks, test-file builders |
+| `Sources/tw3pg/main.swift` | Developer command-line tool: inspect, round-trip, pack, unpack, repack, compare, convert, checks, sweep recordings of what Listen plays, test-file builders |
 | `Tests/PgdataFormatsTests/` | Tests for PgdataFormats (`FormatTests`, `RobustnessTests`, `ConverterTests`, `FactoryLibraryTests`, `FixtureTests`, …) |
 | `Tests/WavetableFormatsTests/` | Tests for WavetableFormats; `Resources/FLAC/` holds synthetic FLAC files read by path |
 | `Tests/PgdataPackerCoreTests/` | Tests for PgdataPackerCore: `WorkbenchTests`, `PlanRobustnessTests`, `ConvertPlanTests.swift` (several classes: `ConvertPlanTests`, `ConvertPlanStateTests`, `ConvertChangeWordsTests`, `ConvertExistingChoicesTests`, `ConvertOptionsTextTests`, `WavetableSketchTests`, `FrameSizeFitTests`, …), `ConvertReportTests`, `ReviewFixPlanTests`, `PianoKeyTests`, and `NameFittingTests` (the Pack page and the Wavetables page's writer give the same 3rd Wave name); `TestPrograms.swift` repeats the program builders of `FormatTests.swift` |
@@ -332,7 +332,7 @@ a separate manager for the typing (`AppDelegate.windowWillReturnUndoManager`).
 | Read another wavetable format | `Reading.swift` dispatch, a new `Read<Format>.swift`, `SourceFormat` | `ReadingTests`, `CorpusCaseTests`, `RoundTripTests`; WAVETABLES.md |
 | Write for another synth | `OutputPreset` in `Wavetable.swift`, `Writing.swift`, `PresetInfo.swift`; `DestinationInfo.swift` in PgdataPackerCore | `WritingTests`, `RoundTripTests`; WAVETABLES.md section 2; README destination table |
 | Frame size decisions | `ReadWAV.swift`, `FrameSizeEvidence`, `FrameSizeFit.swift`, `ConvertPlan.Item.frameSize`/`frameSizeChoices`/`frameSizeAlternatives`; WAVETABLES.md section 3 | `ReadingTests`, `ReviewFixTests`, `FrameSizeFitTests`, `ReviewFixPlanTests`, `ConvertPlanStateTests` |
-| Listen, pitch, audio output | `AudioPreview.swift`, `PianoKey.swift`, `ToolbarController` in `main.swift` (`NSMenuToolbarItem`) | `PianoKeyTests`, `ResamplingTests` (`bandLimitedCycle`); the engine itself only by running the app |
+| Listen, pitch, audio output | `AudioPreview.swift`, `PianoKey.swift`, `ToolbarController` in `main.swift` (`NSMenuToolbarItem`) | `PianoKeyTests`, `ResamplingTests` (`bandLimitedCycle`); `tw3pg sweep` records what Listen plays as WAVs (section 9); the engine itself only by running the app |
 | Preview pictures, Frame slider, sweep | `ConvertDetail.swift`, `WavetableSketch.swift` | `WavetableSketchTests`, `WavetableSketchInterpolationTests`, `ResamplingTests` (`spectralBlend`) |
 | Remove, Edit › Delete, Undo | `ListCommands.swift` (`.listCommands(delete:rename:)` on each list), `MenuActions.deleteSelection` in `main.swift`; `AppState.undoManager`, `removePrograms`/`removeContent`/`removeUnpacks`/`removeConvertItems`, `removeAll*`, `renameConvertItem`, `commitUnpackFileName` | no tests; build and use the app |
 | Return to rename, drop hint, first table selected after a drop | `MenuActions.installReturnKey` in `main.swift` and the lists' `rename` handlers, `AppState.focusProgramName`; `AppState.dragIsOverPage` and `LogBar`; `AppState.convertSelectionRequest` | no tests; build and use the app |
@@ -366,7 +366,12 @@ Other checks:
 - **Developer tool**: `swift run tw3pg inspect <file>`; `tw3pg roundtrip <dir>` re-serializes every
   file and reports byte differences; `tw3pg repack <dir>` unpacks and repacks `.pgdata` files;
   `tw3pg wtscan [--check-writers] <files or dirs>` lists what the Wavetables page would find and
-  round-trips every preset.
+  round-trips every preset; `tw3pg sweep <file> <out dir> [--preset <name>] [--new-frames crossfade]`
+  records what the Wavetables page's Listen plays while the Frame slider is dragged through the
+  table (converted and read back when a preset is given), one WAV per interpolation, with the
+  difference between consecutive cycles, so the three interpolations can be compared by ear and
+  by analysis (the same code path as the app: `WavetableSketch.fullCycle`,
+  `Resampling.bandLimitedCycle`, a 480-sample crossfade into each new cycle).
 - **Fixtures**: `FixtureTests` runs with the suite; regenerate after a deliberate change with
   `PGDATA_TESTS=1 PGDATA_REGENERATE_FIXTURES=1 swift test --filter FixtureTests` and commit the files.
 - **Documentation**: `PGDATA_DOCS=1 swift package --disable-sandbox preview-documentation --target PgdataFormats`

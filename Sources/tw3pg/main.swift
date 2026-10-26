@@ -22,6 +22,11 @@ import WavetableFormats
 //                                        reads it back
 //   tw3pg wtdump <file> <out.f32>        the first table's samples as raw float32 little-endian (to compare a
 //                                        decoder with ffmpeg: ffmpeg -i x.flac -f f32le -ac 1 x.raw)
+//   tw3pg sweep <file> <out dir> [--preset <name>] [--interpolation none|crossfade|spectral|all] [--seconds 8]
+//                [--new-frames original|crossfade] [--pitch 220] [--rate 48000] [--frame-size N]
+//                                        record what the Wavetables page's Listen
+//                                        plays while the Frame slider is dragged from the first frame to the
+//                                        last, one WAV per interpolation, with the difference between cycles
 //   tw3pg maketests | maketest5 | maketest6 ...   build the hardware-test files (see each command's usage line)
 
 func files(under paths: [String], ext: Set<String>) -> [URL] {
@@ -85,7 +90,7 @@ func need(_ n: Int, _ rest: [String], _ usage: String) {
     if rest.count < n { print("usage: tw3pg " + usage); exit(2) }
 }
 guard let cmd = args.first else {
-    print("usage: tw3pg inspect|roundtrip|unpack|repack|compare|factory-catalog|pack|convert|convertcheck|wtcheck|wtscan|wtdump|maketests|maketest5|maketest6 ...")
+    print("usage: tw3pg inspect|roundtrip|unpack|repack|compare|factory-catalog|pack|convert|convertcheck|wtcheck|wtscan|wtdump|sweep|maketests|maketest5|maketest6 ...")
     exit(2)
 }
 let rest = Array(args.dropFirst())
@@ -443,6 +448,143 @@ case "wtdump":
     for s in t.samples { withUnsafeBytes(of: s.bitPattern.littleEndian) { out.append(contentsOf: $0) } }
     try out.write(to: URL(fileURLWithPath: rest[1]))
     print("\(t.samples.count) samples")
+
+case "sweep":
+    // Records what the Wavetables page's Listen plays while the Frame slider is dragged from
+    // the first frame to the last, as a WAV per interpolation, so the three can be compared by
+    // ear and by analysis. The same path as the app: the file's first table, converted for the
+    // preset and read back when one is given (as the preview shows the result), the cycle at
+    // each position from WavetableSketch.fullCycle, band-limited for the pitch
+    // (Resampling.bandLimitedCycle to 4,096 samples, harmonics below half the sample rate), and
+    // each new cycle crossfaded in over 480 samples (10 ms at 48 kHz) as AudioPreview.Voice does;
+    // the slider's position is taken 60 times a second, the display's rate.
+    var sweepArgs = rest
+    func option(_ name: String) -> String? {
+        guard let i = sweepArgs.firstIndex(of: name), i + 1 < sweepArgs.count else { return nil }
+        let v = sweepArgs[i + 1]; sweepArgs.removeSubrange(i...(i + 1)); return v
+    }
+    let presetName = option("--preset")
+    let modeName = option("--interpolation") ?? "all"
+    let seconds = Double(option("--seconds") ?? "8") ?? 8
+    let pitch = Double(option("--pitch") ?? "220") ?? 220
+    let rate = Double(option("--rate") ?? "48000") ?? 48_000
+    let forcedSize = option("--frame-size").flatMap(Int.init)
+    let newFrames = option("--new-frames") ?? "original"
+    need(2, sweepArgs, "sweep <file> <out dir> [--preset thirdWaveP|thirdWaveU|wav2048|miniFreak|tonverk|phasePlant|surge|waveEdit] "
+         + "[--interpolation none|crossfade|spectral|all] [--new-frames original|crossfade] [--seconds 8] [--pitch 220] [--rate 48000] [--frame-size N]")
+    let frameCountPolicy: FrameCountPolicy = try {
+        switch newFrames {
+        case "original": return .pickEvenly      // the Options box's "Original Frames Only"
+        case "crossfade": return .interpolate    // "Crossfade New Frames"
+        default: throw NSError(domain: "tw3pg", code: 2, userInfo: [NSLocalizedDescriptionKey: "unknown --new-frames \(newFrames); original or crossfade"])
+        }
+    }()
+    let inputURL = URL(fileURLWithPath: sweepArgs[0]), outDir = URL(fileURLWithPath: sweepArgs[1])
+    guard FileManager.default.fileExists(atPath: inputURL.path) else { print("error: no such file: \(inputURL.path)"); exit(1) }
+    let preset: OutputPreset? = try presetName.map {
+        guard let p = OutputPreset(rawValue: $0) else { throw NSError(domain: "tw3pg", code: 2, userInfo: [NSLocalizedDescriptionKey: "unknown preset \($0); one of \(OutputPreset.allCases.map(\.rawValue).joined(separator: ", "))"]) }
+        return p
+    }
+    let modes: [Interpolation] = try {
+        switch modeName {
+        case "all": return [Interpolation.none, .crossfade, .spectral]
+        case "none": return [Interpolation.none]
+        case "crossfade": return [.crossfade]
+        case "spectral": return [.spectral]
+        default: throw NSError(domain: "tw3pg", code: 2, userInfo: [NSLocalizedDescriptionKey: "unknown interpolation \(modeName); none, crossfade, spectral, or all"])
+        }
+    }()
+    guard let found = try WavetableReader.read(url: inputURL).first else { print("no table in \(inputURL.path)"); exit(1) }
+    let size = forcedSize ?? found.frameSize ?? (found.candidateFrameSizes.count == 1 ? found.candidateFrameSizes[0] : nil)
+    guard let size, let sourceTable = found.wavetable(frameSize: size) else {
+        print("the frame size is open (\(found.candidateFrameSizes.map(String.init).joined(separator: ", "))); give --frame-size"); exit(1)
+    }
+    print("\(found.name): \(sourceTable.frameCount) frames of \(size) samples, frame size from \(found.frameSizeBasis)"
+          + (found.interpolation.map { ", interpolation in the file: \($0.rawValue)" } ?? ""))
+    try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
+    let stem = SafeFileName.make(found.name).replacingOccurrences(of: " ", with: "_")
+    for mode in modes {
+        // The frames the preview shows and plays: the converted file read back, or the source.
+        var frames = sourceTable.frames
+        var what = "source"
+        if let preset {
+            let options = OutputOptions(frameCountPolicy: frameCountPolicy, interpolation: preset.recordsInterpolation ? mode : nil)
+            let out = try WavetableWriter.write(sourceTable, preset: preset, options: options)
+            let back = try WavetableReader.read(out.data, fileName: out.fileName)
+            guard let b = back.first, let r = b.wavetable(frameSize: b.frameSize ?? b.candidateFrameSizes.first) else {
+                print("  \(preset.rawValue): could not read the converted file back"); continue
+            }
+            frames = r.frames
+            what = preset.rawValue + (frameCountPolicy == .interpolate ? "-newframes" : "")
+            if mode == modes[0] {
+                print("  converted for \(preset.rawValue): \(r.frameCount) frames of \(r.frameSize) samples"
+                      + (out.notes.isEmpty ? "" : "; " + out.notes.joined(separator: " ")))
+            }
+        }
+        // The voice: a 4,096-sample band-limited table read with linear interpolation, a new one
+        // crossfaded in over `fadeLength` samples whenever the cycle at the slider's position
+        // changes (with no interpolation, only when the stored frame changes).
+        let tableSize = 4096, fadeLength = 480
+        let maxHarmonic = max(1, Int(rate / (2 * pitch)) - 1)
+        let total = Int(seconds * rate), step = max(1, Int(rate / 60))
+        var out = [Float](repeating: 0, count: total)
+        var current: [Float] = [], previous: [Float] = [], lastCycle: [Float] = []
+        var phase = 0.0, fade = 0, changes = 0
+        var differences: [Float] = []   // RMS difference between each new table and the one before
+        var largestJump: (position: Double, rms: Float) = (0, 0)
+        func read(_ table: [Float], _ phase: Double) -> Float {
+            let x = phase * Double(tableSize)
+            var i = Int(x); if i >= tableSize { i -= tableSize }
+            let a = table[i], b = table[i + 1 == tableSize ? 0 : i + 1]
+            return a + (b - a) * Float(x - Double(i))
+        }
+        for i in 0..<total {
+            if i % step == 0 {
+                let position = Double(i) / Double(max(1, total - 1))
+                if let point = WavetableSketch.fullCycle(at: position, in: frames, interpolation: mode), point.values != lastCycle {
+                    lastCycle = point.values
+                    var table = Resampling.bandLimitedCycle(point.values, to: tableSize, maxHarmonic: maxHarmonic)
+                    let peak = table.reduce(Float(0)) { max($0, abs($1)) }
+                    if peak > 1 { table = table.map { $0 / peak } }
+                    if !current.isEmpty {
+                        var sum: Float = 0
+                        for (x, y) in zip(table, current) { sum += (x - y) * (x - y) }
+                        let rms = (sum / Float(tableSize)).squareRoot()
+                        differences.append(rms)
+                        if rms > largestJump.rms { largestJump = (position, rms) }
+                        fade = fadeLength
+                    }
+                    previous = current; current = table; changes += 1
+                }
+            }
+            guard !current.isEmpty else { continue }
+            var v = read(current, phase)
+            if fade > 0 {
+                let w = Float(fade) / Float(fadeLength)
+                v = v * (1 - w) + read(previous, phase) * w
+                fade -= 1
+            }
+            // A 10 ms fade in and out, so the file starts and ends without a click.
+            let edge = min(i, total - 1 - i)
+            if edge < fadeLength { v *= Float(edge) / Float(fadeLength) }
+            out[i] = v
+            phase += pitch / rate
+            if phase >= 1 { phase -= 1 }
+        }
+        // A mono float32 WAV (the same layout the Wavetables page writes for Serum-style files).
+        var wav = Data()
+        func le32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { wav.append(contentsOf: $0) } }
+        func le16(_ v: UInt16) { withUnsafeBytes(of: v.littleEndian) { wav.append(contentsOf: $0) } }
+        wav.append(contentsOf: Array("RIFF".utf8)); le32(UInt32(36 + out.count * 4)); wav.append(contentsOf: Array("WAVE".utf8))
+        wav.append(contentsOf: Array("fmt ".utf8)); le32(16); le16(3); le16(1); le32(UInt32(rate)); le32(UInt32(rate) * 4); le16(4); le16(32)
+        wav.append(contentsOf: Array("data".utf8)); le32(UInt32(out.count * 4))
+        for s in out { le32(s.bitPattern) }
+        let fileName = "\(stem)-\(what)-\(mode.rawValue).wav"
+        try wav.write(to: outDir.appendingPathComponent(fileName))
+        let mean = differences.isEmpty ? 0 : differences.reduce(0, +) / Float(differences.count)
+        print("  \(fileName): \(changes) cycles played; between consecutive cycles the RMS difference is "
+              + String(format: "%.4f on average, %.4f at most (at position %.2f)", mean, largestJump.rms, largestJump.position))
+    }
 
 default:
     print("unknown command \(cmd)"); exit(2)
