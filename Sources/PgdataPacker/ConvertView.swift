@@ -299,21 +299,24 @@ struct ConvertTable: View {
             // Table header takes no tooltip on macOS 13), the cells spell it out on hover. The
             // widths fit the headers and the longest cells ("256 × 2,048  from markers" with its
             // chevron; "256 → 64 frames, picked evenly, attenuated" on two lines).
+            // Input and Output are capped, so the width the window has to spare goes to Name and,
+            // above all, Changes, whose lines are the longest (Adam, 2026-10-26: Changes was
+            // truncating while Output held 240 points for "64 × 128").
             TableColumn("Input (frames × samples)") { (item: ConvertPlan.Item) in ConvertFrameSizeCell(state: st, item: item, selection: $selection) }
-                .width(min: 200, ideal: 230)
+                .width(min: 200, ideal: 230, max: 260)
             // The interpolation a file states is in the preview's facts and the Options box's
             // "existing" marks, not a column of its own: most files state none, and the room is
             // the Changes column's (Adam, 2026-10-26).
             TableColumn("Output (frames × samples)") { (item: ConvertPlan.Item) in
                 ConvertOutputCell(expected: plan.expected(for: item), summary: plan.expectedResult(for: item), included: plan.isIncluded(item))
             }
-                .width(min: 150, ideal: 170)
+                .width(min: 150, ideal: 170, max: 200)
             TableColumn("Changes") { (item: ConvertPlan.Item) in
                 ConvertChangesCell(words: plan.changeWords(for: item), summary: plan.expectedResult(for: item),
                                    notes: plan.itemNotes(for: item), included: plan.isIncluded(item),
                                    unchanged: plan.unchangedWords(for: item))
             }
-                .width(min: 180, ideal: 300)
+                .width(min: 180, ideal: 520)
         }
         // A double-click on a row edits its name, as does Return with one row selected (see
         // `ListCommands`): the Table's own double-click, so a single click selects
