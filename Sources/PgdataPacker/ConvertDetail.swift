@@ -369,6 +369,10 @@ struct ConvertOverviewPair: View {
     let item: ConvertPlan.Item
     /// The slider's place through the table, 0 (first frame) to 1 (last).
     @State private var position: Double = 0
+    /// For a destination whose file records no interpolation, what the result is drawn and
+    /// played with instead of the synth's default (the Hear pop-up); nil for the default. Back
+    /// to the default whenever the table or the destination changes (Adam, 2026-10-26).
+    @State private var hearing: Interpolation?
 
     var body: some View {
         let plan = state.convertPlan
@@ -377,9 +381,13 @@ struct ConvertOverviewPair: View {
             // input is drawn at once; the result's place says it is being converted).
             let converted = state.convertPreview(item)
             let result = converted?.frames
-            // What the destination's synth plays, for the result's in-betweens and Listen: the
-            // 3rd Wave's wavetable smoothing by default (a U table blends, a P table steps).
-            let resultInterpolation = plan.interpolationPlayed(for: item)
+            // What the destination's synth plays, for the result's in-betweens and Listen: what
+            // the file records; else the 3rd Wave's wavetable smoothing by default (a U table
+            // blends, a P table steps), or nothing for a synth whose default is not known; and
+            // for those formats, the Hear pop-up's choice over the default.
+            let recorded = plan.preset.recordsInterpolation
+            let playedByDefault = plan.interpolationPlayed(for: item) ?? Interpolation.none
+            let resultInterpolation: Interpolation? = recorded ? plan.interpolationPlayed(for: item) : (hearing ?? playedByDefault)
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 16) {
                     ConvertOverview(frames: source.frames,
@@ -393,7 +401,7 @@ struct ConvertOverviewPair: View {
                                         caption: "\(plan.preset.shortTitle) · \(result.count) × \(ConvertPlan.formatCount(first.count))",
                                         interpolation: resultInterpolation,
                                         unstatedLegend: "interpolation set in the synth",
-                                        interpolationNote: ConvertOverviewPair.interpolationNote(for: plan.preset),
+                                        interpolationNote: recorded ? nil : ConvertOverviewPair.interpolationNote(for: plan.preset, chosen: hearing != nil),
                                         tint: WavetableStackCanvas.resultColor,
                                         position: position)
                     } else if converted == nil {
@@ -406,8 +414,13 @@ struct ConvertOverviewPair: View {
                 .help("The table’s frames, front (first) to back (last): the input as read, and what the destination gets, read back from the file this page would write. Solid lines are the frames in the file (at most 64 are drawn, 24 when the interpolation is drawn between them, each reduced to the width of the picture). Colored lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum’s or Vital’s own morphs. The Frame slider below sweeps through the table; the third picture draws the cycle there.")
                 ConvertSweepControls(position: $position, preview: preview,
                                      playing: result != nil ? "the \(plan.preset.shortTitle) output" : "the input",
+                                     hearing: recorded || result == nil ? nil : $hearing,
+                                     hearingDefault: playedByDefault,
+                                     hearingHelp: ConvertOverviewPair.hearingHelp(for: plan.preset),
                                      cycle: { cycleToPlay(source: source.frames, result: result, resultInterpolation: resultInterpolation) })
             }
+            .onChange(of: item.id) { _ in hearing = nil }
+            .onChange(of: plan.preset) { _ in hearing = nil }
             .onChange(of: position) { _ in updatePlaying(source: source.frames, result: result, resultInterpolation: resultInterpolation) }
             .onChange(of: result) { (r: [[Float]]?) in updatePlaying(source: source.frames, result: r, resultInterpolation: resultInterpolation) }
             // The Options' interpolation changes what plays between frames without changing
@@ -419,13 +432,25 @@ struct ConvertOverviewPair: View {
     }
 
     /// Why the result is drawn and played with its interpolation when its file records none:
-    /// for the 3rd Wave, what its wavetable smoothing does by default (checked on an 8M;
-    /// FORMATS.md section 5.1; `ConvertPlan.interpolationPlayed(for:)`). Nil for the others.
-    static func interpolationNote(for preset: OutputPreset) -> String? {
+    /// the Hear pop-up's choice, or for the 3rd Wave what its wavetable smoothing does by
+    /// default (checked on an 8M; FORMATS.md section 5.1; `ConvertPlan.interpolationPlayed(for:)`).
+    /// Nil for the others' defaults, which are not known.
+    static func interpolationNote(for preset: OutputPreset, chosen: Bool) -> String? {
+        if chosen { return "chosen under Hear" }
         switch preset {
-        case .thirdWaveU: return "wavetable smoothing, on by default on the 3rd Wave, taken as a crossfade"
-        case .thirdWaveP: return "wavetable smoothing is off by default on the 3rd Wave"
+        case .thirdWaveU: return "the 3rd Wave’s wavetable smoothing, on by default"
+        case .thirdWaveP: return "the 3rd Wave’s wavetable smoothing is off by default"
         default: return nil
+        }
+    }
+
+    /// The Hear pop-up's tip: what the choice is for, and what the synth itself does.
+    static func hearingHelp(for preset: OutputPreset) -> String {
+        let common = "How the result is drawn and played between frames here; the file records no interpolation, so the synth decides when it plays the table. "
+        switch preset {
+        case .thirdWaveU: return common + "On the 3rd Wave, wavetable smoothing is on by default for a U table (taken here to be a crossfade) and can be turned off in the program’s Wave Flow settings."
+        case .thirdWaveP: return common + "On the 3rd Wave, wavetable smoothing is off by default for a P table and can be turned on in the program’s Wave Flow settings."
+        default: return common + "What \(preset.shortTitle) does by default is not known here."
         }
     }
 
@@ -451,6 +476,13 @@ struct ConvertSweepControls: View {
     @Binding var position: Double
     @ObservedObject var preview: AudioPreview
     let playing: String
+    /// For a destination whose file records no interpolation: the interpolation to draw and
+    /// play the result with (nil in the binding for the synth's default); nil here when the
+    /// format records it (the Options box sets it then) or there is no result yet.
+    var hearing: Binding<Interpolation?>? = nil
+    /// The synth's default, named in the pop-up.
+    var hearingDefault: Interpolation = Interpolation.none
+    var hearingHelp: String = ""
     let cycle: () -> [Float]
 
     var body: some View {
@@ -480,6 +512,23 @@ struct ConvertSweepControls: View {
                 .controlSize(.small)
                 .fixedSize()
                 .help("The pitch Listen plays at: a piano key and its frequency (A4 is 440 Hz)")
+                if let hearing {
+                    // "Hear": what plays between frames, for a format whose file leaves that to
+                    // the synth. The default is the synth's own where it is known.
+                    Text("Hear").font(.caption).foregroundStyle(.secondary)
+                    Picker("Hear", selection: Binding<Interpolation>(
+                        get: { hearing.wrappedValue ?? hearingDefault },
+                        set: { (value: Interpolation) in hearing.wrappedValue = value == hearingDefault ? nil : value })) {
+                        ForEach([Interpolation.none, .crossfade, .spectral], id: \.self) { (value: Interpolation) in
+                            Text(value.displayName + (value == hearingDefault ? " — default" : "")).tag(value)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
+                    .fixedSize()
+                    .help(hearingHelp)
+                }
             }
             if let problem = preview.problem {
                 Text(problem).font(.caption).foregroundStyle(.red)
@@ -574,7 +623,7 @@ struct ConvertSweepView: View {
             Text("Cycle at the slider")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 5) {
                 if let sourcePoint {
                     ConvertSwatch(color: WavetableStackCanvas.sourceColor,
                                   text: "Input: " + WavetableSketch.sweepWords(sourcePoint, of: source.count, interpolation: sourceInterpolation))
@@ -636,7 +685,8 @@ struct ConvertOverviewLegend: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        // Each entry is one line of the legend; a little space tells them apart when one wraps.
+        VStack(alignment: .leading, spacing: 5) {
             ConvertSwatch(color: tint, text: storedWords)
             if interpolation == .crossfade {
                 ConvertSwatch(color: WavetableStackCanvas.crossfadeColor(tint), text: "Crossfades" + (note.map { " (" + $0 + ")" } ?? ""))
@@ -653,8 +703,9 @@ struct ConvertSwatch: View {
     let color: Color
     let text: String
     var body: some View {
-        HStack(spacing: 4) {
-            RoundedRectangle(cornerRadius: 1.5).fill(color).frame(width: 14, height: 3)
+        // The swatch sits by the first line, not the middle, when the words wrap.
+        HStack(alignment: .top, spacing: 4) {
+            RoundedRectangle(cornerRadius: 1.5).fill(color).frame(width: 14, height: 3).padding(.top, 5)
             Text(text).fixedSize(horizontal: false, vertical: true)
         }
     }

@@ -291,7 +291,7 @@ final class MenuActions: NSObject, NSMenuItemValidation {
 
 /// The window's toolbar: one control, the page switcher, centered. It follows `AppState.section`
 /// (which the View menu also sets) and sets it.
-final class ToolbarController: NSObject, NSToolbarDelegate {
+final class ToolbarController: NSObject, NSToolbarDelegate, NSMenuDelegate {
     private static let pageItem = NSToolbarItem.Identifier("page")
     private static let outputItem = NSToolbarItem.Identifier("audioOutput")
     private let appState: AppState
@@ -405,14 +405,38 @@ final class ToolbarController: NSObject, NSToolbarDelegate {
         return item
     }
 
+    /// The volume slider in the menu, made once so a drag is not interrupted by the menu being
+    /// filled again (the menu follows every change of the audio state).
+    private lazy var volumeView = VolumeMenuView(volume: AudioPreview.shared.volume) { AudioPreview.shared.volume = $0 }
+    /// Whether the menu is open: it is not filled again meanwhile (dragging the volume slider
+    /// changes the audio state on every tick), only once it closes.
+    private var outputMenuIsOpen = false
+    private var outputMenuNeedsFilling = false
+
+    func menuWillOpen(_ menu: NSMenu) { outputMenuIsOpen = true }
+
+    func menuDidClose(_ menu: NSMenu) {
+        outputMenuIsOpen = false
+        if outputMenuNeedsFilling { DispatchQueue.main.async { [weak self] in self?.fillOutputMenu() } }
+    }
+
     private func fillOutputMenu() {
         guard let item = outputItem else { return }
+        guard !outputMenuIsOpen else { outputMenuNeedsFilling = true; return }
+        outputMenuNeedsFilling = false
         let preview = AudioPreview.shared
         let chosen = preview.effectiveOutputDevice
         let menu = NSMenu()
+        menu.delegate = self
         let header = NSMenuItem(title: "Audio Output for Listen", action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
+        // The level, as the system's Sound menu has it: a slider between two speaker icons.
+        let volumeItem = NSMenuItem()
+        volumeView.volume = preview.volume
+        volumeItem.view = volumeView
+        menu.addItem(volumeItem)
+        menu.addItem(.separator())
         let defaultItem = NSMenuItem(title: "System Default", action: #selector(outputChosen(_:)), keyEquivalent: "")
         defaultItem.target = self
         defaultItem.state = chosen == nil ? .on : .off
@@ -431,6 +455,50 @@ final class ToolbarController: NSObject, NSToolbarDelegate {
 
     @objc private func outputChosen(_ sender: NSMenuItem) {
         AudioPreview.shared.outputDeviceUID = sender.representedObject as? String
+    }
+}
+
+/// A menu item's view: "Volume", then a slider between a quiet and a loud speaker icon, for the
+/// level Listen plays at (`AudioPreview.volume`). The system's Sound menu has the same shape.
+final class VolumeMenuView: NSView {
+    private let slider = NSSlider(value: 1, minValue: 0, maxValue: 1, target: nil, action: nil)
+    private let changed: (Float) -> Void
+
+    /// The slider's position, set from the audio state when the menu is filled.
+    var volume: Float {
+        get { Float(slider.doubleValue) }
+        set { slider.doubleValue = Double(newValue) }
+    }
+
+    init(volume: Float, changed: @escaping (Float) -> Void) {
+        self.changed = changed
+        super.init(frame: NSRect(x: 0, y: 0, width: 230, height: 24))
+        let label = NSTextField(labelWithString: "Volume")
+        label.font = NSFont.menuFont(ofSize: 0)
+        label.frame = NSRect(x: 14, y: 4, width: 56, height: 17)
+        addSubview(label)
+        let quiet = NSImageView(image: NSImage(systemSymbolName: "speaker.fill", accessibilityDescription: nil) ?? NSImage())
+        quiet.frame = NSRect(x: 70, y: 5, width: 14, height: 14)
+        quiet.contentTintColor = .secondaryLabelColor
+        addSubview(quiet)
+        slider.frame = NSRect(x: 88, y: 2, width: 110, height: 20)
+        slider.controlSize = .small
+        slider.isContinuous = true
+        slider.doubleValue = Double(volume)
+        slider.target = self
+        slider.action = #selector(slid(_:))
+        slider.setAccessibilityLabel("Volume")
+        addSubview(slider)
+        let loud = NSImageView(image: NSImage(systemSymbolName: "speaker.wave.3.fill", accessibilityDescription: nil) ?? NSImage())
+        loud.frame = NSRect(x: 202, y: 5, width: 18, height: 14)
+        loud.contentTintColor = .secondaryLabelColor
+        addSubview(loud)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    @objc private func slid(_ sender: NSSlider) {
+        changed(Float(sender.doubleValue))
     }
 }
 

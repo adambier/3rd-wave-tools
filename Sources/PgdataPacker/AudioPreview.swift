@@ -50,12 +50,21 @@ final class AudioPreview: ObservableObject {
     }
     /// Why playing failed, when it did (shown beside the Listen control).
     @Published private(set) var problem: String?
+    /// The level Listen plays at, 0 to 1 (1 is the cycle at −12 dB, the engine's own headroom);
+    /// the Audio Output menu's slider; kept between sessions.
+    @Published var volume: Float {
+        didSet {
+            UserDefaults.standard.set(Double(volume), forKey: Self.volumeKey)
+            engine.mainMixerNode.outputVolume = volume
+        }
+    }
 
     /// The keys the pitch pop-up offers: C2 (65.4 Hz) to C6 (1,046.5 Hz).
     static let pitches = PianoKey.keys(16...64)
 
     private static let pitchKey = "ListenPitch"
     private static let outputKey = "ListenOutputDeviceUID"
+    private static let volumeKey = "ListenVolume"
     /// The band-limited cycle's length: long enough that reading it with linear interpolation
     /// adds little of its own. Every cycle handed to the voice has exactly this length.
     static let tableSize = 4096
@@ -78,6 +87,8 @@ final class AudioPreview: ObservableObject {
         // A saved pitch outside the pop-up's range (edited defaults) would leave it blank.
         pitch = Self.pitches.contains(savedKey) ? savedKey : PianoKey.defaultPitch
         outputDeviceUID = UserDefaults.standard.string(forKey: Self.outputKey)
+        let savedVolume = UserDefaults.standard.object(forKey: Self.volumeKey) as? Double
+        volume = Float(min(max(savedVolume ?? 1, 0), 1))
         outputDevices = AudioOutputDevices.all()
         deviceListener = AudioOutputDevices.listen { [weak self] in
             guard let self else { return }
@@ -176,6 +187,7 @@ final class AudioPreview: ObservableObject {
             engine.connect(node, to: engine.mainMixerNode, format: format)
             source = node
         }
+        engine.mainMixerNode.outputVolume = volume
         try engine.start()
     }
 
