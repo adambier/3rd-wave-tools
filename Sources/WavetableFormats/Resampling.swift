@@ -5,7 +5,7 @@ import Foundation
 /// Frame sizes change spectrally: each cycle is taken apart into its harmonics and put back
 /// together at the new size, which is exact for a periodic cycle (adapted from ThirdWaveWT's
 /// `CycleResampler`, MIT, © 2026 Adam Arthur Bier). Power-of-two sizes use an FFT; other sizes
-/// (a Serum sidecar allows any size from 32 to 9,999, e.g. 600) are analysed with Bluestein's
+/// (a Serum sidecar allows any size from 32 to 9,999, e.g. 600) are analyzed with Bluestein's
 /// algorithm, which is as fast.
 public enum Resampling {
     /// Resizes one periodic cycle to `size` samples, band-limited (exact for a periodic cycle).
@@ -55,7 +55,7 @@ public enum Resampling {
 
     /// One cycle as its harmonics, for blending cycles by spectrum (``spectralBlend(_:_:t:)``
     /// does one blend; taking each frame's spectrum once, then blending pairs, is quicker when
-    /// several blends are wanted between the same frames) and for synthesising it again at any
+    /// several blends are wanted between the same frames) and for synthesizing it again at any
     /// size, band-limited.
     public struct CycleSpectrum {
         var harmonics: Harmonics
@@ -71,7 +71,7 @@ public enum Resampling {
             let bins = Swift.min(a.harmonics.re.count, b.harmonics.re.count)
             var re = [Double](repeating: 0, count: bins), im = re
             let tt = Double(t)
-            // Below this an amplitude counts as absent (amplitudes here are normalised; a cycle
+            // Below this an amplitude counts as absent (amplitudes here are normalized; a cycle
             // with values within ±1 has harmonics within ±1).
             let silent = 1e-7
             for k in 0..<bins {

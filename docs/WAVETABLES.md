@@ -136,21 +136,23 @@ open), and the samples beside them (multisampled notes, single cycles, looped no
 not. DUNE 3's `.wt` files, and Harmor's and Komplexer's, are in formats of their own; the app
 does not read them.
 
-**An aid for choosing.** When the size is left open, the chooser draws the first frame at each
-size and marks one "likely" when the samples suggest it. The suggestion rests on how alike
-neighbouring frames are: at each candidate size n, the page takes the mean difference between
+**Estimating from the samples.** When the file's contents state no size, the page rates every
+size the length allows by how alike neighboring frames are at that size, takes the best as its
+estimate (the Input column says "estimated"), and falls back to 2,048, the Serum-style size,
+only when no size stands out; the chooser draws the first frame at each size and marks the
+rated size "likely" whenever another is in use. The rating rests on how alike
+neighboring frames are: at each candidate size n, the page takes the mean difference between
 every sample and the one n samples later (frame k against frame k + 1), as a fraction of the
 file's mean level, and the same at a lag of n/2. The frames of a wavetable change little from one
 to the next, so at the right size the first difference is small (at most 0.5) and much
 smaller than the second (at most half of it: the two halves of a cycle differ). A size that is
 too small fails the second test, since a smooth cycle is about as like itself a fragment later as
 half a fragment later; a multiple of the right size passes neither better than the right size
-does, and when several sizes pass, the smallest is marked. The pictures themselves are not
+does, and when several sizes pass, the smallest is taken. The pictures themselves are not
 decisive either: a size twice too large shows the cycle repeated, and one too small shows part
 of it, both of them smooth. A bank of unrelated frames (a WaveEdit bank, say) fits no size; when
-the sizes fit equally badly the chooser says so. For the two lengths left open (8,192 and 16,384
-samples), the likely size is assumed, and the Input column says so; the chooser stays, for another
-choice.
+the sizes fit equally badly the chooser says so. For the two lengths never settled by convention
+(8,192 and 16,384 samples), a file whose samples point to no size waits for a choice.
 
 **Single-cycle files are not listed.** A WAV holding one cycle (for example, a single-cycle
 library's 600-sample cycles, each looped over the whole file) is a building block for a wavetable
@@ -205,7 +207,7 @@ When a destination needs a different number of frames, you choose how:
 - **Original Frames Only** makes no new waveforms. Bringing a table down to fewer frames keeps
   evenly spaced originals, the first and last among them (256 → 64 keeps about every 4th);
   bringing it up to more repeats each original in order (16 → 64 repeats each about 4 times).
-- **Crossfade New Frames** makes each new frame by crossfading its two neighbours, once, when
+- **Crossfade New Frames** makes each new frame by crossfading its two neighbors, once, when
   converting. This is separate from the interpolation a file records, which is whether and how
   a synth interpolates between frames as it plays.
 

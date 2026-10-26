@@ -55,7 +55,7 @@ try unified.serialized().write(to: pgdataURL)
 ```
 
 A program saved by older firmware is converted to the current layout as it is packed, because
-the 3rd Wave's `.pgdata` import does not convert it fully. To recognise Groove Synthesis's
+the 3rd Wave's `.pgdata` import does not convert it fully. To recognize Groove Synthesis's
 factory tables by their content, use ``FactoryLibrary/builtIn``.
 
 ## Unpack a unified program

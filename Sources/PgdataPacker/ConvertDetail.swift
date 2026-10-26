@@ -19,6 +19,13 @@ import PgdataPackerCore
 struct ConvertDetailPane: View {
     @EnvironmentObject var state: AppState
     let selection: Set<UUID>
+    /// The most height the pane may take (what leaves the destination below its minimum).
+    let maxHeight: CGFloat
+    /// The height the content asks for, measured as it lays out.
+    @State private var contentHeight: CGFloat = 0
+
+    /// The least the pane is given, whatever the window's height.
+    static let minimumHeight: CGFloat = 120
 
     /// The selected rows the table shows (a row the filter hides stays selected out of sight,
     /// as in Pack).
@@ -32,23 +39,44 @@ struct ConvertDetailPane: View {
 
     var body: some View {
         let chosen = self.chosen
-        Group {
-            if chosen.count == 1 {
-                // The preview lays itself out in the pane's width (the pictures and the facts
-                // column share it; see ConvertItemPreview) and scrolls when the pane is too short
-                // for it, so nothing is cut off at any size of the window or the split.
-                ScrollView {
+        // The pane is as tall as its content, up to `maxHeight`: a status display, not a pane
+        // to resize or scroll. Only in a short window does the content exceed the room; it then
+        // scrolls, and a fade at the bottom edge shows there is more.
+        let height = min(max(contentHeight, Self.minimumHeight), maxHeight)
+        let overflows = contentHeight > maxHeight + 0.5
+        ScrollView {
+            Group {
+                if chosen.count == 1 {
                     ConvertItemPreview(state: state, item: chosen[0])
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
+                } else {
+                    ConvertPreviewPlaceholder(items: chosen)
                 }
-            } else {
-                ConvertPreviewPlaceholder(items: chosen)
+            }
+            .background(GeometryReader { (geo: GeometryProxy) in
+                Color.clear.preference(key: ConvertDetailHeightKey.self, value: geo.size.height)
+            })
+        }
+        .onPreferenceChange(ConvertDetailHeightKey.self) { (h: CGFloat) in contentHeight = h }
+        .frame(maxWidth: .infinity)
+        .frame(height: height)
+        .background(Color(nsColor: .underPageBackgroundColor))
+        .overlay(alignment: .bottom) {
+            if overflows {
+                LinearGradient(colors: [Color(nsColor: .underPageBackgroundColor).opacity(0), Color(nsColor: .underPageBackgroundColor)],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: 18)
+                    .allowsHitTesting(false)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .underPageBackgroundColor))
     }
+}
+
+/// The height the preview's content lays out at (`ConvertDetailPane`).
+struct ConvertDetailHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 /// With no table or several selected: what to do, and for several, how many are blocked and how
@@ -70,13 +98,13 @@ struct ConvertPreviewPlaceholder: View {
             }
         }
         .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 
 /// For several selected tables: one frame size for those whose file does not state one
-/// (assumed, estimated, or open), from the sizes all of them allow. Select all (⌘A) and a folder
-/// of unlabelled WAVs from one maker is settled in one choice. Tables whose file states a size
+/// (estimated, or open), from the sizes all of them allow. Select all (⌘A) and a folder
+/// of unlabeled WAVs from one maker is settled in one choice. Tables whose file states a size
 /// keep it (the preview's Override Frame Size… is for one table at a time). When no selected
 /// table is adjustable, or no one size fits them all, a line says so instead.
 struct ConvertSeveralFrameSize: View {
@@ -96,7 +124,7 @@ struct ConvertSeveralFrameSize: View {
                 Text("\(CountWords.all(items.count, "tables")) take their frame size from the file.")
                     .font(.caption).foregroundStyle(.secondary)
             } else if sizes.isEmpty {
-                Text("No one frame size fits \(CountWords.all(adjustable.count, "tables").lowercased()) whose size is assumed or estimated; set them in the Input column.")
+                Text("No one frame size fits \(CountWords.all(adjustable.count, "tables").lowercased()) whose size is estimated; set them in the Input column.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
@@ -104,8 +132,8 @@ struct ConvertSeveralFrameSize: View {
                 HStack(spacing: 8) {
                     Text(adjustable.count == items.count
                          ? "Frame size for \(CountWords.all(items.count, "tables").lowercased()):"
-                         : (adjustable.count == 1 ? "Frame size for the one table whose size is assumed or estimated:"
-                                                  : "Frame size for the \(adjustable.count) tables whose size is assumed or estimated:"))
+                         : (adjustable.count == 1 ? "Frame size for the one table whose size is estimated:"
+                                                  : "Frame size for the \(adjustable.count) tables whose size is estimated:"))
                     Picker("Frame size", selection: Binding<Int>(
                         get: { shared ?? 0 },
                         set: { (size: Int) in if size != 0 { state.convertPlan.chooseFrameSize(size, forAll: ids) } })) {
@@ -116,7 +144,7 @@ struct ConvertSeveralFrameSize: View {
                     }
                     .labelsHidden()
                     .fixedSize()
-                    .help("One frame size for the selected tables whose size is assumed or estimated (not stated in the file); only the sizes every one of their lengths allows are offered. Each table’s Input column shows the result and can still be changed on its own.")
+                    .help("One frame size for the selected tables whose size is estimated (not stated in the file); only the sizes every one of their lengths allows are offered. Each table’s Input column shows the result and can still be changed on its own.")
                 }
                 if stated > 0 {
                     Text(stated == 1 ? "1 table takes its frame size from the file and keeps it."
@@ -233,7 +261,7 @@ struct ConvertPreviewFacts: View {
         return "\(frames) frame\(frames == 1 ? "" : "s") × \(ConvertPlan.formatCount(n)) samples"
     }
 
-    /// Where the size comes from; for an assumed size, also where to change it.
+    /// Where the size comes from; for an estimated size, also where to change it.
     private var inputDetail: String {
         item.sizeSource == .guessed || item.sizeSource == .likely
             ? item.basisDescription + " If the frames look or sound wrong, choose another size in the Input column."
@@ -245,14 +273,20 @@ struct ConvertPreviewFacts: View {
             Text("\(item.sourceDescription) · \(item.location.url.path)")
                 .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 .help(([item.location.url.path] + item.alsoIn.map { "Also: " + $0.url.path }).joined(separator: "\n"))
-            VStack(alignment: .leading, spacing: Self.lineSpacing) {
-                ConvertFactBlock(label: "Input", value: inputValue, detail: inputDetail, alert: item.frameSize == nil)
-                if item.sizeIsStated && !item.frameSizeAlternatives.isEmpty {
-                    ConvertSizeOverrideLink(state: state, item: item)
+            // Input and Interpolation side by side: the one is a sentence or two, the other a
+            // word, and a row keeps the pane short.
+            HStack(alignment: .top, spacing: 20) {
+                VStack(alignment: .leading, spacing: Self.lineSpacing) {
+                    ConvertFactBlock(label: "Input", value: inputValue, detail: inputDetail, alert: item.frameSize == nil)
+                    if item.sizeIsStated && !item.frameSizeAlternatives.isEmpty {
+                        ConvertSizeOverrideLink(state: state, item: item)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                ConvertFactBlock(label: "Interpolation", value: item.interpolationDescription, detail: nil, alert: false)
+                    .frame(width: 130, alignment: .topLeading)
+                    .help("Whether a synth interpolates between frames as the table is swept, and by which method: crossfade (it blends neighboring frames) or spectral (it blends their harmonics); none means no interpolation (it steps from frame to frame). Some files say which; most synths set it on the oscillator instead.")
             }
-            ConvertFactBlock(label: "Interpolation", value: item.interpolationDescription, detail: nil, alert: false)
-                .help("Whether a synth interpolates between frames as the table is swept, and by which method: crossfade (it blends neighbouring frames) or spectral (it blends their harmonics); none means no interpolation (it steps from frame to frame). Some files say which; most synths set it on the oscillator instead.")
             ConvertWhatHappens(state: state, item: item)
         }
         .textSelection(.enabled)
@@ -344,7 +378,7 @@ struct ConvertOverviewPair: View {
                         ConvertOverview(frames: result,
                                         caption: "\(plan.preset.shortTitle) · \(result.count) × \(ConvertPlan.formatCount(first.count))",
                                         interpolation: resultInterpolation,
-                                        unstatedLegend: plan.preset.isThirdWave ? "the 3rd Wave sets the interpolation itself" : "interpolation set in the synth",
+                                        unstatedLegend: ConvertOverviewPair.resultLegend(for: plan.preset),
                                         tint: WavetableStackCanvas.resultColor,
                                         position: position)
                     } else if converted == nil {
@@ -354,7 +388,7 @@ struct ConvertOverviewPair: View {
                                      result: result, resultInterpolation: resultInterpolation,
                                      resultTitle: plan.preset.shortTitle, position: position)
                 }
-                .help("The table’s frames, front (first) to back (last): the input as read, and what the destination gets, read back from the file this page would write. Solid lines are the frames in the file (at most 64 are drawn, 24 when the interpolation is drawn between them, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum’s or Vital’s own morphs. The Frame slider below sweeps through the table; the third picture draws the cycle there.")
+                .help("The table’s frames, front (first) to back (last): the input as read, and what the destination gets, read back from the file this page would write. Solid lines are the frames in the file (at most 64 are drawn, 24 when the interpolation is drawn between them, each reduced to the width of the picture). Colored lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum’s or Vital’s own morphs. The Frame slider below sweeps through the table; the third picture draws the cycle there.")
                 ConvertSweepControls(position: $position, preview: preview,
                                      playing: result != nil ? "the \(plan.preset.shortTitle) output" : "the input",
                                      cycle: { cycleToPlay(source: source.frames, result: result, resultInterpolation: resultInterpolation) })
@@ -363,6 +397,17 @@ struct ConvertOverviewPair: View {
             .onChange(of: result) { (r: [[Float]]?) in updatePlaying(source: source.frames, result: r, resultInterpolation: resultInterpolation) }
             .onChange(of: item.id) { _ in updatePlaying(source: source.frames, result: result, resultInterpolation: resultInterpolation) }
             .onDisappear { preview.stop() }
+        }
+    }
+
+    /// The words after "Frames in the file" under the result when its file records no
+    /// interpolation: for the 3rd Wave, what its wavetable smoothing does by default (checked on
+    /// an 8M; FORMATS.md section 5.1); for the others, that the synth sets it.
+    static func resultLegend(for preset: OutputPreset) -> String {
+        switch preset {
+        case .thirdWaveP: return "wavetable smoothing is off by default on the 3rd Wave, so it steps between them"
+        case .thirdWaveU: return "wavetable smoothing is on by default on the 3rd Wave, so it blends between them"
+        default: return "interpolation set in the synth"
         }
     }
 
@@ -382,7 +427,7 @@ struct ConvertOverviewPair: View {
 }
 
 /// Under the pictures: the Frame slider, the Listen button, and the pitch pop-up (piano keys
-/// with their numbers and frequencies). `playing` names what Listen plays, for its tip; `cycle`
+/// with their frequencies). `playing` names what Listen plays, for its tip; `cycle`
 /// gives the cycle to play when Listen is pressed.
 struct ConvertSweepControls: View {
     @Binding var position: Double
@@ -416,7 +461,7 @@ struct ConvertSweepControls: View {
                 .pickerStyle(.menu)
                 .controlSize(.small)
                 .fixedSize()
-                .help("The pitch Listen plays at: a piano key with its number (A4 = key 49 = 440 Hz) and frequency")
+                .help("The pitch Listen plays at: a piano key and its frequency (A4 is 440 Hz)")
             }
             if let problem = preview.problem {
                 Text(problem).font(.caption).foregroundStyle(.red)
@@ -426,7 +471,7 @@ struct ConvertSweepControls: View {
     }
 }
 
-/// One stacked-frames picture, its caption, and a legend with colour swatches for its lines.
+/// One stacked-frames picture, its caption, and a legend with color swatches for its lines.
 /// The picture is 130 points high (the pane scrolls when that is too much) and as wide as it
 /// is given; the caption and legend wrap rather than being cut off. The frame at `position`
 /// (the Frame slider's place) is highlighted.
@@ -437,7 +482,7 @@ struct ConvertOverview: View {
     let interpolation: Interpolation?
     /// The words after "Frames in the file" when `interpolation` is nil.
     let unstatedLegend: String
-    /// The table's colour: the source's (`WavetableStackCanvas.sourceColor`) or the result's
+    /// The table's color: the source's (`WavetableStackCanvas.sourceColor`) or the result's
     /// (`resultColor`), the same in the cycle picture beside them.
     let tint: Color
     /// The Frame slider's place, 0…1.
@@ -477,11 +522,11 @@ struct ConvertPreviewPending: View {
 }
 
 /// The cycle at the Frame slider's place, drawn large: the source's in the stored-frame
-/// colour and the result's over it in the accent colour, both to one scale (full scale, or the
+/// color and the result's over it in the accent color, both to one scale (full scale, or the
 /// louder of the two when a table goes beyond it, so a table that was turned down shows
 /// smaller). Under it, which frames each comes from ("Frame 12 of 64"; "Between frames 12 and
 /// 13 (crossfade)"), from `WavetableSketch.cycle(at:in:interpolation:)`. (The pink line in the
-/// stacks marks the slider's place; here the two tables need two colours of their own.)
+/// stacks marks the slider's place; here the two tables need two colors of their own.)
 struct ConvertSweepView: View {
     let source: [[Float]]
     let sourceInterpolation: Interpolation?
@@ -521,7 +566,7 @@ struct ConvertSweepView: View {
 }
 
 /// Two cycles over each other, to one scale: the source's and, when there is one, the result's,
-/// in the colours of their stacks (`WavetableStackCanvas.sourceColor`, `resultColor`).
+/// in the colors of their stacks (`WavetableStackCanvas.sourceColor`, `resultColor`).
 struct SweepCycleCanvas: View {
     let source: [Float]
     let result: [Float]?
@@ -531,7 +576,7 @@ struct SweepCycleCanvas: View {
             let peak = max(1, (source + (result ?? [])).reduce(Float(0)) { max($0, abs($1)) })
             let amplitude = (size.height / 2 - 2) / CGFloat(peak)
             let base = size.height / 2
-            // The centre line, for the scale.
+            // The center line, for the scale.
             var axis = Path()
             axis.move(to: CGPoint(x: 0, y: base)); axis.addLine(to: CGPoint(x: size.width, y: base))
             context.stroke(axis, with: .color(Color.secondary.opacity(0.3)), lineWidth: 0.5)
@@ -572,7 +617,7 @@ struct ConvertOverviewLegend: View {
     }
 }
 
-/// A short line of colour and a few words, which wrap in a narrow pane.
+/// A short line of color and a few words, which wrap in a narrow pane.
 struct ConvertSwatch: View {
     let color: Color
     let text: String
@@ -587,33 +632,33 @@ struct ConvertSwatch: View {
 /// Stored frames drawn as polylines stacked diagonally, the first in front, the farthest
 /// fading, each reduced to about a value per two points of width. Stepped tables show the
 /// frames as separate slices with nothing between. With a crossfade or spectral
-/// interpolation, thinner lines in a second colour fill each gap (up to five per gap), the
+/// interpolation, thinner lines in a second color fill each gap (up to five per gap), the
 /// stored frames thin to 24 and the stack is drawn closer together, so the fill reads as a
 /// surface; the picture stays within about 150 lines. With `highlight` set (0 front to 1
 /// back, the Frame slider's place), the cycle at that depth is drawn over the stack in
-/// the highlight colour: a stored frame, or the in-between the interpolation gives there.
+/// the highlight color: a stored frame, or the in-between the interpolation gives there.
 ///
 /// Two canvases, one over the other: the stack (`StackLinesCanvas`, which SwiftUI redraws only
-/// when the frames, interpolation, or colour change) and the highlight, which alone follows the
+/// when the frames, interpolation, or color change) and the highlight, which alone follows the
 /// slider, so dragging it costs one line, not the 150 behind it.
 struct WavetableStackCanvas: View {
     let frames: [[Float]]
     let interpolation: Interpolation?
-    /// The colour of the stored frames: the table's own, so the source and the result keep
-    /// their colours across the pictures (`sourceColor`, `resultColor`).
+    /// The color of the stored frames: the table's own, so the source and the result keep
+    /// their colors across the pictures (`sourceColor`, `resultColor`).
     var tint: Color = WavetableStackCanvas.sourceColor
     var highlight: Double? = nil
 
-    /// The source's colour, in its stack and in the cycle picture.
+    /// The source's color, in its stack and in the cycle picture.
     static let sourceColor = Color.primary
-    /// The result's colour, in its stack and in the cycle picture.
+    /// The result's color, in its stack and in the cycle picture.
     static let resultColor = Color.accentColor
-    /// The colour of crossfade in-betweens: the table's own, fainter.
+    /// The color of crossfade in-betweens: the table's own, fainter.
     static func crossfadeColor(_ tint: Color) -> Color { tint.opacity(0.55) }
-    /// The colour of spectral in-betweens, whichever table they belong to.
+    /// The color of spectral in-betweens, whichever table they belong to.
     static let spectralColor = Color.purple
-    /// The colour of the highlighted cycle: one the page uses for nothing else (orange is for
-    /// warnings, purple for spectral blends, the accent colour for the result).
+    /// The color of the highlighted cycle: one the page uses for nothing else (orange is for
+    /// warnings, purple for spectral blends, the accent color for the result).
     static let highlightColor = Color.pink
 
     var body: some View {

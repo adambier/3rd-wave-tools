@@ -80,7 +80,7 @@ struct LogBar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                // A labelled button rather than a bare arrow, so it is clear what it opens.
+                // A labeled button rather than a bare arrow, so it is clear what it opens.
                 Button { state.showLog.toggle() } label: {
                     Label(state.showLog ? "Hide Log" : "Show Log", systemImage: state.showLog ? "chevron.down" : "chevron.right")
                 }
@@ -300,8 +300,8 @@ enum AlertPresenter {
 
     /// Lays out a report (see `ReportText`): paragraphs separated by blank lines, headings (lines
     /// ending in ":") in semibold with the list under them as indented bullets. An item's name
-    /// (a file or table) is in semibold label colour and its explanation (after the tab) in the
-    /// secondary label colour after a dash, so the names stand out as the list is scanned; the
+    /// (a file or table) is in semibold label color and its explanation (after the tab) in the
+    /// secondary label color after a dash, so the names stand out as the list is scanned; the
     /// copy button copies the same text plain.
     private static func styled(_ text: String) -> NSAttributedString {
         let size = NSFont.systemFontSize

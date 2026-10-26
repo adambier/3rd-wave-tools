@@ -64,7 +64,7 @@ enum Panels {
     }
 
     /// What `write` did: how many files it wrote (and which, as indices into the list given), and
-    /// what went wrong; nil when cancelled.
+    /// what went wrong; nil when canceled.
     struct WriteResult {
         var written: Int
         var writtenIndices: Set<Int> = []
@@ -77,7 +77,7 @@ enum Panels {
     /// whether to keep both (the new copies get " 2", " 3"…; the default, since nothing is lost
     /// by it), replace those files, or cancel. The files are then written on a background queue:
     /// `progress` gets (the file being written, how many) on the main thread before each one, and
-    /// `completion` the result on the main thread, or nil when cancelled. Write failures are
+    /// `completion` the result on the main thread, or nil when canceled. Write failures are
     /// collected and reported once, not one alert per file.
     static func write(_ files: [(name: String, data: Data)], into folder: URL,
                       progress: @escaping (Int, Int) -> Void = { _, _ in },

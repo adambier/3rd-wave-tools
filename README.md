@@ -15,7 +15,7 @@ confirmed on the 3rd Wave and what is inferred.
 
 **Building something for the 3rd Wave?** The file formats are (unofficially) documented as far as
 they're understood, and the libraries behind this app, test files, and a developer tool are free to
-use under the MIT licence: see [For developers](#for-developers).
+use under the MIT license: see [For developers](#for-developers).
 
 ![The Pack page: the programs added on the left; for the selected program, what each oscillator source will play and whether it is embedded; below, the wavetables and multisamples added and the slots they go to](docs/pack-window.png)
 
@@ -308,13 +308,15 @@ The Input column says where each table's frame size comes from. A size the file'
 (a chunk, a header, or a format that fixes it) is taken as it is. One the page estimated, from a
 `_wt<N>` tag in the file name, a Serum `.txt` beside the file, or markers, is the default of a
 choice: click it to see every size the length allows, each drawn so the one that cuts the frames
-in the right place is visible. When the file states nothing, the page assumes 2,048 samples per
-frame, the Serum-style size, and says so. Two lengths are left open, since they are also well-known
-tables at other sizes: 8,192 samples (64 × 128, a PPG-style table, or 4 × 2,048) and 16,384 (64 ×
-256, a WaveEdit bank, or 8 × 2,048); for those the page assumes the size whose frames are most
-alike from one to the next, marked "likely" in the chooser, or waits for a choice when no size
-stands out. With several tables selected, the preview offers one frame size for those whose size
-is assumed or estimated, from the sizes all of them allow (⌘A selects every table). For the rare
+in the right place is visible. When the file states nothing, the page estimates the size from
+the samples: the size at which the frames are most alike from one to the next, as a wavetable's
+are (see [`docs/WAVETABLES.md`](docs/WAVETABLES.md#3-how-a-frame-size-is-decided)); when no size stands out, it takes 2,048
+samples per frame, the Serum-style size. Either way the column says "estimated", and the chooser
+offers the other sizes the length allows. Two lengths are never settled by convention, since they
+are also well-known tables at other sizes: 8,192 samples (64 × 128, a PPG-style table, or 4 ×
+2,048) and 16,384 (64 × 256, a WaveEdit bank, or 8 × 2,048); for those the page waits for a choice
+when the samples do not decide. With several tables selected, the preview offers one frame size
+for those whose size is estimated, from the sizes all of them allow (⌘A selects every table). For the rare
 WAV or FLAC whose chunk states the wrong size, **Override Frame Size…** in the preview opens the
 same chooser. The counts above the table jump to the first table that still needs a size or cannot
 be split into frames; **Show only tables that can't be converted yet** filters to them, and the
@@ -349,14 +351,14 @@ Shown when a choice applies to the destination and the tables (the captions coun
 - When the destination needs a different number of frames, **Original Frames Only** keeps evenly
   spaced originals (the first and last among them) for fewer frames and repeats each original in
   order for more, making no new waveforms; **Crossfade New Frames** makes each new frame by
-  crossfading its neighbours.
+  crossfading its neighbors.
 - **Interpolation**, for formats whose file records it: an interpolation method, crossfade or
-  spectral, or none (no interpolation: the destination steps from frame to frame). The Interpolation
-  column shows what each table's own file specifies; by default each table keeps that, and a
-  table whose file says nothing gets crossfade.
+  spectral, or none (no interpolation: the destination steps from frame to frame). The preview
+  shows what each table's own file specifies; by default each table keeps that, and a table
+  whose file says nothing gets crossfade.
 - Tonverk's frame size, and the PPG's four standard waveforms for P tables.
 - For a 3rd Wave destination, **Also add the .wt files to the Pack page**, to embed them in
-  programs; both Convert buttons honour it.
+  programs; both Convert buttons honor it.
 
 #### Preview
 
@@ -365,7 +367,7 @@ selection: the input and the result stacked frame by frame, with the interpolati
 frames where a file records one; its file, its frame size and what that rests on, its
 interpolation, and what converting changes. The **Frame** slider
 sweeps through the table and draws the cycle there large, input and result together. **Listen** plays that cycle, following the slider, at the pitch chosen
-beside it (a piano key with its number; A3, 220 Hz, to start) through the device chosen under
+beside it (a piano key and its frequency; A3, 220 Hz, to start) through the device chosen under
 **Audio Output**, the speaker icon at the right of the toolbar.
 
 #### Converting
@@ -408,7 +410,7 @@ Checked on an 8M (OS 2.0d), and most points on a 24M as well
 > **Empty the `PROGRAMS` folder before exporting.** An export onto an existing file of the same name
 > has been observed not to shorten it (once, on a 24M), so a longer old file leaves its tail behind
 > the new program. (The app
-> recognises such a file by its header, drops the leftover values when packing or unpacking it,
+> recognizes such a file by its header, drops the leftover values when packing or unpacking it,
 > and says so.)
 >
 > **Leave only one `.pgdata` in `PROGRAMS` when using Import unified program data file.** It takes
@@ -417,7 +419,7 @@ Checked on an 8M (OS 2.0d), and most points on a 24M as well
 ## For developers
 
 pgdata Packer is one tool; a major aim of this project is to help make it easier to build others,
-in any language. Everything here is open source under the MIT licence.
+in any language. Everything here is open source under the MIT license.
 
 - **The format reference.** [`docs/FORMATS.md`](docs/FORMATS.md) describes the structure of the
   3rd Wave's four file formats, for someone implementing them for the first time, and how the 3rd
@@ -430,7 +432,7 @@ in any language. Everything here is open source under the MIT licence.
   of what it should parse to, so a new reader or writer can be checked without the 3rd Wave at hand.
   They are synthetic, so they can be used freely.
 - **A Swift library.** `PgdataFormats` reads and writes every format byte for byte, packs and
-  unpacks `.pgdata` files, converts older programs as the 3rd Wave does, and recognises Groove
+  unpacks `.pgdata` files, converts older programs as the 3rd Wave does, and recognizes Groove
   Synthesis's factory wavetables. It depends only on Foundation, and its tests run on macOS, Linux,
   and Windows. Add it to a Swift package with
   `.package(url: "https://github.com/adambier/3rd-wave-tools", from: "1.0.5")` and the product
@@ -503,7 +505,7 @@ factory tables instead of embedding them, so its output differs there by design.
 
 ## Tests on the 3rd Wave
 
-Besides the import behaviour above, name lengths and the 3rd Wave's own export file names were
+Besides the import behavior above, name lengths and the 3rd Wave's own export file names were
 checked on the 3rd Wave. The conversion of older programs was worked out from 599 programs
 bulk-imported and exported again on an 8M and a 24M, and programs converted and packed by this
 app were imported on both. The 3rd Wave's exports were also

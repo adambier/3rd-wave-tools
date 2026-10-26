@@ -5,7 +5,7 @@ import PgdataFormats   // SwiftPM build; absent in the app’s single-module swi
 
 // Decision logic behind pgdata Packer, kept free of UI code so it can be unit-tested and reused by
 // other front ends (a command-line tool, or a GUI on another platform). These are the app's own
-// policies; the file formats and the 3rd Wave's behaviour are in PgdataFormats. The API here may
+// policies; the file formats and the 3rd Wave's behavior are in PgdataFormats. The API here may
 // change between versions more than PgdataFormats's does.
 //
 //   ContentFile     a .wt or .bin the user added, with the slot it is assigned to
@@ -22,7 +22,7 @@ public struct ContentFile: Identifiable, Equatable {
     /// Slot the user assigned it to (pre-filled from the filename when it names one).
     public var slot: SourceRef?
     /// Identity of the content (a hash of its values), computed once: it is compared on every
-    /// plan, and computing it means re-serialising the whole table.
+    /// plan, and computing it means re-serializing the whole table.
     public let fingerprint: UInt64
     /// Things about the content worth a warning when it is packed (see `Multisample.problems`
     /// and `WavetableFile.peak`), computed once.
@@ -34,7 +34,7 @@ public struct ContentFile: Identifiable, Equatable {
         case let .wavetable(w):
             fingerprint = w.fingerprint
             let peak = w.peak
-            problems = peak > 1.0001 ? ["its samples reach ±\(String(format: "%.2f", peak)); the 3rd Wave’s own tables stay within ±1, so the file may be damaged or not normalised"] : []
+            problems = peak > 1.0001 ? ["its samples reach ±\(String(format: "%.2f", peak)); the 3rd Wave’s own tables stay within ±1, so the file may be damaged or not normalized"] : []
         case let .multisample(m):
             fingerprint = m.fingerprint
             problems = m.problems
@@ -529,7 +529,7 @@ public struct UnpackPlan {
         /// The name generated for the file, which an emptied name field falls back to.
         public var defaultFileName: String = ""
         /// For a wavetable: the content's fingerprint and name, so the plan can be refreshed
-        /// without re-serialising the table.
+        /// without re-serializing the table.
         public var fingerprint: UInt64? = nil
         public var contentName: String? = nil
         /// Something wrong with the content worth showing (see `ContentFile.problems`).
@@ -570,7 +570,7 @@ public struct UnpackPlan {
     }
 
     /// The plan with its wavetable descriptions and factory-duplicate flags recomputed, without
-    /// re-serialising anything. File names and Write choices are kept, except that a factory
+    /// re-serializing anything. File names and Write choices are kept, except that a factory
     /// duplicate's Write follows `skipFactoryDuplicates` (every item's does with `resetWrite`).
     public func refreshed(factory: FactoryLibrary, skipFactoryDuplicates: Bool, resetWrite: Bool = false) -> UnpackPlan {
         var plan = self

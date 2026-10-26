@@ -121,7 +121,7 @@ final class ReadingTests: XCTestCase {
 
     func testFingerprintMatchesFactoryLibrary() throws {
         // FactoryLibrary computes its fingerprints from .wt files with WavetableFile.fingerprint;
-        // a library built from the fixture, filed as slot P05, must recognise the reader's fingerprint.
+        // a library built from the fixture, filed as slot P05, must recognize the reader's fingerprint.
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ReadingTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -405,7 +405,7 @@ final class ReadingTests: XCTestCase {
 
         let s = try readOne(wavFile([ramp(3 * 2048)]), "s.wav")
         XCTAssertEqual(s.frameSize, 2048)
-        XCTAssertEqual(s.frameSizeBasis, "file length only (2,048 per frame assumed, the Serum-style size; the file does not specify a frame size)")
+        XCTAssertEqual(s.frameSizeBasis, "file length only (2,048 per frame by convention, the Serum-style size; the file does not specify a frame size)")
         XCTAssertEqual(s.frameSizeEvidence, .length)
         XCTAssertEqual(s.candidateFrameSizes, [64, 128, 256, 512, 1024])
 

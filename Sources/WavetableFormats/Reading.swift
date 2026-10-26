@@ -28,7 +28,7 @@ public enum WavetableReader {
     /// not divide into frames). `sidecarText` is the contents of a Serum-style `.txt` sidecar for a
     /// WAV or FLAC file, if one exists.
     ///
-    /// - Throws: ``WavetableError`` when the file is recognisably a wavetable format (a Surge
+    /// - Throws: ``WavetableError`` when the file is recognizably a wavetable format (a Surge
     ///   `.wt`, a 3rd Wave `.wt` or `.pgdata`, a WAV, or a FLAC file) but is damaged
     ///   (``WavetableError/Kind/damaged``), is a WAV in a form this reader does not decode
     ///   (``WavetableError/Kind/unsupported``), or is marked as a wavetable whose stated frame

@@ -179,9 +179,6 @@ final class AppState: ObservableObject {
     /// takes (the pages set it from their drop targets).
     @Published var dragIsOverPage = false
 
-    /// The height of the Wavetables page's preview pane, which the user drags; remembered between
-    /// sessions (see `ConvertPaneDivider`).
-    @Published var convertPreviewHeight: CGFloat = 320 { didSet { saveSettings() } }
     /// The writer's results for the tables the Wavetables page previews, kept between passes;
     /// computed on a background queue (see `convertPreview(_:)`).
     let convertPreviews = ConvertPreviewCache()
@@ -225,10 +222,9 @@ final class AppState: ObservableObject {
         if let raw = defaults.string(forKey: "convertFrameCountPolicy"), let p = FrameCountPolicy(rawValue: raw) {
             convertPlan.options.frameCountPolicy = p
         }
-        let height = defaults.double(forKey: "convertPreviewHeight")
-        if height >= 170 { convertPreviewHeight = CGFloat(height) }
-        // Settings from versions that asked for the factory .wt files and tracked the 3rd Wave's slots.
-        for key in ["factoryFolders", "embedFactory", "synthHasAllFactory"] { defaults.removeObject(forKey: key) }
+        // Settings from versions that asked for the factory .wt files and tracked the 3rd Wave's
+        // slots, and from 1.1 builds whose preview pane was dragged to a height.
+        for key in ["factoryFolders", "embedFactory", "synthHasAllFactory", "convertPreviewHeight"] { defaults.removeObject(forKey: key) }
         loading = false
         Publishers.Merge3($programs.map { _ in () }, $contentFiles.map { _ in () }, $contentNames.map { _ in () })
             .sink { [weak self] in self?.planCache = [:] }
@@ -246,7 +242,6 @@ final class AppState: ObservableObject {
         defaults.set(nameCleaner.fixedSpellings, forKey: "cleanFixedSpellings")
         defaults.set(convertPlan.preset.rawValue, forKey: "convertPreset")
         defaults.set(convertPlan.options.frameCountPolicy.rawValue, forKey: "convertFrameCountPolicy")
-        defaults.set(Double(convertPreviewHeight), forKey: "convertPreviewHeight")
     }
 
     // MARK: Messages
@@ -497,16 +492,22 @@ final class AppState: ObservableObject {
         }
     }
 
-    func removeContent(_ id: UUID) {
-        guard let index = contentFiles.firstIndex(where: { $0.id == id }) else { return }
-        let file = contentFiles[index], name = contentNames[id]
-        contentFiles.remove(at: index)
-        contentNames[id] = nil
-        registerUndo("Remove File") { [weak self] in
+    func removeContent(_ id: UUID) { removeContent([id]) }
+
+    /// Removes added wavetable and multisample files from the Pack page (undoable; the files
+    /// themselves are not touched).
+    func removeContent(_ ids: Set<UUID>) {
+        let removed = contentFiles.enumerated().filter { ids.contains($0.element.id) }
+        guard !removed.isEmpty else { return }
+        let names = contentNames.filter { ids.contains($0.key) }
+        contentFiles.removeAll { ids.contains($0.id) }
+        for id in ids { contentNames[id] = nil }
+        let name = "Remove \(removed.count == 1 ? "File" : "Files")"
+        registerUndo(name) { [weak self] in
             guard let self else { return }
-            self.contentFiles = Self.putBack([(offset: index, element: file)], into: self.contentFiles)
-            self.contentNames[id] = name
-            self.registerUndo("Remove File") { [weak self] in self?.removeContent(id) }
+            self.contentFiles = Self.putBack(removed, into: self.contentFiles)
+            for (id, newName) in names { self.contentNames[id] = newName }
+            self.registerUndo(name) { [weak self] in self?.removeContent(ids) }
         }
     }
 
@@ -667,7 +668,7 @@ final class AppState: ObservableObject {
         }, completion: { [weak self] (result: Panels.WriteResult?) in
             guard let self else { return }
             self.working = nil
-            guard let result else { self.note("Packing cancelled; nothing written."); return }
+            guard let result else { self.note("Packing canceled; nothing written."); return }
             let failed = failed + result.failed.map { ReportText.item(splitting: $0) }
             // The report's sections cover the files that were really written.
             var packedPlans: [PackPlan] = []
@@ -731,17 +732,39 @@ final class AppState: ObservableObject {
         unpacks[i].plan.items[j].write = write
     }
 
-    /// Takes an edited file name when the user finishes editing it. The name is cleaned the way
-    /// generated ones are ("/" and the like become "_"); an empty one falls back to the generated
-    /// name. Returns the name as stored, for the field to show.
+    /// Keeps an edited file name on the Unpack page: `stem` is the part before the suffix, which
+    /// stays the file's own (a `.pro` is written as a `.pro`); it is cleaned the way generated
+    /// names are ("/" and the like become "_"), and an empty stem brings the generated name
+    /// back. Undoable ("Undo Rename"). Returns the name kept.
     @discardableResult
-    func commitUnpackFileName(_ unpackID: UUID, _ itemID: UUID, _ text: String) -> String {
+    func commitUnpackFileName(_ unpackID: UUID, _ itemID: UUID, stem: String) -> String {
         guard let i = unpacks.firstIndex(where: { $0.id == unpackID }),
-              let j = unpacks[i].plan.items.firstIndex(where: { $0.id == itemID }) else { return text }
-        let name = text.trimmingCharacters(in: .whitespaces).isEmpty
-            ? unpacks[i].plan.items[j].defaultFileName : OutputNames.sanitize(text)
-        if unpacks[i].plan.items[j].fileName != name { unpacks[i].plan.items[j].fileName = name }
+              let j = unpacks[i].plan.items.firstIndex(where: { $0.id == itemID }) else { return stem }
+        let item = unpacks[i].plan.items[j]
+        let suffix = Self.suffix(of: item.defaultFileName)
+        var trimmed = stem.trimmingCharacters(in: .whitespaces)
+        if !suffix.isEmpty, trimmed.lowercased().hasSuffix(suffix.lowercased()) {
+            trimmed = String(trimmed.dropLast(suffix.count)).trimmingCharacters(in: .whitespaces)   // typed again: once is enough
+        }
+        let name = trimmed.isEmpty ? item.defaultFileName : OutputNames.sanitize(trimmed) + suffix
+        setUnpackFileName(unpackID, itemID, name)
         return name
+    }
+
+    /// ".pro", ".wt", ".bin": the suffix of a generated file name, with its dot; empty without one.
+    static func suffix(of fileName: String) -> String {
+        let ext = (fileName as NSString).pathExtension
+        return ext.isEmpty ? "" : "." + ext
+    }
+
+    /// Sets a file name on the Unpack page, undoable.
+    private func setUnpackFileName(_ unpackID: UUID, _ itemID: UUID, _ name: String) {
+        guard let i = unpacks.firstIndex(where: { $0.id == unpackID }),
+              let j = unpacks[i].plan.items.firstIndex(where: { $0.id == itemID }),
+              unpacks[i].plan.items[j].fileName != name else { return }
+        let before = unpacks[i].plan.items[j].fileName
+        unpacks[i].plan.items[j].fileName = name
+        registerUndo("Rename") { [weak self] in self?.setUnpackFileName(unpackID, itemID, before) }
     }
 
     func removeUnpacks(_ ids: Set<UUID>) {
@@ -814,7 +837,7 @@ final class AppState: ObservableObject {
         }, completion: { [weak self] (result: Panels.WriteResult?) in
             guard let self else { return }
             self.working = nil
-            guard let result else { self.note("Unpacking cancelled; nothing written."); return }
+            guard let result else { self.note("Unpacking canceled; nothing written."); return }
             var msg = "Unpacked \(count) file\(count == 1 ? "" : "s") into \u{201C}\(folder.lastPathComponent)\u{201D}: \(result.written) file\(result.written == 1 ? "" : "s") written."
             if !result.failed.isEmpty { msg += "\n\nNot written:\n" + result.failed.map { ReportText.item(splitting: $0) }.joined(separator: "\n") }
             self.note(msg + " (\(folder.path))")
@@ -878,6 +901,24 @@ final class AppState: ObservableObject {
             c.problems.forEach { note("Could not read \($0)") }
             alertMessage = "Some files could not be read.\n\n" + c.problems.prefix(8).map { ReportText.item(splitting: $0) }.joined(separator: "\n")
                 + (c.problems.count > 8 ? "\n\n…and \(c.problems.count - 8) more (see the log)." : "")
+        }
+    }
+
+    /// Gives a table on the Wavetables page a new name, which goes on the converted file (the
+    /// source file is not changed); the file's own name clears it. Undoable ("Undo Rename").
+    func renameConvertItem(_ id: UUID, to name: String) {
+        guard let i = convertPlan.items.firstIndex(where: { $0.id == id }) else { return }
+        let before = convertPlan.items[i].newName
+        convertPlan.rename(id, to: name)
+        guard convertPlan.items[i].newName != before else { return }
+        registerUndo("Rename") { [weak self] in
+            guard let self, let j = self.convertPlan.items.firstIndex(where: { $0.id == id }) else { return }
+            let undone = self.convertPlan.items[j].newName
+            self.convertPlan.items[j].newName = before
+            self.registerUndo("Rename") { [weak self] in
+                guard let self, let k = self.convertPlan.items.firstIndex(where: { $0.id == id }) else { return }
+                self.renameConvertItem(id, to: undone ?? self.convertPlan.items[k].table.name)
+            }
         }
     }
 

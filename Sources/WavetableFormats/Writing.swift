@@ -227,7 +227,7 @@ public enum WavetableWriter {
             switch (options.frameCountPolicy, m < n) {
             case (.pickEvenly, true): how = "keeping evenly spaced original frames, the first and last among them"
             case (.pickEvenly, false): how = "repeating frames at evenly spaced positions (no new frames)"
-            case (.interpolate, _): how = "crossfading neighbouring frames at evenly spaced positions, keeping the first and last"
+            case (.interpolate, _): how = "crossfading neighboring frames at evenly spaced positions, keeping the first and last"
             }
             notes.append("Frame count changed from \(grouped(n)) to \(grouped(m)) (\(reason) frames), \(how).")
         }
@@ -327,7 +327,7 @@ public enum WavetableWriter {
 /// What converting a table for a destination will do, from the table's frame size, frame count,
 /// peak, and interpolation alone (``WavetableWriter/plan(for:preset:options:)``). The writer
 /// follows it step by step, so a tool can show it before converting; the writer's own notes,
-/// afterwards, say what was done.
+/// afterward, say what was done.
 public struct WritePlan: Equatable, Sendable {
     /// Whether the table is turned down to fit the destination.
     public enum Scaling: Equatable, Sendable {
@@ -434,11 +434,11 @@ public extension OutputPreset {
     /// Where the preset's sources are incomplete or unconfirmed, what that leaves open (shown
     /// with the destination's sources; the Wavetables page warns in the open only when the
     /// tables to convert bring one of these about, see `ConvertPlan.caveat(for:)`); nil when the
-    /// sources settle its behaviour. From the open questions in docs/WAVETABLES.md.
+    /// sources settle its behavior. From the open questions in docs/WAVETABLES.md.
     var caveat: String? {
         switch self {
         case .wav2048:
-            return "Vital’s behaviour is taken from its public source code; the current release may differ. Pigments reads no metadata, so the interpolation saved in the file does not reach it."
+            return "Vital’s behavior is taken from its public source code; the current release may differ. Pigments reads no metadata, so the interpolation saved in the file does not reach it."
         case .miniFreak:
             return "How MiniFreak V reduces 2,048-sample frames to 512, and how it treats fewer than 64 frames, is not documented."
         case .phasePlant:

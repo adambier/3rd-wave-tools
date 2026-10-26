@@ -28,8 +28,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     /// The window's undo manager is the app state's, so Edit › Undo and Redo (sent to the first
-    /// responder and on to the window) undo removals from the pages' lists.
-    func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? { appState?.undoManager }
+    /// responder and on to the window) undo removals and renames in the pages' lists. While a
+    /// text field is being edited, the field editor asks the window too, and gets a manager of
+    /// its own: typing is undone within the field, and a committed name is undone as a rename,
+    /// not as keystrokes in a field that is gone. The text manager is emptied when editing
+    /// begins, so one field's typing is never undone in another.
+    func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? {
+        window.firstResponder is NSText ? textUndoManager : appState?.undoManager
+    }
+    private let textUndoManager = UndoManager()
+    private var editingObserver: NSObjectProtocol?
+
+    override init() {
+        super.init()
+        editingObserver = NotificationCenter.default.addObserver(forName: NSControl.textDidBeginEditingNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.textUndoManager.removeAllActions()
+        }
+    }
 
     /// Files dropped on the app's icon (in the Dock or the Finder). The app claims no file type
     /// (see the Info.plist in make-app.sh), so this is the one way the Finder hands it files.
@@ -60,7 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc func showAbout(_ sender: Any?) {
-        // Centred paragraphs with a blank line's space between them.
+        // Centered paragraphs with a blank line's space between them.
         let para = NSMutableParagraphStyle()
         para.alignment = .center
         para.paragraphSpacing = NSFont.smallSystemFontSize
@@ -68,7 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let credits = NSMutableAttributedString(
             string: "Packs and unpacks unified program data (.pgdata) files for the Groove Synthesis 3rd Wave, and converts wavetables to and from its formats.\n"
                 + "Not affiliated with or endorsed by Groove Synthesis.\n"
-                + "Source: \(source)",   // the licence is the panel’s copyright line (NSHumanReadableCopyright)
+                + "Source: \(source)",   // the license is the panel’s copyright line (NSHumanReadableCopyright)
             attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
                          .foregroundColor: NSColor.secondaryLabelColor,
                          .paragraphStyle: para])
@@ -136,22 +151,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 /// (see the `controls` of PackView, UnpackView, and ConvertView) or while a pack, unpack, or
 /// conversion is running.
 final class MenuActions: NSObject, NSMenuItemValidation {
-    /// What Edit › Delete sends down the responder chain; the pages' lists answer it with
-    /// `.onCommand(MenuActions.removeSelected)` by removing their selected rows (undoable), and
-    /// answer with nil while nothing is selected, which disables the item.
-    static let removeSelected = NSSelectorFromString("removeSelected:")
-    /// What the Return key sends down the responder chain while a list has the focus (see
-    /// `installReturnKey`); the lists answer it with `.onCommand(MenuActions.renameSelected)` by
-    /// editing the selected row's name, as the Finder does, and with nil when no one row is
-    /// selected. There is no menu item for it: Return is the Finder's way, not a menu shortcut.
-    static let renameSelected = NSSelectorFromString("renameSelected:")
-
     /// Edit › Delete (the Delete key, as the HIG has it). The item is this object's, not the
     /// first responder's, so that it can stay out of the way of text: while a text field is
     /// being edited the item is disabled and the key deletes a character, as it should; with a
-    /// list focused the item is enabled when the list answers `removeSelected:`.
+    /// list focused, the item is enabled when that list has rows selected (`ListCommands`,
+    /// keyed by the table view that is the first responder), and removes them (undoable).
     @objc func deleteSelection(_ sender: Any?) {
-        _ = NSApp.sendAction(Self.removeSelected, to: nil, from: self)
+        ListCommands.shared.handlers(forFirstResponderOf: NSApp.keyWindow)?.delete?()
     }
 
     private var textIsBeingEdited: Bool {
@@ -166,18 +172,20 @@ final class MenuActions: NSObject, NSMenuItemValidation {
         super.init()
     }
 
-    /// Turns a plain Return (or keypad Enter) pressed while a list or table has the focus into
-    /// `renameSelected:` down the responder chain. The event is swallowed only when a list
-    /// answers; otherwise it goes on as before. Text being edited keeps its Return (the first
-    /// responder is then the field editor, not the table), as do buttons and pop-ups.
+    /// A plain Return (or keypad Enter) pressed while a list has the focus edits the selected
+    /// row's name, as in the Finder (`ListCommands`; there is no menu item for it, since Return is
+    /// the Finder's way, not a menu shortcut). The event is swallowed only when the list has a
+    /// rename to do (one row selected); otherwise it goes on as before. Text being edited keeps
+    /// its Return (the first responder is then the field editor, not the table), as do buttons
+    /// and pop-ups.
     func installReturnKey() {
         returnKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { (event: NSEvent) -> NSEvent? in
             let returnKey: UInt16 = 36, keypadEnter: UInt16 = 76
             guard event.keyCode == returnKey || event.keyCode == keypadEnter,
                   event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty,
                   event.window === NSApp.keyWindow,
-                  NSApp.keyWindow?.firstResponder is NSTableView,
-                  NSApp.sendAction(MenuActions.renameSelected, to: nil, from: nil) else { return event }
+                  let rename = ListCommands.shared.handlers(forFirstResponderOf: NSApp.keyWindow)?.rename else { return event }
+            rename()
             return nil
         }
     }
@@ -266,14 +274,14 @@ final class MenuActions: NSObject, NSMenuItemValidation {
             menuItem.title = appState.showLog ? "Hide Log" : "Show Log"
             return true
         case #selector(deleteSelection(_:)):
-            return !textIsBeingEdited && NSApp.target(forAction: Self.removeSelected, to: nil, from: self) != nil
+            return !textIsBeingEdited && ListCommands.shared.handlers(forFirstResponderOf: NSApp.keyWindow)?.delete != nil
         default:
             return true
         }
     }
 }
 
-/// The window's toolbar: one control, the page switcher, centred. It follows `AppState.section`
+/// The window's toolbar: one control, the page switcher, centered. It follows `AppState.section`
 /// (which the View menu also sets) and sets it.
 final class ToolbarController: NSObject, NSToolbarDelegate {
     private static let pageItem = NSToolbarItem.Identifier("page")
@@ -310,7 +318,7 @@ final class ToolbarController: NSObject, NSToolbarDelegate {
         return toolbar
     }
 
-    // The page switcher in the centre; at the trailing end, while the Wavetables page is shown,
+    // The page switcher in the center; at the trailing end, while the Wavetables page is shown,
     // the audio output for its Listen control. The output item is there on every page then: a
     // toolbar whose items come and go with the page is what the HIG advises against, and the
     // device is one setting for the app.
@@ -467,9 +475,9 @@ private func buildMainMenu(appDelegate: AppDelegate, menuActions: MenuActions) -
     editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
     editMenu.addItem(.separator())
     // Delete, on the Delete key, as the HIG's Edit menu has it (`MenuActions.deleteSelection`
-    // validates it and passes it to the focused list, which answers only while rows are selected;
-    // removals are undoable). An earlier ⌘⌫ was Finder's Move to Trash shortcut, not the Edit
-    // menu's.
+    // validates it and passes it to the focused list through `ListCommands`, which has a
+    // handler only while rows are selected; removals are undoable). An earlier ⌘⌫ was Finder's
+    // Move to Trash shortcut, not the Edit menu's.
     let deleteItem = editMenu.addItem(withTitle: "Delete", action: #selector(MenuActions.deleteSelection(_:)), keyEquivalent: "\u{8}")
     deleteItem.keyEquivalentModifierMask = []
     deleteItem.target = menuActions
@@ -532,10 +540,14 @@ menuActions.installReturnKey()
 let toolbarController = ToolbarController(appState: appState)
 application.mainMenu = buildMainMenu(appDelegate: appDelegate, menuActions: menuActions)
 
-// Wide enough for the program list and every column of the Pack and Wavetables tables, but never
-// larger than the screen.
-let visible = NSScreen.main?.visibleFrame.size ?? NSSize(width: 1512, height: 900)
-let defaultSize = NSSize(width: min(1560, visible.width - 24), height: min(900, visible.height - 40))
+// The default size is the one that fits the smallest display the app is expected on, a 13-inch
+// MacBook with the Dock showing (about 1,470 × 860 points of visible frame), and the pages are
+// laid out to give their best at that size, the Wavetables table giving way to its right pane
+// (Adam, 2026-10-26). On a larger display the window opens at the same size and can be
+// enlarged; on a smaller one it is capped to the screen. The minimum is set in ContentView
+// (1,000 × 700).
+let visible = NSScreen.main?.visibleFrame.size ?? NSSize(width: 1470, height: 860)
+let defaultSize = NSSize(width: min(1440, visible.width - 24), height: min(860, visible.height - 40))
 let window = NSWindow(
     contentRect: NSRect(origin: .zero, size: defaultSize),
     styleMask: [.titled, .closable, .miniaturizable, .resizable],

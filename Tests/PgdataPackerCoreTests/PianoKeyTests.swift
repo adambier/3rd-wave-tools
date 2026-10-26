@@ -30,7 +30,7 @@ final class PianoKeyTests: XCTestCase {
     }
 
     func testTextAndClamping() {
-        XCTAssertEqual(PianoKey.a440.label, "A4 · key 49 · 440 Hz")
+        XCTAssertEqual(PianoKey.a440.label, "A4 · 440 Hz")
         XCTAssertEqual(PianoKey.middleC.frequencyText, "261.6 Hz")
         XCTAssertEqual(PianoKey(1).frequencyText, "27.5 Hz")
         XCTAssertEqual(PianoKey(0).number, 1)

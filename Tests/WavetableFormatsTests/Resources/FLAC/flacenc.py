@@ -1,6 +1,6 @@
 """A small FLAC encoder (RFC 9639) for making test files that ffmpeg cannot: 8/12/20/32-bit,
 wasted bits, variable block sizes, Rice2 and escaped partitions, chosen stereo modes, custom
-metadata blocks, and missing or wrong MD5 signatures. Not optimised; correctness only."""
+metadata blocks, and missing or wrong MD5 signatures. Not optimized; correctness only."""
 import hashlib, struct
 
 class Bits:

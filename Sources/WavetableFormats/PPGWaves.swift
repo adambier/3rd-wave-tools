@@ -3,7 +3,7 @@ import Foundation
 /// The PPG's four standard waveforms, which positions 60–63 of the 3rd Wave's PPG-derived P tables
 /// hold: a triangle, a narrow pulse, a square, and a sawtooth (FORMATS.md section 5.1).
 ///
-/// The shapes here are idealised, 128 samples each, the same as the fixture generator in the
+/// The shapes here are idealized, 128 samples each, the same as the fixture generator in the
 /// tests: they have not been compared sample by sample with the factory tables' waves 60–63, whose
 /// exact shapes and phases may differ.
 public enum PPGStandardWaves {
@@ -18,7 +18,7 @@ public enum PPGStandardWaves {
     public static let narrowPulse: [Float] = wave { x in x < 0.125 ? 1 : -1 }
     /// The square (position 62): +1 for the first half, −1 for the second.
     public static let square: [Float] = wave { x in x < 0.5 ? 1 : -1 }
-    /// The sawtooth (position 63): a ramp from −1 rising towards +1.
+    /// The sawtooth (position 63): a ramp from −1 rising toward +1.
     public static let sawtooth: [Float] = wave { x in 2 * x - 1 }
 
     /// The four waves in position order (60, 61, 62, 63).

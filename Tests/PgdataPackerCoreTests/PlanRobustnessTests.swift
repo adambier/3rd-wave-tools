@@ -3,7 +3,7 @@ import XCTest
 @testable import PgdataPackerCore
 
 /// How `ContentFile` and the pack and unpack plans behave on mistyped, implausible, and
-/// unstorable content: a plain reason or warning, never a crash. (The readers' own behaviour on
+/// unstorable content: a plain reason or warning, never a crash. (The readers' own behavior on
 /// damaged files is `RobustnessTests` in PgdataFormatsTests.)
 final class PlanRobustnessTests: XCTestCase {
     private func error(_ body: () throws -> Any) -> String {
@@ -22,9 +22,9 @@ final class PlanRobustnessTests: XCTestCase {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("pgdata-robust-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
-        let mislabelled = dir.appendingPathComponent("U50_x.bin")
-        try wt.write(to: mislabelled)
-        XCTAssertThrowsError(try ContentFile.load(mislabelled))
+        let mislabeled = dir.appendingPathComponent("U50_x.bin")
+        try wt.write(to: mislabeled)
+        XCTAssertThrowsError(try ContentFile.load(mislabeled))
         let other = dir.appendingPathComponent("notes.txt")
         try Data("hello".utf8).write(to: other)
         XCTAssertTrue(error { try ContentFile.load(other) }.contains("not a wavetable (.wt) or multisample (.bin)"))

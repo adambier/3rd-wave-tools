@@ -77,7 +77,7 @@ public enum SourceRef: Hashable, Comparable, CustomStringConvertible, Sendable {
         }
     }
 
-    /// The seven analog-modelled waves, as the 3rd Wave labels and names them (read on an 8M,
+    /// The seven analog-modeled waves, as the 3rd Wave labels and names them (read on an 8M,
     /// 2026-10-22). The wave offset knob sweeps A05 from white through pink to red noise and A06
     /// from white through blue to violet.
     public static let analogNames = ["Sawtooth", "Square", "Triangle", "Sine", "Supersaw", "Pink noise", "Blue noise"]

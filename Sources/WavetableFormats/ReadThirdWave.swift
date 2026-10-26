@@ -7,7 +7,7 @@ import PgdataFormats
 // read with PgdataFormats, and each table's fingerprint is computed exactly as FactoryLibrary
 // computes its factory fingerprints (WavetableFile.fingerprint: FNV-1a 64 of all the values as
 // float32, the U table's mipmap chain included), so FactoryLibrary.builtIn.slot(withFingerprint:)
-// recognises factory tables.
+// recognizes factory tables.
 
 extension WavetableReader {
     /// The text of a 3rd Wave `.wt` (without a UTF-8 byte-order mark), or nil when `bytes` does not

@@ -59,7 +59,7 @@ bank 3"), or share only your own programs and exports.
   anything new.
 - **`WavetableFormats`** reads, resizes, and writes wavetables in other synths' formats. It
   depends only on Foundation and `PgdataFormats`, has no UI, and must build on the same three
-  platforms. Each destination's `basis` names what its behaviour rests on, and its `testedIn`
+  platforms. Each destination's `basis` names what its behavior rests on, and its `testedIn`
   lists only the synths it has been tested in.
 - **`PgdataPackerCore`** holds the app's own decisions (pack, unpack, and convert plans, file
   names, Clean Up Names), also without UI, so that other front ends can share them. **`PgdataPacker`** is the
@@ -75,9 +75,10 @@ The README, FORMATS.md, the documentation, and the app's text follow a few conve
 - "3rd Wave", never "Third Wave"; "Groove Synthesis" in full.
 - "the 3rd Wave" or "your 3rd Wave", not "the synth" and never "a 3rd Wave" standing alone
   ("a 3rd Wave program" is fine).
-- Standing behaviour in the present tense; single observations as "has been observed to …".
+- Standing behavior in the present tense; single observations as "has been observed to …".
 - Inferences said to be inferences.
-- The serial (Oxford) comma.
+- The serial (Oxford) comma. American spelling ("color", "behavior", "recognize"), in code
+  comments too.
 - Plain, short words; one term for one thing (table, frame, frame size, interpolation,
   destination); nothing said twice in one view, report, or paragraph; counts that read naturally
   ("Both tables", "1 change", never "All 2 tables" or "1 changes"); labels that say exactly what
@@ -94,6 +95,6 @@ conventions above hold. Say in the pull request if a sentence's meaning changed.
 
 Fork the repository, make your change on a branch, and open a pull request that says what changed
 and, for format findings, what it rests on. Run the tests first. Contributions are accepted under
-the project's MIT licence.
+the project's MIT license.
 
 This project is not affiliated with or endorsed by Groove Synthesis.

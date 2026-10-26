@@ -11,7 +11,7 @@ this file; `docs/FORMATS.md` and `docs/WAVETABLES.md` remain the authorities on 
 |---|---|
 | Repository | `adambier/3rd-wave-tools` (GitHub), Swift package `3rd-wave-tools` |
 | What it is | pgdata Packer, a macOS app for the Groove Synthesis 3rd Wave, plus the three libraries and the developer tool behind it |
-| Licence | MIT (`LICENSE`); not affiliated with or endorsed by Groove Synthesis |
+| License | MIT (`LICENSE`); not affiliated with or endorsed by Groove Synthesis |
 | Formats handled | `.pro` (program), `.wt` (wavetable), `.bin` (multisample), `.pgdata` (unified program); other synths' wavetable files (WAV, FLAC, Surge `.wt`) |
 | Language, tooling | Swift, `swift-tools-version:5.9`; Swift 5.9 or later (CI: the `swift:6.0-noble` image on Linux, Swift 6.2 on Windows, the runner's Xcode on macOS); XCTest |
 | App platform | macOS 13 or later (`platforms: [.macOS(.v13)]`); SwiftUI plus AppKit; no Xcode project |
@@ -40,7 +40,7 @@ targets: [
 
 | Product | Take it for | Stability |
 |---|---|---|
-| `PgdataFormats` | Reading, writing, packing, unpacking, and converting the 3rd Wave's files; recognising factory tables | Versioned with the app; kept stable from `v1.0.5` on |
+| `PgdataFormats` | Reading, writing, packing, unpacking, and converting the 3rd Wave's files; recognizing factory tables | Versioned with the app; kept stable from `v1.0.5` on |
 | `WavetableFormats` | Finding wavetables in WAV, FLAC, Surge `.wt`, and 3rd Wave files; resizing; writing for other synths | Provisional in 1.1 (new; may change until a 1.1.x release after more testing) |
 | `PgdataPackerCore` | Pack, unpack, and convert plans, output names, Clean Up Names, report text | May change between versions |
 
@@ -220,7 +220,8 @@ Don't:
   wavetable slots and analog waves only).
 - Don't guess a frame size silently: a `FoundTable` with `frameSize == nil` is settled by the
   user from `candidateFrameSizes`, or by `FrameSizeFit`'s likely size only where the Input column
-  says "assumed" (`ConvertPlan.Item.frameSize`, `sizeQualifier`); never by 2,048 alone.
+  says "estimated" (`ConvertPlan.Item.estimatedFrameSize`, `sizeQualifier`); 2,048, the Serum-style
+  convention, is the estimate only when the samples point to no size.
 - Don't commit files from other people's sound sets, factory banks, or synth exports; tests build
   their inputs synthetically (see the headers of `CorpusCaseTests.swift` and `ReadingTests.swift`).
 - Don't import a module a test target does not depend on in `Package.swift` (section 4): a
@@ -269,7 +270,7 @@ PgdataPackerCore (`Sources/PgdataPackerCore/`):
 | `NameCleaner` | `NameCleaner.swift` | Clean Up Names proposals |
 | `OutputPreset` display extensions | `DestinationInfo.swift` | What the Wavetables page says about each destination: `Group` (with `title`, `presets`), `group`, `shortTitle`, `specLine`, `distinction` |
 | `ConvertReport`, `ReportText` | `ConvertReport.swift` | The Wavetables page's report after converting (alert title and text, log text); the item-line form every report uses |
-| `FrameSizeFit`, `WavetableSketch`, `CountWords`, `PianoKey` | own files | Frame-size heuristic ("likely"; assumed only when nothing states a size), preview pictures and the cycle at a sweep position, report phrasing, the Listen control's piano keys |
+| `FrameSizeFit`, `WavetableSketch`, `CountWords`, `PianoKey` | own files | Frame-size heuristic (the estimate when the file states no size; 2,048 is the fallback), preview pictures and the cycle at a sweep position, report phrasing, the Listen control's piano keys |
 
 App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle, Help links),
 `AppState.swift` (all state, `ObservableObject`, main thread; `Section` = Pack, Unpack, Wavetables),
@@ -279,30 +280,42 @@ App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle
 writing with progress), `SearchField.swift` (an `NSSearchField` for SwiftUI), `AudioPreview.swift`
 (the Listen control's engine: `AVAudioEngine` with a source node whose `Voice` owns three fixed
 buffers, band-limiting through `Resampling.bandLimitedCycle`, and the CoreAudio output-device list).
-The Wavetables page is laid out as the other two: the table on the left, and on the right the
-selected table's preview (`ConvertDetailPane`) over the destination pane; its buttons are Pack's
-(Remove Selected, Remove All…, **Convert Selected…**, **Convert All…**, the last two through
-`AppState.convertTables(_:)`), and the 3rd Wave options' checkbox "Also add the .wt files to the
-Pack page" (`AppState.convertAddsToPack`) is honoured by both. `ConvertView.swift` also holds
-`TableReveal` (scrolls the Wavetables table to a row through the `NSTableView` behind SwiftUI's
-`Table`; the summary strip's blocked counts jump to `ConvertPlan.firstItem(with:)`) and
-`ConvertPaneDivider` (the preview's height, `AppState.convertPreviewHeight`); `ConvertDetail.swift`
-holds the preview: `ConvertSweepControls`
+The Wavetables page is laid out as the other two: the table on the left (status, Name, Input,
+Output, Changes; what a file states about interpolation is in the preview and the Options box's
+"existing" marks), and on the right the selected table's preview (`ConvertDetailPane`, as tall as
+its content up to what leaves the destination `ConvertDestinationPane.minimumHeight`, with a fade
+when it must scroll) over the destination pane; its buttons are Pack's (Remove Selected, Remove
+All…, **Convert Selected…**, **Convert All…**, the last two through `AppState.convertTables(_:)`),
+and the 3rd Wave options' checkbox "Also add the .wt files to the Pack page"
+(`AppState.convertAddsToPack`) is honored by both. The pages are laid out to give their best at
+the default window size, which fits a 13-inch display (1,440 × 860; `main.swift`), the table
+giving way to the right pane. `ConvertView.swift` also holds `TableReveal` (scrolls the Wavetables
+table to a row through the `NSTableView` behind SwiftUI's `Table`; the summary strip's blocked
+counts jump to `ConvertPlan.firstItem(with:)`); `ConvertDetail.swift` holds the preview:
+`ConvertSweepControls`
 (Frame slider, Listen/Stop, pitch pop-up over `AudioPreview.pitches`, C2–C6), `ConvertSweepView`,
 `ConvertSizeOverrideLink` (Override Frame Size…, over `Item.frameSizeAlternatives`), and
 `ConvertSeveralFrameSize` (one frame size for several selected tables). `main.swift` also holds
 `MenuActions` (the File, Edit, and View menus' targets and validation; Edit › Delete, on the Delete
-key, is disabled while text is edited and otherwise reaches the focused list through
-`.onCommand(MenuActions.removeSelected)`; removals are undoable through `AppState.undoManager`,
-which the window returns; a plain Return while a list has the focus becomes `renameSelected:`
-through an `NSEvent` local monitor, and the lists answer it by editing the selected row's name,
-Pack's by putting the cursor in the program's name field) and `ToolbarController` (the unified toolbar whose segmented control
+key, is disabled while text is edited and otherwise removes the focused list's selected rows; a
+plain Return while a list has the focus edits the selected row's name, Pack's list putting the
+cursor in the program's name field, through an `NSEvent` local monitor) and `ToolbarController`
+(the unified toolbar whose segmented control
 switches pages, with the audio output menu at its trailing end on every page). The Wavetables page
 is shown only while View › Show Under-Development Features is on (`AppState.showsUnderDevelopmentFeatures`,
 `Section.isUnderDevelopment`, `availableSections`), and carries an orange under-development notice
 while `ConvertPlan.conversionUnderDevelopment` is true (any `OutputPreset.testedIn` empty). Scroll bars follow the system setting; menus carry
 the shortcuts (⌘O, ⇧⌘E, ⌘1–⌘3, ⌥⌘L, ⌫, ⌘A, ⌘Z); the Info.plist declares the file types with
 `LSHandlerRank` None, so files open by Dock-icon drop without the app claiming any type.
+`ListCommands.swift` is how Delete and Return reach a list: each `List` or `Table` registers its
+closures with `.listCommands(delete:rename:)`, whose bridge view finds the `NSTableView` behind the
+list and keys them by it, and `MenuActions` looks up the window's first responder (SwiftUI's
+`.onCommand` on a `List` or `Table` did not answer `NSApp.target(forAction:)` on macOS 13). Every
+list that holds added items (Pack's programs and its added files, Unpack's `.pgdata` files, the
+Wavetables table) removes by selection, with no per-row button; Unpack's file table lists outputs
+and removes nothing (Write unchecks one). Removals and committed renames are undoable through
+`AppState.undoManager`, which the window returns; while a text field is edited the window returns
+a separate manager for the typing (`AppDelegate.windowWillReturnUndoManager`).
 
 ## 8. Where to look (task to files)
 
@@ -321,12 +334,12 @@ the shortcuts (⌘O, ⇧⌘E, ⌘1–⌘3, ⌥⌘L, ⌫, ⌘A, ⌘Z); the Info.p
 | Frame size decisions | `ReadWAV.swift`, `FrameSizeEvidence`, `FrameSizeFit.swift`, `ConvertPlan.Item.frameSize`/`frameSizeChoices`/`frameSizeAlternatives`; WAVETABLES.md section 3 | `ReadingTests`, `ReviewFixTests`, `FrameSizeFitTests`, `ReviewFixPlanTests`, `ConvertPlanStateTests` |
 | Listen, pitch, audio output | `AudioPreview.swift`, `PianoKey.swift`, `ToolbarController` in `main.swift` (`NSMenuToolbarItem`) | `PianoKeyTests`, `ResamplingTests` (`bandLimitedCycle`); the engine itself only by running the app |
 | Preview pictures, Frame slider, sweep | `ConvertDetail.swift`, `WavetableSketch.swift` | `WavetableSketchTests`, `WavetableSketchInterpolationTests`, `ResamplingTests` (`spectralBlend`) |
-| Remove, Edit › Delete, Undo | `MenuActions.deleteSelection` in `main.swift`; `AppState.undoManager`, `removePrograms`/`removeContent`/`removeUnpacks`/`removeConvertItems`, `removeAll*`; the lists answer `removeSelected:` only while rows are selected | no tests; build and use the app |
-| Return to rename, drop hint, first table selected after a drop | `MenuActions.installReturnKey`/`renameSelected` in `main.swift`, the lists' `.onCommand(MenuActions.renameSelected)`, `AppState.focusProgramName`; `AppState.dragIsOverPage` and `LogBar`; `AppState.convertSelectionRequest` | no tests; build and use the app |
+| Remove, Edit › Delete, Undo | `ListCommands.swift` (`.listCommands(delete:rename:)` on each list), `MenuActions.deleteSelection` in `main.swift`; `AppState.undoManager`, `removePrograms`/`removeContent`/`removeUnpacks`/`removeConvertItems`, `removeAll*`, `renameConvertItem`, `commitUnpackFileName` | no tests; build and use the app |
+| Return to rename, drop hint, first table selected after a drop | `MenuActions.installReturnKey` in `main.swift` and the lists' `rename` handlers, `AppState.focusProgramName`; `AppState.dragIsOverPage` and `LogBar`; `AppState.convertSelectionRequest` | no tests; build and use the app |
 | Showing or hiding the Wavetables page | `AppState.showsUnderDevelopmentFeatures`, `MenuActions.toggleUnderDevelopmentFeatures`, `ToolbarController.fillSegments`/`showOutputItem` | no tests; build and use the app |
-| Pack page behaviour (what each source will be, status lines, slot estimate) | `PackPlan` in `Workbench.swift` | `WorkbenchTests`; then `PackView.swift`, `AppState.swift` |
-| Unpack page behaviour | `UnpackPlan` in `Workbench.swift` | `WorkbenchTests`; then `UnpackView.swift` |
-| Wavetables page behaviour | `ConvertPlan.swift`, `ConvertReport.swift` | `ConvertPlanTests`, `ConvertReportTests`; then `ConvertView.swift`, `ConvertDetail.swift`, `ConvertDestination.swift` |
+| Pack page behavior (what each source will be, status lines, slot estimate) | `PackPlan` in `Workbench.swift` | `WorkbenchTests`; then `PackView.swift`, `AppState.swift` |
+| Unpack page behavior | `UnpackPlan` in `Workbench.swift` | `WorkbenchTests`; then `UnpackView.swift` |
+| Wavetables page behavior | `ConvertPlan.swift`, `ConvertReport.swift` | `ConvertPlanTests`, `ConvertReportTests`; then `ConvertView.swift`, `ConvertDetail.swift`, `ConvertDestination.swift` |
 | Clean Up Names | `NameCleaner.swift` | `WorkbenchTests`; `NameCleanupSheet.swift` |
 | Menus, About, Help links, updater | `main.swift` | `make-app.sh` (Info.plist keys) |
 | Developer checks against real files | `Sources/tw3pg/main.swift` | README "Verification" |
@@ -373,9 +386,11 @@ No tests cover the SwiftUI views; a UI change is verified by building and using 
 - "3rd Wave", never "Third Wave"; "Groove Synthesis" in full; "the 3rd Wave" or "your 3rd Wave",
   not "the synth" and never "a 3rd Wave" standing alone ("tests on the 3rd Wave", not "on a 3rd
   Wave"; as an adjective, "a 3rd Wave program" is fine).
-- Standing behaviour in the present tense; single observations as "has been observed to …";
+- Standing behavior in the present tense; single observations as "has been observed to …";
   inferences said to be inferences; never claim more than the evidence supports.
 - The serial (Oxford) comma. "e.g.," or "for example" before parenthetical examples.
+- American spelling throughout ("color", "behavior", "recognize", "gray", "license"), in code
+  comments and identifiers too.
 - No third-party sound-set, program, or author names in README, docs, or app text (code comments,
   tests, and screenshots may carry them).
 - App vocabulary: add (files), pack, embed, unpack, convert; 3rd Wave functions in bold in
@@ -463,7 +478,8 @@ credentials that are not in the repository.
   destinations have been tested in their synths.
 - Listen and the preview's spectral lines use `Resampling.spectralBlend`, an approximation: Serum's
   and Vital's morph methods are not published. `FrameSizeFit` is a heuristic (frames alike at lag
-  n, unlike at n/2); the Input column says "assumed" wherever it decided.
+  n, unlike at n/2); the Input column says "estimated" wherever it decided, and the samples
+  outrank the Serum-style convention (Adam, 2026-10-26).
 - The preview writes the converted bytes and reads them back (`ConvertPreviewCache`), on a
   background queue since 1.1 (`result(_:in:ready:)`; the result's picture shows a spinner until it
   is in). The read-back is kept because it is what the picture claims to show (the file the page
@@ -487,9 +503,9 @@ credentials that are not in the repository.
 | P table | PPG-style wavetable: 64 frames of 128 samples, each point stored with its difference to the next (16,384 values) |
 | U table | Wavetable of 64 frames of 1,024 samples followed by its mipmap chain (131,072 values) |
 | Frame | One cycle of a waveform; a wavetable is a sequence of frames of equal length. The 3rd Wave's own terms (its wave offset and wave envelope, the manual's counts of waves) and WaveEdit's say "wave" for the same thing; this project says frame throughout, and keeps "wave" for the analog oscillator's waves, for the PPG's four standard waveforms, and in names (Wave Maker, the `WAVES` folder) |
-| Frame size | Samples per frame (128, 1,024, 2,048, …); for WAV and FLAC sources it is settled by metadata, file name, sidecar, markers, or length (`FrameSizeEvidence`), or by the samples' fit (`FrameSizeFit`, said to be assumed), or left to the user |
+| Frame size | Samples per frame (128, 1,024, 2,048, …); for WAV and FLAC sources it is settled by metadata, file name, sidecar, markers, or length (`FrameSizeEvidence`), or by the samples' fit (`FrameSizeFit`, said to be estimated; 2,048 when they point to no size), or left to the user |
 | Mipmap chain | The band-limited copies of a U table's 64 frames at 512, 256, 128, 64, and 64 samples (65,536 values) that follow the frames in a `.wt` |
-| Fingerprint | 64-bit FNV-1a of a table's values as little-endian float32 (`fnv1a64`); how factory tables and duplicates are recognised |
+| Fingerprint | 64-bit FNV-1a of a table's values as little-endian float32 (`fnv1a64`); how factory tables and duplicates are recognized |
 | Preset (`OutputPreset`) | A conversion destination (3rd Wave P or U table, Serum-style WAV, MiniFreak V, Tonverk, Phase Plant, Surge XT, WaveEdit) |
 | Plan | A `PgdataPackerCore` value describing what a page will do (`PackPlan`, `UnpackPlan`, `ConvertPlan`) |
 | Layout | A program's values per part, floats per part, and globals (current: 181/137/182); older layouts are converted |

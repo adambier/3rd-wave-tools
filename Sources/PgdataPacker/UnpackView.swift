@@ -51,8 +51,8 @@ struct UnpackView: View {
                             .tag(u.id)
                         }
                     }
-                    // Edit › Delete answers only while rows are selected (nil disables the item).
-                    .onCommand(MenuActions.removeSelected, perform: selection.isEmpty ? nil : { state.removeUnpacks(selection); selection = [] })
+                    // Edit › Delete acts only while rows are selected (nil disables the item).
+                    .listCommands(delete: selection.isEmpty ? nil : { state.removeUnpacks(selection); selection = [] })
                     .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(state.unpacks.map(\.id)) }
                     .frame(minWidth: 230, idealWidth: 270, maxWidth: 420)
                     .onChange(of: selection) { s in
@@ -126,7 +126,13 @@ struct UnpackDetail: View {
                 }
             }
             BeforeImportBox(items: items)
-            Text(several ? "Files these will produce" : "Files this will produce").font(.headline)
+            HStack(alignment: .firstTextBaseline) {
+                Text(several ? "Files these will produce" : "Files this will produce").font(.headline)
+                Spacer()
+                // Names are plain text until edited, as in the Finder, so the heading says how.
+                Text("Double-click a name, or select its row and press Return, to edit it")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
             // Write first (ticks in one line at the left), Contents last (the widest column). The
             // Program column only with several files; macOS 13 has no conditional table columns,
             // so there are two tables. A double-click on a row (Return with the row selected, or
@@ -147,7 +153,9 @@ struct UnpackDetail: View {
                     } primaryAction: { (ids: Set<UUID>) in
                         rename(ids)
                     }
-                    .onCommand(MenuActions.renameSelected, perform: tableSelection.count == 1 ? { rename(tableSelection) } : nil)
+                    // Return edits the file name of the one selected row; nothing is removed here
+                    // (the rows are the files to be written, and Write unchecks one).
+                    .listCommands(delete: nil, rename: tableSelection.count == 1 ? { rename(tableSelection) } : nil)
                     .onCommand(#selector(NSResponder.selectAll(_:))) { tableSelection = Set(rows.map(\.id)) }
                 } else {
                     Table(rows, selection: $tableSelection) {
@@ -162,7 +170,9 @@ struct UnpackDetail: View {
                     } primaryAction: { (ids: Set<UUID>) in
                         rename(ids)
                     }
-                    .onCommand(MenuActions.renameSelected, perform: tableSelection.count == 1 ? { rename(tableSelection) } : nil)
+                    // Return edits the file name of the one selected row; nothing is removed here
+                    // (the rows are the files to be written, and Write unchecks one).
+                    .listCommands(delete: nil, rename: tableSelection.count == 1 ? { rename(tableSelection) } : nil)
                     .onCommand(#selector(NSResponder.selectAll(_:))) { tableSelection = Set(rows.map(\.id)) }
                 }
             }
@@ -211,21 +221,21 @@ struct BeforeImportBox: View {
         let samples = multisamples
         if samples.count == 1 {
             let s = samples[0]
-            out.append(("Import multisample \(quoted(s.name)) into slot \(s.slot) before importing the .pro, "
-                        + "or the program will play whatever is in \(s.slot).", false))
+            out.append(("When loading these files on the 3rd Wave, import multisample \(quoted(s.name)) into slot \(s.slot) "
+                        + "before importing the .pro, or the program will play whatever is in \(s.slot).", false))
         } else if samples.count > 1 {
             let list = samples.map { "\($0.slot) \(quoted($0.name))" }.joined(separator: ", ")
-            out.append(("Import these multisamples into their slots before importing the .pro files, "
-                        + "or the programs will play whatever is there: \(list).", false))
+            out.append(("When loading these files on the 3rd Wave, import these multisamples into their slots before "
+                        + "importing the .pro files, or the programs will play whatever is there: \(list).", false))
         }
-        // Different multisamples labelled with the same slot cannot all go in it.
+        // Different multisamples labeled with the same slot cannot all go in it.
         var bySlot: [String: [String]] = [:]
         for s in samples { bySlot[s.slot, default: []].append(s.name) }
         for slot in bySlot.keys.sorted() {
             guard let names = bySlot[slot], names.count > 1 else { continue }
             let list = names.map { quoted($0) }.joined(separator: " and ")
             let all = names.count == 2 ? "both" : "all"
-            out.append(("\(list) are \(all) labelled \(slot), but only one can be in that slot. "
+            out.append(("\(list) are \(all) labeled \(slot), but only one can be in that slot. "
                         + "Whichever is there is what every program using \(slot) plays.", true))
         }
         var refs: [SourceRef] = []
@@ -292,9 +302,10 @@ struct WriteToggleCell: View {
 }
 
 /// The file name: text until its row is double-clicked (or selected and Return pressed), then a
-/// field (as in Finder). The field is edited freely and the name cleaned when editing ends, so
-/// typing a space does not have it trimmed away under the cursor. Return or leaving the field
-/// keeps the name; Escape drops the edit.
+/// field (as in Finder) for the part before the suffix, with the suffix fixed beside it (a
+/// `.pro` is written as a `.pro`, whatever the name). The field is edited freely and the name
+/// cleaned when editing ends, so typing a space does not have it trimmed away under the cursor.
+/// Return or leaving the field keeps the name; Escape drops the edit.
 struct FileNameCell: View {
     @ObservedObject var state: AppState
     let unpackID: UUID
@@ -304,32 +315,45 @@ struct FileNameCell: View {
     @FocusState private var focused: Bool
 
     private var editing: Bool { renaming == file.id }
+    /// ".pro", ".wt", or ".bin", from the generated name (the edited one always ends the same way).
+    private var suffix: String { AppState.suffix(of: file.defaultFileName) }
+    /// The name without its suffix, for the field.
+    private var stem: String {
+        file.fileName.lowercased().hasSuffix(suffix.lowercased()) && !suffix.isEmpty
+            ? String(file.fileName.dropLast(suffix.count)) : file.fileName
+    }
 
     var body: some View {
         if editing {
-            TextField("File name", text: $text)
-                .labelsHidden()
-                .textFieldStyle(.roundedBorder)
-                .focused($focused)
-                .onAppear {
-                    text = file.fileName
-                    // The field takes focus once it is in the window, not while it is being added.
-                    DispatchQueue.main.async { focused = true }
+            HStack(spacing: 2) {
+                TextField("File name", text: $text)
+                    .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
+                    .focused($focused)
+                    .onAppear {
+                        text = stem
+                        // The field takes focus once it is in the window, not while it is being added.
+                        DispatchQueue.main.async { focused = true }
+                    }
+                    .onSubmit { commit() }
+                    .onExitCommand { renaming = nil }
+                    .onChange(of: focused) { (hasFocus: Bool) in if !hasFocus { commit() } }
+                if !suffix.isEmpty {
+                    Text(suffix).foregroundStyle(.secondary)
+                        .help("The suffix stays: it says what kind of file this is")
                 }
-                .onSubmit { commit() }
-                .onExitCommand { renaming = nil }
-                .onChange(of: focused) { (hasFocus: Bool) in if !hasFocus { commit() } }
+            }
         } else {
             Text(file.fileName).lineLimit(1)
-                .help(file.fileName + "\nDouble-click, or select the row and press Return, to rename")
+                .help(file.fileName + "\nDouble-click, or select the row and press Return, to rename (the suffix stays)")
         }
     }
 
-    /// Keeps the edited name (cleaned, or the generated name when emptied) and ends editing; a
-    /// field that Escape has already closed is left alone.
+    /// Keeps the edited name (cleaned, with its suffix; the generated name when emptied) and
+    /// ends editing; a field that Escape has already closed is left alone.
     private func commit() {
         guard editing else { return }
-        state.commitUnpackFileName(unpackID, file.id, text)
+        state.commitUnpackFileName(unpackID, file.id, stem: text)
         renaming = nil
     }
 }

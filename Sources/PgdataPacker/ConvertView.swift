@@ -32,24 +32,23 @@ struct ConvertView: View {
                           detail: "Add WAV and FLAC wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table is then listed with its size (frames × samples per frame) and what converting changes, and previewed on the right; to edit a name, double-click its row or select it and press Return. This page converts existing wavetables between formats; it does not make wavetables from other audio.")
             } else {
                 HSplitView {
+                    // The table gives way first: it scrolls anyway, and the right pane's
+                    // preview and destination are what the page is read from.
                     ConvertTablesPane(selection: $selection)
-                        .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
-                    // The preview's height is the page's own (dragged at the divider, kept
-                    // between sessions): a VSplitView gave the preview back its smallest height
-                    // whenever the selection changed its content.
+                        .frame(minWidth: 520, idealWidth: 800, maxWidth: .infinity, maxHeight: .infinity)
+                    // The preview takes the height its content needs (a status display, not a
+                    // pane to resize), up to what leaves the destination its minimum; the
+                    // destination scrolls below it.
                     GeometryReader { (geo: GeometryProxy) in
-                        let tallest = max(ConvertPaneDivider.minimumHeight, geo.size.height - ConvertPaneDivider.destinationMinimumHeight)
-                        let height = min(max(state.convertPreviewHeight, ConvertPaneDivider.minimumHeight), tallest)
                         VStack(spacing: 0) {
-                            ConvertDetailPane(selection: selection)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: height)
-                            ConvertPaneDivider(height: $state.convertPreviewHeight, tallest: tallest)
+                            ConvertDetailPane(selection: selection,
+                                              maxHeight: max(ConvertDetailPane.minimumHeight, geo.size.height - ConvertDestinationPane.minimumHeight))
+                            Divider()
                             ConvertDestinationPane()
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                     }
-                    .frame(minWidth: 440, idealWidth: 480, maxWidth: 640, maxHeight: .infinity)
+                    .frame(minWidth: 480, idealWidth: 600, maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
@@ -116,7 +115,7 @@ struct ConvertView: View {
 }
 
 /// The notice under the toolbar while `ConvertPlan.conversionUnderDevelopment` is true: in
-/// orange, centred, with the reason as its tip. It goes by itself once every destination has
+/// orange, centered, with the reason as its tip. It goes by itself once every destination has
 /// been tested in its synth (`OutputPreset.testedIn`).
 struct ConvertDevelopmentNotice: View {
     var body: some View {
@@ -126,54 +125,6 @@ struct ConvertDevelopmentNotice: View {
             .frame(maxWidth: .infinity)
             .padding(.top, 8)
             .help("The Sources beside each destination say whether converting to it has been tested in its synth. This notice goes when every destination has been.")
-    }
-}
-
-/// The divider between the preview and the destination in the right pane: dragging it changes
-/// the preview's height (`AppState.convertPreviewHeight`), between `minimumHeight` and
-/// `tallest`, as a split view's divider would, with the up-down cursor. A thin line in a strip
-/// wide enough to grab.
-struct ConvertPaneDivider: View {
-    @Binding var height: CGFloat
-    /// The most the preview may take: the pane's height less what the table keeps.
-    let tallest: CGFloat
-    @State private var heightAtStart: CGFloat?
-
-    /// The least the preview is given.
-    static let minimumHeight: CGFloat = 170
-    /// What the destination below keeps when the preview is dragged down (its heading, the
-    /// first group of destinations, and the divider; the rest scrolls).
-    static let destinationMinimumHeight: CGFloat = 220
-    /// The strip the pointer grabs.
-    private static let grabHeight: CGFloat = 9
-
-    var body: some View {
-        ZStack {
-            Color.clear
-            Divider()
-        }
-        .frame(height: Self.grabHeight)
-        .contentShape(Rectangle())
-        .onHover { (inside: Bool) in
-            if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
-        }
-        .gesture(
-            DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                .onChanged { (drag: DragGesture.Value) in
-                    let start = heightAtStart ?? height
-                    heightAtStart = start
-                    NSCursor.resizeUpDown.set()   // kept while the pointer runs ahead of the strip
-                    // The preview is above the divider: dragging down makes it taller.
-                    height = min(max(start + drag.translation.height, Self.minimumHeight), tallest)
-                }
-                .onEnded { _ in heightAtStart = nil }
-        )
-        .accessibilityLabel("Preview height")
-        .accessibilityValue("\(Int(height)) points")
-        .accessibilityAdjustableAction { (direction: AccessibilityAdjustmentDirection) in
-            let step: CGFloat = 20
-            height = min(max(height + (direction == .increment ? step : -step), Self.minimumHeight), tallest)
-        }
     }
 }
 
@@ -278,6 +229,10 @@ struct ConvertSummaryStrip: View {
                     jump(.cannotSplit)
                 }
                 Spacer()
+                // That names are editable is not visible in the rows (plain text until edited,
+                // as in the Finder), so the line says how (Adam, 2026-10-26).
+                Text("Double-click a name, or select its row and press Return, to edit it")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             .frame(height: 28)
             .padding(.horizontal, 12)
@@ -328,34 +283,29 @@ struct ConvertTable: View {
             TableColumn("") { (item: ConvertPlan.Item) in ConvertStatusCell(status: plan.status(item), tip: plan.statusDescription(item)) }
                 .width(22)
             TableColumn("Name") { (item: ConvertPlan.Item) in ConvertNameCell(state: st, item: item, renaming: $renaming) }
-                .width(min: 140, ideal: 210)
+                .width(min: 170, ideal: 250)
             // Input and Output are both frames × samples per frame: the headers say the unit (a
             // Table header takes no tooltip on macOS 13), the cells spell it out on hover. The
             // widths fit the headers and the longest cells ("256 × 2,048  from markers" with its
             // chevron; "256 → 64 frames, picked evenly, turned down" on two lines).
             TableColumn("Input (frames × samples)") { (item: ConvertPlan.Item) in ConvertFrameSizeCell(state: st, item: item, selection: $selection) }
-                .width(min: 230, ideal: 260)
-            // The interpolation the table came with ("Not stated" for most WAVs); what the
-            // destination's file records is the Options box's affair.
-            // "in file": the column shows what the source file states; the Options box sets what
-            // the destination records.
-            TableColumn("Interpolation in file") { (item: ConvertPlan.Item) in
-                ConvertInterpolationCell(interpolation: item.table.interpolation, included: plan.isIncluded(item))
-            }
-                .width(min: 100, ideal: 120)
+                .width(min: 200, ideal: 230)
+            // The interpolation a file states is in the preview's facts and the Options box's
+            // "existing" marks, not a column of its own: most files state none, and the room is
+            // the Changes column's (Adam, 2026-10-26).
             TableColumn("Output (frames × samples)") { (item: ConvertPlan.Item) in
                 ConvertOutputCell(expected: plan.expected(for: item), summary: plan.expectedResult(for: item), included: plan.isIncluded(item))
             }
-                .width(min: 170, ideal: 190)
+                .width(min: 150, ideal: 170)
             TableColumn("Changes") { (item: ConvertPlan.Item) in
                 ConvertChangesCell(words: plan.changeWords(for: item), summary: plan.expectedResult(for: item),
                                    notes: plan.itemNotes(for: item), included: plan.isIncluded(item),
                                    unchanged: plan.unchangedWords(for: item))
             }
-                .width(min: 200, ideal: 330)
+                .width(min: 180, ideal: 300)
         }
         // A double-click on a row edits its name, as does Return with one row selected (see
-        // `MenuActions.renameSelected`): the Table's own double-click, so a single click selects
+        // `ListCommands`): the Table's own double-click, so a single click selects
         // the row as it does anywhere else in the table. (A double-tap gesture on the name would
         // most likely claim the first click, as the Input column's button and the old name field
         // do, which is why both had to select their row by hand.) The rows' contextual menu
@@ -372,12 +322,10 @@ struct ConvertTable: View {
         } primaryAction: { (ids: Set<UUID>) in
             if ids.count == 1, let id = ids.first { rename(id) }
         }
-        // Edit › Delete and Return answer only when they have something to act on (nil disables
+        // Edit › Delete and Return act only when they have something to act on (nil disables
         // the menu item and lets the key pass).
-        .onCommand(MenuActions.removeSelected, perform: visibleSelection.isEmpty ? nil : {
-            state.removeConvertItems(visibleSelection); selection = []
-        })
-        .onCommand(MenuActions.renameSelected, perform: visibleSelection.count == 1 ? { if let id = visibleSelection.first { rename(id) } } : nil)
+        .listCommands(delete: visibleSelection.isEmpty ? nil : { state.removeConvertItems(visibleSelection); selection = [] },
+                      rename: visibleSelection.count == 1 ? { if let id = visibleSelection.first { rename(id) } } : nil)
         .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(items.map(\.id)) }
     }
 
@@ -391,22 +339,7 @@ struct ConvertTable: View {
     }
 }
 
-/// The interpolation the table's file states: "None (stepped)", "Crossfade", "Spectral", or, in
-/// secondary type, "Not stated".
-struct ConvertInterpolationCell: View {
-    let interpolation: Interpolation?
-    let included: Bool
-    var body: some View {
-        Text(Interpolation.displayName(interpolation))
-            .lineLimit(1)
-            .foregroundStyle(interpolation == nil || !included ? Color.secondary : Color.primary)
-            .help(interpolation == nil
-                  ? "The file says nothing about interpolation; most synths set the method on the oscillator, and a destination whose file records it saves crossfade unless the Options say otherwise."
-                  : "Whether the file asks a synth to interpolate between frames, and by which method: crossfade (it blends neighbouring frames) or spectral (it blends their harmonics); none means no interpolation (it steps from frame to frame).")
-    }
-}
-
-/// Red when the table can't be converted yet, a grey check when it is ready, nothing when
+/// Red when the table can't be converted yet, a gray check when it is ready, nothing when
 /// Convert All leaves it out.
 struct ConvertStatusCell: View {
     let status: ConvertPlan.Status
@@ -440,6 +373,7 @@ struct ConvertNameCell: View {
         let included = plan.isIncluded(item)
         HStack(spacing: 5) {
             ConvertNameField(state: state, item: item, included: included, renaming: $renaming)
+                .layoutPriority(-1)   // the badges keep their width; the name is what truncates
             if let origin = item.originBadge {
                 ConvertBadge(text: origin, tip: item.location.url.path)
             }
@@ -513,7 +447,7 @@ struct ConvertNameField: View {
         renaming = nil
         focused = false
         let trimmed = text.trimmingCharacters(in: .whitespaces)
-        if !trimmed.isEmpty, trimmed != item.name { state.convertPlan.rename(item.id, to: trimmed) }
+        if !trimmed.isEmpty, trimmed != item.name { state.renameConvertItem(item.id, to: trimmed) }
     }
 
     private func cancel() {
@@ -530,6 +464,7 @@ struct ConvertBadge: View {
         Text(text)
             .font(.caption2)
             .lineLimit(1)
+            .fixedSize()   // never cut to "Factory U…": the name beside it gives way instead
             .padding(.horizontal, 5).padding(.vertical, 1)
             .background(Capsule().fill(Color.secondary.opacity(0.18)))
             .help(tip)
@@ -537,7 +472,7 @@ struct ConvertBadge: View {
 }
 
 /// The input as frames × samples per frame, with a word or two after it on where the size
-/// comes from ("in the file", "assumed", "set manually"; `Item.sizeQualifier`). When the file
+/// comes from ("in the file", "estimated", "set manually"; `Item.sizeQualifier`). When the file
 /// allows other sizes, the cell is a button that opens the size chooser and selects the row,
 /// so the preview below shows the table; when the size is still open, it is red.
 struct ConvertFrameSizeCell: View {
@@ -599,11 +534,6 @@ struct ConvertSizeText: View {
             if let word = item.sizeQualifier {
                 Text(word).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
-            // The Serum-style assumption with the samples pointing elsewhere: a doubt worth
-            // seeing in the row, in the warning colour.
-            if let likely = item.likelySizeInDoubt {
-                Text("\(ConvertPlan.formatCount(likely)) likely").font(.caption).foregroundStyle(.orange).lineLimit(1)
-            }
         }
         .padding(.leading, plain ? ConvertFramesBySize.buttonInset : 0)
     }
@@ -620,8 +550,10 @@ struct ConvertFramesBySize: View {
 
     /// The width of the count's column: room for three digits.
     static let countWidth: CGFloat = 26
-    /// What a bordered button insets its label by, applied to plain text in the same column.
-    static let buttonInset: CGFloat = 7
+    /// What a bordered button insets its label by, applied to plain text in the same column so
+    /// the × signs line up down the column (measured against a build: 7 left the plain rows
+    /// about 5 points short).
+    static let buttonInset: CGFloat = 12
 
     var body: some View {
         // Never shortened to "2…": the numbers take the width they need, and when a cell is too
@@ -658,7 +590,7 @@ struct ConvertSizePopover: View {
     private static let textWidth: CGFloat = width - 24
 
     /// What the “likely” mark on a button means, or that nothing stands out; nothing when the
-    /// likely size is the one assumed (the sentence above the buttons says so then).
+    /// likely size is the one in use (the sentence above the buttons says so then).
     private var fitLine: String? {
         switch item.frameSizeFit {
         case .likely(let n):
@@ -711,7 +643,8 @@ struct ConvertSizePopover: View {
 }
 
 /// One size: the first frame cut at that size, "64 × 128" under it, what the destination makes
-/// of it ("→ 64 × 1,024, 4 → 64 frames, repeated"), and "likely" when the samples suggest it.
+/// of it ("→ 64 × 1,024, 4 → 64 frames, repeated"), and, in orange, "likely" when the samples
+/// suggest it and another size is in use (the size in use needs no mark).
 struct ConvertSizeButton: View {
     @ObservedObject var state: AppState
     let item: ConvertPlan.Item
@@ -751,8 +684,8 @@ struct ConvertSizeButton: View {
                     .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                if likely {
-                    Text("likely").font(.caption).foregroundStyle(.secondary)
+                if likely && !chosen {
+                    Text("likely").font(.caption).foregroundStyle(.orange)
                 }
             }
             .padding(6)

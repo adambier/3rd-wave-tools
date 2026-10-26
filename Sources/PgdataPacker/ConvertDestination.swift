@@ -15,6 +15,10 @@ import PgdataPackerCore
 struct ConvertDestinationPane: View {
     @EnvironmentObject var state: AppState
 
+    /// What the pane keeps when the preview above it is tall: its heading and the first rows
+    /// (the rest scrolls).
+    static let minimumHeight: CGFloat = 260
+
     var body: some View {
         let plan = state.convertPlan
         VStack(spacing: 0) {
@@ -289,7 +293,7 @@ struct ConvertFrameCountOption: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .help("Original frames only: no new waveforms are made. Fewer frames keeps evenly spaced originals, the first and last among them (256 → 64 keeps about every 4th); more frames repeats each original in order (16 → 64 repeats each about 4 times).\nCrossfade new frames: makes each new frame by crossfading its two neighbours. This happens once, when converting; it is separate from the interpolation saved in the file, which is how the synth moves between frames as it plays.")
+            .help("Original frames only: no new waveforms are made. Fewer frames keeps evenly spaced originals, the first and last among them (256 → 64 keeps about every 4th); more frames repeats each original in order (16 → 64 repeats each about 4 times).\nCrossfade new frames: makes each new frame by crossfading its two neighbors. This happens once, when converting; it is separate from the interpolation saved in the file, which is how the synth moves between frames as it plays.")
             Text(state.convertPlan.frameCountCaption)
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -360,7 +364,7 @@ struct ConvertInterpolationOption: View {
                 }
             }
             .labelsHidden()
-            .frame(maxWidth: 260)
+            .frame(maxWidth: 260, alignment: .leading)   // under its label, not centered in the room
             // The "Each table's own — existing: …" item can be longer than the pop-up; its tip
             // carries the full text.
             .help((plan.eachTablesOwnInterpolationLabel.map { $0.text + "\n" } ?? "") + tip)
@@ -415,7 +419,7 @@ struct ConvertTonverkSizeOption: View {
                 }
             }
             .labelsHidden()
-            .frame(maxWidth: 260)
+            .frame(maxWidth: 260, alignment: .leading)
             .help((plan.eachTablesOwnFrameSizeLabel.map { $0.text + "\n" } ?? "") + "\u{201C}Existing\u{201D} is the frame size the tables already have; Tonverk takes 64 to 4,096 (powers of two), and a table of another size is written at 2,048. Any other choice resamples every table to that size. The size goes into the file name as a _wt tag (the preview shows each table’s); a trailing \u{201C}r\u{201D} marks a stepped table.")
         }
     }
@@ -436,7 +440,7 @@ struct ConvertTonverkSizeOption: View {
 }
 
 /// For a 3rd Wave destination: whether the .wt files written are then added to the Pack page
-/// (`AppState.convertAddsToPack`), which both Convert buttons honour.
+/// (`AppState.convertAddsToPack`), which both Convert buttons honor.
 struct ConvertPackOption: View {
     @ObservedObject var state: AppState
 

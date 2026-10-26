@@ -38,11 +38,11 @@ public struct Wavetable: Equatable, Sendable {
     }
 }
 
-/// How a synth moves between neighbouring frames, as some file formats can record it.
+/// How a synth moves between neighboring frames, as some file formats can record it.
 public enum Interpolation: String, Equatable, Sendable, CaseIterable {
     /// Jumps from frame to frame (Serum's "no interp"; Tonverk's trailing `r`).
     case none
-    /// Crossfades between neighbouring frames.
+    /// Crossfades between neighboring frames.
     case crossfade
     /// Morphs between frames' spectra (Serum's and Vital's spectral morph).
     case spectral
@@ -75,7 +75,7 @@ public enum FrameSizeEvidence: String, Equatable, Sendable {
     /// Evenly spaced `cue ` points or a single `smpl` loop: markers that ordinary samples have
     /// too, so less certain.
     case markers
-    /// The file's length only: an assumption (2,048 per frame) the user may need to change.
+    /// The file's length only: 2,048 per frame by convention, an estimate the user may need to change.
     case length
     /// Nothing settles it: the user must choose from `candidateFrameSizes`.
     case none
@@ -104,7 +104,7 @@ public enum FrameSizeSource: Equatable, Sendable {
     case surgeHeader
     /// The fixed layout of a 3rd Wave P table (64 × 128) or U table (64 × 1,024).
     case thirdWaveTable(isP: Bool)
-    /// The file's length alone: 2,048 samples per frame assumed.
+    /// The file's length alone: 2,048 samples per frame by convention.
     case fileLength
 }
 
@@ -193,7 +193,7 @@ public struct FoundTable: Equatable, Sendable {
     public var interpolation: Interpolation?
     /// For a table from a 3rd Wave `.wt` or `.pgdata`: the content fingerprint pgdata Packer's
     /// factory library uses (FNV-1a 64 of all the file's values as float32), so factory tables can
-    /// be recognised. Nil for other sources.
+    /// be recognized. Nil for other sources.
     public var thirdWaveFingerprint: UInt64?
     /// Things worth telling the user about this table (e.g., samples beyond ±1), each with what
     /// it is about and its sentence.
@@ -256,7 +256,7 @@ public enum OutputPreset: String, Equatable, Sendable, CaseIterable {
 public enum FrameCountPolicy: String, Equatable, Sendable, CaseIterable {
     /// Keep the first and last frames and space the rest evenly (no new waveforms).
     case pickEvenly
-    /// Crossfade between neighbouring source frames.
+    /// Crossfade between neighboring source frames.
     case interpolate
 }
 

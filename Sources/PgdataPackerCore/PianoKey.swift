@@ -42,8 +42,9 @@ public struct PianoKey: Hashable, Comparable, Identifiable, Sendable {
         return String(format: "%.1f Hz", rounded)
     }
 
-    /// The pop-up's line for the key: "A4 · key 49 · 440 Hz".
-    public var label: String { "\(name) · key \(number) · \(frequencyText)" }
+    /// The pop-up's line for the key: "A4 · 440 Hz" (the key number is not shown; the note and
+    /// its pitch are enough, Adam, 2026-10-26).
+    public var label: String { "\(name) · \(frequencyText)" }
 
     /// The keys in `range` that exist (1…88), in order.
     public static func keys(_ range: ClosedRange<Int>) -> [PianoKey] {

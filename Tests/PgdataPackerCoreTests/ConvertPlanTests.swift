@@ -348,25 +348,36 @@ final class ConvertPlanStateTests: XCTestCase {
         return p
     }
 
-    func testLikelySizeInDoubtIsShownBesideTheAssumption() {
-        // A length-only WAV is assumed Serum-style (2,048), but its frames repeat every 1,024
-        // samples, so the fit marks 1,024 likely: the row says so beside "assumed".
+    func testTheSamplesOverrideTheLengthOnlyConvention() {
+        // A length-only WAV would be Serum-style (2,048) by convention, but its frames repeat
+        // every 1,024 samples, so the fit makes 1,024 likely and that is the estimate (Adam,
+        // 2026-10-26: "if a different size is likely, then don't assume"). The chooser still
+        // offers the convention.
         let doubtful = FoundTable(name: "Doubt", fileName: "Doubt.wav", source: .wav,
                                   samples: (0..<(12 * 2048)).map { Float(sin(Double($0) * 2 * .pi / 1024)) * 0.5 },
                                   frameSize: 2048, frameSizeBasis: "file length only", candidateFrameSizes: [1024, 512, 4096],
                                   frameSizeEvidence: .length)
         var p = plan([doubtful, table("Plain", frames: 4, size: 2048, evidence: .length)])
-        XCTAssertEqual(p.items[0].sizeSource, .guessed)
-        XCTAssertEqual(p.items[0].likelySizeInDoubt, 1024)
-        XCTAssertTrue(p.items[0].basisDescription.contains("more alike at 1,024"))
-        // A plain 2,048-period table has no doubt; a chosen size removes it.
-        XCTAssertNil(p.items[1].likelySizeInDoubt)
+        XCTAssertEqual(p.items[0].frameSize, 1024)
+        XCTAssertEqual(p.items[0].estimatedFrameSize, 1024)
+        XCTAssertEqual(p.items[0].frameCount, 24)
+        XCTAssertEqual(p.items[0].sizeSource, .likely)
+        XCTAssertEqual(p.items[0].sizeQualifier, "estimated")
+        XCTAssertEqual(p.items[0].basisDescription, "The file doesn’t specify a frame size; 1,024 samples per frame is the estimate, because frames of that size are alike from one to the next, as a wavetable’s are. Its length also allows 2,048, 512, and 4,096.")
+        XCTAssertEqual(p.items[0].frameSizeChoices, [2048, 1024, 512, 4096])
+        // A plain 2,048-period table: the fit confirms the convention.
+        XCTAssertEqual(p.items[1].frameSize, 2048)
+        XCTAssertEqual(p.items[1].sizeSource, .likely)
+        // Choosing the convention is a choice; choosing the estimate again is none.
+        p.chooseFrameSize(p.items[0].id, 2048)
+        XCTAssertEqual(p.items[0].sizeSource, .setManually)
+        XCTAssertEqual(p.items[0].basisDescription, "Set manually; the file’s length suggested 2,048.")
         p.chooseFrameSize(p.items[0].id, 1024)
-        XCTAssertNil(p.items[0].likelySizeInDoubt)
+        XCTAssertEqual(p.items[0].sizeSource, .likely)
     }
 
     func testOneFrameSizeForSeveralTables() {
-        // Two tables whose size is assumed from the length (8,192 samples: 2,048 assumed), one
+        // Two tables whose size is estimated from the length (8,192 samples: 2,048), one
         // open (noise, 16,384 samples), and one whose file states 2,048.
         // (B at another level, or it would be collapsed into A as an identical copy.)
         var p = plan([table("A", frames: 4, size: 2048, evidence: .length),
@@ -429,11 +440,12 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertTrue(p.statusDescription(odd).hasPrefix("Can’t split into frames: 2,500 samples"))
         XCTAssertEqual(p.status(guess), .ready)
         XCTAssertTrue(guess.isGuessed)
-        XCTAssertEqual(guess.sizeSource, .guessed)
-        XCTAssertEqual(guess.sizeSource.label, "Assumed")
-        XCTAssertEqual(guess.basisDescription, "The file doesn’t specify a frame size; 2,048 samples per frame is assumed, the size of Serum-style wavetables.")
+        // A 2,048-period table: the samples confirm the convention, so the estimate is "likely".
+        XCTAssertEqual(guess.sizeSource, .likely)
+        XCTAssertEqual(guess.sizeSource.label, "Estimated")
+        XCTAssertEqual(guess.basisDescription, "The file doesn’t specify a frame size; 2,048 samples per frame is the estimate, because frames of that size are alike from one to the next, as a wavetable’s are. Its length also allows 1,024.")
         XCTAssertEqual(ready.sizeSource, .inFile)
-        XCTAssertEqual(ready.basisDescription, "Clm chunk.")   // the reader’s own phrase, capitalised
+        XCTAssertEqual(ready.basisDescription, "Clm chunk.")   // the reader’s own phrase, capitalized
 
         // Only blockers count: a guessed size and a warning convert, so they need no attention.
         XCTAssertFalse(p.needsAttention(ready))
@@ -442,7 +454,7 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertFalse(p.needsAttention(guess))
         XCTAssertFalse(p.needsAttention(loud))
         XCTAssertEqual(p.attentionCount, 2)
-        XCTAssertEqual(guess.sizeQualifier, "assumed")
+        XCTAssertEqual(guess.sizeQualifier, "estimated")
         XCTAssertEqual(ready.sizeQualifier, "in the file")
         XCTAssertNil(open.sizeQualifier)
         XCTAssertNil(ready.originBadge)
@@ -851,10 +863,10 @@ final class ConvertChangeWordsTests: XCTestCase {
 }
 
 
-/// The aid for choosing a frame size: how alike neighbouring frames are at each candidate size.
+/// The aid for choosing a frame size: how alike neighboring frames are at each candidate size.
 final class FrameSizeFitTests: XCTestCase {
     /// `frames` cycles of `size` samples; frame k is a sine with a little of harmonic 2 + k/8,
-    /// so neighbouring frames are alike but not identical.
+    /// so neighboring frames are alike but not identical.
     private func table(frames: Int, size: Int) -> [Float] {
         (0..<frames).flatMap { f -> [Float] in
             let h = Float(2 + f / 8)
@@ -904,13 +916,13 @@ final class FrameSizeFitTests: XCTestCase {
         var plan = ConvertPlan()
         plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Open.wav"), table: t)], factory: FactoryLibrary())
         XCTAssertEqual(plan.items[0].frameSizeFit, .likely(128))
-        // The likely size is assumed, and said to be (Adam, 2026-10-25); the chooser still offers the rest.
+        // The likely size is the estimate, and said to be (Adam, 2026-10-25); the chooser still offers the rest.
         XCTAssertEqual(plan.items[0].frameSize, 128)
         XCTAssertEqual(plan.items[0].sizeSource, .likely)
-        XCTAssertEqual(plan.items[0].sizeQualifier, "assumed")
+        XCTAssertEqual(plan.items[0].sizeQualifier, "estimated")
         XCTAssertTrue(plan.items[0].isGuessed)
         XCTAssertEqual(plan.status(plan.items[0]), .ready)
-        XCTAssertEqual(plan.items[0].basisDescription, "The file doesn’t specify a frame size; 128 samples per frame is assumed because frames of that size are alike from one to the next, as a wavetable’s are. Its length also allows 2,048.")
+        XCTAssertEqual(plan.items[0].basisDescription, "The file doesn’t specify a frame size; 128 samples per frame is the estimate, because frames of that size are alike from one to the next, as a wavetable’s are. Its length also allows 2,048.")
         XCTAssertEqual(plan.items[0].frameSizeChoices, [128, 2048])
         plan.chooseFrameSize(plan.items[0].id, 2048)
         XCTAssertEqual(plan.items[0].sizeSource, .setManually)
@@ -959,7 +971,7 @@ final class ConvertOptionsTextTests: XCTestCase {
     func testExpectedForAnotherSizeFeedsTheChooser() {
         let open = table("Open", frames: 4, size: 2048, candidates: [128, 2048], frameSize: .some(nil))
         let p = plan([open], preset: .thirdWaveU)
-        // A 2,048-period wave makes 2,048 likely, so it is assumed; the chooser still asks about 128.
+        // A 2,048-period wave makes 2,048 likely, so it is the estimate; the chooser still asks about 128.
         XCTAssertEqual(p.items[0].frameSize, 2048)
         XCTAssertEqual(p.items[0].sizeSource, .likely)
         XCTAssertNotNil(p.expected(for: p.items[0]))
@@ -1014,7 +1026,7 @@ final class ConvertExistingChoicesTests: XCTestCase {
         tall.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Tall.wav"), table: table)], factory: FactoryLibrary())
         XCTAssertNil(tall.caveat(for: .miniFreak))
         XCTAssertNotNil(tall.caveat(for: .phasePlant))
-        // Destinations whose sources settle their behaviour never warn, the 3rd Wave ones among
+        // Destinations whose sources settle their behavior never warn, the 3rd Wave ones among
         // them (how many tables fit is the 3rd Wave's matter, not a caution here).
         for preset in [OutputPreset.thirdWaveU, .thirdWaveP, .tonverk, .surge, .waveEdit] {
             XCTAssertNil(two.caveat(for: preset), "\(preset)")

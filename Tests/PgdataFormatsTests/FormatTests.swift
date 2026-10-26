@@ -194,7 +194,7 @@ final class PackTests: XCTestCase {
         var zeros = pro
         for i in (4 * 181 + 4 + 544)..<(4 * 181 + 4 + 548) { zeros.values[i] = .float(0) }
         XCTAssertEqual(Unpacker.unpack(try Packer.pack(zeros, content: [:])).program.serialized(), zeros.serialized())
-        // The 544 layout is still recognised: its integer tail follows directly.
+        // The 544 layout is still recognized: its integer tail follows directly.
         let older = makeProgram(sources: Array(repeating: 42, count: 12), floats: 544)
         XCTAssertEqual(Unpacker.unpack(try Packer.pack(older, content: [:])).program.serialized(), older.serialized())
     }

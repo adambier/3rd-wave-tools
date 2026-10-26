@@ -26,7 +26,7 @@ not make wavetables from other audio.
   files for Elektron Tonverk and WaveEdit; and Surge XT's `.wt`. Every change it makes is listed
   in the ``OutputFile/notes``.
 
-Each preset states what its behaviour rests on (``OutputPreset/basis``) and where it has been
+Each preset states what its behavior rests on (``OutputPreset/basis``) and where it has been
 tested (``OutputPreset/testedIn``); a preset not yet tested in its destination says so. The
 formats themselves, with sources, are described in
 [WAVETABLES.md](https://github.com/adambier/3rd-wave-tools/blob/main/docs/WAVETABLES.md), and the

@@ -201,7 +201,7 @@ SPARKLE_FW="$APP/Contents/Frameworks/Sparkle.framework"
 mkdir -p "$APP/Contents/Frameworks"
 ditto "$SPARKLE_DIR/Sparkle.framework" "$SPARKLE_FW"
 rm -rf "$SPARKLE_FW/XPCServices" "$SPARKLE_FW/Versions/B/XPCServices"
-# Sparkle's MIT licence asks for its notice to go with every copy.
+# Sparkle's MIT license asks for its notice to go with every copy.
 cp "$SPARKLE_DIR/LICENSE" "$APP/Contents/Resources/Sparkle-LICENSE.txt"
 
 # Document types. The app claims no file type or suffix: it must never become the default app for
@@ -343,7 +343,7 @@ fi
 if [ "$NOTARIZE" -eq 1 ]; then
     # Submit a zip of the app (ditto keeps the bundle's metadata and signature, which zip does
     # not), wait for Apple's verdict, then staple the ticket to the app so Gatekeeper can check
-    # it offline. The zip for distribution is made afterwards, from the stapled app.
+    # it offline. The zip for distribution is made afterward, from the stapled app.
     NOTARIZE_ZIP="build/notarize.zip"
     rm -f "$NOTARIZE_ZIP"
     ditto -c -k --keepParent "$APP" "$NOTARIZE_ZIP"

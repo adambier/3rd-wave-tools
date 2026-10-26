@@ -148,7 +148,7 @@ public struct WavetableFile: Equatable, Sendable {
     public var fingerprint: UInt64 { fnv1a64(dataBytes) }
 
     /// The largest absolute sample. The 3rd Wave's own tables stay within ±1 (seen in every
-    /// factory table, and in SysEx dumps from an 8M), so more suggests a damaged or unnormalised file.
+    /// factory table, and in SysEx dumps from an 8M), so more suggests a damaged or unnormalized file.
     /// A P table stores each point as a sample and the difference to the next (FORMATS.md 5.1),
     /// and a difference can reach ±2, so only the samples (the even positions) count.
     public var peak: Float {

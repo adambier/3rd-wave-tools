@@ -1,7 +1,7 @@
 import Foundation
 
 // The spectral core behind Resampling: a radix-2 FFT for power-of-two lengths, Bluestein's
-// algorithm (the same FFT on a longer, padded sequence) to analyse any other length, and plain
+// algorithm (the same FFT on a longer, padded sequence) to analyze any other length, and plain
 // synthesis for other output lengths. Adapted from ThirdWaveWT's CycleResampler (MIT, © 2026 Adam
 // Arthur Bier), whose FFT this is; the rest is new here.
 
@@ -89,7 +89,7 @@ extension Resampling {
     enum FFT {
         static func isPowerOfTwo(_ n: Int) -> Bool { n > 0 && (n & (n - 1)) == 0 }
 
-        /// The unnormalised forward DFT of a real sequence of any length n ≥ 1, by Bluestein's
+        /// The unnormalized forward DFT of a real sequence of any length n ≥ 1, by Bluestein's
         /// algorithm: X[k] = c_k · Σ_j (x_j·c_j) · conj(c_{k−j}) with the chirp c_j = e^{−πi·j²/n},
         /// a convolution done with power-of-two FFTs of length ≥ 2n − 1.
         static func bluestein(_ x: [Double]) -> (re: [Double], im: [Double]) {
@@ -126,7 +126,7 @@ extension Resampling {
             return ((0..<n).map { cos(step * Double($0)) }, (0..<n).map { sin(step * Double($0)) })
         }
 
-        /// Unnormalised forward transform; the inverse divides by n. `re.count` must be a power of two.
+        /// Unnormalized forward transform; the inverse divides by n. `re.count` must be a power of two.
         static func transform(_ re: inout [Double], _ im: inout [Double], inverse: Bool) {
             let n = re.count
             guard n > 1 else { return }

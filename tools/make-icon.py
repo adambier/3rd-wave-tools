@@ -5,7 +5,7 @@ perspective) rising out of an open box, on a blue rounded-square tile.
     python3 tools/make-icon.py            # writes Resources/AppIcon.icns and Resources/AppIcon.png
 
 Needs cairosvg and Pillow (pip install cairosvg pillow). The tile follows the macOS icon grid:
-an 824-point rounded square centred on a 1024-point canvas, with a soft shadow.
+an 824-point rounded square centered on a 1024-point canvas, with a soft shadow.
 """
 import io, math, os, sys
 import cairosvg
@@ -22,7 +22,7 @@ def mix(c1, c2, t):
     return "#%02x%02x%02x" % tuple(round(lerp(int(c1[i:i+2], 16), int(c2[i:i+2], 16), t)) for i in (1, 3, 5))
 
 def wave(t, x):
-    """One frame of the table: a sine at t = 0 morphing smoothly towards a saw at t = 1
+    """One frame of the table: a sine at t = 0 morphing smoothly toward a saw at t = 1
     (five harmonics with Lanczos smoothing, so the lines stay clean at small sizes)."""
     v = 0.0
     for k in range(1, 6):
@@ -50,10 +50,10 @@ def frames():
             y = base - amp * wave(t, x * 2 * math.pi)
             pts.append((cx - width / 2 + x * width, y))
         d = "M" + " L".join("%.1f,%.1f" % p for p in pts)
-        colour = mix("#eaf6ff", "#ff5fd2", t)
+        color = mix("#eaf6ff", "#ff5fd2", t)
         opacity = lerp(0.6, 1.0, t)
         stroke = lerp(12, 17, t)
-        paths.append(f'<path d="{d}" fill="none" stroke="{colour}" stroke-width="{stroke:.1f}" '
+        paths.append(f'<path d="{d}" fill="none" stroke="{color}" stroke-width="{stroke:.1f}" '
                      f'stroke-linecap="round" stroke-linejoin="round" opacity="{opacity:.2f}"/>')
     return "\n".join(paths)
 

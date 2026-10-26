@@ -12,6 +12,9 @@ struct PackView: View {
     @EnvironmentObject var state: AppState
     @State private var selection = Set<UUID>()
     @State private var dropTargeted = false
+    /// The rows selected in the Added Wavetables and Samples table (its own selection; the
+    /// program list has `selection`). Remove Selected and Edit › Delete remove both.
+    @State private var contentSelection = Set<UUID>()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -25,7 +28,7 @@ struct PackView: View {
                     programList.frame(minWidth: 220, idealWidth: 260, maxWidth: 440)
                     VSplitView {
                         detail.frame(minHeight: 300)
-                        ContentFilesTable().frame(minHeight: 120, idealHeight: 190)
+                        ContentFilesTable(selection: $contentSelection).frame(minHeight: 120, idealHeight: 190)
                     }
                 }
             }
@@ -40,6 +43,9 @@ struct PackView: View {
         // leave the selection; keep it to the programs that remain.
         .onChange(of: state.programs.map(\.id)) { (ids: [UUID]) in
             selection = selection.filter { (id: UUID) -> Bool in ids.contains(id) }
+        }
+        .onChange(of: state.contentFiles.map(\.id)) { (ids: [UUID]) in
+            contentSelection = contentSelection.filter { (id: UUID) -> Bool in ids.contains(id) }
         }
         .sheet(item: $state.repointRequest) { req in RepointSheet(state: state, request: req) }
     }
@@ -56,9 +62,11 @@ struct PackView: View {
                 .help("Propose tidier names for the programs and the files you added (e.g., slot numbers removed, title case). Factory wavetables keep their names.")
                 .sheet(isPresented: $state.showNameCleanup) { NameCleanupSheet(state: state) }
             Spacer()
-            Button("Remove Selected") { state.removePrograms(visibleSelection); selection = [] }
-                .disabled(visibleSelection.isEmpty || state.isWorking)
-                .help("Remove the selected programs from this list (the files are not touched)")
+            // Whatever is selected on the page: programs in the list, files in the table below
+            // the program (each list also answers Edit › Delete on its own).
+            Button("Remove Selected") { removeSelected() }
+                .disabled((visibleSelection.isEmpty && contentSelection.isEmpty) || state.isWorking)
+                .help("Remove the selected programs and added files from this page (the files are not touched)")
             Button("Remove All…") { state.removeAllPack() }
                 .disabled((state.programs.isEmpty && state.contentFiles.isEmpty) || state.isWorking)
                 .help("Remove every program and added file from this page (the files are not touched)")
@@ -73,6 +81,12 @@ struct PackView: View {
 
     /// The selection without rows the filter hides (the list keeps those selected out of sight).
     private var visibleSelection: Set<UUID> { selection.intersection(shownPrograms.map(\.id)) }
+
+    /// Remove Selected: the selected programs and the selected added files, each undoable.
+    private func removeSelected() {
+        if !visibleSelection.isEmpty { state.removePrograms(visibleSelection); selection = [] }
+        if !contentSelection.isEmpty { state.removeContent(contentSelection); contentSelection = [] }
+    }
 
     /// Programs matching the filter field and, when asked, only those needing attention.
     private var shownPrograms: [AppState.PackItem] {
@@ -107,11 +121,11 @@ struct PackView: View {
                     ProgramRow(state: st, item: item).tag(item.id)
                 }
             }
-            // Edit › Delete answers only while programs are selected (nil disables the item).
-            .onCommand(MenuActions.removeSelected, perform: visibleSelection.isEmpty ? nil : { state.removePrograms(visibleSelection); selection = [] })
-            // Return with one program selected puts the cursor in its name field, the page's
-            // way of renaming (the other pages' lists edit the name in the row).
-            .onCommand(MenuActions.renameSelected, perform: visibleSelection.count == 1 ? { state.focusProgramName() } : nil)
+            // Edit › Delete acts only while programs are selected (nil disables the item); Return
+            // with one program selected puts the cursor in its name field, the page's way of
+            // renaming (the other pages' lists edit the name in the row).
+            .listCommands(delete: visibleSelection.isEmpty ? nil : { state.removePrograms(visibleSelection); selection = [] },
+                          rename: visibleSelection.count == 1 ? { state.focusProgramName() } : nil)
             // Edit › Select All (⌘A) selects every program shown (the list's own handling, when
             // it has the focus, does the same).
             .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(shownPrograms.map(\.id)) }
@@ -407,6 +421,9 @@ struct ChoiceCell: View {
 
 struct ContentFilesTable: View {
     @EnvironmentObject var state: AppState
+    /// The selected files; removed with Remove Selected or Edit › Delete, as rows in the other
+    /// lists are (no per-row button: the lists all work the same way).
+    @Binding var selection: Set<UUID>
 
     var body: some View {
         let st = state
@@ -415,7 +432,7 @@ struct ContentFilesTable: View {
             Text("Added Wavetables and Samples").font(.headline).padding(.horizontal, 12).padding(.top, 8)
             Text("A file assigned to a slot is used by every program here that uses that slot, with two exceptions for factory slots. In U48–U55, a file is used only by programs from before 2025, when those were user slots; later programs keep the factory table unless you choose the file in their Plays menu. In any other factory slot, the file replaces the factory table, and the report after packing says where.")
                 .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12)
-            Table(st.contentFiles) {
+            Table(st.contentFiles, selection: $selection) {
                 // Most important first: what the file is, its slot, and whether anything uses it.
                 TableColumn("File") { (f: ContentFile) in Text(f.url.lastPathComponent).lineLimit(1).help(f.url.path) }
                     .width(min: 120, ideal: 170)
@@ -433,15 +450,9 @@ struct ContentFilesTable: View {
                     .width(min: 200, ideal: 320)
                 TableColumn("Type") { (f: ContentFile) in Text(f.kindLabel).foregroundStyle(.secondary).lineLimit(1).help(f.kindLabel) }
                     .width(min: 150, ideal: 170)
-                TableColumn("") { (f: ContentFile) in
-                    Button { st.removeContent(f.id) } label: { Image(systemName: "minus.circle") }
-                        .buttonStyle(.borderless)
-                        .disabled(st.isWorking)
-                        .accessibilityLabel("Remove \(f.url.lastPathComponent)")
-                        .help("Remove this file from the list (the file is not touched)")
-                }
-                .width(28)
             }
+            .listCommands(delete: selection.isEmpty ? nil : { st.removeContent(selection); selection = [] })
+            .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(st.contentFiles.map(\.id)) }
             .overlay {
                 if st.contentFiles.isEmpty {
                     ListPlaceholder(text: "No wavetables or samples yet. Drop .wt and .bin files onto this page, or click Add Files or Folders…")

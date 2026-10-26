@@ -67,6 +67,9 @@ Where something is reasoning that has not been checked, the text says so in word
 [^manual]: Groove Synthesis's user manual (v1.9).
 [^spec]: Groove Synthesis's *3rd Wave MIDI CC + SysEx Spec* (v2a).
 [^bank-arranger]: Groove Synthesis's Bank Arranger script.
+[^smoothing]: Checked on a 3rd Wave 8M (OS 2.0d), 26 October 2026: an oscillator set to a P
+    table showed **wavetable smoothing** off, and one set to a U table showed it on, without the
+    setting having been changed. Not yet checked on a 24M.
 
 **Counting and naming.** Positions inside a block count from 0: integer 34 is the 35th value of a
 part's integer block, and likewise for floats and globals. Lines of a `.pro` count from 1.
@@ -218,7 +221,7 @@ not interpreted.
 |---|---|
 | 53 | Tempo in BPM, probably (3rd Wave Terminal shows 102.000000 as 102.0 BPM). |
 | 113 | `W3_PROG_3` only: probably a second amp envelope amount, 0 = full, 1 = none. OS 2.0 folds it into integer 34 when converting.[^bulk] |
-| 124 | Pan, probably (3rd Wave Terminal's Pan knob): 0 = left, 0.5 = centre, 1 = right. |
+| 124 | Pan, probably (3rd Wave Terminal's Pan knob): 0 = left, 0.5 = center, 1 = right. |
 
 **Global values.** These apply to the whole program. Apart from value 0, the meanings below are
 inferences: from how the values change when the 3rd Wave converts or fits a program to an 8M, from
@@ -376,7 +379,7 @@ the user's own.[^manual] The format:
   A writer should compute the differences
   from the samples; what the 3rd Wave does when a file's differences disagree with its samples has
   not been tested.
-- **The samples are floats within ±1**, not quantised to the PPG's 8-bit levels, although the
+- **The samples are floats within ±1**, not quantized to the PPG's 8-bit levels, although the
   manual calls the P set "8-bit" and says the **Wave Maker** converts imported audio "to the correct
   sample rate and bit depth" for it. So any reduction the 3rd Wave applies is presumably made when
   it imports or plays a table, and is not recorded in the file.
@@ -388,8 +391,11 @@ the user's own.[^manual] The format:
 
 How a P table *plays* is set in the program, not the file, by three settings in the oscillator's
 Wave Flow menu meant to reproduce the PPG:[^manual] **wavetable smoothing** (interpolation
-between neighbouring frames), **waveform smoothing** (interpolation within the frame and of pitch),
-and **use upper wavetable**. With **use upper wavetable** on, a sweep past position 63 continues
+between neighboring frames), **waveform smoothing** (interpolation within the frame and of pitch),
+and **use upper wavetable**. By default, **wavetable smoothing** is off for an oscillator playing
+a P table and on for one playing a U table,[^smoothing] so a P table steps from frame to frame
+and a U table blends between them unless the program says otherwise. With **use upper wavetable**
+on, a sweep past position 63 continues
 into P30, the PPG's upper wavetable; with it off, the 3rd Wave sweeps positions 0–59 only, and
 60–63 are reached by setting the wave offset there with the wave envelope off. That is why a P
 table's last four frames look unrelated to the rest. The user manual's "About Wave Flow and the
@@ -706,10 +712,11 @@ are damaged as distributed (empty or cut short).
 |---|---|
 | Source ids read on the OSC screen | ids 34, 1000, 2000, and 41–47 as in section 2 |
 | `.pgdata` listing factory tables without data | imports and plays from the factory slots |
-| A table identical to a factory one, labelled with another slot; the same content under a new name; a new table under a factory name | reused, reused, stored as new: matching is by content |
-| A new table or multisample labelled with an occupied or blank slot | stored in a free slot (or after an overwrite prompt), program repointed |
+| A table identical to a factory one, labeled with another slot; the same content under a new name; a new table under a factory name | reused, reused, stored as new: matching is by content |
+| A new table or multisample labeled with an occupied or blank slot | stored in a free slot (or after an overwrite prompt), program repointed |
 | Multisample slot listed without data, slot occupied / empty | plays that slot / silent, no warning |
 | 31-character names | displayed in full |
+| Wave Flow defaults: an oscillator set to a P table, and one set to a U table | **wavetable smoothing** off for the P table, on for the U table (section 5.1) |
 | The 3rd Wave's own `.pro` and `.pgdata` exports | file names and contents as in sections 4 and 8 |
 | A `W3_PROG_3` program packed unconverted, against **Import program** | silent; the differences in section 6.1 |
 | 299 programs (100 `W3_PROG_3`, 76 `W3_PROG_4`, 123 `W3_PROG_5`) bulk-imported and exported | the conversion rules in section 6 |
@@ -723,7 +730,7 @@ are damaged as distributed (empty or cut short).
 | 24M: a `.pgdata` carrying factory U08 with its mipmap chain zeroed | matched to U08: the hash covers the table only |
 | 24M: a `.pgdata` carrying a new U table (U08 at half level) with its chain zeroed, then **Export Wavetable** | stored in U56, played the same from C2 to C7, exported with the zeros intact: the chain is not used |
 | 24M: the 2022 program of section 6.5 that gains a copy of part 1, packed unconverted (`W3_PROG_3` layout) and imported with the `.pgdata` import | part 2 still blank, tempo 120, velocity 5: the fixes are not applied; parts 1 and 2 both shown active (cause not examined) |
-| 24M: two `.pgdata` files carrying the same multisample labelled S20 and S21 | the first stored it in S11 ("Updating sample voice memory"); the second pointed its program at S11 ("Updating Sample Data"): reused by content |
+| 24M: two `.pgdata` files carrying the same multisample labeled S20 and S21 | the first stored it in S11 ("Updating sample voice memory"); the second pointed its program at S11 ("Updating Sample Data"): reused by content |
 
 **Implemented from this document alone.** As a check that section 6 describes the conversion fully
 enough to reproduce it, a converter was written by

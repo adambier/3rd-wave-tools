@@ -90,10 +90,18 @@ public struct ConvertPlan: Equatable {
 
         /// The name it is converted under: the new name from Clean Up Names, or the file's.
         public var name: String { newName ?? table.name }
-        /// The frame size used: the user's choice, else the file's, else the size the samples
-        /// make likely when the file leaves the size open (`FrameSizeFit`; assumed, and said to
-        /// be). Nil when nothing settles it.
-        public var frameSize: Int? { chosenFrameSize ?? table.frameSize ?? FrameSizeFit.likelySize(frameSizeFit) }
+        /// The frame size used: the user's choice, else the page's estimate. Nil when nothing
+        /// settles it.
+        public var frameSize: Int? { chosenFrameSize ?? estimatedFrameSize }
+        /// The size the page settles on when the user has chosen none: the file's own, except
+        /// that a size taken from the file's length alone (the Serum-style 2,048) gives way to
+        /// the size the samples make likely (`FrameSizeFit`), since the samples are better
+        /// evidence than a convention; with no size from the file, the likely one; nil when
+        /// nothing settles it. The Input column says "estimated" wherever this decided.
+        public var estimatedFrameSize: Int? {
+            if case .length = table.frameSizeEvidence, let n = FrameSizeFit.likelySize(frameSizeFit) { return n }
+            return table.frameSize ?? FrameSizeFit.likelySize(frameSizeFit)
+        }
         /// The sizes the Input column offers, when the size is open, an estimate
         /// (`sizeIsEstimate`), or overridden (`chosenFrameSize`): the file's own first, then the
         /// other sizes its length allows (`WavetableReader.fittingFrameSizes`). Empty when the
@@ -153,32 +161,25 @@ public struct ConvertPlan: Equatable {
             if frameSize != nil { return "Can’t split into frames" }
             return "Choose a frame size"
         }
-        /// Whether the frame size is the page's assumption (from the file's length alone, or from
-        /// the samples' fit), with no choice made.
+        /// Whether the frame size is the page's estimate (from the samples' fit, or from the
+        /// file's length alone), with no choice made.
         public var isGuessed: Bool { chosenFrameSize == nil && (sizeSource == .guessed || sizeSource == .likely) }
         /// A word or two after the size in the Input column, saying where the size comes from,
         /// so every row shows how much to trust it: "in the file" (a chunk or header states
         /// it, or the format fixes it), "in the name" (a Tonverk tag), "in the .txt" (a Serum
-        /// sidecar), "from markers" (cue or loop markers), "assumed" (from the length alone),
-        /// or "set manually" (the user chose it); nil when there is no size yet. The full
-        /// reason is `basisDescription`.
+        /// sidecar), "from markers" (cue or loop markers), "estimated" (from the samples, or
+        /// from the length alone), or "set manually" (the user chose it); nil when there is no
+        /// size yet. The full reason is `basisDescription`.
         public var sizeQualifier: String? {
             switch sizeSource {
             case .inFile: return "in the file"
             case .fileName: return "in the name"
             case .sidecar: return "in the .txt"
             case .markers: return "from markers"
-            case .guessed, .likely: return "assumed"
+            case .guessed, .likely: return "estimated"
             case .setManually: return "set manually"
             case .notStated: return nil
             }
-        }
-        /// When the size is the Serum-style assumption but the samples point to another size
-        /// (`FrameSizeFit.likelySize`), that size: the Input column shows it in orange beside
-        /// "assumed", so the doubt is seen without opening the chooser. Nil otherwise.
-        public var likelySizeInDoubt: Int? {
-            guard sizeSource == .guessed, case .likely(let n) = frameSizeFit, n != frameSize else { return nil }
-            return n
         }
         /// A short badge for where the table came from, when that matters: the slot and file for
         /// a table inside a `.pgdata`, "3rd Wave U" or "3rd Wave P", "Surge .wt", or "FLAC"; nil
@@ -202,7 +203,7 @@ public struct ConvertPlan: Equatable {
             case .fileName: return .fileName
             case .sidecar: return .sidecar
             case .markers: return .markers
-            case .length: return .guessed
+            case .length: return FrameSizeFit.likelySize(frameSizeFit) != nil ? .likely : .guessed
             case .none: return .notStated
             }
         }
@@ -215,19 +216,17 @@ public struct ConvertPlan: Equatable {
             case .inFile, .fileName, .sidecar: return file + "."
             case .markers: return file + "; less certain than a frame size the file states."
             case .guessed:
-                // 2,048 samples per frame is the size of Serum-style wavetables (WAVETABLES.md section 2).
-                var text = "The file doesn’t specify a frame size; \(ConvertPlan.formatCount(table.frameSize ?? 2048)) samples per frame is assumed, the size of Serum-style wavetables."
-                // When the samples point elsewhere, say so here too, not only in the chooser.
-                if case .likely(let n) = frameSizeFit, n != frameSize {
-                    text += " Its frames are more alike at \(ConvertPlan.formatCount(n)), which the chooser marks likely."
-                }
-                return text
+                // 2,048 samples per frame is the size of Serum-style wavetables (WAVETABLES.md
+                // section 2); taken when the samples themselves point to no size.
+                return "The file doesn’t specify a frame size, and nothing in its samples points to one; \(ConvertPlan.formatCount(table.frameSize ?? 2048)) samples per frame, the size of Serum-style wavetables, is the estimate."
             case .likely:
-                let others = table.candidateFrameSizes.filter { $0 != frameSize }.map(ConvertPlan.formatCount)
-                return "The file doesn’t specify a frame size; \(ConvertPlan.formatCount(frameSize ?? 0)) samples per frame is assumed because frames of that size are alike from one to the next, as a wavetable’s are."
+                // The other sizes the chooser offers: the file's own (when the length alone
+                // suggested one) and the rest its length allows.
+                let others = frameSizeChoices.filter { $0 != frameSize }.map(ConvertPlan.formatCount)
+                return "The file doesn’t specify a frame size; \(ConvertPlan.formatCount(frameSize ?? 0)) samples per frame is the estimate, because frames of that size are alike from one to the next, as a wavetable’s are."
                     + (others.isEmpty ? "" : " Its length also allows \(ConvertPlan.listPhrase(others)).")
             case .notStated:
-                // Unlike `.guessed` and `.likely`, nothing could be assumed: the file states no
+                // Unlike `.guessed` and `.likely`, nothing could be estimated: the file states no
                 // size, its length is not a Serum-style one, and no size makes its frames alike.
                 return "Unable to estimate a frame size from this file."
                     + (table.candidateFrameSizes.isEmpty ? " Its length allows none of the sizes offered here (powers of two from 64 to 4,096)."
@@ -263,23 +262,24 @@ public struct ConvertPlan: Equatable {
         case sidecar
         /// Loop or cue markers, which ordinary samples carry too.
         case markers
-        /// The file's length alone: 2,048 assumed.
+        /// The file's length alone, with the samples pointing to no size: 2,048 estimated.
         case guessed
-        /// The file leaves the size open and the samples make one size likely: that one assumed.
+        /// The samples make one size likely (`FrameSizeFit`): that one estimated, whether the
+        /// file's length alone suggested another or left the size open.
         case likely
         /// Nothing says: the user must choose.
         case notStated
         /// The user chose a size.
         case setManually
 
-        /// A word or two for the tooltips ("In file", "Assumed", "Set manually").
+        /// A word or two for the tooltips ("In file", "Estimated", "Set manually").
         public var label: String {
             switch self {
             case .inFile: return "In file"
             case .fileName: return "File name"
             case .sidecar: return "Serum .txt"
             case .markers: return "Markers"
-            case .guessed, .likely: return "Assumed"
+            case .guessed, .likely: return "Estimated"
             case .notStated: return "Not stated"
             case .setManually: return "Set manually"
             }
@@ -434,7 +434,7 @@ public struct ConvertPlan: Equatable {
                                         options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { continue }
             for case let f as URL in e {
                 // Hidden files and folders are skipped by name too, for a Foundation whose
-                // enumerator does not honour .skipsHiddenFiles.
+                // enumerator does not honor .skipsHiddenFiles.
                 if f.lastPathComponent.hasPrefix(".") { e.skipDescendants(); continue }
                 if (try? f.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true { continue }
                 all.append(f)
@@ -520,8 +520,12 @@ public struct ConvertPlan: Equatable {
                 factorySlot = nil
                 factoryName = nil
             }
+            // Rated unless the file's contents state the size; even when the length allows one
+            // size only, so a length-only file whose frames are alike at the Serum-style size is
+            // "likely" rather than a bare convention.
             let choices = (t.frameSize.map { [$0] } ?? []) + t.candidateFrameSizes.filter { $0 != t.frameSize }
-            fit = t.candidateFrameSizes.isEmpty ? .unclear : FrameSizeFit.verdict(t.samples, sizes: choices)
+            let stated: Bool = { if case .statedInFile = t.frameSizeEvidence { return true }; return false }()
+            fit = stated || choices.isEmpty ? .unclear : FrameSizeFit.verdict(t.samples, sizes: choices)
         }
     }
 
@@ -562,14 +566,13 @@ public struct ConvertPlan: Equatable {
     public mutating func chooseFrameSize(_ id: UUID, _ size: Int?) {
         guard let i = items.firstIndex(where: { $0.id == id }) else { return }
         if let size, !items[i].frameSizeAlternatives.contains(size), !items[i].frameSizeChoices.contains(size) { return }
-        // The file's own size, or the one assumed from the samples, is no choice at all.
-        let assumed = items[i].table.frameSize ?? FrameSizeFit.likelySize(items[i].frameSizeFit)
-        items[i].chosenFrameSize = size == assumed ? nil : size
+        // The page's own estimate is no choice at all.
+        items[i].chosenFrameSize = size == items[i].estimatedFrameSize ? nil : size
     }
 
     // MARK: One frame size for several tables
 
-    /// Among `ids`, the items whose frame size the file does not state (assumed, estimated, or
+    /// Among `ids`, the items whose frame size the file does not state (estimated or
     /// still open), in the page's order: the ones a frame size chosen for several tables
     /// applies to. A table whose file states its size keeps it (the preview's override is for
     /// one table at a time).
@@ -665,7 +668,7 @@ public struct ConvertPlan: Equatable {
     }
 
     /// Whether an item Convert All takes can't be converted yet (the filter above the table).
-    /// Assumed frame sizes and warnings do not count: those items are converted.
+    /// Estimated frame sizes and warnings do not count: those items are converted.
     public func needsAttention(_ item: Item) -> Bool { status(item).isBlocked }
 
     /// The items Convert All takes that cannot convert yet (see `needsAttention`).
@@ -964,7 +967,7 @@ public struct ConvertPlan: Equatable {
 
     /// How a frame count is changed, in a word: "repeated" (more frames, originals repeated),
     /// "picked evenly" (fewer frames, originals kept), or "crossfaded" (new frames made by
-    /// crossfading neighbours, either way).
+    /// crossfading neighbors, either way).
     public static func methodWord(_ policy: FrameCountPolicy, grows: Bool) -> String {
         switch policy {
         case .pickEvenly: return grows ? "repeated" : "picked evenly"

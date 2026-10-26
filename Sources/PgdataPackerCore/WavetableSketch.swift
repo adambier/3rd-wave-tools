@@ -56,7 +56,7 @@ public extension WavetableSketch {
         /// The stored frame after it (`lower` again at a whole position, or when the table
         /// steps).
         public var upper: Int
-        /// How far from `lower` towards `upper` the position lies, 0…1 (0 when `upper == lower`).
+        /// How far from `lower` toward `upper` the position lies, 0…1 (0 when `upper == lower`).
         public var fraction: Float
 
         /// Whether the cycle is an in-between of two stored frames.
@@ -121,7 +121,7 @@ public extension WavetableSketch {
         return (stored, max(0, min(5, (cap - stored) / (stored - 1))))
     }
 
-    /// The in-between frames between each pair of neighbouring frames, `perGap` per gap, in
+    /// The in-between frames between each pair of neighboring frames, `perGap` per gap, in
     /// order (gap 0's first, then gap 1's, …): linear crossfades for `.crossfade`, spectral
     /// blends (``spectralBlend(_:_:t:)``) for `.spectral`, and none for `.none` or nil (the
     /// table steps from frame to frame, or nothing says). Each in-between is paired with its

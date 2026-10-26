@@ -233,7 +233,7 @@ extension WavetableReader {
             frameSize = 2048
             source = .fileLength
             evidence = .length
-            basis = "file length only (2,048 per frame assumed, the Serum-style size; the file does not specify a frame size)"
+            basis = "file length only (2,048 per frame by convention, the Serum-style size; the file does not specify a frame size)"
             candidates = fittingFrameSizes(count).filter { $0 != 2048 }
         } else {
             return try none()   // unreachable: the first branch takes every other length

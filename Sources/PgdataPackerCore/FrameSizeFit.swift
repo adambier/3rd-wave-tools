@@ -1,14 +1,15 @@
 import Foundation
 
 /// An aid for choosing a frame size the file leaves open: how well each candidate size fits the
-/// samples, judged by how alike neighbouring frames are at that size. The frames of a wavetable
+/// samples, judged by how alike neighboring frames are at that size. The frames of a wavetable
 /// change little from one to the next, so at the right size frame k + 1 is close to frame k,
 /// and much closer than the two halves of a frame are to each other. At a size that is too
 /// small a "frame" is a fragment of the cycle, and a smooth cycle is about as like itself a
 /// fragment later as half a fragment later; at a multiple of the right size the frames are
-/// alike, but no more alike than at the right size. This is a heuristic: it is shown as
-/// "likely", and assumed only when nothing states a size (`ConvertPlan.Item.frameSize`); a
-/// table whose frames differ sharply (a bank of unrelated frames) fits no size well.
+/// alike, but no more alike than at the right size. This is a heuristic: its size is the
+/// page's estimate only when the file's contents state no size (`ConvertPlan.Item.estimatedFrameSize`),
+/// and the Input column says "estimated" there; a table whose frames differ sharply (a bank
+/// of unrelated frames) fits no size well.
 public enum FrameSizeFit {
     /// How a candidate size fits.
     public struct Rating: Equatable {
@@ -16,7 +17,7 @@ public enum FrameSizeFit {
         public var size: Int
         /// The mean difference between each sample and the one a frame later, as a fraction of
         /// the signal's mean level: 0 when every frame repeats the one before it; about 1 or
-        /// more when neighbouring frames are unrelated.
+        /// more when neighboring frames are unrelated.
         public var difference: Float
         /// The same difference half a frame later, for comparison: large at the right size
         /// (the two halves of a cycle differ), close to `difference` at a size that is too
