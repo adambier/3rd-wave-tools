@@ -174,7 +174,7 @@ struct ConvertSeveralSummary: View {
     }
 
     /// "Converting to a U table resizes 13 of the 13 tables (see the Changes column); 11 get fewer
-    /// frames; 2 are turned down." or "Converting changes only the file format of all 13 tables."
+    /// frames; 2 are attenuated." or "Converting changes only the file format of all 13 tables."
     static func changeSentence(plan: ConvertPlan, items: [ConvertPlan.Item]) -> String {
         let expected = items.compactMap { plan.expected(for: $0) }
         let resized = expected.filter(\.resizes).count
@@ -192,7 +192,7 @@ struct ConvertSeveralSummary: View {
         if resized > 0 { parts.append("resizes the frames of \(resized == total ? these : "\(resized) of the \(total) tables")") }
         if fewer > 0 { parts.append("\(count(fewer)) get fewer frames") }
         if more > 0 { parts.append("\(count(more)) get more frames") }
-        if down > 0 { parts.append("\(count(down)) \(down == 1 ? "is" : "are") turned down") }
+        if down > 0 { parts.append("\(count(down)) \(down == 1 ? "is" : "are") attenuated") }
         if resized == 0 { parts[0] = "changes \(these): " + parts[0] }
         return "Converting to \(kind) " + parts.joined(separator: "; ") + " (see the Changes column)."
     }

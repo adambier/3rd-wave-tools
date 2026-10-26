@@ -200,7 +200,7 @@ smaller frame cannot hold (those above its Nyquist frequency) and keeps the rest
 frame with content above the 512th harmonic loses it when it becomes a 1,024-sample frame; the
 report says when a frame was resized. Growing can raise the peak slightly between the original
 samples; such peaks are kept in 32-bit float files, and for the 3rd Wave and 16-bit files the table
-is turned down to fit, which the report says.
+is attenuated to fit, which the report says.
 
 When a destination needs a different number of frames, you choose how:
 

@@ -179,12 +179,20 @@ final class MenuActions: NSObject, NSMenuItemValidation {
     /// its Return (the first responder is then the field editor, not the table), as do buttons
     /// and pop-ups.
     func installReturnKey() {
-        returnKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { (event: NSEvent) -> NSEvent? in
+        returnKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] (event: NSEvent) -> NSEvent? in
             let returnKey: UInt16 = 36, keypadEnter: UInt16 = 76
             guard event.keyCode == returnKey || event.keyCode == keypadEnter,
                   event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty,
-                  event.window === NSApp.keyWindow,
-                  let rename = ListCommands.shared.handlers(forFirstResponderOf: NSApp.keyWindow)?.rename else { return event }
+                  event.window === NSApp.keyWindow else { return event }
+            guard let rename = ListCommands.shared.handlers(forFirstResponderOf: NSApp.keyWindow)?.rename else {
+                // Return reached no list: say what had the focus, so a list that does not hand
+                // its table view the focus can be found (a diagnostic, in the log only).
+                if let self, !(NSApp.keyWindow?.firstResponder is NSText) {
+                    let responder = NSApp.keyWindow?.firstResponder.map { String(describing: type(of: $0)) } ?? "nothing"
+                    self.appState.note("Return went unhandled: the focus was on \(responder); \(ListCommands.shared.count) lists registered.")
+                }
+                return event
+            }
             rename()
             return nil
         }

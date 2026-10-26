@@ -194,7 +194,7 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertTrue(item.basisDescription.hasPrefix("Set manually"))
         XCTAssertEqual(item.sizeSource, .setManually)
         XCTAssertEqual(plan.status(item), .ready)
-        XCTAssertEqual(plan.expectedResult(for: item), "64 × 1,024; resized from 256 samples per frame; may be turned down a little to fit after resizing")
+        XCTAssertEqual(plan.expectedResult(for: item), "64 × 1,024; resized from 256 samples per frame; may be attenuated a little to fit after resizing")
         c = plan.convert(write: Self.fakeWriter)
         XCTAssertEqual(c.errors, [])
         XCTAssertEqual(c.files.map(\.fileName), ["Edit.wt"])
@@ -215,8 +215,8 @@ final class ConvertPlanTests: XCTestCase {
                  factory: FactoryLibrary())
         let (big, few, u) = (plan.items[0], plan.items[1], plan.items[2])
         // Any change of frame size may turn the table down (band-limiting can overshoot).
-        XCTAssertEqual(plan.expectedResult(for: big), "64 × 1,024; resized from 2,048 samples per frame; 256 frames → 64, picked evenly; may be turned down a little to fit after resizing")
-        XCTAssertEqual(plan.expectedResult(for: few), "64 × 1,024; resized from 2,048 samples per frame; 8 frames → 64, repeated; may be turned down a little to fit after resizing")
+        XCTAssertEqual(plan.expectedResult(for: big), "64 × 1,024; resized from 2,048 samples per frame; 256 frames → 64, picked evenly; may be attenuated a little to fit after resizing")
+        XCTAssertEqual(plan.expectedResult(for: few), "64 × 1,024; resized from 2,048 samples per frame; 8 frames → 64, repeated; may be attenuated a little to fit after resizing")
         XCTAssertEqual(plan.expectedResult(for: u), "64 × 1,024")
         // What the page says when nothing changes: a 3rd Wave table going back to the 3rd Wave is
         // the same table (a U table's mipmap chain is recomputed); anything else changes format.
@@ -238,7 +238,7 @@ final class ConvertPlanTests: XCTestCase {
 
         plan.preset = .thirdWaveP
         plan.options.appendPPGStandardWaves = true
-        XCTAssertEqual(plan.expectedResult(for: u), "64 × 128; resized from 1,024 samples per frame; 64 frames → 60, crossfaded; may be turned down a little to fit after resizing; the PPG’s four standard waveforms at 60–63")
+        XCTAssertEqual(plan.expectedResult(for: u), "64 × 128; resized from 1,024 samples per frame; 64 frames → 60, crossfaded; may be attenuated a little to fit after resizing; the PPG’s four standard waveforms at 60–63")
     }
 
     // MARK: Converting and writing
@@ -481,7 +481,7 @@ final class ConvertPlanStateTests: XCTestCase {
                       table("Quiet", notes: [ReadNote(disagree, "The sizes differ; the clm chunk wins."),
                                              ReadNote(.highFrameCount(300, limit: 256), "300 frames.")])])
         let loud = p.itemNotes(for: p.items[0])
-        XCTAssertEqual(loud.warnings, ["Peak 1.23 is over full scale (±1); the table is turned down to fit, so it plays a little quieter.", "Left channel read."])
+        XCTAssertEqual(loud.warnings, ["Peak 1.23 is over full scale (±1); the table is attenuated to fit, so it plays a little quieter.", "Left channel read."])
         XCTAssertEqual(loud.information, [])
         XCTAssertEqual(p.notes(for: p.items[0]), loud.all)
         XCTAssertEqual(p.items[0].peak, 1.234, accuracy: 1e-5)
@@ -503,7 +503,7 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertTrue(big.scaledToFit)
         XCTAssertFalse(big.peakKept)
         XCTAssertNil(big.interpolationRecorded)   // a 3rd Wave .wt cannot record it
-        XCTAssertTrue(p.expectedResult(for: p.items[0]).contains("turned down to fit (peak 1.50)"))
+        XCTAssertTrue(p.expectedResult(for: p.items[0]).contains("attenuated to fit (peak 1.50)"))
         let small = try XCTUnwrap(p.expected(for: p.items[1]))
         XCTAssertFalse(small.resizes)
         XCTAssertNil(small.frameSizeGrows)
@@ -800,7 +800,7 @@ final class ConvertChangeWordsTests: XCTestCase {
         var plan = ConvertPlan(preset: .thirdWaveU)
         plan.add([found(big), found(fits)], factory: FactoryLibrary())
         let b = plan.changeWords(for: plan.items[0])
-        XCTAssertEqual(b?.changes, ["2,048 → 1,024 samples", "256 → 64 frames, picked evenly", "turned down"])
+        XCTAssertEqual(b?.changes, ["2,048 → 1,024 samples", "256 → 64 frames, picked evenly", "attenuated"])
         XCTAssertEqual(b?.warnings, ["12 extra samples dropped", "left channel only"])
         let f = plan.changeWords(for: plan.items[1])
         XCTAssertEqual(f?.changes, [])
@@ -815,7 +815,7 @@ final class ConvertChangeWordsTests: XCTestCase {
         plan.preset = .thirdWaveP
         plan.options.appendPPGStandardWaves = true
         plan.rename(plan.items[1].id, to: String(repeating: "x", count: 40))
-        XCTAssertEqual(plan.changeWords(for: plan.items[1])?.changes, ["1,024 → 128 samples", "64 → 60 frames, picked evenly", "may be turned down", "+ PPG waveforms", "name changed"])
+        XCTAssertEqual(plan.changeWords(for: plan.items[1])?.changes, ["1,024 → 128 samples", "64 → 60 frames, picked evenly", "may be attenuated", "+ PPG waveforms", "name changed"])
         plan.options.frameCountPolicy = .interpolate
         XCTAssertEqual(plan.changeWords(for: plan.items[1])?.changes.dropFirst().first, "64 → 60 frames, crossfaded")
         plan.options.frameCountPolicy = .pickEvenly
@@ -979,8 +979,8 @@ final class ConvertOptionsTextTests: XCTestCase {
         XCTAssertEqual(asP?.frameCountIn, 64)
         XCTAssertEqual(asP?.frameCountOut, 64)
         XCTAssertEqual(asP?.frameSizeOut, 1024)
-        XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 128)?.changes, ["128 → 1,024 samples", "may be turned down"])   // resizing can raise the peak
-        XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 2048)?.changes, ["2,048 → 1,024 samples", "4 → 64 frames, repeated", "may be turned down"])
+        XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 128)?.changes, ["128 → 1,024 samples", "may be attenuated"])   // resizing can raise the peak
+        XCTAssertEqual(p.changeWords(for: p.items[0], frameSize: 2048)?.changes, ["2,048 → 1,024 samples", "4 → 64 frames, repeated", "may be attenuated"])
         XCTAssertNil(p.expected(for: p.items[0], frameSize: 1000), "does not divide")
     }
 }

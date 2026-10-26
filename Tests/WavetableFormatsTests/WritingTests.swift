@@ -114,7 +114,7 @@ final class WritingTests: XCTestCase {
         notes(out, contain: "Resized from 2,048 to 1,024")
         notes(out, contain: "Frame count changed from 3 to 64")
         notes(out, contain: "repeating frames")
-        notes(out, contain: "Turned down to fit (peak was 1.50")
+        notes(out, contain: "Attenuated by 3.5 dB to fit within ±1 (the peak was 1.50")
     }
 
     func testThirdWaveNameSanitised() throws {
@@ -327,7 +327,7 @@ final class WritingTests: XCTestCase {
     func testWaveEditScalesToFit() throws {
         let out = try write(table(frames: 64, size: 256, peak: 2), .waveEdit)
         XCTAssertEqual(parseWAV(out.data).samples.map(abs).max(), 32_767)
-        notes(out, contain: "Turned down to fit (peak was 2.00")
+        notes(out, contain: "Attenuated by 6.0 dB to fit within ±1 (the peak was 2.00")
     }
 
     // MARK: Names, validation, presets
@@ -406,11 +406,11 @@ final class WritingTests: XCTestCase {
         XCTAssertEqual(big.fileExtension, "wt")
 
         // Shrinking can raise the peak too: band-limiting a sharp edge overshoots (Gibbs), so a
-        // full-scale square is "may be turned down" for a P table, and the writer turns it down.
+        // full-scale square is "may be attenuated" for a P table, and the writer turns it down.
         let shrinks = WavetableWriter.plan(frameSize: 2048, frameCount: 64, peak: 1, interpolation: nil, preset: .thirdWaveP)
         XCTAssertEqual(shrinks.scaling, .possible)
         let square = Wavetable(name: "Square", frames: (0..<64).map { _ in (0..<2048).map { $0 < 1024 ? Float(1) : Float(-1) } })
-        notes(try write(square, .thirdWaveP), contain: "Turned down to fit")
+        notes(try write(square, .thirdWaveP), contain: "Attenuated by")
         // A change of frame count alone cannot raise the peak.
         XCTAssertEqual(WavetableWriter.plan(frameSize: 1024, frameCount: 256, peak: 1, interpolation: nil, preset: .thirdWaveU).scaling, .none)
 
@@ -457,7 +457,7 @@ final class WritingTests: XCTestCase {
     }
 
     /// The writer does what its plan says, for every preset and several shapes of table, with
-    /// the default options and with every option changed; the plan's "may be turned down" is
+    /// the default options and with every option changed; the plan's "may be attenuated" is
     /// the one thing left open.
     func testWriterFollowsItsPlan() throws {
         let shapes: [(frames: Int, size: Int, peak: Float, interpolation: Interpolation?)] = [
@@ -517,8 +517,8 @@ final class WritingTests: XCTestCase {
                         XCTAssertFalse(said("kept, over full scale"), label)
                     }
                     switch plan.scaling {
-                    case .certain: XCTAssertTrue(said("Turned down to fit"), label)
-                    case .none: XCTAssertFalse(said("Turned down to fit"), label)
+                    case .certain: XCTAssertTrue(said("Attenuated by"), label)
+                    case .none: XCTAssertFalse(said("Attenuated by"), label)
                     case .possible: break   // settled by the resized peak
                     }
                     if plan.changesCount {

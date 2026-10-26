@@ -116,8 +116,9 @@ struct ConvertView: View {
 }
 
 /// The notice under the toolbar while `ConvertPlan.conversionUnderDevelopment` is true: in
-/// orange, centered, with the reason as its tip. It goes by itself once every destination has
-/// been tested in its synth (`OutputPreset.testedIn`).
+/// orange, centered, with the reason as its tip. It goes by itself once the destinations that
+/// gate it (the 3rd Wave's tables and Tonverk) have been tested in their synths
+/// (`OutputPreset.testedIn`); the rows of any destination still untested then say so.
 struct ConvertDevelopmentNotice: View {
     var body: some View {
         Label("Wavetable conversion under development; some output formats remain untested.", systemImage: "exclamationmark.triangle")
@@ -125,7 +126,7 @@ struct ConvertDevelopmentNotice: View {
             .foregroundStyle(.orange)
             .frame(maxWidth: .infinity)
             .padding(.top, 8)
-            .help("The Sources beside each destination say whether converting to it has been tested in its synth. This notice goes when every destination has been.")
+            .help("The Sources beside each destination say whether converting to it has been tested in its synth. This notice goes when the 3rd Wave’s tables and Tonverk have been; the rows of other destinations still untested then say so.")
     }
 }
 
@@ -288,7 +289,7 @@ struct ConvertTable: View {
             // Input and Output are both frames × samples per frame: the headers say the unit (a
             // Table header takes no tooltip on macOS 13), the cells spell it out on hover. The
             // widths fit the headers and the longest cells ("256 × 2,048  from markers" with its
-            // chevron; "256 → 64 frames, picked evenly, turned down" on two lines).
+            // chevron; "256 → 64 frames, picked evenly, attenuated" on two lines).
             TableColumn("Input (frames × samples)") { (item: ConvertPlan.Item) in ConvertFrameSizeCell(state: st, item: item, selection: $selection) }
                 .width(min: 200, ideal: 230)
             // The interpolation a file states is in the preview's facts and the Options box's
@@ -738,16 +739,22 @@ struct ConvertChangesCell: View {
     }
 
     var body: some View {
-        if let words {
-            if words.changes.isEmpty && words.warnings.isEmpty {
-                Text("—").foregroundStyle(.secondary).help(unchanged + "\n" + tip)
+        Group {
+            if let words {
+                if words.changes.isEmpty && words.warnings.isEmpty {
+                    Text("—").foregroundStyle(.secondary).help(unchanged + "\n" + tip)
+                } else {
+                    line(words).lineLimit(2).help(tip)
+                }
             } else {
-                line(words).lineLimit(2).help(tip)
+                Text("—").foregroundStyle(.secondary).help(tip)
             }
-        } else {
-            Text("—").foregroundStyle(.secondary).help(tip)
         }
+        .padding(.trailing, Self.trailingInset)
     }
+
+    /// Room between the text and the pane's edge, the last column reaching it (Adam, 2026-10-26).
+    static let trailingInset: CGFloat = 10
 
     private func line(_ words: (changes: [String], warnings: [String])) -> Text {
         let changes = Text(words.changes.joined(separator: ", "))

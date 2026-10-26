@@ -47,6 +47,9 @@ final class ListCommands {
         entries.removeObject(forKey: tableView)
     }
 
+    /// How many lists are registered (for the log's diagnostics).
+    var count: Int { entries.count }
+
     /// The handlers of the list whose table view is the window's first responder; nil when the
     /// first responder is something else (a text field, a button, nothing).
     func handlers(forFirstResponderOf window: NSWindow?) -> Handlers? {

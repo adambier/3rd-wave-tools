@@ -24,8 +24,10 @@ final class AppState: ObservableObject {
             }
         }
         /// Whether the page is still under development, so it is shown only when View › Show
-        /// Under-Development Features is on (`AppState.showsUnderDevelopmentFeatures`).
-        var isUnderDevelopment: Bool { self == .convert }
+        /// Under-Development Features is on (`AppState.showsUnderDevelopmentFeatures`): the
+        /// Wavetables page, until the destinations that gate it have been tested
+        /// (`ConvertPlan.conversionUnderDevelopment`).
+        var isUnderDevelopment: Bool { self == .convert && ConvertPlan.conversionUnderDevelopment }
     }
 
     private static let underDevelopmentKey = "ShowUnderDevelopmentFeatures"

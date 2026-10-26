@@ -339,8 +339,10 @@ The destination applies to every table converted. The chosen row says why its fo
 and, in orange, what is open about it: that converting to it has not yet been tested (none has),
 and anything its sources leave open that the tables bring about. The book
 icon beside each row (under **Sources**) opens the documents the format rests on; a green seal in
-its place marks a destination that has been tested. While any destination is untested, the page
-carries a notice that wavetable conversion is under development.
+its place marks a destination that has been tested. Until the 3rd Wave's tables and Tonverk have
+been tested, the page is shown only with View › **Show Under-Development Features** and carries a
+notice that wavetable conversion is under development; after that, a destination still untested
+says so in its row.
 [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes what each destination expects, with sources.
 
 #### Options

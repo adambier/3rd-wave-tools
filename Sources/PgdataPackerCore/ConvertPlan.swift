@@ -617,8 +617,8 @@ public struct ConvertPlan: Equatable {
         }
         if item.peak > 1 {
             warnings.insert("Peak \(Wavetable.peakText(item.peak)) is over full scale (±1); "
-                + (destinationScalesToFit ? "the table is turned down to fit, so it plays a little quieter."
-                                          : "it is kept as it is, so unless the synth turns the table down, it may clip the loudest parts, which adds a hard, buzzy edge."), at: 0)
+                + (destinationScalesToFit ? "the table is attenuated to fit, so it plays a little quieter."
+                                          : "it is kept as it is, so unless the synth attenuates the table, it may clip the loudest parts, which adds a hard, buzzy edge."), at: 0)
         }
         if let slot = item.factorySlot {
             let label = "factory " + slot.label + (item.factoryName.map { " " + $0 } ?? "")
@@ -719,12 +719,18 @@ public struct ConvertPlan: Equatable {
                                 : "Tested in " + listPhrase(preset.testedIn) + "."
     }
 
-    /// Whether converting to any listed destination has yet to be tested in its synth
-    /// (`OutputPreset.testedIn` empty). While true, the Wavetables page carries a notice that
-    /// wavetable conversion is under development; the notice goes when the last destination
-    /// is tested.
+    /// The destinations whose testing decides whether wavetable conversion is still under
+    /// development: the 3rd Wave's P and U tables, the page's purpose, and Tonverk (Adam,
+    /// 2026-10-26). The other destinations carry their own caution until they are tested.
+    public static let gatingPresets: [OutputPreset] = [.thirdWaveP, .thirdWaveU, .tonverk]
+
+    /// Whether converting to any of the `gatingPresets` has yet to be tested in its synth
+    /// (`OutputPreset.testedIn` empty). While true, the Wavetables page is shown only with View ›
+    /// Show Under-Development Features and carries a notice that wavetable conversion is under
+    /// development; both go when the last of those destinations is tested, and the rows of
+    /// destinations still untested say so themselves.
     public static var conversionUnderDevelopment: Bool {
-        OutputPreset.allCases.contains { $0.testedIn.isEmpty }
+        gatingPresets.contains { $0.testedIn.isEmpty }
     }
 
     /// The orange note under the chosen destination, or nil: one of the things its sources leave
@@ -959,8 +965,8 @@ public struct ConvertPlan: Equatable {
         if e.changesCount {
             parts.append("\(Self.formatCount(e.frameCountIn)) frame\(e.frameCountIn == 1 ? "" : "s") → \(e.tableFrameCount), " + Self.methodWord(e.countPolicy, grows: e.frameCountGrows == true))
         }
-        if e.scaledToFit { parts.append("turned down to fit (peak \(Wavetable.peakText(e.peak)))") }
-        else if e.mayScaleToFit { parts.append("may be turned down a little to fit after resizing") }
+        if e.scaledToFit { parts.append("attenuated to fit (peak \(Wavetable.peakText(e.peak)))") }
+        else if e.mayScaleToFit { parts.append("may be attenuated a little to fit after resizing") }
         if e.addsPPGWaves { parts.append("the PPG’s four standard waveforms at 60–63") }
         return parts.joined(separator: "; ")
     }
@@ -1003,7 +1009,7 @@ public struct ConvertPlan: Equatable {
     }
 
     /// What the Changes column says for an item: short words for each change the destination
-    /// makes ("2,048 → 1,024 samples", "64 → 256 frames", "turned down", "+ PPG waveforms", "name changed"), and
+    /// makes ("2,048 → 1,024 samples", "64 → 256 frames", "attenuated", "+ PPG waveforms", "name changed"), and
     /// short orange words for the warnings ("peak 1.14", "extra samples dropped"). Both empty
     /// when nothing changes but the format; nil when the item cannot convert.
     public func changeWords(for item: Item) -> (changes: [String], warnings: [String])? {
@@ -1019,8 +1025,10 @@ public struct ConvertPlan: Equatable {
         if e.changesCount {
             changes.append("\(Self.formatCount(e.frameCountIn)) → \(e.tableFrameCount) frames, " + Self.methodWord(e.countPolicy, grows: e.frameCountGrows == true))
         }
-        if e.scaledToFit { changes.append("turned down") }
-        else if e.mayScaleToFit { changes.append("may be turned down") }
+        // "Attenuated": resizing a frame can raise its peak above ±1 (a square to 128 samples
+        // reaches 1.18), and the writer then scales the table to fit (WritePlan.Scaling).
+        if e.scaledToFit { changes.append("attenuated") }
+        else if e.mayScaleToFit { changes.append("may be attenuated") }
         if e.addsPPGWaves { changes.append("+ PPG waveforms") }
         if preset.isThirdWave, WavetableWriter.thirdWaveName(item.name).name != item.name.trimmingCharacters(in: .whitespaces) {
             changes.append("name changed")

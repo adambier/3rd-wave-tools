@@ -242,7 +242,8 @@ public enum WavetableWriter {
             let g = 1 / peak
             frames = frames.map { $0.map { $0 * g } }
             let reason = preset.isThirdWave ? "the 3rd Wave’s own tables stay within ±1" : "16-bit samples cannot go beyond full scale"
-            notes.append("Turned down to fit (peak was \(Wavetable.peakText(peak)), \(decimal(20 * log10(Double(g)), 1)) dB); plays a little quieter: \(reason).")
+            // "Attenuated", the audio word, rather than "turned down" (Adam, 2026-10-26).
+            notes.append("Attenuated by \(decimal(-20 * log10(Double(g)), 1)) dB to fit within ±1 (the peak was \(Wavetable.peakText(peak))): \(reason).")
         }
 
         mutating func notePeakKept() {
