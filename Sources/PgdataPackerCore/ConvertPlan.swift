@@ -77,8 +77,6 @@ public struct ConvertPlan: Equatable {
         /// file leaves the size open (`table.frameSize` is nil), and possible when only its length
         /// suggested one.
         public var chosenFrameSize: Int?
-        /// The user's checkbox; nil follows the destination's default (see `ConvertPlan.isSelected`).
-        public var userSelection: Bool?
         /// A new name from Clean Up Names (nil: the name the file gives).
         public var newName: String?
         /// The largest absolute sample, computed once when the table is added (the views ask for
@@ -288,18 +286,21 @@ public struct ConvertPlan: Equatable {
         }
     }
 
-    /// Whether an item will convert, and if not, why.
+    /// Whether an item will convert, and if not, why. The page acts on the rows the user selects
+    /// (Convert Selected…) or on every table (Convert All…); `isIncluded(_:)` says which tables
+    /// Convert All takes, and the statuses speak of those.
     public enum Status: Equatable {
-        /// Marked to convert, with a frame size that divides the samples into frames.
+        /// Ready: a frame size that divides the samples into frames.
         case ready
-        /// Marked to convert, but the file leaves the frame size open and none has been chosen.
+        /// The file leaves the frame size open and none has been chosen.
         case needsFrameSize
-        /// Marked to convert, but the samples do not divide into frames of the size given.
+        /// The samples do not divide into frames of the size given.
         case cannotSplit
-        /// Not marked to convert: left out.
+        /// Left out by Convert All: a factory table for a 3rd Wave destination, which the 3rd Wave
+        /// already has (Convert Selected… still takes it).
         case excluded
 
-        /// Whether the item is marked to convert but cannot.
+        /// Whether Convert All takes the item but it cannot convert yet.
         public var isBlocked: Bool { self == .needsFrameSize || self == .cannotSplit }
     }
 
@@ -518,21 +519,14 @@ public struct ConvertPlan: Equatable {
     /// Removes items from the list.
     public mutating func remove(_ ids: Set<UUID>) { items.removeAll { ids.contains($0.id) } }
 
-    /// Whether an item is marked to convert by default for the current destination: everything except the
-    /// 3rd Wave's factory tables when the destination is the 3rd Wave, which already has them.
-    public func defaultSelection(_ item: Item) -> Bool { !(preset.isThirdWave && item.factorySlot != nil) }
+    /// Whether Convert All takes an item for the current destination: everything except the 3rd
+    /// Wave's factory tables when the destination is the 3rd Wave, which already has them (Convert
+    /// Selected… takes whatever is selected, those included). The Options captions and the
+    /// destination's cautions describe these items.
+    public func isIncluded(_ item: Item) -> Bool { !(preset.isThirdWave && item.factorySlot != nil) }
 
-    /// Whether an item is marked to convert: the user's choice, or the default.
-    public func isSelected(_ item: Item) -> Bool { item.userSelection ?? defaultSelection(item) }
-
-    /// Marks an item to convert, or clears the mark.
-    public mutating func setSelected(_ id: UUID, _ on: Bool) {
-        guard let i = items.firstIndex(where: { $0.id == id }) else { return }
-        items[i].userSelection = on
-    }
-
-    /// The items marked to convert, in list order.
-    public var selectedItems: [Item] { items.filter(isSelected) }
+    /// The items Convert All takes, in list order.
+    public var includedItems: [Item] { items.filter(isIncluded) }
 
     /// Sets the frame size for an item, from its `frameSizeChoices`; nil, or the file's own size,
     /// clears the choice. Other sizes are ignored.
@@ -597,7 +591,7 @@ public struct ConvertPlan: Equatable {
         if let slot = item.factorySlot {
             let label = "factory " + slot.label + (item.factoryName.map { " " + $0 } ?? "")
             information.append(preset.isThirdWave
-                ? "Same as \(label), which your 3rd Wave is expected to have, so it starts unchecked."
+                ? "Same as \(label), which your 3rd Wave is expected to have, so Convert All leaves it out (Convert Selected… takes it)."
                 : "Same as \(label).")
         }
         return ItemNotes(warnings: warnings, information: information)
@@ -621,17 +615,17 @@ public struct ConvertPlan: Equatable {
 
     /// Whether an item converts, and if not, why.
     public func status(_ item: Item) -> Status {
-        guard isSelected(item) else { return .excluded }
+        guard isIncluded(item) else { return .excluded }
         if item.frameSize == nil { return .needsFrameSize }
         return item.frameCount == nil ? .cannotSplit : .ready
     }
 
     /// The item's status as a sentence or two: what blocks it and what to do, or that it is
-    /// ready, or that it is not marked to convert.
+    /// ready, or that Convert All leaves it out.
     public func statusDescription(_ item: Item) -> String {
         switch status(item) {
         case .ready: return "Ready to convert."
-        case .excluded: return "Not marked to convert; left out."
+        case .excluded: return "Left out by Convert All: a factory table your 3rd Wave already has. Convert Selected… takes it."
         case .needsFrameSize:
             return "Choose a frame size: none could be estimated from the file."
                 + (item.table.candidateFrameSizes.isEmpty ? " Its length allows none of the sizes offered here (powers of two from 64 to 4,096)."
@@ -641,20 +635,20 @@ public struct ConvertPlan: Equatable {
         }
     }
 
-    /// Whether an item marked to convert can't be converted yet (the filter above the table).
+    /// Whether an item Convert All takes can't be converted yet (the filter above the table).
     /// Assumed frame sizes and warnings do not count: those items are converted.
     public func needsAttention(_ item: Item) -> Bool { status(item).isBlocked }
 
-    /// The items marked to convert that cannot convert yet (see `needsAttention`).
+    /// The items Convert All takes that cannot convert yet (see `needsAttention`).
     public var attentionCount: Int { items.filter(needsAttention).count }
 
-    /// The items marked to convert that still need a frame size.
+    /// The items Convert All takes that still need a frame size.
     public var needsFrameSizeCount: Int { items.filter { status($0) == .needsFrameSize }.count }
 
-    /// The items marked to convert whose samples do not divide into frames.
+    /// The items Convert All takes whose samples do not divide into frames.
     public var cannotSplitCount: Int { items.filter { status($0) == .cannotSplit }.count }
 
-    /// The items marked to convert that cannot, for either reason.
+    /// The items Convert All takes that cannot convert yet, for either reason.
     public var blockedCount: Int { items.filter { status($0).isBlocked }.count }
 
     /// What converting does to a table whose destination changes none of its frames, size, or
@@ -679,9 +673,9 @@ public struct ConvertPlan: Equatable {
     /// page's counts of blocked tables jump to this item when clicked.
     public func firstItem(with status: Status) -> Item? { items.first { self.status($0) == status } }
 
-    /// The items marked to convert whose frame count the destination changes.
+    /// The items Convert All takes whose frame count the destination changes.
     public var frameCountChangeCount: Int {
-        selectedItems.filter { expected(for: $0)?.changesCount == true }.count
+        includedItems.filter { expected(for: $0)?.changesCount == true }.count
     }
 
     /// Whether converting to a destination has been tested (`OutputPreset.testedIn`): the
@@ -712,7 +706,7 @@ public struct ConvertPlan: Equatable {
     /// The 3rd Wave destinations have none: how many tables fit is a matter for the 3rd Wave
     /// (section 7 of FORMATS.md), not a caution the page raises.
     public func caveat(for preset: OutputPreset) -> String? {
-        let tables = selectedItems.filter(canConvert)
+        let tables = includedItems.filter(canConvert)
         switch preset {
         case .wav2048:
             let notCrossfade = tables.contains { (item: Item) -> Bool in
@@ -812,7 +806,7 @@ public struct ConvertPlan: Equatable {
         var unchosen = options
         unchosen.interpolation = nil
         var counts: [Interpolation: Int] = [:]
-        for item in selectedItems where canConvert(item) && item.table.interpolation != nil {
+        for item in includedItems where canConvert(item) && item.table.interpolation != nil {
             if let i = WavetableWriter.interpolationRecorded(for: preset, source: item.table.interpolation, options: unchosen) {
                 counts[i, default: 0] += 1
             }
@@ -824,7 +818,7 @@ public struct ConvertPlan: Equatable {
     /// `defaultInterpolation` unless one is chosen); 0 when the destination records none.
     public var unstatedInterpolationCount: Int {
         guard preset.recordsInterpolation else { return 0 }
-        return selectedItems.filter { canConvert($0) && $0.table.interpolation == nil }.count
+        return includedItems.filter { canConvert($0) && $0.table.interpolation == nil }.count
     }
 
     /// The one interpolation every table to convert states (see `existingInterpolations`); nil
@@ -870,7 +864,7 @@ public struct ConvertPlan: Equatable {
     /// Tonverk frame size picker). Tables that cannot convert yet are left out.
     public func existingFrameSizes() -> [Int: Int] {
         var counts: [Int: Int] = [:]
-        for item in selectedItems where canConvert(item) {
+        for item in includedItems where canConvert(item) {
             if let n = item.frameSize { counts[n, default: 0] += 1 }
         }
         return counts
@@ -952,7 +946,7 @@ public struct ConvertPlan: Equatable {
     /// How many tables to convert gain frames and how many lose them for the destination.
     public var frameCountChanges: (gain: Int, lose: Int) {
         var gain = 0, lose = 0
-        for item in selectedItems {
+        for item in includedItems {
             guard let grows = expected(for: item)?.frameCountGrows else { continue }
             if grows { gain += 1 } else { lose += 1 }
         }
@@ -1029,7 +1023,7 @@ public struct ConvertPlan: Equatable {
 
     // MARK: Preview
 
-    /// Runs the writer for one item (whether it is marked to convert does not matter), so the preview can
+    /// Runs the writer for one item (whether Convert All takes it does not matter), so the preview can
     /// show what converting it does; nil when the item cannot convert or the writer fails.
     public func preview(_ item: Item,
                         write: (Wavetable, OutputPreset, OutputOptions) throws -> OutputFile = WavetableWriter.write)
@@ -1056,13 +1050,15 @@ public struct ConvertPlan: Equatable {
 
     // MARK: Converting
 
-    /// Converts the items marked to convert with `write` (each separately; a failure is collected, not
-    /// thrown), and gives the files unique names. Items without a known frame size are reported
-    /// and left out.
-    public func convert(write: (Wavetable, OutputPreset, OutputOptions) throws -> OutputFile = WavetableWriter.write)
+    /// Converts items with `write` (each separately; a failure is collected, not thrown), and
+    /// gives the files unique names: the items with the given ids, in list order (Convert
+    /// Selected…), or, with nil, the items Convert All takes (`includedItems`). Items without a
+    /// known frame size are reported and left out.
+    public func convert(_ ids: Set<UUID>? = nil, write: (Wavetable, OutputPreset, OutputOptions) throws -> OutputFile = WavetableWriter.write)
         -> Conversion {
-        var files: [OutputFile] = [], ids: [UUID] = [], reports: [ItemReport] = [], errors: [String] = []
-        for item in selectedItems {
+        var files: [OutputFile] = [], converted: [UUID] = [], reports: [ItemReport] = [], errors: [String] = []
+        let chosen = ids.map { (wanted: Set<UUID>) in items.filter { wanted.contains($0.id) } } ?? includedItems
+        for item in chosen {
             guard var table = item.table.wavetable(frameSize: item.frameSize) else {
                 errors.append("\(item.name): " + (item.frameSize == nil
                     ? "choose a frame size first"
@@ -1072,13 +1068,13 @@ public struct ConvertPlan: Equatable {
             table.name = item.name
             do {
                 let f = try write(table, preset, options)
-                files.append(f); ids.append(item.id)
+                files.append(f); converted.append(item.id)
                 reports.append(ItemReport(name: item.name, notes: f.notes))
             } catch {
                 errors.append("\(item.name): \(Self.describe(error))")
             }
         }
-        return Conversion(files: Self.uniqueNames(files), itemIDs: ids, reports: reports, errors: errors)
+        return Conversion(files: Self.uniqueNames(files), itemIDs: converted, reports: reports, errors: errors)
     }
 
     /// The notes of a conversion, each distinct note once with the tables it applies to: the

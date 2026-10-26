@@ -265,7 +265,7 @@ PgdataPackerCore (`Sources/PgdataPackerCore/`):
 | Type | File | Role |
 |---|---|---|
 | `ContentFile`, `PackPlan`, `UnpackPlan`, `OutputNames`, `Oscillator`, `ProgramFile.repointed` | `Workbench.swift` | Pack and Unpack page decisions and output file names |
-| `ConvertPlan`, `ConvertPreviewCache` | `ConvertPlan.swift` | Wavetables page decisions: collecting files, collapsing duplicates, frame-size choice (`Item.frameSize`, `frameSizeChoices`, `sizeQualifier`, `SizeSource`), the preview's override (`Item.frameSizeAlternatives`, `sizeIsStated`), one frame size for several tables (`adjustableItems(in:)`, `commonFrameSizes(of:)`, `sharedFrameSize(of:)`, `chooseFrameSize(_:forAll:)`), blocked-table jumps (`firstItem(with:)`), expected results, the under-development notice (`conversionUnderDevelopment`, `testingStatus(_:)`), reports |
+| `ConvertPlan`, `ConvertPreviewCache` | `ConvertPlan.swift` | Wavetables page decisions: collecting files, collapsing duplicates, frame-size choice (`Item.frameSize`, `frameSizeChoices`, `sizeQualifier`, `SizeSource`), the preview's override (`Item.frameSizeAlternatives`, `sizeIsStated`), one frame size for several tables (`adjustableItems(in:)`, `commonFrameSizes(of:)`, `sharedFrameSize(of:)`, `chooseFrameSize(_:forAll:)`), blocked-table jumps (`firstItem(with:)`), which tables Convert All takes (`isIncluded(_:)`, `includedItems`: every table but factory tables for a 3rd Wave destination) and converting them or a selection (`convert(_:write:)`), expected results, the under-development notice (`conversionUnderDevelopment`, `testingStatus(_:)`), reports |
 | `NameCleaner` | `NameCleaner.swift` | Clean Up Names proposals |
 | `OutputPreset` display extensions | `DestinationInfo.swift` | What the Wavetables page says about each destination: `Group` (with `title`, `presets`), `group`, `shortTitle`, `specLine`, `distinction` |
 | `ConvertReport`, `ReportText` | `ConvertReport.swift` | The Wavetables page's report after converting (alert title and text, log text); the item-line form every report uses |
@@ -279,10 +279,15 @@ App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle
 writing with progress), `SearchField.swift` (an `NSSearchField` for SwiftUI), `AudioPreview.swift`
 (the Listen control's engine: `AVAudioEngine` with a source node whose `Voice` owns three fixed
 buffers, band-limiting through `Resampling.bandLimitedCycle`, and the CoreAudio output-device list).
-`ConvertView.swift` also holds `TableReveal` (scrolls the Wavetables table to a row through the
-`NSTableView` behind SwiftUI's `Table`; the summary strip's blocked counts jump to
-`ConvertPlan.firstItem(with:)`) and `ConvertPaneDivider` (the preview's height,
-`AppState.convertPreviewHeight`); `ConvertDetail.swift` holds the preview: `ConvertSweepControls`
+The Wavetables page is laid out as the other two: the table on the left, and on the right the
+selected table's preview (`ConvertDetailPane`) over the destination pane; its buttons are Pack's
+(Remove Selected, Remove All…, **Convert Selected…**, **Convert All…**, the last two through
+`AppState.convertTables(_:)`), and the 3rd Wave options' checkbox "Also add the .wt files to the
+Pack page" (`AppState.convertAddsToPack`) is honoured by both. `ConvertView.swift` also holds
+`TableReveal` (scrolls the Wavetables table to a row through the `NSTableView` behind SwiftUI's
+`Table`; the summary strip's blocked counts jump to `ConvertPlan.firstItem(with:)`) and
+`ConvertPaneDivider` (the preview's height, `AppState.convertPreviewHeight`); `ConvertDetail.swift`
+holds the preview: `ConvertSweepControls`
 (Frame slider, Listen/Stop, pitch pop-up over `AudioPreview.pitches`, C2–C6), `ConvertSweepView`,
 `ConvertSizeOverrideLink` (Override Frame Size…, over `Item.frameSizeAlternatives`), and
 `ConvertSeveralFrameSize` (one frame size for several selected tables). `main.swift` also holds

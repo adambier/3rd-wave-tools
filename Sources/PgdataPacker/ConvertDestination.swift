@@ -10,8 +10,8 @@ import WavetableFormats
 import PgdataPackerCore
 #endif
 
-/// The right-hand pane of the Wavetables page: the destinations in two groups, a line on what they
-/// rest on, and the options that apply to the one chosen.
+/// The lower part of the Wavetables page's right pane, under the preview: the destinations in
+/// two groups, a line on what they rest on, and the options that apply to the one chosen.
 struct ConvertDestinationPane: View {
     @EnvironmentObject var state: AppState
 
@@ -25,7 +25,7 @@ struct ConvertDestinationPane: View {
                     HStack(alignment: .top, spacing: 8) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Convert to").font(.headline)
-                            Text(ConvertDestinationPane.scope(plan.selectedItems.count))
+                            Text(ConvertDestinationPane.scope(plan.includedItems.count, of: plan.items.count))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer(minLength: 0)
@@ -50,27 +50,22 @@ struct ConvertDestinationPane: View {
             }
             if plan.preset.isThirdWave {
                 Divider()
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("To load .wt files: copy the WAVES folder onto the 3rd Wave’s USB drive and use Global → “Bulk wavetable import”, or add them to the 3rd Wave Terminal app’s library and sync.")
-                    Text("Send to Pack also adds the .wt files to the Pack page.")
-                }
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12).padding(.vertical, 8)
+                Text("To load .wt files: copy the WAVES folder onto the 3rd Wave’s USB drive and use Global → “Bulk wavetable import”, or add them to the 3rd Wave Terminal app’s library and sync.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
             }
         }
     }
 
-    /// "For all 75 tables to convert": the destination and its options apply to every table
-    /// marked to convert, unlike the preview below the table.
-    static func scope(_ marked: Int) -> String {
-        switch marked {
-        case 0: return "No tables are marked to convert yet."
-        case 1: return "For the one table to convert."
-        case 2: return "For both tables to convert."
-        default: return "For all \(marked) tables to convert."
-        }
+    /// Under "Convert to": what the destination and its options apply to ("For all 75 tables."),
+    /// unlike the preview above, which is one table's. Convert All's set is named when factory
+    /// tables are left out of it.
+    static func scope(_ included: Int, of total: Int) -> String {
+        if total == 0 { return "No tables yet." }
+        if included == total { return total == 1 ? "For the one table." : (total == 2 ? "For both tables." : "For all \(total) tables.") }
+        return "For every table; Convert All takes \(included) of \(total) (factory tables left out)."
     }
 }
 
@@ -255,13 +250,14 @@ struct ConvertOptionsBox: View {
         let preset = plan.preset
         let changes = plan.frameCountChanges
         let frameCount = changes.gain + changes.lose > 0
-        if frameCount || preset.recordsInterpolation || preset == .tonverk || preset == .thirdWaveP {
+        if frameCount || preset.recordsInterpolation || preset == .tonverk || preset.isThirdWave {
             GroupBox("Options") {
                 VStack(alignment: .leading, spacing: 12) {
                     if frameCount { ConvertFrameCountOption(state: state) }
                     if preset.recordsInterpolation { ConvertInterpolationOption(state: state) }
                     if preset == .tonverk { ConvertTonverkSizeOption(state: state) }
                     if preset == .thirdWaveP { ConvertPPGOption(state: state) }
+                    if preset.isThirdWave { ConvertPackOption(state: state) }
                 }
                 .padding(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -436,6 +432,18 @@ struct ConvertTonverkSizeOption: View {
                 state.convertPlan.options.tonverkFrameSize = value == state.convertPlan.sharedTonverkFrameSize ? nil : value
             }
         )
+    }
+}
+
+/// For a 3rd Wave destination: whether the .wt files written are then added to the Pack page
+/// (`AppState.convertAddsToPack`), which both Convert buttons honour.
+struct ConvertPackOption: View {
+    @ObservedObject var state: AppState
+
+    var body: some View {
+        Toggle("Also add the .wt files to the Pack page", isOn: $state.convertAddsToPack)
+            .toggleStyle(.checkbox)
+            .help("After converting, the .wt files are added to the Pack page’s “Added Wavetables and Samples”, ready to embed in a .pgdata, and that page is shown. The files stay where they were written.")
     }
 }
 

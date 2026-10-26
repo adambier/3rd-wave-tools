@@ -129,24 +129,26 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertNil(plan.items[1].factorySlot)
         XCTAssertNil(plan.items[2].factorySlot)   // not a 3rd Wave source: no fingerprint, never flagged
 
-        // A 3rd Wave destination: the factory table starts unchecked, with a note saying why.
-        XCTAssertFalse(plan.isSelected(factory))
-        XCTAssertTrue(plan.isSelected(plan.items[1]))
-        XCTAssertTrue(plan.isSelected(plan.items[2]))
-        XCTAssertTrue(plan.notes(for: factory).contains { $0.contains("expected to have, so it starts unchecked") })
-        XCTAssertEqual(plan.selectedItems.map(\.name), ["Mine", "Pad"])
+        // A 3rd Wave destination: Convert All leaves the factory table out, with a note saying why.
+        XCTAssertFalse(plan.isIncluded(factory))
+        XCTAssertTrue(plan.isIncluded(plan.items[1]))
+        XCTAssertTrue(plan.isIncluded(plan.items[2]))
+        XCTAssertEqual(plan.status(factory), .excluded)
+        XCTAssertTrue(plan.notes(for: factory).contains { $0.contains("expected to have, so Convert All leaves it out") })
+        XCTAssertEqual(plan.includedItems.map(\.name), ["Mine", "Pad"])
 
-        // Another destination: ticked, flagged without the 3rd Wave note.
+        // Another destination: included, flagged without the 3rd Wave note.
         plan.preset = .wav2048
-        XCTAssertTrue(plan.isSelected(plan.items[0]))
-        XCTAssertFalse(plan.notes(for: plan.items[0]).contains { $0.contains("starts unchecked") })
+        XCTAssertTrue(plan.isIncluded(plan.items[0]))
+        XCTAssertFalse(plan.notes(for: plan.items[0]).contains { $0.contains("leaves it out") })
         XCTAssertTrue(plan.notes(for: plan.items[0]).contains { $0.contains("U07") })
 
-        // The user's tick wins over the default either way.
+        // Convert Selected… converts exactly the ids given, the factory table among them.
         plan.preset = .thirdWaveP
-        plan.setSelected(factory.id, true)
-        plan.setSelected(plan.items[2].id, false)
-        XCTAssertEqual(plan.selectedItems.map(\.name), [name, "Mine"])
+        let all = plan.convert()
+        XCTAssertEqual(all.itemIDs, [plan.items[1].id, plan.items[2].id])
+        let some = plan.convert([factory.id, plan.items[1].id])
+        XCTAssertEqual(some.itemIDs, [factory.id, plan.items[1].id])
     }
 
     func testFactoryPTableNameThatRepeatsTheSlotIsLeftOut() throws {
@@ -173,7 +175,7 @@ final class ConvertPlanTests: XCTestCase {
         XCTAssertEqual(item.sizeSource, .notStated)
         XCTAssertEqual(item.basisDescription, "Unable to estimate a frame size from this file. Its length allows 256 (64 frames) or 2,048 (8 frames).")
         XCTAssertFalse(plan.canConvert(item))
-        XCTAssertTrue(plan.isSelected(item))   // ticked, but not converted until a size is chosen
+        XCTAssertTrue(plan.isIncluded(item))   // included, but not converted until a size is chosen
         XCTAssertEqual(plan.expectedResult(for: item), "Choose a frame size first")
         XCTAssertEqual(plan.status(item), .needsFrameSize)
         XCTAssertTrue(plan.statusDescription(item).contains("Choose a frame size"))
@@ -448,13 +450,6 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(p.cannotSplitCount, 1)
         XCTAssertEqual(p.blockedCount, 2)
 
-        // Unticked tables need no attention and are not blocked.
-        p.setSelected(open.id, false)
-        XCTAssertEqual(p.status(p.items[1]), .excluded)
-        XCTAssertFalse(p.needsAttention(p.items[1]))
-        XCTAssertEqual(p.blockedCount, 1)
-        XCTAssertEqual(p.attentionCount, 1)
-        XCTAssertEqual(p.statusDescription(p.items[1]), "Not marked to convert; left out.")
 
         // Choosing a size for a guessed table makes it the user's choice.
         p.chooseFrameSize(guess.id, 1024)
@@ -1011,17 +1006,17 @@ final class ConvertExistingChoicesTests: XCTestCase {
         plan.options.interpolation = .spectral
         XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 1, Interpolation.none: 2, .spectral: 1])
         plan.options.interpolation = nil
-        // Tables not marked to convert are left out; when the rest all state one value, it is shared.
-        for item in plan.items where item.table.interpolation != Interpolation.none { plan.setSelected(item.id, false) }
+        // Only the tables listed count; when they all state one value, it is shared.
+        plan.remove(Set(plan.items.filter { $0.table.interpolation != Interpolation.none }.map(\.id)))
         XCTAssertEqual(plan.existingInterpolations(), [Interpolation.none: 2])
         XCTAssertEqual(plan.sharedExistingInterpolation, Interpolation.none)
         XCTAssertNil(plan.eachTablesOwnInterpolationLabel)
         // One stated value plus a file that says nothing: not shared, and the label says so.
-        for item in plan.items where item.table.interpolation == nil { plan.setSelected(item.id, true) }
+        plan = pickerPlan(.wav2048, [(nil, 2048), (Interpolation.none, 2048), (Interpolation.none, 2048)])
         XCTAssertNil(plan.sharedExistingInterpolation)
         XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped; 1 not stated")
-        // Nothing stated at all: no counts, no "existing"; the default (crossfade) is the unmarked item.
-        for item in plan.items { plan.setSelected(item.id, false) }
+        // No tables at all: no counts, no "existing"; the default (crossfade) is the unmarked item.
+        plan = ConvertPlan(preset: .wav2048)
         XCTAssertEqual(plan.existingInterpolations(), [:])
         XCTAssertNil(plan.sharedExistingInterpolation)
         XCTAssertNil(plan.eachTablesOwnInterpolationLabel)
@@ -1032,7 +1027,7 @@ final class ConvertExistingChoicesTests: XCTestCase {
         XCTAssertNil(unstated.eachTablesOwnInterpolationLabel)
         XCTAssertEqual(unstated.defaultInterpolationItem, .crossfade)
         // A destination whose files record no interpolation has nothing to count.
-        for item in plan.items { plan.setSelected(item.id, true) }
+        plan = pickerPlan(.wav2048, [(.crossfade, 2048), (nil, 2048), (Interpolation.none, 2048), (.spectral, 2048), (Interpolation.none, 2048)])
         plan.preset = .thirdWaveU
         XCTAssertEqual(plan.existingInterpolations(), [:])
         XCTAssertEqual(plan.unstatedInterpolationCount, 0)
@@ -1077,7 +1072,7 @@ final class ConvertExistingChoicesTests: XCTestCase {
         plan = pickerPlan(.tonverk, [(nil, 600), (nil, 1000), (nil, 1000)])
         XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel?.text, "Each table’s own — existing: 2,048 for 3 tables of 600 and 1,000, which Tonverk doesn’t take")
         // Nothing to convert.
-        for item in plan.items { plan.setSelected(item.id, false) }
+        plan.remove(Set(plan.items.map(\.id)))
         XCTAssertEqual(plan.existingFrameSizes(), [:])
         XCTAssertEqual(plan.eachTablesOwnFrameSizeLabel, ConvertPlan.ChoiceLabel(value: "Each table’s own"))
         // The label's rule is the writer's: what each of those tables is written at.

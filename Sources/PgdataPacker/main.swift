@@ -174,18 +174,13 @@ final class MenuActions: NSObject, NSMenuItemValidation {
         }
     }
 
-    /// The current page's main action: Pack All…, Unpack All…, or Convert….
+    /// The current page's main action: Pack All…, Unpack All…, or Convert All….
     @objc func mainAction(_ sender: Any?) {
         switch appState.section {
         case .pack: appState.writeUnified(appState.programs.map(\.id))
         case .unpack: appState.unpack(appState.unpacks.map(\.id))
         case .convert: appState.convertTables()
         }
-    }
-
-    /// The Wavetables page's "Send to Pack…".
-    @objc func sendToPack(_ sender: Any?) {
-        appState.convertTables(sendToPack: true)
     }
 
     /// Shows the page the item's tag names (its index in `AppState.Section.allCases`).
@@ -210,7 +205,7 @@ final class MenuActions: NSObject, NSMenuItemValidation {
         switch appState.section {
         case .pack: return "Pack All…"
         case .unpack: return "Unpack All…"
-        case .convert: return "Convert…"
+        case .convert: return "Convert All…"
         }
     }
 
@@ -220,7 +215,7 @@ final class MenuActions: NSObject, NSMenuItemValidation {
         switch appState.section {
         case .pack: return !appState.programs.isEmpty
         case .unpack: return !appState.unpacks.isEmpty
-        case .convert: return !appState.convertPlan.selectedItems.isEmpty
+        case .convert: return !appState.convertPlan.includedItems.isEmpty
         }
     }
 
@@ -232,11 +227,6 @@ final class MenuActions: NSObject, NSMenuItemValidation {
         case #selector(mainAction(_:)):
             menuItem.title = mainActionTitle
             return mainActionEnabled
-        case #selector(sendToPack(_:)):
-            // Enabled as the Wavetables page's button is: tables marked, and a 3rd Wave destination.
-            let plan = appState.convertPlan
-            return appState.section == .convert && !appState.isWorking
-                && !plan.selectedItems.isEmpty && plan.preset.isThirdWave
         case #selector(showPage(_:)):
             let sections = AppState.Section.allCases
             let current = sections.firstIndex(of: appState.section) ?? -1
@@ -437,8 +427,6 @@ private func buildMainMenu(appDelegate: AppDelegate, menuActions: MenuActions) -
     let mainItem = fileMenu.addItem(withTitle: "Pack All…", action: #selector(MenuActions.mainAction(_:)), keyEquivalent: "e")
     mainItem.keyEquivalentModifierMask = [.command, .shift]
     mainItem.target = menuActions
-    let sendItem = fileMenu.addItem(withTitle: "Send to Pack…", action: #selector(MenuActions.sendToPack(_:)), keyEquivalent: "")
-    sendItem.target = menuActions
     fileMenu.addItem(.separator())
     fileMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
     fileMenuItem.submenu = fileMenu

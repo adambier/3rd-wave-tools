@@ -78,8 +78,8 @@ Notes on each:
   `.pgdata` with **Import unified program data file**. Its **Wave Maker** also imports a Serum
   wavetable WAV into the U set, and takes a WAV of exactly 8,192 samples (64 × 128) as a P
   table.[^3w-manual] The page's 3rd Wave destinations add formats and frame sizes Wave Maker does not
-  read, many tables at once, and **Send to Pack**. The page does not make wavetables from other
-  audio: that is what Wave Maker is for.
+  read, many tables at once, and a step straight to the Pack page. The page does not make
+  wavetables from other audio: that is what Wave Maker is for.
 
 ### The Surge `.wt` file
 

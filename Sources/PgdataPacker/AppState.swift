@@ -148,6 +148,11 @@ final class AppState: ObservableObject {
     @Published var convertOnlyAttention = false
     /// The Wavetables page's filter by name (as `programFilter` is the Pack page's).
     @Published var convertFilter = ""
+    /// Whether converting to a 3rd Wave destination then adds the .wt files to the Pack page (the
+    /// 3rd Wave options' checkbox); kept between sessions.
+    @Published var convertAddsToPack: Bool = UserDefaults.standard.bool(forKey: "ConvertAddsToPack") {
+        didSet { UserDefaults.standard.set(convertAddsToPack, forKey: "ConvertAddsToPack") }
+    }
 
     /// The Wavetables page's rows as shown: every table, those matching `convertFilter` (by name
     /// or file name), and, with `convertOnlyAttention`, only those that can't be converted yet.
@@ -865,7 +870,7 @@ final class AppState: ObservableObject {
         guard n > 0 else { return }
         let what = "\(n) table\(n == 1 ? "" : "s")"
         Panels.confirm(title: "Remove everything from the Wavetables page?",
-                       message: "This removes \(what) from the list, with the tables you marked to convert and the frame sizes you chose. The files themselves are not touched.",
+                       message: "This removes \(what) from the list, with the names and frame sizes you chose. The files themselves are not touched.",
                        ok: "Remove All") { [weak self] (confirmed: Bool) in
             guard confirmed, let self else { return }
             let items = Array(self.convertPlan.items.enumerated())
@@ -880,35 +885,37 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Converts the tables marked to convert for the chosen destination into a folder the user chooses. With
-    /// `sendToPack` (3rd Wave destinations), the .wt files written are then added to the Pack page.
-    /// The converting and writing run on a background queue, with progress in the status bar; the
-    /// plan is taken as it is when the folder is chosen, and the preview cache is left alone.
-    func convertTables(sendToPack: Bool = false) {
+    /// Converts tables for the chosen destination into a folder the user chooses: the tables
+    /// with the given ids (Convert Selected…), or, with nil, every table Convert All takes
+    /// (`ConvertPlan.includedItems`). For a 3rd Wave destination with `convertAddsToPack` on,
+    /// the .wt files written are then added to the Pack page. The converting and writing run on
+    /// a background queue, with progress in the status bar; the report comes up at the end.
+    func convertTables(_ ids: Set<UUID>? = nil) {
         guard !isWorking else { return }
         let plan = convertPlan
-        let marked = plan.selectedItems
-        guard !marked.isEmpty else {
-            alertMessage = "No tables are marked to convert. Check the tables to convert in the Convert column."
+        let chosen = ids.map { (wanted: Set<UUID>) in plan.items.filter { wanted.contains($0.id) } } ?? plan.includedItems
+        let what = ids == nil ? "to convert" : "selected"
+        guard !chosen.isEmpty else {
+            alertMessage = ids == nil ? "No tables to convert." : "No tables are selected."
             return
         }
-        guard marked.contains(where: plan.canConvert) else {
-            alertMessage = (marked.count == 1 ? "The table marked to convert can’t be converted yet: a frame size could not be estimated from its file."
-                                              : "None of the tables marked to convert can be converted yet: frame sizes could not be estimated from their files.")
+        guard chosen.contains(where: plan.canConvert) else {
+            alertMessage = (chosen.count == 1 ? "The table \(what) can’t be converted yet: a frame size could not be estimated from its file."
+                                              : "None of the tables \(what) can be converted yet: frame sizes could not be estimated from their files.")
                 + "\n\nChoose a frame size in the Input column first."
             return
         }
-        let toPack = sendToPack && plan.preset.isThirdWave
+        let toPack = convertAddsToPack && plan.preset.isThirdWave
         guard let folder = Panels.chooseFolder(
-            prompt: toPack ? "Convert and Send" : "Convert Here",
+            prompt: "Convert Here",
             message: toPack ? "Choose where to put the .wt files; they are then added to the Pack page"
                             : "Choose where to put the converted files") else { return }
-        let total = marked.filter(plan.canConvert).count
+        let total = chosen.filter(plan.canConvert).count
         working = WorkProgress(verb: "Converting", done: 0, total: total)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             // The plan converts each table through this writer; it counts them for the status bar.
             var current = 0
-            let conversion = plan.convert { (table: Wavetable, preset: OutputPreset, options: OutputOptions) throws -> OutputFile in
+            let conversion = plan.convert(ids) { (table: Wavetable, preset: OutputPreset, options: OutputOptions) throws -> OutputFile in
                 current += 1
                 let n = current
                 DispatchQueue.main.async { self?.working = WorkProgress(verb: "Converting", done: n, total: total) }

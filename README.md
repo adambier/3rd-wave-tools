@@ -290,14 +290,15 @@ Drop wavetable files or folders: WAV and FLAC wavetables (the kinds Serum, Vital
 and many other synths use), the 3rd Wave's `.wt` and `.pgdata` files, and Surge `.wt` files.
 Folders are searched, and files without wavetables are passed over. Each table is listed once,
 with any identical copies noted beside it, its frames and frame size, and what converting it
-changes. Groove Synthesis's factory tables are marked, and for a 3rd Wave destination they start
-unchecked, since the app assumes your 3rd Wave already has them (see
-[Factory wavetables](#factory-wavetables)). Names are edited in the table (double-click a row);
-**Clean Up Names…** works as on the Pack page.
+changes. Groove Synthesis's factory tables are marked; for a 3rd Wave destination, **Convert
+All…** leaves them out, since the app assumes your 3rd Wave already has them (see
+[Factory wavetables](#factory-wavetables)), and **Convert Selected…** still takes them. Names are
+edited in the table (double-click a row); **Clean Up Names…** works as on the Pack page.
 
 The page converts existing wavetables; it does not make wavetables from other audio, which is
 what the 3rd Wave's **Wave Maker** does. Wave Maker also imports a Serum wavetable directly; this
-page adds other formats and frame sizes, many tables at once, and Send to Pack.
+page adds other formats and frame sizes, many tables at once, and a step straight to the Pack
+page.
 
 #### Frame sizes
 
@@ -330,9 +331,9 @@ filter field above the table narrows the list by name or file, as on the Pack pa
 | Surge XT | a Surge `.wt` |
 | WaveEdit, E370 | a 16-bit WAV of 64 frames of 256 |
 
-The destination applies to every table marked to convert. The chosen row says why its format is
-separate and, in orange, what is open about it: that converting to it has not yet been tested
-(none has), and anything its sources leave open that the tables to convert bring about. The book
+The destination applies to every table converted. The chosen row says why its format is separate
+and, in orange, what is open about it: that converting to it has not yet been tested (none has),
+and anything its sources leave open that the tables bring about. The book
 icon beside each row (under **Sources**) opens the documents the format rests on; a green seal in
 its place marks a destination that has been tested. While any destination is untested, the page
 carries a notice that wavetable conversion is under development.
@@ -340,7 +341,8 @@ carries a notice that wavetable conversion is under development.
 
 #### Options
 
-Shown when a choice applies to the destination and the tables to convert:
+Shown when a choice applies to the destination and the tables (the captions count the tables
+**Convert All…** takes):
 
 - When the destination needs a different number of frames, **Original Frames Only** keeps evenly
   spaced originals (the first and last among them) for fewer frames and repeats each original in
@@ -351,22 +353,25 @@ Shown when a choice applies to the destination and the tables to convert:
   column shows what each table's own file specifies; by default each table keeps that, and a
   table whose file says nothing gets crossfade.
 - Tonverk's frame size, and the PPG's four standard waveforms for P tables.
+- For a 3rd Wave destination, **Also add the .wt files to the Pack page**, to embed them in
+  programs; both Convert buttons honour it.
 
 #### Preview
 
-The pane below the table shows the selected table: the input and the result stacked frame by
-frame, with the interpolation drawn between frames where a file records one; its file, its frame
-size and what that rests on, its interpolation, and what converting changes. The **Frame** slider
+The pane at the top right shows the selected table, as the Pack and Unpack pages show their
+selection: the input and the result stacked frame by frame, with the interpolation drawn between
+frames where a file records one; its file, its frame size and what that rests on, its
+interpolation, and what converting changes. The **Frame** slider
 sweeps through the table and draws the cycle there large, input and result together. **Listen** plays that cycle, following the slider, at the pitch chosen
 beside it (a piano key with its number; A3, 220 Hz, to start) through the device chosen under
 **Audio Output**, the speaker icon at the right of the toolbar.
 
 #### Converting
 
-**Convert…** writes the files into a folder you choose (3rd Wave tables into a `WAVES` folder
-inside it) and reports everything it changed; it never replaces an existing file. For a 3rd Wave
-destination, **Send to Pack…** does the same and then adds the `.wt` files to the Pack page, to
-embed in programs.
+**Convert Selected…** writes the selected tables, and **Convert All…** every table (for a 3rd
+Wave destination, every table but the factory ones), into a folder you choose (3rd Wave tables
+into a `WAVES` folder inside it), and reports everything it changed; neither replaces an existing
+file. With the Pack option on, the `.wt` files are then added to the Pack page.
 
 To load the `.wt` files on the 3rd Wave, copy the `WAVES` folder onto its USB drive and use
 Global → **Bulk wavetable import**, or add them to the 3rd Wave Terminal app's library and sync.

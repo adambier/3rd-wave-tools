@@ -11,10 +11,11 @@ import WavetableFormats
 import PgdataPackerCore
 #endif
 
-/// The Wavetables page: the wavetables found in the files added (top left), a read-only preview of
-/// the selected one (bottom left), and the destination with its options, which apply to every
-/// table to convert (right). The decisions are in `ConvertPlan`; the preview is in
-/// ConvertDetail.swift and the destination pane in ConvertDestination.swift.
+/// The Wavetables page, laid out as Pack and Unpack are: the list on the left (here the table of
+/// wavetables found in the files added) and, on the right, the selection's detail (a read-only
+/// preview of the selected table) over the destination with its options, which apply to every
+/// table converted. The decisions are in `ConvertPlan`; the preview is in ConvertDetail.swift
+/// and the destination pane in ConvertDestination.swift.
 struct ConvertView: View {
     @EnvironmentObject var state: AppState
     @State private var selection = Set<UUID>()
@@ -31,24 +32,24 @@ struct ConvertView: View {
                           detail: "Add WAV and FLAC wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table is then listed with its size (frames × samples per frame) and what converting changes, and previewed below. This page converts existing wavetables between formats; it does not make wavetables from other audio.")
             } else {
                 HSplitView {
+                    ConvertTablesPane(selection: $selection)
+                        .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
                     // The preview's height is the page's own (dragged at the divider, kept
                     // between sessions): a VSplitView gave the preview back its smallest height
                     // whenever the selection changed its content.
                     GeometryReader { (geo: GeometryProxy) in
-                        let tallest = max(ConvertPaneDivider.minimumHeight, geo.size.height - ConvertPaneDivider.tableMinimumHeight)
+                        let tallest = max(ConvertPaneDivider.minimumHeight, geo.size.height - ConvertPaneDivider.destinationMinimumHeight)
                         let height = min(max(state.convertPreviewHeight, ConvertPaneDivider.minimumHeight), tallest)
                         VStack(spacing: 0) {
-                            ConvertTablesPane(selection: $selection)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            ConvertPaneDivider(height: $state.convertPreviewHeight, tallest: tallest)
                             ConvertDetailPane(selection: selection)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: height)
+                            ConvertPaneDivider(height: $state.convertPreviewHeight, tallest: tallest)
+                            ConvertDestinationPane()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                     }
-                    .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
-                    ConvertDestinationPane()
-                        .frame(minWidth: 260, idealWidth: 300, maxWidth: 380, maxHeight: .infinity)
+                    .frame(minWidth: 440, idealWidth: 480, maxWidth: 640, maxHeight: .infinity)
                 }
             }
         }
@@ -68,9 +69,10 @@ struct ConvertView: View {
     /// The selection without rows the filter hides.
     private var visibleSelection: Set<UUID> { selection.intersection(state.convertShownItems.map(\.id)) }
 
+    // The same buttons as Pack and Unpack, in the same places: Add and Clean Up Names on the
+    // left; Remove Selected, Remove All…, Convert Selected…, Convert All… on the right.
     private var controls: some View {
         let plan = state.convertPlan
-        let marked = plan.selectedItems.count
         return HStack(spacing: 14) {
             Button("Add Files or Folders…") {
                 state.addToConvert(urls: Panels.chooseFiles(message: "Choose wavetable files (.wav, .flac, .wt, .pgdata) or folders to search",
@@ -89,16 +91,15 @@ struct ConvertView: View {
             Button("Remove All…") { state.removeAllConvert() }
                 .disabled(plan.items.isEmpty || state.isWorking)
                 .help("Remove every table from this page (the files are not touched)")
-            // Always shown, so the toolbar keeps its width; available for the 3rd Wave presets.
-            Button("Send to Pack…") { state.convertTables(sendToPack: true) }
-                .disabled(marked == 0 || !plan.preset.isThirdWave || state.isWorking)
-                .help(plan.preset.isThirdWave
-                      ? "Convert the tables marked to convert into .wt files in a folder you choose, then add them to the Pack page"
-                      : "Available when converting to a 3rd Wave table")
-            Button("Convert…") { state.convertTables() }
-                .disabled(marked == 0 || state.isWorking)
+            Button("Convert Selected…") { state.convertTables(visibleSelection) }
+                .disabled(visibleSelection.isEmpty || state.isWorking)
+                .help("Convert the selected tables into a folder you choose")
+            Button("Convert All…") { state.convertTables() }
+                .disabled(plan.includedItems.isEmpty || state.isWorking)
                 .buttonStyle(.borderedProminent)
-                .help("Convert the tables marked to convert into a folder you choose")
+                .help(plan.preset.isThirdWave
+                      ? "Convert every table into a folder you choose, except factory tables, which your 3rd Wave already has (Convert Selected… takes them)"
+                      : "Convert every table into a folder you choose")
         }
         .padding(10)
     }
@@ -118,9 +119,10 @@ struct ConvertDevelopmentNotice: View {
     }
 }
 
-/// The divider between the table and the preview: dragging it changes the preview's height
-/// (`AppState.convertPreviewHeight`), between `minimumHeight` and `tallest`, as a split view's
-/// divider would, with the up-down cursor. A thin line in a strip wide enough to grab.
+/// The divider between the preview and the destination in the right pane: dragging it changes
+/// the preview's height (`AppState.convertPreviewHeight`), between `minimumHeight` and
+/// `tallest`, as a split view's divider would, with the up-down cursor. A thin line in a strip
+/// wide enough to grab.
 struct ConvertPaneDivider: View {
     @Binding var height: CGFloat
     /// The most the preview may take: the pane's height less what the table keeps.
@@ -129,9 +131,9 @@ struct ConvertPaneDivider: View {
 
     /// The least the preview is given.
     static let minimumHeight: CGFloat = 170
-    /// What the table above keeps when the preview is dragged up (its header, a few rows, and
-    /// the divider).
-    static let tableMinimumHeight: CGFloat = 220
+    /// What the destination below keeps when the preview is dragged down (its heading, the
+    /// first group of destinations, and the divider; the rest scrolls).
+    static let destinationMinimumHeight: CGFloat = 220
     /// The strip the pointer grabs.
     private static let grabHeight: CGFloat = 9
 
@@ -151,8 +153,8 @@ struct ConvertPaneDivider: View {
                     let start = heightAtStart ?? height
                     heightAtStart = start
                     NSCursor.resizeUpDown.set()   // kept while the pointer runs ahead of the strip
-                    // Dragging down makes the preview shorter.
-                    height = min(max(start - drag.translation.height, Self.minimumHeight), tallest)
+                    // The preview is above the divider: dragging down makes it taller.
+                    height = min(max(start + drag.translation.height, Self.minimumHeight), tallest)
                 }
                 .onEnded { _ in heightAtStart = nil }
         )
@@ -179,7 +181,7 @@ struct ConvertTablesPane: View {
         let st = state
         let rows = shown
         VStack(alignment: .leading, spacing: 0) {
-            ConvertSummaryStrip(state: st) { (status: ConvertPlan.Status) in
+            ConvertSummaryStrip(state: st, shown: rows.count) { (status: ConvertPlan.Status) in
                 // Jump to the first table with that status: select it (the preview follows)
                 // and scroll it into view.
                 guard let item = st.convertPlan.firstItem(with: status) else { return }
@@ -218,18 +220,20 @@ enum TableReveal {
     }
 }
 
-/// One line above the table: how many tables there are and how many are marked to convert,
-/// what blocks any of them (each count a button that jumps to the first such table), and the
-/// filter for the blocked ones.
+/// Above the table, as on the Pack page: the filter field and the filter for blocked tables,
+/// then one line with how many tables there are, how many Convert All leaves out, and what
+/// blocks any of them (each count a button that jumps to the first such table).
 struct ConvertSummaryStrip: View {
     @ObservedObject var state: AppState
+    /// How many rows the filter shows, for the summary line.
+    let shown: Int
     /// Called with a blocking status when its count is clicked.
     let jump: (ConvertPlan.Status) -> Void
 
     var body: some View {
         let plan = state.convertPlan
         let total = plan.items.count
-        let marked = plan.selectedItems.count
+        let leftOut = total - plan.includedItems.count
         VStack(spacing: 0) {
             // The filter field and the filter checkbox above the summary line, as on the Pack
             // page, so the three pages' lists start the same way.
@@ -241,19 +245,26 @@ struct ConvertSummaryStrip: View {
                     .toggleStyle(.checkbox).font(.caption)
                     .disabled(plan.blockedCount == 0)
                     .help(plan.blockedCount == 0
-                          ? "Every table marked to convert can be converted"
-                          : "Show only the tables marked to convert that still need a frame size, or whose samples don’t divide into frames")
+                          ? "Every table can be converted"
+                          : "Show only the tables that still need a frame size, or whose samples don’t divide into frames")
             }
             .padding(.horizontal, 12).padding(.top, 6)
+            // The summary line, worded as Pack's: the count (and how many the filter shows), then
+            // what Convert All leaves out, then what is blocked.
             HStack(spacing: 12) {
-                Text("\(total) table\(total == 1 ? "" : "s") · \(marked) to convert")
+                Text(shown == total ? "\(total) table\(total == 1 ? "" : "s")" : "\(shown) of \(total) tables shown")
                     .monospacedDigit()
+                if leftOut > 0 {
+                    Text(leftOut == 1 ? "1 factory table left out by Convert All" : "\(leftOut) factory tables left out by Convert All")
+                        .foregroundStyle(.secondary)
+                        .help("Your 3rd Wave already has its factory tables, so Convert All skips them; Convert Selected… takes them")
+                }
                 ConvertBlockedCount(count: plan.needsFrameSizeCount, one: "needs a frame size", many: "need frame sizes",
-                                    help: "Tables marked to convert for which no frame size could be estimated: choose one in the Input column. Click to go to the first.") {
+                                    help: "Tables for which no frame size could be estimated: choose one in the Input column. Click to go to the first.") {
                     jump(.needsFrameSize)
                 }
                 ConvertBlockedCount(count: plan.cannotSplitCount, one: "can’t be split", many: "can’t be split",
-                                    help: "Tables marked to convert whose samples don’t divide into frames of the size given. Click to go to the first.") {
+                                    help: "Tables whose samples don’t divide into frames of the size given. Click to go to the first.") {
                     jump(.cannotSplit)
                 }
                 Spacer()
@@ -289,9 +300,10 @@ struct ConvertBlockedCount: View {
     }
 }
 
-/// The table itself: whether it is converted, its state, its name (edited after a double-click
-/// on the row) and origin, its size and where that came from, what the destination writes, and
-/// what changes on the way.
+/// The table itself: each table's state, its name (edited after a double-click on the row) and
+/// origin, its size and where that came from, what the destination writes, and what changes on
+/// the way. Rows Convert All leaves out (factory tables for a 3rd Wave destination) are in
+/// secondary type; Convert Selected… still takes them.
 struct ConvertTable: View {
     @ObservedObject var state: AppState
     let items: [ConvertPlan.Item]
@@ -303,9 +315,6 @@ struct ConvertTable: View {
         let st = state
         let plan = st.convertPlan
         Table(items, selection: $selection) {
-            // Wide enough for its header: at 44 points "Convert" was cut to "Conv…".
-            TableColumn("Convert") { (item: ConvertPlan.Item) in ConvertCheckCell(state: st, item: item) }
-                .width(min: 66, ideal: 66, max: 66)
             TableColumn("") { (item: ConvertPlan.Item) in ConvertStatusCell(status: plan.status(item), tip: plan.statusDescription(item)) }
                 .width(22)
             TableColumn("Name") { (item: ConvertPlan.Item) in ConvertNameCell(state: st, item: item, renaming: $renaming) }
@@ -321,16 +330,16 @@ struct ConvertTable: View {
             // "in file": the column shows what the source file states; the Options box sets what
             // the destination records.
             TableColumn("Interpolation in file") { (item: ConvertPlan.Item) in
-                ConvertInterpolationCell(interpolation: item.table.interpolation, included: plan.isSelected(item))
+                ConvertInterpolationCell(interpolation: item.table.interpolation, included: plan.isIncluded(item))
             }
                 .width(min: 100, ideal: 120)
             TableColumn("Output (frames × samples)") { (item: ConvertPlan.Item) in
-                ConvertOutputCell(expected: plan.expected(for: item), summary: plan.expectedResult(for: item), included: plan.isSelected(item))
+                ConvertOutputCell(expected: plan.expected(for: item), summary: plan.expectedResult(for: item), included: plan.isIncluded(item))
             }
                 .width(min: 170, ideal: 190)
             TableColumn("Changes") { (item: ConvertPlan.Item) in
                 ConvertChangesCell(words: plan.changeWords(for: item), summary: plan.expectedResult(for: item),
-                                   notes: plan.itemNotes(for: item), included: plan.isSelected(item),
+                                   notes: plan.itemNotes(for: item), included: plan.isIncluded(item),
                                    unchanged: plan.unchangedWords(for: item))
             }
                 .width(min: 200, ideal: 330)
@@ -363,20 +372,6 @@ struct ConvertTable: View {
     }
 }
 
-struct ConvertCheckCell: View {
-    @ObservedObject var state: AppState
-    let item: ConvertPlan.Item
-    var body: some View {
-        // The title is the checkbox's name for VoiceOver; the column header shows the word.
-        Toggle("Convert \(item.name)", isOn: Binding(get: { state.convertPlan.isSelected(item) },
-                                                      set: { state.convertPlan.setSelected(item.id, $0) }))
-            .labelsHidden()
-            .help(item.factorySlot != nil && state.convertPlan.preset.isThirdWave
-                  ? "Your 3rd Wave is expected to have this factory table, so it starts unchecked"
-                    + (item.factorySlot?.is2025FactorySlot == true ? " (U48–U55 joined the factory set in 2025; Groove Synthesis offers them as a download)" : "") : "")
-    }
-}
-
 /// The interpolation the table's file states: "None (stepped)", "Crossfade", "Spectral", or, in
 /// secondary type, "Not stated".
 struct ConvertInterpolationCell: View {
@@ -392,8 +387,8 @@ struct ConvertInterpolationCell: View {
     }
 }
 
-/// Red when the table can't be converted yet, a grey check when it is ready, nothing when it is
-/// not marked to convert.
+/// Red when the table can't be converted yet, a grey check when it is ready, nothing when
+/// Convert All leaves it out.
 struct ConvertStatusCell: View {
     let status: ConvertPlan.Status
     let tip: String
@@ -423,16 +418,19 @@ struct ConvertNameCell: View {
     @Binding var renaming: UUID?
     var body: some View {
         let plan = state.convertPlan
-        let included = plan.isSelected(item)
+        let included = plan.isIncluded(item)
         HStack(spacing: 5) {
             ConvertNameField(state: state, item: item, included: included, renaming: $renaming)
             if let origin = item.originBadge {
                 ConvertBadge(text: origin, tip: item.location.url.path)
             }
             if let slot = item.factorySlot {
-                // The slot in the badge, so the row says which factory table this is.
+                // The slot in the badge, so the row says which factory table this is; the tip
+                // adds what that means for a 3rd Wave destination.
                 ConvertBadge(text: "Factory \(slot.label)",
-                             tip: "Same as factory \(slot.label)\(item.factoryName.map { " " + $0 } ?? ""): your 3rd Wave is expected to have it")
+                             tip: "Same as factory \(slot.label)\(item.factoryName.map { " " + $0 } ?? ""): your 3rd Wave is expected to have it"
+                                + (plan.preset.isThirdWave ? ", so Convert All leaves it out (Convert Selected… takes it)" : "")
+                                + (slot.is2025FactorySlot ? ". U48–U55 joined the factory set in 2025; Groove Synthesis offers them as a download." : ""))
             }
             if !item.alsoIn.isEmpty {
                 Label("×\(item.alsoIn.count + 1)", systemImage: "doc.on.doc")
@@ -529,7 +527,7 @@ struct ConvertFrameSizeCell: View {
     @State private var choosing = false
 
     var body: some View {
-        let included = state.convertPlan.isSelected(item)
+        let included = state.convertPlan.isIncluded(item)
         let choices = item.frameSizeChoices
         if choices.isEmpty && !item.needsFrameSize {
             ConvertSizeText(item: item, included: included, plain: true)
@@ -761,7 +759,7 @@ struct ConvertOutputCell: View {
                                 countWeight: e.frameCountOut != e.frameCountIn ? .semibold : .regular,
                                 sizeWeight: e.resizes ? .semibold : .regular)
                 .foregroundStyle(included ? Color.primary : Color.secondary)
-                .help("Output (frames × samples per frame): " + (included ? summary : "not marked to convert. If it were: " + summary))
+                .help("Output (frames × samples per frame): " + (included ? summary : "left out by Convert All; Convert Selected… would write " + summary))
         } else {
             Text("—").foregroundStyle(.secondary).help(summary)
         }
