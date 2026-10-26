@@ -19,7 +19,7 @@ Why you might want to use it:
 - You'd like to extract the program, wavetable, and sample files from unified program files, many
   at a time.
 - You'd like to convert wavetables from other hardware and software synths' formats to the 3rd
-  Wave's, or 3rd Wave P and U tables to formats other synths read.
+  Wave's, or 3rd Wave P and U tables to formats other synths read--one at a time or in bulk.
 - You'd like to look at a set of wavetables and listen to them, the frames of each drawn stacked
   front to back and played at the pitch you choose, and see what each file says about its frame
   size and interpolation.
