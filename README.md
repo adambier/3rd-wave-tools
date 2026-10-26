@@ -11,7 +11,7 @@ those of other synths.
 
 Why might you want to use this app?
 
-* You have existing programs you created or bought that have separate wavetables or samples and you'd like to bundle them together for ease of archiving, importation into the 3rd Wave Terminal app, and sharing with others
+* You have existing programs you created or downloaded that have separate wavetables or samples and you'd like to bundle them together for ease of archiving, importation into the 3rd Wave Terminal app, and sharing with others
 * You'd like to run an analysis on a set of program data files to see which wavetables or samples are missing or orphaned (without any programs that make use of them)
 * You'd like to bulk-extract program, wavetable, or sample files from unified program data files
 * You'd like to convert wavetables in different hardware and VST synth formats to 3rd Wave-compatible formats, or to convert 3rd Wave P or U wavetables to formats usably by other synths
