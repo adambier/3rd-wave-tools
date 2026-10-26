@@ -64,10 +64,57 @@ struct ConvertPreviewPlaceholder: View {
                 .foregroundStyle(.secondary)
             if items.count > 1 {
                 ConvertSeveralSummary(plan: plan, items: items)
+                ConvertSeveralFrameSize(state: state, items: items)
+                    .padding(.top, 6)
             }
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+/// For several selected tables: one frame size for those whose file does not state one
+/// (assumed, estimated, or open), from the sizes all of them allow. Select all (⌘A) and a folder
+/// of unlabelled WAVs from one maker is settled in one choice. Tables whose file states a size
+/// keep it (the preview's Override Frame Size… is for one table at a time). Nothing when no
+/// selected table is adjustable, or no one size fits them all.
+struct ConvertSeveralFrameSize: View {
+    @ObservedObject var state: AppState
+    let items: [ConvertPlan.Item]
+
+    var body: some View {
+        let plan = state.convertPlan
+        let ids = Set(items.map(\.id))
+        let adjustable = plan.adjustableItems(in: ids)
+        let sizes = ConvertPlan.commonFrameSizes(of: adjustable)
+        if !adjustable.isEmpty, !sizes.isEmpty {
+            let shared = ConvertPlan.sharedFrameSize(of: adjustable)
+            let stated = items.count - adjustable.count
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(adjustable.count == items.count
+                         ? "Frame size for all \(items.count) tables:"
+                         : (adjustable.count == 1 ? "Frame size for the one table whose file doesn’t state it:"
+                                                  : "Frame size for the \(adjustable.count) tables whose files don’t state it:"))
+                    Picker("Frame size", selection: Binding<Int>(
+                        get: { shared ?? 0 },
+                        set: { (size: Int) in if size != 0 { state.convertPlan.chooseFrameSize(size, forAll: ids) } })) {
+                        if shared == nil { Text("Various").tag(0) }
+                        ForEach(sizes, id: \.self) { (size: Int) in
+                            Text("\(ConvertPlan.formatCount(size)) samples per frame").tag(size)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                    .help("One frame size for the selected tables whose file doesn’t state one; only the sizes every one of their lengths allows are offered. Each table’s Input column shows the result and can still be changed on its own.")
+                }
+                if stated > 0 {
+                    Text(stated == 1 ? "1 table states its frame size in the file and keeps it."
+                                     : "\(stated) tables state their frame size in the file and keep it.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 }
 
@@ -185,7 +232,7 @@ struct ConvertPreviewFacts: View {
                 }
             }
             ConvertFactBlock(label: "Interpolation", value: item.interpolationDescription, detail: nil, alert: false)
-                .help("Whether a synth interpolates between frames as the table is swept, and how: crossfade (it blends neighbouring frames), spectral (it blends their harmonics), or none (no interpolation: it steps from frame to frame). Some files say which; most synths set it on the oscillator instead.")
+                .help("Whether a synth interpolates between frames as the table is swept, and by which method: crossfade (it blends neighbouring frames) or spectral (it blends their harmonics); none means no interpolation (it steps from frame to frame). Some files say which; most synths set it on the oscillator instead.")
             ConvertWhatHappens(state: state, item: item)
         }
         .textSelection(.enabled)
@@ -215,7 +262,7 @@ struct ConvertFactBlock: View {
     }
 }
 
-/// "Change…" under the Input block when the file states its frame size: the override, which the
+/// "Override Frame Size…" under the Input block when the file states its frame size: the override, which the
 /// Input column does not offer for a stated size (it is rarely right), opens the same chooser
 /// with the file's own size first and a sentence on when another is the right one. Once a size
 /// is chosen, the column's chooser is active too, and choosing the file's own size again clears
@@ -227,11 +274,11 @@ struct ConvertSizeOverrideLink: View {
 
     private var basis: String {
         let own = item.table.frameSize.map(ConvertPlan.formatCount) ?? "?"
-        return "The file specifies \(own) samples per frame. Choose another size only if each frame shows more than one cycle, or part of one; the file's own size is right for nearly every file."
+        return "The file specifies \(own) samples per frame. Choose another size only if each frame shows more than one cycle, or part of one; the file’s own size is right for nearly every file."
     }
 
     var body: some View {
-        Button("Change…") { choosing.toggle() }
+        Button("Override Frame Size…") { choosing.toggle() }
             .buttonStyle(.link)
             .font(.caption)
             .help("Override the frame size the file specifies (rarely needed)")
@@ -245,8 +292,9 @@ struct ConvertSizeOverrideLink: View {
 /// its own interpolation, and beside it what the destination gets (the preview read back from
 /// the bytes the writer made), with the interpolation the file records. The Frame slider under
 /// them sweeps through the table: the frame at the slider lights up in both stacks, and a third
-/// picture draws that cycle large, input and result together (see `ConvertSweepView`); moving
-/// the pointer across a picture moves the slider too. Listen plays the cycle at the slider
+/// picture draws that cycle large, input and result together (see `ConvertSweepView`). (The
+/// pointer over a picture used to move the sweep too; it went when the slider came, since a
+/// pointer leaving the slider crossed the pictures and moved it.) Listen plays the cycle at the slider
 /// (`AudioPreview`) at the pitch beside it. The pictures share the width they are given, however
 /// narrow, and have a set height (see `ConvertOverview`).
 struct ConvertOverviewPair: View {
@@ -268,20 +316,20 @@ struct ConvertOverviewPair: View {
                                     interpolation: item.table.interpolation,
                                     unstatedLegend: "interpolation not stated",
                                     tint: WavetableStackCanvas.sourceColor,
-                                    position: $position)
+                                    position: position)
                     if let result, let first = result.first {
                         ConvertOverview(frames: result,
                                         caption: "\(plan.preset.shortTitle) · \(result.count) × \(ConvertPlan.formatCount(first.count))",
                                         interpolation: resultInterpolation,
                                         unstatedLegend: "interpolation not stored in the file",
                                         tint: WavetableStackCanvas.resultColor,
-                                        position: $position)
+                                        position: position)
                     }
                     ConvertSweepView(source: source.frames, sourceInterpolation: item.table.interpolation,
                                      result: result, resultInterpolation: resultInterpolation,
                                      resultTitle: plan.preset.shortTitle, position: position)
                 }
-                .help("The table’s frames, front (first) to back (last): the input as read, and what the destination gets, read back from the file this page would write. Solid lines are the frames in the file (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum’s or Vital’s own morphs. The Frame slider below, or the pointer over a picture, sweeps through the table; the third picture draws the cycle there.")
+                .help("The table’s frames, front (first) to back (last): the input as read, and what the destination gets, read back from the file this page would write. Solid lines are the frames in the file (at most 64 are drawn, each reduced to the width of the picture). Coloured lines between them show the interpolation: crossfades are exact; spectral blends are an approximation and do not reproduce Serum’s or Vital’s own morphs. The Frame slider below sweeps through the table; the third picture draws the cycle there.")
                 ConvertSweepControls(position: $position, preview: preview,
                                      playing: result != nil ? "the \(plan.preset.shortTitle) output" : "the input")
             }
@@ -326,7 +374,7 @@ struct ConvertSweepControls: View {
                     .frame(minWidth: 80)
                     .accessibilityLabel("Frame")
                     .accessibilityValue(Text("\(Int((position * 100).rounded())) percent through the table"))
-                    .help("Sweep through the table: the frame here is drawn in pink in the pictures and large in the third; Listen plays it")
+                    .help("Sweep through the table: the frame at the slider is drawn in pink in the pictures and large in the third; Listen plays it")
                 Button {
                     // The toggle only flips the state; ConvertOverviewPair hands the cycle over
                     // when it sees `isPlaying` change, so the two stay in step.
@@ -357,8 +405,8 @@ struct ConvertSweepControls: View {
 
 /// One stacked-frames picture, its caption, and a legend with colour swatches for its lines.
 /// The picture is 130 points high (the pane scrolls when that is too much) and as wide as it
-/// is given; the caption and legend wrap rather than being cut off. The pointer's place across
-/// the picture, left (first frame) to right (last), moves `position`.
+/// is given; the caption and legend wrap rather than being cut off. The frame at `position`
+/// (the Frame slider's place) is highlighted.
 struct ConvertOverview: View {
     let frames: [[Float]]
     let caption: String
@@ -369,24 +417,13 @@ struct ConvertOverview: View {
     /// The table's colour: the source's (`WavetableStackCanvas.sourceColor`) or the result's
     /// (`resultColor`), the same in the cycle picture beside them.
     let tint: Color
-    /// The Frame slider's place, 0…1; the pointer over the picture moves it and it stays.
-    @Binding var position: Double
+    /// The Frame slider's place, 0…1.
+    let position: Double
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             WavetableStackCanvas(frames: frames, interpolation: interpolation, tint: tint, highlight: position)
                 .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
-                .overlay(
-                    GeometryReader { (geo: GeometryProxy) in
-                        Color.clear
-                            .contentShape(Rectangle())
-                            .onContinuousHover { (phase: HoverPhase) in
-                                if case .active(let point) = phase, geo.size.width > 0 {
-                                    position = min(max(point.x / geo.size.width, 0), 1)
-                                }
-                            }
-                    }
-                )
                 // The caption and legend say what the picture shows; VoiceOver gets them below.
                 .accessibilityHidden(true)
             Text(caption).font(.caption).foregroundStyle(.secondary).monospacedDigit()
@@ -399,7 +436,7 @@ struct ConvertOverview: View {
     }
 }
 
-/// The cycle at the pointer's place in the sweep, drawn large: the source's in the stored-frame
+/// The cycle at the Frame slider's place, drawn large: the source's in the stored-frame
 /// colour and the result's over it in the accent colour, both to one scale (full scale, or the
 /// louder of the two when a table goes beyond it, so a table that was turned down shows
 /// smaller). Under it, which frames each comes from ("Frame 12 of 64"; "Between frames 12 and
@@ -513,7 +550,7 @@ struct ConvertSwatch: View {
 /// interpolation, thinner lines in a second colour fill each gap (up to five per gap), the
 /// stored frames thin to 24 and the stack is drawn closer together, so the fill reads as a
 /// surface; the picture stays within about 150 lines. With `highlight` set (0 front to 1
-/// back, the pointer's place in the sweep), the cycle at that depth is drawn over the stack in
+/// back, the Frame slider's place), the cycle at that depth is drawn over the stack in
 /// the highlight colour: a stored frame, or the in-between the interpolation gives there.
 struct WavetableStackCanvas: View {
     let frames: [[Float]]
@@ -566,7 +603,7 @@ struct WavetableStackCanvas: View {
                     context.stroke(path, with: .color(tint.opacity(fade)), lineWidth: showsBetweens ? 1 : 1.2)
                 }
             }
-            // The cycle at the pointer, over everything, at its depth in the stack. Taken from
+            // The cycle at the slider, over everything, at its depth in the stack. Taken from
             // the drawn (reduced) frames, so it sits exactly on them.
             if let highlight {
                 let stored = lines.filter { !$0.between }.sorted { $0.position < $1.position }.map(\.values)

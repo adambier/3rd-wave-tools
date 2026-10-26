@@ -101,7 +101,7 @@ public struct ConvertPlan: Equatable {
         /// other sizes its length allows (`WavetableReader.fittingFrameSizes`). Empty when the
         /// file's contents state the size (a chunk or header, or a format that fixes it) and
         /// nothing has been chosen over it: the column then has nothing to choose, and the
-        /// preview's Change… offers `frameSizeAlternatives` instead.
+        /// preview's Override Frame Size… offers `frameSizeAlternatives` instead.
         public var frameSizeChoices: [Int] {
             let own = table.frameSize.map { [$0] } ?? []
             var others = table.candidateFrameSizes
@@ -530,6 +530,39 @@ public struct ConvertPlan: Equatable {
         // The file's own size, or the one assumed from the samples, is no choice at all.
         let assumed = items[i].table.frameSize ?? FrameSizeFit.likelySize(items[i].frameSizeFit)
         items[i].chosenFrameSize = size == assumed ? nil : size
+    }
+
+    // MARK: One frame size for several tables
+
+    /// Among `ids`, the items whose frame size the file does not state (assumed, estimated, or
+    /// still open), in the page's order: the ones a frame size chosen for several tables
+    /// applies to. A table whose file states its size keeps it (the preview's override is for
+    /// one table at a time).
+    public func adjustableItems(in ids: Set<UUID>) -> [Item] {
+        items.filter { ids.contains($0.id) && !$0.sizeIsStated && !$0.frameSizeChoices.isEmpty }
+    }
+
+    /// The frame sizes every one of `items` allows (`frameSizeChoices`), smallest first; empty
+    /// when no size fits them all.
+    public static func commonFrameSizes(of items: [Item]) -> [Int] {
+        guard let first = items.first else { return [] }
+        var common = Set(first.frameSizeChoices)
+        for item in items.dropFirst() { common.formIntersection(item.frameSizeChoices) }
+        return common.sorted()
+    }
+
+    /// The frame size `items` share, when they all have the same one; nil when they differ.
+    public static func sharedFrameSize(of items: [Item]) -> Int? {
+        let sizes = Set(items.map { $0.frameSize ?? 0 })
+        return sizes.count == 1 ? sizes.first.flatMap { $0 == 0 ? nil : $0 } : nil
+    }
+
+    /// Chooses `size` for every item in `ids` that `adjustableItems(in:)` returns and whose
+    /// length allows it (see `chooseFrameSize(_:_:)`); the others are left as they are.
+    public mutating func chooseFrameSize(_ size: Int, forAll ids: Set<UUID>) {
+        for item in adjustableItems(in: ids) where item.frameSizeChoices.contains(size) {
+            chooseFrameSize(item.id, size)
+        }
     }
 
     /// Notes for an item, warnings first: the reader's, and what the destination means for it.

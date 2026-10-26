@@ -292,8 +292,10 @@ choice: click it to see every size the length allows, each drawn so the one that
 in the right place is visible. When the file states nothing, the page assumes a size and says so:
 2,048 samples per frame, the Serum-style size, when the length allows it; otherwise the size
 whose frames are most alike from one to the next, marked "likely" in the chooser. A size nothing
-settles must be chosen before the table can be converted. For the rare WAV whose chunk states the
-wrong size, a **Change…** link in the preview overrides it.
+settles must be chosen before the table can be converted. With several tables selected, the
+preview offers one frame size for those whose file does not state one, from the sizes all of
+them allow (⌘A selects every table). For the rare WAV whose chunk states the wrong size,
+**Override Frame Size…** in the preview opens the same chooser.
 
 #### Destinations
 
@@ -323,10 +325,10 @@ Shown when a choice applies to the destination and the tables to convert:
   spaced originals (the first and last among them) for fewer frames and repeats each original in
   order for more, making no new waveforms; **Crossfade New Frames** makes each new frame by
   crossfading its neighbours.
-- **Interpolation**, for formats whose file records it: crossfade or spectral, or none (no
-  interpolation: the synth steps from frame to frame). The Interpolation column shows what each
-  table's own file specifies; by default each table keeps that, and a table whose file says
-  nothing gets crossfade.
+- **Interpolation**, for formats whose file records it: an interpolation method, crossfade or
+  spectral, or none (no interpolation: the synth steps from frame to frame). The Interpolation
+  column shows what each table's own file specifies; by default each table keeps that, and a
+  table whose file says nothing gets crossfade.
 - Tonverk's frame size, and the PPG's four standard waveforms for P tables.
 
 #### Preview
@@ -334,8 +336,7 @@ Shown when a choice applies to the destination and the tables to convert:
 The pane below the table shows the selected table: the input and the result stacked frame by
 frame, with the interpolation drawn between frames where a file records one; its file, its frame
 size and what that rests on, its interpolation, and what converting changes. The **Frame** slider
-(or the pointer over a picture) sweeps through the table and draws the cycle there large, input
-and result together. **Listen** plays that cycle, following the slider, at the pitch chosen
+sweeps through the table and draws the cycle there large, input and result together. **Listen** plays that cycle, following the slider, at the pitch chosen
 beside it (a piano key with its number; A3, 220 Hz, to start) through the audio output chosen in
 the toolbar.
 

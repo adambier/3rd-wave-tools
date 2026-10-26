@@ -144,9 +144,9 @@ public enum WavetableWriter {
         mutating func tonverk() -> OutputFile {
             let stepped = plan.interpolationRecorded == Interpolation.none
             if interpolation == .spectral {
-                notes.append("A Tonverk file name can mark a table only as stepped (a trailing “r”) or not, so the spectral morph asked for is left unmarked: Tonverk plays it as a crossfade (its manual says smooth).")
+                notes.append("A Tonverk file name can mark a table only as stepped (a trailing “r”) or not, so the spectral morph asked for is left unmarked: Tonverk plays it as a crossfade (its manual says “smooth”).")
             }
-            noteDefaultInterpolation(prefix: "", result: "so the file name carries no “r” and Tonverk plays the table as a crossfade (its manual says smooth)")
+            noteDefaultInterpolation(prefix: "", result: "so the file name carries no “r” and Tonverk plays the table as a crossfade (its manual says “smooth”)")
             let named = WavetableWriter.Names.fileStem(table.name)
             notes += named.notes
             let untagged = WavetableWriter.Names.removeTonverkTag(named.stem)
@@ -253,7 +253,7 @@ public enum WavetableWriter {
         mutating func noteDefaultInterpolation(prefix: String = "This format records whether and how a synth interpolates between frames. ",
                                                result: String = "so crossfade is saved") {
             if options.interpolation == nil && table.interpolation == nil {
-                notes.append("\(prefix)The source file doesn’t specify the interpolation and no other choice was made, \(result).")
+                notes.append("\(prefix)The source file says nothing about interpolation and no other choice was made, \(result).")
             }
         }
 
@@ -262,7 +262,7 @@ public enum WavetableWriter {
         mutating func noteUnrecordedInterpolation() {
             if let asked = options.interpolation ?? table.interpolation {
                 let who = preset.isThirdWave ? "the 3rd Wave" : "the synth"
-                notes.append("This format doesn’t store the interpolation (\(asked.displayName.lowercased()) asked for); \(who) sets how frames blend.")
+                notes.append("This format doesn’t store the interpolation method (\(asked.displayName.lowercased()) asked for); \(who) sets how frames blend.")
             }
         }
 

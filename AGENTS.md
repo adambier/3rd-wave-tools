@@ -277,12 +277,14 @@ App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle
 writing with progress), `SearchField.swift` (an `NSSearchField` for SwiftUI), `AudioPreview.swift`
 (the Listen control's engine: `AVAudioEngine` with a source node, band-limiting through
 `Resampling.bandLimitedCycle`, and the CoreAudio output-device list). `main.swift` also holds
-`MenuActions` (the File and View menus' targets and validation; Edit › Remove Selected ⌘⌫ reaches
-the lists through `.onCommand`) and `ToolbarController` (the unified toolbar whose segmented control
+`MenuActions` (the File, Edit, and View menus' targets and validation; Edit › Delete, on the Delete
+key, is disabled while text is edited and otherwise reaches the focused list through
+`.onCommand(MenuActions.removeSelected)`; removals are undoable through `AppState.undoManager`,
+which the window returns) and `ToolbarController` (the unified toolbar whose segmented control
 switches pages, with the audio output pop-up at its trailing end on every page). The Wavetables page
 carries an orange under-development notice while `ConvertPlan.conversionUnderDevelopment` is true
 (any `OutputPreset.testedIn` empty). Scroll bars follow the system setting; menus carry
-the shortcuts (⌘O, ⇧⌘E, ⌘1–⌘3, ⌥⌘L, ⌘⌫, ⌘A); the Info.plist declares the file types with
+the shortcuts (⌘O, ⇧⌘E, ⌘1–⌘3, ⌥⌘L, ⌫, ⌘A, ⌘Z); the Info.plist declares the file types with
 `LSHandlerRank` None, so files open by Dock-icon drop without the app claiming any type.
 
 ## 8. Where to look (task to files)

@@ -340,6 +340,29 @@ final class ConvertPlanStateTests: XCTestCase {
         return p
     }
 
+    func testOneFrameSizeForSeveralTables() {
+        // Two tables whose size is assumed from the length (8,192 samples: 2,048 assumed), one
+        // open (noise, 16,384 samples), and one whose file states 2,048.
+        // (B at another level, or it would be collapsed into A as an identical copy.)
+        var p = plan([table("A", frames: 4, size: 2048, evidence: .length),
+                      table("B", frames: 4, size: 2048, peak: 0.7, evidence: .length),
+                      table("Open", size: nil, samples: 16_384, candidates: [256, 2048]),
+                      table("Stated", frames: 4, size: 2048, peak: 0.25)])
+        let all = Set(p.items.map(\.id))
+        let adjustable = p.adjustableItems(in: all)
+        XCTAssertEqual(adjustable.map(\.name), ["A", "B", "Open"])
+        // The sizes every adjustable table allows: A and B allow 64…4,096, Open only 256 and 2,048.
+        XCTAssertEqual(ConvertPlan.commonFrameSizes(of: adjustable), [256, 2048])
+        XCTAssertNil(ConvertPlan.sharedFrameSize(of: adjustable))   // Open has none yet
+        p.chooseFrameSize(256, forAll: all)
+        XCTAssertEqual(p.items.map { $0.frameSize }, [256, 256, 256, 2048])
+        XCTAssertEqual(ConvertPlan.sharedFrameSize(of: p.adjustableItems(in: all)), 256)
+        XCTAssertEqual(p.items[3].sizeSource, .inFile, "a stated size is left alone")
+        // A size one table's length does not allow is applied to the others only.
+        p.chooseFrameSize(1024, forAll: all)
+        XCTAssertEqual(p.items.map { $0.frameSize }, [1024, 1024, 256, 2048])
+    }
+
     func testOverridingAStatedFrameSize() {
         // A WAV whose chunk states 2,048: the Input column offers no choice, the preview's
         // Change… offers every size the length allows, the file's own first.

@@ -310,8 +310,8 @@ struct ConvertInterpolationOption: View {
     private var tonverk: Bool { state.convertPlan.preset == .tonverk }
 
     private var tip: String {
-        tonverk ? "Tonverk reads it from the file name: a trailing \u{201C}r\u{201D} means stepped, otherwise crossfade (its manual says smooth). Other synths set interpolation on the oscillator."
-                : "Serum and Vital read it from the WAV; Tonverk reads it from the file name. Other synths set interpolation on the oscillator."
+        tonverk ? "Tonverk reads it from the file name: a trailing \u{201C}r\u{201D} means stepped, otherwise crossfade (its manual says \u{201C}smooth\u{201D}). Other synths set interpolation on the oscillator."
+                : "Serum and Vital read it from the WAV; Tonverk reads it from the file name. Other synths set the interpolation method on the oscillator."
     }
 
     /// The values the destination can record. Tonverk's name says stepped or smooth, nothing
@@ -330,16 +330,16 @@ struct ConvertInterpolationOption: View {
         let plan = state.convertPlan
         var lines: [String] = []
         if plan.sharedExistingInterpolation != nil || plan.eachTablesOwnInterpolationLabel != nil {
-            var sentence = "\u{201C}Existing\u{201D} is the interpolation a table’s file states"
+            var sentence = "\u{201C}Existing\u{201D} is what a table’s file states"
             if plan.unstatedInterpolationCount > 0 {
-                sentence += "; a file that doesn’t specify one is saved as crossfade"
+                sentence += "; a file that states nothing is saved as crossfade"
             }
             lines.append(sentence + ".")
         }
         if tonverk {
-            lines.append("Crossfade blends each frame into the next. None is no interpolation: Tonverk jumps from frame to frame, and the file name gets an \u{201C}r\u{201D}.")
+            lines.append("Crossfade is an interpolation method: each frame blends into the next. None is no interpolation: Tonverk jumps from frame to frame, and the file name gets an \u{201C}r\u{201D}.")
         } else {
-            lines.append("Crossfade blends each frame into the next; spectral blends their harmonics (Serum’s and Vital’s spectral morph). None is no interpolation: the synth jumps from frame to frame.")
+            lines.append("Crossfade and spectral are interpolation methods: crossfade blends each frame into the next; spectral blends their harmonics (Serum’s and Vital’s spectral morph). None is no interpolation: the synth jumps from frame to frame.")
         }
         return lines.joined(separator: " ")
     }
