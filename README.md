@@ -66,8 +66,10 @@ Files and folders can be dropped onto a page, chosen with **Add Files or Folders
 File menu or on the page, or dropped onto the app's icon in the Dock, which sends each file to the
 page that reads it (the app does not claim any of these file types as its own). Selected rows go
 with **Remove Selected** or Edit › **Delete** (the Delete key); **Remove All…** clears a page; both
-can be undone with Edit › **Undo**. Files on disk are never touched by either. The status bar
-shows the last thing the app did, and **Show Log** (⌥⌘L) everything it has done this session.
+can be undone with Edit › **Undo**. Files on disk are never touched by either. A name is edited
+by double-clicking its row, or by selecting the row and pressing Return, as in the Finder (on the
+Pack page, Return puts the cursor in the program's name field). The status bar shows the last
+thing the app did, and **Show Log** (⌥⌘L) everything it has done this session.
 Every report or list of problems the app shows has a copy icon beside its title that puts the text
 on the clipboard.
 

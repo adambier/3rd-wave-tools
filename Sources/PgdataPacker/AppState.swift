@@ -166,11 +166,34 @@ final class AppState: ObservableObject {
                     || item.location.url.lastPathComponent.localizedCaseInsensitiveContains(needle))
         }
     }
+    /// Counts the requests to put the cursor in the Pack page's program name field (Return in
+    /// the program list); `ProgramDetail` watches it.
+    @Published private(set) var programNameFocusRequest = 0
+    func focusProgramName() { programNameFocusRequest += 1 }
+
+    /// The table the Wavetables page should select and scroll to: the first table of each drop
+    /// (`finishAddingToConvert`); `ConvertView` watches it.
+    @Published private(set) var convertSelectionRequest: UUID?
+
+    /// Whether a drag of files is over the current page; the status bar then says what the page
+    /// takes (the pages set it from their drop targets).
+    @Published var dragIsOverPage = false
+
     /// The height of the Wavetables page's preview pane, which the user drags; remembered between
     /// sessions (see `ConvertPaneDivider`).
     @Published var convertPreviewHeight: CGFloat = 320 { didSet { saveSettings() } }
-    /// The writer's results for the tables the Wavetables page previews, kept between passes.
+    /// The writer's results for the tables the Wavetables page previews, kept between passes;
+    /// computed on a background queue (see `convertPreview(_:)`).
     let convertPreviews = ConvertPreviewCache()
+    /// Bumped when a preview asked for has been computed, so the views asking show it.
+    @Published private(set) var convertPreviewVersion = 0
+
+    /// The preview of a table for the current destination and options: from the cache, or nil
+    /// while it is being computed, in which case the view is updated once it is ready.
+    func convertPreview(_ item: ConvertPlan.Item) -> ConvertPreviewCache.Result? {
+        _ = convertPreviewVersion   // read, so a view calling this follows the version
+        return convertPreviews.result(item, in: convertPlan) { [weak self] in self?.convertPreviewVersion += 1 }
+    }
 
     // Messages
     @Published var log: [String] = []
@@ -810,6 +833,7 @@ final class AppState: ObservableObject {
         guard !urls.isEmpty else { return }
         batchesReading += 1
         reading = reading ?? LoadProgress(done: 0, total: 0)
+        let factory = self.factory
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let (files, ignored) = ConvertPlan.filesToRead(in: urls)
             DispatchQueue.main.async { self?.reading = LoadProgress(done: 0, total: files.count) }
@@ -819,14 +843,20 @@ final class AppState: ObservableObject {
                 }
             })
             collected.ignored = ignored
-            DispatchQueue.main.async { self?.finishAddingToConvert(collected) }
+            // The hashing, peak, factory match, and frame-size verdict of each table are done
+            // here, off the main thread; the list only checks them in.
+            let prepared = collected.found.map { ConvertPlan.Prepared($0, factory: factory) }
+            DispatchQueue.main.async { self?.finishAddingToConvert(collected, prepared) }
         }
     }
 
-    private func finishAddingToConvert(_ c: ConvertPlan.Collected) {
+    private func finishAddingToConvert(_ c: ConvertPlan.Collected, _ prepared: [ConvertPlan.Prepared]) {
         batchesReading -= 1
         if batchesReading <= 0 { batchesReading = 0; reading = nil }
-        let s = convertPlan.add(c.found, factory: factory)
+        let before = Set(convertPlan.items.map(\.id))
+        let s = convertPlan.add(prepared)
+        // The first table added is selected, so the preview shows what the drop brought.
+        if let first = convertPlan.items.first(where: { !before.contains($0.id) }) { convertSelectionRequest = first.id }
         func count(_ n: Int, _ word: String) -> String { "\(n) \(word)\(n == 1 ? "" : "s")" }
         if s.added > 0 {
             var msg = "Added \(count(s.added, "wavetable"))"

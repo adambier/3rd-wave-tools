@@ -29,7 +29,7 @@ struct ConvertView: View {
             Divider()
             if state.convertPlan.items.isEmpty {
                 EmptyHint(title: "Drop wavetables here",
-                          detail: "Add WAV and FLAC wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table is then listed with its size (frames × samples per frame) and what converting changes, and previewed below. This page converts existing wavetables between formats; it does not make wavetables from other audio.")
+                          detail: "Add WAV and FLAC wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table is then listed with its size (frames × samples per frame) and what converting changes, and previewed on the right; to edit a name, double-click its row or select it and press Return. This page converts existing wavetables between formats; it does not make wavetables from other audio.")
             } else {
                 HSplitView {
                     ConvertTablesPane(selection: $selection)
@@ -58,10 +58,20 @@ struct ConvertView: View {
             DropSupport.load(providers) { state.addToConvert(urls: $0) }
             return true
         }
+        .onChange(of: dropTargeted) { (over: Bool) in state.dragIsOverPage = over }
         // A row that goes (removed here, or by Remove All) leaves the selection, whichever way
         // it went.
         .onChange(of: state.convertPlan.items.map(\.id)) { (ids: [UUID]) in
             selection = selection.filter { (id: UUID) -> Bool in ids.contains(id) }
+        }
+        // The first table of a drop is selected and scrolled to, so the preview shows it.
+        .onChange(of: state.convertSelectionRequest) { (id: UUID?) in
+            guard let id else { return }
+            selection = [id]
+            let rows = state.convertShownItems
+            if let row = rows.firstIndex(where: { $0.id == id }) {
+                DispatchQueue.main.async { TableReveal.scroll(toRow: row, rowCount: rows.count) }
+            }
         }
     }
 
@@ -344,11 +354,12 @@ struct ConvertTable: View {
             }
                 .width(min: 200, ideal: 330)
         }
-        // A double-click on a row edits its name: the Table's own double-click, so a single
-        // click selects the row as it does anywhere else in the table. (A double-tap gesture on
-        // the name would most likely claim the first click, as the Input column's button and the
-        // old name field do, which is why both had to select their row by hand.) The rows'
-        // contextual menu offers the same, and removing, for the rows clicked.
+        // A double-click on a row edits its name, as does Return with one row selected (see
+        // `MenuActions.renameSelected`): the Table's own double-click, so a single click selects
+        // the row as it does anywhere else in the table. (A double-tap gesture on the name would
+        // most likely claim the first click, as the Input column's button and the old name field
+        // do, which is why both had to select their row by hand.) The rows' contextual menu
+        // offers the same, and removing, for the rows clicked.
         .contextMenu(forSelectionType: UUID.self) { (ids: Set<UUID>) in
             if ids.count == 1, let id = ids.first {
                 Button("Rename") { rename(id) }
@@ -361,9 +372,17 @@ struct ConvertTable: View {
         } primaryAction: { (ids: Set<UUID>) in
             if ids.count == 1, let id = ids.first { rename(id) }
         }
-        .onCommand(MenuActions.removeSelected) { state.removeConvertItems(selection.intersection(items.map(\.id))); selection = [] }
+        // Edit › Delete and Return answer only when they have something to act on (nil disables
+        // the menu item and lets the key pass).
+        .onCommand(MenuActions.removeSelected, perform: visibleSelection.isEmpty ? nil : {
+            state.removeConvertItems(visibleSelection); selection = []
+        })
+        .onCommand(MenuActions.renameSelected, perform: visibleSelection.count == 1 ? { visibleSelection.first.map(rename) } : nil)
         .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(items.map(\.id)) }
     }
+
+    /// The selected rows among those shown (a row the filter hides stays selected out of sight).
+    private var visibleSelection: Set<UUID> { selection.intersection(items.map(\.id)) }
 
     /// Starts editing the row's name, with the row selected so the preview below shows the table.
     private func rename(_ id: UUID) {
@@ -443,8 +462,9 @@ struct ConvertNameCell: View {
 }
 
 /// The name as plain text, which becomes a field while the row is being renamed (a double-click
-/// on the row, or Rename in its contextual menu; see `ConvertTable`), as a file's name does in
-/// the Finder; a single click only selects the row, as anywhere else in the table. Return or
+/// on the row, Return with the row selected, or Rename in its contextual menu; see
+/// `ConvertTable`), as a file's name does in the Finder; a single click only selects the row, as
+/// anywhere else in the table. Return or
 /// leaving the field commits, Escape restores the name, and the text comes back either way; an
 /// empty name is not taken.
 struct ConvertNameField: View {
@@ -481,8 +501,8 @@ struct ConvertNameField: View {
                 .lineLimit(1)
                 .foregroundStyle(included ? Color.primary : Color.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .help(item.newName == nil ? "\u{201C}\(item.name)\u{201D}. Double-click the row to edit the name, which goes on the converted file (and inside a 3rd Wave table); the source file is not changed."
-                                          : "\u{201C}\(item.name)\u{201D}, was \u{201C}\(item.table.name)\u{201D}; double-click the row to edit")
+                .help(item.newName == nil ? "\u{201C}\(item.name)\u{201D}. Double-click the row, or select it and press Return, to edit the name, which goes on the converted file (and inside a 3rd Wave table); the source file is not changed."
+                                          : "\u{201C}\(item.name)\u{201D}, was \u{201C}\(item.table.name)\u{201D}; double-click the row, or select it and press Return, to edit")
         }
     }
 

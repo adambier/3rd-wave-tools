@@ -39,7 +39,7 @@ struct UnpackView: View {
             Divider()
             if state.unpacks.isEmpty {
                 EmptyHint(title: "Drop .pgdata files here",
-                          detail: "Add unified program (.pgdata) files; folders work too. Each is then split into its program (.pro), its embedded wavetables (.wt), and its multisamples (.bin, named with their S slot).")
+                          detail: "Add unified program (.pgdata) files; folders work too. Each is then split into its program (.pro), its embedded wavetables (.wt), and its multisamples (.bin, named with their S slot). To rename a file, double-click its row or select it and press Return.")
             } else {
                 HSplitView {
                     List(selection: $selection) {
@@ -51,7 +51,8 @@ struct UnpackView: View {
                             .tag(u.id)
                         }
                     }
-                    .onCommand(MenuActions.removeSelected) { state.removeUnpacks(selection); selection = [] }
+                    // Edit › Delete answers only while rows are selected (nil disables the item).
+                    .onCommand(MenuActions.removeSelected, perform: selection.isEmpty ? nil : { state.removeUnpacks(selection); selection = [] })
                     .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(state.unpacks.map(\.id)) }
                     .frame(minWidth: 230, idealWidth: 270, maxWidth: 420)
                     .onChange(of: selection) { s in
@@ -79,6 +80,7 @@ struct UnpackView: View {
             DropSupport.load(providers) { state.add(urls: $0) }
             return true
         }
+        .onChange(of: dropTargeted) { (over: Bool) in state.dragIsOverPage = over }
         // Files removed in any way (Remove All… asks in a sheet, so nothing runs after it here)
         // leave the selection; keep it to the files that remain.
         .onChange(of: state.unpacks.map(\.id)) { (ids: [UUID]) in
@@ -127,8 +129,8 @@ struct UnpackDetail: View {
             Text(several ? "Files these will produce" : "Files this will produce").font(.headline)
             // Write first (ticks in one line at the left), Contents last (the widest column). The
             // Program column only with several files; macOS 13 has no conditional table columns,
-            // so there are two tables. A double-click on a row (or Rename File in its context
-            // menu) edits the file name in place, as in Finder.
+            // so there are two tables. A double-click on a row (Return with the row selected, or
+            // Rename File in its context menu) edits the file name in place, as in Finder.
             Group {
                 if several {
                     Table(rows, selection: $tableSelection) {
@@ -145,6 +147,7 @@ struct UnpackDetail: View {
                     } primaryAction: { (ids: Set<UUID>) in
                         rename(ids)
                     }
+                    .onCommand(MenuActions.renameSelected, perform: tableSelection.count == 1 ? { rename(tableSelection) } : nil)
                     .onCommand(#selector(NSResponder.selectAll(_:))) { tableSelection = Set(rows.map(\.id)) }
                 } else {
                     Table(rows, selection: $tableSelection) {
@@ -159,6 +162,7 @@ struct UnpackDetail: View {
                     } primaryAction: { (ids: Set<UUID>) in
                         rename(ids)
                     }
+                    .onCommand(MenuActions.renameSelected, perform: tableSelection.count == 1 ? { rename(tableSelection) } : nil)
                     .onCommand(#selector(NSResponder.selectAll(_:))) { tableSelection = Set(rows.map(\.id)) }
                 }
             }
@@ -287,9 +291,10 @@ struct WriteToggleCell: View {
     }
 }
 
-/// The file name: text until its row is double-clicked, then a field (as in Finder). The field is
-/// edited freely and the name cleaned when editing ends, so typing a space does not have it trimmed
-/// away under the cursor. Return or leaving the field keeps the name; Escape drops the edit.
+/// The file name: text until its row is double-clicked (or selected and Return pressed), then a
+/// field (as in Finder). The field is edited freely and the name cleaned when editing ends, so
+/// typing a space does not have it trimmed away under the cursor. Return or leaving the field
+/// keeps the name; Escape drops the edit.
 struct FileNameCell: View {
     @ObservedObject var state: AppState
     let unpackID: UUID
@@ -316,7 +321,7 @@ struct FileNameCell: View {
                 .onChange(of: focused) { (hasFocus: Bool) in if !hasFocus { commit() } }
         } else {
             Text(file.fileName).lineLimit(1)
-                .help(file.fileName + "\nDouble-click to rename")
+                .help(file.fileName + "\nDouble-click, or select the row and press Return, to rename")
         }
     }
 

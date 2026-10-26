@@ -484,33 +484,62 @@ public struct ConvertPlan: Equatable {
 
     // MARK: Items
 
-    /// Adds found tables to the list. A table whose content (samples and frame size) matches one
-    /// already listed is recorded under it ("also in …") rather than listed again; a table from a
-    /// file and slot already listed is left out. Tables from 3rd Wave files are checked against
-    /// the factory library.
+    /// Adds found tables to the list: prepares each (`Prepared`) and adds them (`add(_:)`). A
+    /// table whose content (samples and frame size) matches one already listed is recorded under
+    /// it ("also in …") rather than listed again; a table from a file and slot already listed is
+    /// left out. Tables from 3rd Wave files are checked against the factory library.
     @discardableResult
     public mutating func add(_ found: [Found], factory: FactoryLibrary = .builtIn) -> AddSummary {
+        add(found.map { Prepared($0, factory: factory) })
+    }
+
+    /// A found table with the work of adding it done ahead, on any thread: its content key (a
+    /// hash of every sample), its peak, the factory table it matches, and the frame-size verdict
+    /// over its samples. The app prepares tables on the queue that read them, so that
+    /// `add(_:)`, on the main thread, has only the list to check them against.
+    public struct Prepared {
+        /// The table and where it was found.
+        public let found: Found
+        let key: ContentKey
+        let peak: Float
+        let factorySlot: SourceRef?
+        let factoryName: String?
+        let fit: FrameSizeFit.Verdict
+
+        /// Does the work for one found table.
+        public init(_ found: Found, factory: FactoryLibrary = .builtIn) {
+            let t = found.table
+            self.found = found
+            key = ContentKey(t)
+            peak = t.peak
+            if let fp = t.thirdWaveFingerprint, let ref = factory.slot(withFingerprint: fp) {
+                factorySlot = ref
+                // The factory P00–P33 tables are named "Wavetable P00" …: a name that only repeats the slot is left out.
+                factoryName = factory.name(ref).flatMap { $0 == "Wavetable \(ref.label)" ? nil : $0 }
+            } else {
+                factorySlot = nil
+                factoryName = nil
+            }
+            let choices = (t.frameSize.map { [$0] } ?? []) + t.candidateFrameSizes.filter { $0 != t.frameSize }
+            fit = t.candidateFrameSizes.isEmpty ? .unclear : FrameSizeFit.verdict(t.samples, sizes: choices)
+        }
+    }
+
+    /// Adds prepared tables (see `Prepared`): a table identical to one listed is recorded under
+    /// it ("also in …"), the same file and slot again is left out, and the rest become items.
+    @discardableResult
+    public mutating func add(_ prepared: [Prepared]) -> AddSummary {
         var s = AddSummary(added: 0, duplicates: 0, repeated: 0)
-        for f in found {
-            let t = f.table
-            let location = Location(url: f.url, label: Self.locationLabel(t, url: f.url))
-            let key = ContentKey(t)
-            if let i = items.firstIndex(where: { $0.contentKey == key && $0.table.samples == t.samples }) {
+        for p in prepared {
+            let t = p.found.table
+            let location = Location(url: p.found.url, label: Self.locationLabel(t, url: p.found.url))
+            if let i = items.firstIndex(where: { $0.contentKey == p.key && $0.table.samples == t.samples }) {
                 if items[i].location == location || items[i].alsoIn.contains(location) { s.repeated += 1; continue }
                 items[i].alsoIn.append(location); s.duplicates += 1
                 continue
             }
-            var slot: SourceRef?
-            var factoryName: String?
-            if let fp = t.thirdWaveFingerprint, let ref = factory.slot(withFingerprint: fp) {
-                slot = ref
-                // The factory P00–P33 tables are named "Wavetable P00" …: a name that only repeats the slot is left out.
-                factoryName = factory.name(ref).flatMap { $0 == "Wavetable \(ref.label)" ? nil : $0 }
-            }
-            let choices = (t.frameSize.map { [$0] } ?? []) + t.candidateFrameSizes.filter { $0 != t.frameSize }
-            let fit: FrameSizeFit.Verdict = t.candidateFrameSizes.isEmpty ? .unclear : FrameSizeFit.verdict(t.samples, sizes: choices)
             items.append(Item(id: UUID(), table: t, location: location, sourceDescription: Self.sourceDescription(t),
-                              factorySlot: slot, factoryName: factoryName, peak: t.peak, frameSizeFit: fit, contentKey: key))
+                              factorySlot: p.factorySlot, factoryName: p.factoryName, peak: p.peak, frameSizeFit: p.fit, contentKey: p.key))
             s.added += 1
         }
         return s
@@ -1231,7 +1260,24 @@ public struct ConvertPlan: Equatable {
 /// Keeps the writer's result for the items the detail pane shows, so a selection that does not
 /// change is not converted again on every pass. A result is reused while the item's name,
 /// frame size, and samples, and the plan's destination and options, are the same.
+///
+/// The app asks with `result(_:in:ready:)`, which answers at once from the cache or starts the
+/// conversion on a background queue and calls back on the main thread when it is done: writing a
+/// U table and reading its text back takes a noticeable moment, and the window must not wait for
+/// it. `preview(_:in:)` and `resultFrames(_:in:)` do the same work at once, on the caller's
+/// thread (tests, and anything that needs the answer now). All of it is for one thread at a
+/// time, the main thread in the app; only the conversion itself runs elsewhere.
 public final class ConvertPreviewCache {
+    /// What the preview of one item comes to: the file the page would write and that file read
+    /// back and cut into frames (what the destination gets), each nil when there is none.
+    public struct Result {
+        /// The file the page would write; nil when the item cannot convert or the writer fails.
+        public var file: OutputFile?
+        /// The file's table read back with `WavetableReader` and cut into frames of the size the
+        /// destination writes; nil when there is no file or the reader finds no table in it.
+        public var frames: [[Float]]?
+    }
+
     private struct Key: Equatable {
         var itemID: UUID
         var name: String
@@ -1242,12 +1288,12 @@ public final class ConvertPreviewCache {
     }
     private struct Entry {
         var key: Key
-        var file: OutputFile?
-        /// The written file read back and cut into frames; nil until asked for, then kept.
-        var frames: [[Float]]??
+        /// The result; nil while it is being computed on the background queue.
+        var result: Result?
     }
     private var entries: [UUID: Entry] = [:]
     private let write: (Wavetable, OutputPreset, OutputOptions) throws -> OutputFile
+    private let queue = DispatchQueue(label: "pgdata Packer preview", qos: .userInitiated)
     /// How many times the writer has run (for tests).
     public private(set) var writerRuns = 0
 
@@ -1256,34 +1302,64 @@ public final class ConvertPreviewCache {
         self.write = write
     }
 
-    private func entry(_ item: ConvertPlan.Item, in plan: ConvertPlan) -> Entry {
-        let key = Key(itemID: item.id, name: item.name, frameSize: item.frameSize, sampleCount: item.table.samples.count,
-                      preset: plan.preset, options: plan.options)
-        if let hit = entries[item.id], hit.key == key { return hit }
-        writerRuns += 1
-        let e = Entry(key: key, file: plan.preview(item, write: write), frames: nil)
-        entries[item.id] = e
-        return e
+    private static func key(_ item: ConvertPlan.Item, in plan: ConvertPlan) -> Key {
+        Key(itemID: item.id, name: item.name, frameSize: item.frameSize, sampleCount: item.table.samples.count,
+            preset: plan.preset, options: plan.options)
     }
 
-    /// `plan.preview(item)`, from the cache when nothing that affects it has changed.
-    public func preview(_ item: ConvertPlan.Item, in plan: ConvertPlan) -> OutputFile? {
-        entry(item, in: plan).file
-    }
-
-    /// The converted table as the destination gets it: the preview's bytes read back with
-    /// `WavetableReader` and cut into frames of the size the destination writes. Nil when there
-    /// is no preview or the reader finds no table in it. Kept with the preview.
-    public func resultFrames(_ item: ConvertPlan.Item, in plan: ConvertPlan) -> [[Float]]? {
-        let e = entry(item, in: plan)
-        if let known = e.frames { return known }
+    /// The conversion itself: the writer, then the file read back. Pure, so it can run anywhere.
+    private static func compute(_ item: ConvertPlan.Item, in plan: ConvertPlan,
+                                write: (Wavetable, OutputPreset, OutputOptions) throws -> OutputFile) -> Result {
+        let file = plan.preview(item, write: write)
         var frames: [[Float]]?
-        if let file = e.file, let found = try? WavetableReader.read(file.data, fileName: file.fileName).first {
+        if let file, let found = try? WavetableReader.read(file.data, fileName: file.fileName).first {
             let size = found.frameSize ?? plan.expected(for: item)?.frameSizeOut
             frames = found.wavetable(frameSize: size)?.frames
         }
-        entries[item.id]?.frames = .some(frames)
-        return frames
+        return Result(file: file, frames: frames)
+    }
+
+    /// The result, computed now if the cache does not hold it.
+    private func resultNow(_ item: ConvertPlan.Item, in plan: ConvertPlan) -> Result {
+        let key = Self.key(item, in: plan)
+        if let hit = entries[item.id], hit.key == key, let result = hit.result { return result }
+        writerRuns += 1
+        let result = Self.compute(item, in: plan, write: write)
+        entries[item.id] = Entry(key: key, result: result)
+        return result
+    }
+
+    /// `plan.preview(item)`, from the cache when nothing that affects it has changed; computed
+    /// now otherwise.
+    public func preview(_ item: ConvertPlan.Item, in plan: ConvertPlan) -> OutputFile? {
+        resultNow(item, in: plan).file
+    }
+
+    /// The converted table as the destination gets it (`Result.frames`), from the cache when
+    /// nothing that affects it has changed; computed now otherwise.
+    public func resultFrames(_ item: ConvertPlan.Item, in plan: ConvertPlan) -> [[Float]]? {
+        resultNow(item, in: plan).frames
+    }
+
+    /// The result from the cache, or nil while it is being computed: the first call for an item
+    /// (or for a change to it) starts the conversion on a background queue and returns nil, and
+    /// `ready` is called on the main thread once the result is in the cache, so the caller can
+    /// ask again. Further calls while it is computed return nil without starting it again.
+    public func result(_ item: ConvertPlan.Item, in plan: ConvertPlan, ready: @escaping () -> Void) -> Result? {
+        let key = Self.key(item, in: plan)
+        if let hit = entries[item.id], hit.key == key { return hit.result }   // nil while in progress
+        entries[item.id] = Entry(key: key, result: nil)
+        writerRuns += 1
+        let write = self.write
+        queue.async { [weak self] in
+            let result = Self.compute(item, in: plan, write: write)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let entry = self.entries[item.id], entry.key == key else { return }   // superseded
+                self.entries[item.id] = Entry(key: key, result: result)
+                ready()
+            }
+        }
+        return nil
     }
 
     /// Forgets everything (e.g., when items are removed).

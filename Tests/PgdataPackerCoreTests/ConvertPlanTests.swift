@@ -633,6 +633,37 @@ final class WavetableSketchTests: XCTestCase {
         plan.preset = .phasePlant
         XCTAssertEqual(cache.resultFrames(plan.items[0], in: plan)?.count, 256)
     }
+
+    /// `result(_:in:ready:)` answers nil while the conversion runs on the background queue, calls
+    /// back on the main thread once, and then answers from the cache; a second ask in the meantime
+    /// starts nothing. A change to the plan starts a new conversion, and a stale callback is dropped.
+    func testResultIsComputedInTheBackgroundAndThenCached() throws {
+        let wave = (0..<2048).map { Float(sin(Double($0) * 2 * .pi / 2048)) * 0.5 }
+        let t = FoundTable(name: "T", fileName: "T.wav", source: .wav, samples: Array((0..<8).map { _ in wave }.joined()),
+                           frameSize: 2048, frameSizeBasis: "clm chunk")
+        var plan = ConvertPlan(preset: .thirdWaveU)
+        plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/T.wav"), table: t)], factory: FactoryLibrary())
+        let cache = ConvertPreviewCache()
+        let ready = expectation(description: "ready")
+        XCTAssertNil(cache.result(plan.items[0], in: plan) { XCTAssertTrue(Thread.isMainThread); ready.fulfill() })
+        XCTAssertNil(cache.result(plan.items[0], in: plan) { XCTFail("a second ask while computing must not start again") })
+        XCTAssertEqual(cache.writerRuns, 1)
+        wait(for: [ready], timeout: 10)
+        let result = try XCTUnwrap(cache.result(plan.items[0], in: plan) { XCTFail("cached") })
+        XCTAssertEqual(result.file?.fileName, "T.wt")
+        XCTAssertEqual(result.frames?.count, 64)
+        XCTAssertEqual(cache.writerRuns, 1)
+        // The same answer the synchronous calls give, without another run.
+        XCTAssertEqual(cache.preview(plan.items[0], in: plan)?.fileName, "T.wt")
+        XCTAssertEqual(cache.writerRuns, 1)
+
+        plan.preset = .waveEdit
+        let again = expectation(description: "ready again")
+        XCTAssertNil(cache.result(plan.items[0], in: plan) { again.fulfill() })
+        XCTAssertEqual(cache.writerRuns, 2)
+        wait(for: [again], timeout: 10)
+        XCTAssertEqual(cache.result(plan.items[0], in: plan) { XCTFail("cached") }?.frames?[0].count, 256)
+    }
 }
 
 /// The faint frames the overview draws between stored frames.

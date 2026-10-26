@@ -19,7 +19,7 @@ struct PackView: View {
             Divider()
             if state.programs.isEmpty && state.contentFiles.isEmpty {
                 EmptyHint(title: "Drop programs and their wavetables or multisamples here",
-                          detail: "Add .pro files and the .wt and .bin files they use; folders work too. Each program then shows what its oscillators play and which files will be embedded.")
+                          detail: "Add .pro files and the .wt and .bin files they use; folders work too. Each program then shows what its oscillators play and which files will be embedded; its name is edited above that (select the program and press Return to get there).")
             } else {
                 HSplitView {
                     programList.frame(minWidth: 220, idealWidth: 260, maxWidth: 440)
@@ -35,6 +35,7 @@ struct PackView: View {
             DropSupport.load(providers) { state.add(urls: $0) }
             return true
         }
+        .onChange(of: dropTargeted) { (over: Bool) in state.dragIsOverPage = over }
         // Programs removed in any way (Remove All… asks in a sheet, so nothing runs after it here)
         // leave the selection; keep it to the programs that remain.
         .onChange(of: state.programs.map(\.id)) { (ids: [UUID]) in
@@ -106,7 +107,11 @@ struct PackView: View {
                     ProgramRow(state: st, item: item).tag(item.id)
                 }
             }
-            .onCommand(MenuActions.removeSelected) { state.removePrograms(visibleSelection); selection = [] }
+            // Edit › Delete answers only while programs are selected (nil disables the item).
+            .onCommand(MenuActions.removeSelected, perform: visibleSelection.isEmpty ? nil : { state.removePrograms(visibleSelection); selection = [] })
+            // Return with one program selected puts the cursor in its name field, the page's
+            // way of renaming (the other pages' lists edit the name in the row).
+            .onCommand(MenuActions.renameSelected, perform: visibleSelection.count == 1 ? { state.focusProgramName() } : nil)
             // Edit › Select All (⌘A) selects every program shown (the list's own handling, when
             // it has the focus, does the same).
             .onCommand(#selector(NSResponder.selectAll(_:))) { selection = Set(shownPrograms.map(\.id)) }
@@ -197,6 +202,9 @@ struct ProgramRow: View {
 struct ProgramDetail: View {
     @EnvironmentObject var state: AppState
     let item: AppState.PackItem
+    /// Whether the name field has the cursor; Return in the program list puts it there
+    /// (`AppState.focusProgramName`).
+    @FocusState private var nameFocused: Bool
 
     var body: some View {
         let st = state
@@ -210,7 +218,9 @@ struct ProgramDetail: View {
                 .textFieldStyle(.roundedBorder)
                 .font(.title2)
                 .frame(maxWidth: 380)
-                .help("The name written into the .pgdata; the .pro file is not changed. Format \(item.program.version), \(item.program.valuesPerPart) values per part.")
+                .focused($nameFocused)
+                .onChange(of: state.programNameFocusRequest) { _ in nameFocused = true }
+                .help("The name written into the .pgdata; the .pro file is not changed. Select the program and press Return to edit it here. Format \(item.program.version), \(item.program.valuesPerPart) values per part.")
                 if item.name != item.program.name {
                     Text("was \u{201C}\(item.program.name)\u{201D}").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         .help("Was \u{201C}\(item.program.name)\u{201D} in the .pro file; renamed here")

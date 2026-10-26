@@ -62,26 +62,18 @@ extension View {
 // MARK: - Log
 
 /// The status bar under the pages: the log's button; the last log line, or the progress of files
-/// being read or of a pack, unpack, or conversion; while the page lists nothing, how to add files
-/// (once it has content, the hint would only be noise); and the log itself below, when open.
+/// being read or of a pack, unpack, or conversion; while files are dragged over the page, what it
+/// takes (an empty page says so itself, and once it has content a standing hint would only be
+/// noise); and the log itself below, when open.
 struct LogBar: View {
     @EnvironmentObject var state: AppState
 
-    /// Whether the current page lists nothing yet.
-    private var pageIsEmpty: Bool {
-        switch state.section {
-        case .pack: return state.programs.isEmpty && state.contentFiles.isEmpty
-        case .unpack: return state.unpacks.isEmpty
-        case .convert: return state.convertPlan.items.isEmpty
-        }
-    }
-
-    /// What the current page takes, for the hint while it is empty.
+    /// What the current page takes, for the hint while files are dragged over it.
     private var dropHint: String {
         switch state.section {
-        case .pack: return "Drop .pro, .wt, .bin, or .pgdata files or folders onto the page above to add them"
-        case .unpack: return "Drop .pgdata files or folders onto the page above to add them"
-        case .convert: return "Drop .wav, .flac, .wt, or .pgdata files or folders onto the page above to add them"
+        case .pack: return "Drop .pro, .wt, .bin, or .pgdata files or folders to add them"
+        case .unpack: return "Drop .pgdata files or folders to add them"
+        case .convert: return "Drop .wav, .flac, .wt, or .pgdata files or folders to add them"
         }
     }
 
@@ -127,7 +119,7 @@ struct LogBar: View {
                         .help(state.log.last ?? "Nothing added yet.")
                 }
                 Spacer()
-                if pageIsEmpty {
+                if state.dragIsOverPage {
                     Label(dropHint, systemImage: "arrow.down.doc")
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         .help(dropHint)

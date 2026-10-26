@@ -265,7 +265,7 @@ PgdataPackerCore (`Sources/PgdataPackerCore/`):
 | Type | File | Role |
 |---|---|---|
 | `ContentFile`, `PackPlan`, `UnpackPlan`, `OutputNames`, `Oscillator`, `ProgramFile.repointed` | `Workbench.swift` | Pack and Unpack page decisions and output file names |
-| `ConvertPlan`, `ConvertPreviewCache` | `ConvertPlan.swift` | Wavetables page decisions: collecting files, collapsing duplicates, frame-size choice (`Item.frameSize`, `frameSizeChoices`, `sizeQualifier`, `SizeSource`), the preview's override (`Item.frameSizeAlternatives`, `sizeIsStated`), one frame size for several tables (`adjustableItems(in:)`, `commonFrameSizes(of:)`, `sharedFrameSize(of:)`, `chooseFrameSize(_:forAll:)`), blocked-table jumps (`firstItem(with:)`), which tables Convert All takes (`isIncluded(_:)`, `includedItems`: every table but factory tables for a 3rd Wave destination) and converting them or a selection (`convert(_:write:)`), expected results, the under-development notice (`conversionUnderDevelopment`, `testingStatus(_:)`), reports |
+| `ConvertPlan`, `ConvertPreviewCache` | `ConvertPlan.swift` | Wavetables page decisions: collecting files (`Prepared` does each table's hashing, factory match, and frame-size verdict on the reading queue; `add(_:)` checks them into the list), collapsing duplicates, frame-size choice (`Item.frameSize`, `frameSizeChoices`, `sizeQualifier`, `SizeSource`), the preview's override (`Item.frameSizeAlternatives`, `sizeIsStated`), one frame size for several tables (`adjustableItems(in:)`, `commonFrameSizes(of:)`, `sharedFrameSize(of:)`, `chooseFrameSize(_:forAll:)`), blocked-table jumps (`firstItem(with:)`), which tables Convert All takes (`isIncluded(_:)`, `includedItems`: every table but factory tables for a 3rd Wave destination) and converting them or a selection (`convert(_:write:)`), expected results, the under-development notice (`conversionUnderDevelopment`, `testingStatus(_:)`), reports |
 | `NameCleaner` | `NameCleaner.swift` | Clean Up Names proposals |
 | `OutputPreset` display extensions | `DestinationInfo.swift` | What the Wavetables page says about each destination: `Group` (with `title`, `presets`), `group`, `shortTitle`, `specLine`, `distinction` |
 | `ConvertReport`, `ReportText` | `ConvertReport.swift` | The Wavetables page's report after converting (alert title and text, log text); the item-line form every report uses |
@@ -294,7 +294,9 @@ holds the preview: `ConvertSweepControls`
 `MenuActions` (the File, Edit, and View menus' targets and validation; Edit › Delete, on the Delete
 key, is disabled while text is edited and otherwise reaches the focused list through
 `.onCommand(MenuActions.removeSelected)`; removals are undoable through `AppState.undoManager`,
-which the window returns) and `ToolbarController` (the unified toolbar whose segmented control
+which the window returns; a plain Return while a list has the focus becomes `renameSelected:`
+through an `NSEvent` local monitor, and the lists answer it by editing the selected row's name,
+Pack's by putting the cursor in the program's name field) and `ToolbarController` (the unified toolbar whose segmented control
 switches pages, with the audio output menu at its trailing end on every page). The Wavetables page
 is shown only while View › Show Under-Development Features is on (`AppState.showsUnderDevelopmentFeatures`,
 `Section.isUnderDevelopment`, `availableSections`), and carries an orange under-development notice
@@ -319,7 +321,8 @@ the shortcuts (⌘O, ⇧⌘E, ⌘1–⌘3, ⌥⌘L, ⌫, ⌘A, ⌘Z); the Info.p
 | Frame size decisions | `ReadWAV.swift`, `FrameSizeEvidence`, `FrameSizeFit.swift`, `ConvertPlan.Item.frameSize`/`frameSizeChoices`/`frameSizeAlternatives`; WAVETABLES.md section 3 | `ReadingTests`, `ReviewFixTests`, `FrameSizeFitTests`, `ReviewFixPlanTests`, `ConvertPlanStateTests` |
 | Listen, pitch, audio output | `AudioPreview.swift`, `PianoKey.swift`, `ToolbarController` in `main.swift` (`NSMenuToolbarItem`) | `PianoKeyTests`, `ResamplingTests` (`bandLimitedCycle`); the engine itself only by running the app |
 | Preview pictures, Frame slider, sweep | `ConvertDetail.swift`, `WavetableSketch.swift` | `WavetableSketchTests`, `WavetableSketchInterpolationTests`, `ResamplingTests` (`spectralBlend`) |
-| Remove, Edit › Delete, Undo | `MenuActions.deleteSelection` in `main.swift`; `AppState.undoManager`, `removePrograms`/`removeContent`/`removeUnpacks`/`removeConvertItems`, `removeAll*` | no tests; build and use the app |
+| Remove, Edit › Delete, Undo | `MenuActions.deleteSelection` in `main.swift`; `AppState.undoManager`, `removePrograms`/`removeContent`/`removeUnpacks`/`removeConvertItems`, `removeAll*`; the lists answer `removeSelected:` only while rows are selected | no tests; build and use the app |
+| Return to rename, drop hint, first table selected after a drop | `MenuActions.installReturnKey`/`renameSelected` in `main.swift`, the lists' `.onCommand(MenuActions.renameSelected)`, `AppState.focusProgramName`; `AppState.dragIsOverPage` and `LogBar`; `AppState.convertSelectionRequest` | no tests; build and use the app |
 | Showing or hiding the Wavetables page | `AppState.showsUnderDevelopmentFeatures`, `MenuActions.toggleUnderDevelopmentFeatures`, `ToolbarController.fillSegments`/`showOutputItem` | no tests; build and use the app |
 | Pack page behaviour (what each source will be, status lines, slot estimate) | `PackPlan` in `Workbench.swift` | `WorkbenchTests`; then `PackView.swift`, `AppState.swift` |
 | Unpack page behaviour | `UnpackPlan` in `Workbench.swift` | `WorkbenchTests`; then `UnpackView.swift` |
@@ -461,9 +464,11 @@ credentials that are not in the repository.
 - Listen and the preview's spectral lines use `Resampling.spectralBlend`, an approximation: Serum's
   and Vital's morph methods are not published. `FrameSizeFit` is a heuristic (frames alike at lag
   n, unlike at n/2); the Input column says "assumed" wherever it decided.
-- The preview writes the converted bytes and reads them back on the main thread (`ConvertPreviewCache`);
-  a 256 × 2,048 table to a U table takes a noticeable moment per selection. Computing it off the main
-  thread, or taking the frames from the writer without the text round trip, is open.
+- The preview writes the converted bytes and reads them back (`ConvertPreviewCache`), on a
+  background queue since 1.1 (`result(_:in:ready:)`; the result's picture shows a spinner until it
+  is in). The read-back is kept because it is what the picture claims to show (the file the page
+  would write, as a reader sees it); taking the frames from the writer instead would be quicker
+  but would show the writer's intent, not the file.
 
 ## 13. Glossary
 

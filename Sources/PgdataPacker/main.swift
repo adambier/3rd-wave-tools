@@ -137,8 +137,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 /// conversion is running.
 final class MenuActions: NSObject, NSMenuItemValidation {
     /// What Edit › Delete sends down the responder chain; the pages' lists answer it with
-    /// `.onCommand(MenuActions.removeSelected)` by removing their selected rows (undoable).
+    /// `.onCommand(MenuActions.removeSelected)` by removing their selected rows (undoable), and
+    /// answer with nil while nothing is selected, which disables the item.
     static let removeSelected = NSSelectorFromString("removeSelected:")
+    /// What the Return key sends down the responder chain while a list has the focus (see
+    /// `installReturnKey`); the lists answer it with `.onCommand(MenuActions.renameSelected)` by
+    /// editing the selected row's name, as the Finder does, and with nil when no one row is
+    /// selected. There is no menu item for it: Return is the Finder's way, not a menu shortcut.
+    static let renameSelected = NSSelectorFromString("renameSelected:")
 
     /// Edit › Delete (the Delete key, as the HIG has it). The item is this object's, not the
     /// first responder's, so that it can stay out of the way of text: while a text field is
@@ -152,10 +158,28 @@ final class MenuActions: NSObject, NSMenuItemValidation {
         NSApp.keyWindow?.firstResponder is NSText
     }
     private let appState: AppState
+    /// The Return key's event monitor (`installReturnKey`), kept for the app's life.
+    private var returnKeyMonitor: Any?
 
     init(appState: AppState) {
         self.appState = appState
         super.init()
+    }
+
+    /// Turns a plain Return (or keypad Enter) pressed while a list or table has the focus into
+    /// `renameSelected:` down the responder chain. The event is swallowed only when a list
+    /// answers; otherwise it goes on as before. Text being edited keeps its Return (the first
+    /// responder is then the field editor, not the table), as do buttons and pop-ups.
+    func installReturnKey() {
+        returnKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { (event: NSEvent) -> NSEvent? in
+            let returnKey: UInt16 = 36, keypadEnter: UInt16 = 76
+            guard event.keyCode == returnKey || event.keyCode == keypadEnter,
+                  event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty,
+                  event.window === NSApp.keyWindow,
+                  NSApp.keyWindow?.firstResponder is NSTableView,
+                  NSApp.sendAction(MenuActions.renameSelected, to: nil, from: nil) else { return event }
+            return nil
+        }
     }
 
     /// The current page's "Add Files or Folders…": the same panel as its button, with files of
@@ -443,8 +467,9 @@ private func buildMainMenu(appDelegate: AppDelegate, menuActions: MenuActions) -
     editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
     editMenu.addItem(.separator())
     // Delete, on the Delete key, as the HIG's Edit menu has it (`MenuActions.deleteSelection`
-    // validates it and passes it to the focused list; removals are undoable). An earlier ⌘⌫ was
-    // Finder's Move to Trash shortcut, not the Edit menu's.
+    // validates it and passes it to the focused list, which answers only while rows are selected;
+    // removals are undoable). An earlier ⌘⌫ was Finder's Move to Trash shortcut, not the Edit
+    // menu's.
     let deleteItem = editMenu.addItem(withTitle: "Delete", action: #selector(MenuActions.deleteSelection(_:)), keyEquivalent: "\u{8}")
     deleteItem.keyEquivalentModifierMask = []
     deleteItem.target = menuActions
@@ -503,6 +528,7 @@ application.delegate = appDelegate
 let appState = AppState()
 appDelegate.appState = appState
 let menuActions = MenuActions(appState: appState)
+menuActions.installReturnKey()
 let toolbarController = ToolbarController(appState: appState)
 application.mainMenu = buildMainMenu(appDelegate: appDelegate, menuActions: menuActions)
 

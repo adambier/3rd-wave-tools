@@ -327,7 +327,10 @@ struct ConvertOverviewPair: View {
     var body: some View {
         let plan = state.convertPlan
         if let source = item.table.wavetable(frameSize: item.frameSize) {
-            let result = state.convertPreviews.resultFrames(item, in: plan)
+            // The result comes from the cache, or a moment later from the background queue (the
+            // input is drawn at once; the result's place says it is being converted).
+            let preview = state.convertPreview(item)
+            let result = preview?.frames
             let resultInterpolation = plan.interpolationRecorded(for: item)
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 16) {
@@ -344,6 +347,8 @@ struct ConvertOverviewPair: View {
                                         unstatedLegend: plan.preset.isThirdWave ? "the 3rd Wave sets the interpolation itself" : "interpolation set in the synth",
                                         tint: WavetableStackCanvas.resultColor,
                                         position: position)
+                    } else if preview == nil {
+                        ConvertPreviewPending(caption: plan.preset.shortTitle)
                     }
                     ConvertSweepView(source: source.frames, sourceInterpolation: item.table.interpolation,
                                      result: result, resultInterpolation: resultInterpolation,
@@ -450,6 +455,23 @@ struct ConvertOverview: View {
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
         // One element: the caption ("Input · 64 × 2,048"), then the legend's lines.
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// The result picture's place while the conversion runs on the background queue: a spinner
+/// where the picture will be, with the destination's name as the caption.
+struct ConvertPreviewPending: View {
+    let caption: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ProgressView()
+                .controlSize(.small)
+                .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
+            Text("\(caption) · converting…").font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .accessibilityElement(children: .combine)
     }
 }
@@ -570,6 +592,10 @@ struct ConvertSwatch: View {
 /// surface; the picture stays within about 150 lines. With `highlight` set (0 front to 1
 /// back, the Frame slider's place), the cycle at that depth is drawn over the stack in
 /// the highlight colour: a stored frame, or the in-between the interpolation gives there.
+///
+/// Two canvases, one over the other: the stack (`StackLinesCanvas`, which SwiftUI redraws only
+/// when the frames, interpolation, or colour change) and the highlight, which alone follows the
+/// slider, so dragging it costs one line, not the 150 behind it.
 struct WavetableStackCanvas: View {
     let frames: [[Float]]
     let interpolation: Interpolation?
@@ -590,64 +616,53 @@ struct WavetableStackCanvas: View {
     /// warnings, purple for spectral blends, the accent colour for the result).
     static let highlightColor = Color.pink
 
-    /// A line to draw: its depth in frames from the front, its values, and whether it is an
-    /// in-between.
-    private struct Line {
-        var position: Double
-        var values: [Float]
-        var between: Bool
-    }
-
     var body: some View {
-        Canvas { (context: inout GraphicsContext, size: CGSize) in
-            let showsBetweens = interpolation == .crossfade || interpolation == .spectral
-            let lines = WavetableStackCanvas.lines(frames, interpolation: interpolation, showsBetweens: showsBetweens, width: size.width)
-            guard let last = lines.first?.position, last > 0 || lines.count == 1 else { return }
-            // Closer together with in-betweens, so the lines merge into a surface.
-            let depthX = size.width * (showsBetweens ? 0.22 : 0.3)
-            let depthY = size.height * (showsBetweens ? 0.36 : 0.5)
-            let waveWidth = size.width - depthX
-            let amplitude = (size.height - depthY) / 2 - 1
-            let betweenColor = interpolation == .spectral ? WavetableStackCanvas.spectralColor : WavetableStackCanvas.crossfadeColor(tint)
-            for line in lines {
-                let t: CGFloat = last > 0 ? CGFloat(line.position / last) : 0
-                let x0 = depthX * t
-                let base = size.height - amplitude - 1 - depthY * t
-                let path = WavetableStackCanvas.path(line.values, x0: x0, base: base, width: waveWidth, amplitude: amplitude)
-                let fade = 1 - 0.6 * Double(t)
-                if line.between {
-                    context.stroke(path, with: .color(betweenColor.opacity(0.6 * fade)), lineWidth: 0.6)
-                } else {
-                    context.stroke(path, with: .color(tint.opacity(fade)), lineWidth: showsBetweens ? 1 : 1.2)
-                }
-            }
-            // The cycle at the slider, over everything, at its depth in the stack. Taken from
-            // the drawn (reduced) frames, so it sits exactly on them.
+        ZStack {
+            StackLinesCanvas(frames: frames, interpolation: interpolation, tint: tint)
+                .equatable()
             if let highlight {
-                let stored = lines.filter { !$0.between }.sorted { $0.position < $1.position }.map(\.values)
-                if let point = WavetableSketch.cycle(at: highlight, in: stored, interpolation: interpolation, columns: stored.first?.count ?? 1) {
-                    let t = CGFloat(highlight)
-                    let base = size.height - amplitude - 1 - depthY * t
-                    let path = WavetableStackCanvas.path(point.values, x0: depthX * t, base: base, width: waveWidth, amplitude: amplitude)
-                    context.stroke(path, with: .color(WavetableStackCanvas.highlightColor), lineWidth: 1.6)
-                }
+                StackHighlightCanvas(frames: frames, interpolation: interpolation, highlight: highlight)
             }
         }
     }
 
-    /// The lines back to front: the stored frames (reduced) and the in-betweens, sorted by
-    /// depth so the front ones are drawn last.
-    private static func lines(_ frames: [[Float]], interpolation: Interpolation?, showsBetweens: Bool, width: CGFloat) -> [Line] {
-        let columns = max(8, Int(width * 0.7 / 2))
-        let budget = WavetableSketch.lineBudget(storedFrames: frames.count, showsBetweens: showsBetweens)
-        let reduced = WavetableSketch.reduce(frames, maxFrames: budget.stored, columns: columns)
-        var out: [Line] = reduced.enumerated().map { (pair: (offset: Int, element: [Float])) -> Line in
-            Line(position: Double(pair.offset), values: pair.element, between: false)
+    /// Where the stack sits in a picture of `size`: how far back it recedes and the room each
+    /// frame has. Closer together with in-betweens, so the lines merge into a surface.
+    struct Geometry {
+        let depthX: CGFloat
+        let depthY: CGFloat
+        let waveWidth: CGFloat
+        let amplitude: CGFloat
+        let size: CGSize
+
+        init(size: CGSize, showsBetweens: Bool) {
+            self.size = size
+            depthX = size.width * (showsBetweens ? 0.22 : 0.3)
+            depthY = size.height * (showsBetweens ? 0.36 : 0.5)
+            waveWidth = size.width - depthX
+            amplitude = (size.height - depthY) / 2 - 1
         }
-        for b in WavetableSketch.inBetweens(reduced, interpolation: interpolation, perGap: budget.perGap) {
-            out.append(Line(position: b.position, values: b.values, between: true))
+
+        /// A frame's polyline at depth `t` (0 front, 1 back).
+        func path(_ values: [Float], at t: CGFloat) -> Path {
+            WavetableStackCanvas.path(values, x0: depthX * t, base: size.height - amplitude - 1 - depthY * t,
+                                      width: waveWidth, amplitude: amplitude)
         }
-        return out.sorted { (a: Line, b: Line) -> Bool in a.position > b.position }
+    }
+
+    /// Whether in-betweens are drawn for an interpolation.
+    static func showsBetweens(_ interpolation: Interpolation?) -> Bool {
+        interpolation == .crossfade || interpolation == .spectral
+    }
+
+    /// How many values a frame is reduced to for a picture of `width`: about one per two points.
+    static func columns(for width: CGFloat) -> Int { max(8, Int(width * 0.7 / 2)) }
+
+    /// The stored frames reduced for a picture of `width` (the budget leaves room for the
+    /// in-betweens when they are drawn).
+    static func reducedFrames(_ frames: [[Float]], interpolation: Interpolation?, width: CGFloat) -> [[Float]] {
+        let budget = WavetableSketch.lineBudget(storedFrames: frames.count, showsBetweens: showsBetweens(interpolation))
+        return WavetableSketch.reduce(frames, maxFrames: budget.stored, columns: columns(for: width))
     }
 
     /// One frame as a polyline from `x0` across `width`, around the baseline `base`.
@@ -660,6 +675,74 @@ struct WavetableStackCanvas: View {
             if i == 0 { path.move(to: p) } else { path.addLine(to: p) }
         }
         return path
+    }
+}
+
+/// The stack itself: the stored frames and the in-betweens, back to front. Equatable, so that
+/// SwiftUI leaves it as drawn while only the highlight over it moves.
+struct StackLinesCanvas: View, Equatable {
+    let frames: [[Float]]
+    let interpolation: Interpolation?
+    let tint: Color
+
+    /// A line to draw: its depth in frames from the front, its values, and whether it is an
+    /// in-between.
+    private struct Line {
+        var position: Double
+        var values: [Float]
+        var between: Bool
+    }
+
+    var body: some View {
+        Canvas { (context: inout GraphicsContext, size: CGSize) in
+            let showsBetweens = WavetableStackCanvas.showsBetweens(interpolation)
+            let lines = StackLinesCanvas.lines(frames, interpolation: interpolation, showsBetweens: showsBetweens, width: size.width)
+            guard let last = lines.first?.position, last > 0 || lines.count == 1 else { return }
+            let geometry = WavetableStackCanvas.Geometry(size: size, showsBetweens: showsBetweens)
+            let betweenColor = interpolation == .spectral ? WavetableStackCanvas.spectralColor : WavetableStackCanvas.crossfadeColor(tint)
+            for line in lines {
+                let t: CGFloat = last > 0 ? CGFloat(line.position / last) : 0
+                let path = geometry.path(line.values, at: t)
+                let fade = 1 - 0.6 * Double(t)
+                if line.between {
+                    context.stroke(path, with: .color(betweenColor.opacity(0.6 * fade)), lineWidth: 0.6)
+                } else {
+                    context.stroke(path, with: .color(tint.opacity(fade)), lineWidth: showsBetweens ? 1 : 1.2)
+                }
+            }
+        }
+    }
+
+    /// The lines back to front: the stored frames (reduced) and the in-betweens, sorted by
+    /// depth so the front ones are drawn last.
+    private static func lines(_ frames: [[Float]], interpolation: Interpolation?, showsBetweens: Bool, width: CGFloat) -> [Line] {
+        let budget = WavetableSketch.lineBudget(storedFrames: frames.count, showsBetweens: showsBetweens)
+        let reduced = WavetableStackCanvas.reducedFrames(frames, interpolation: interpolation, width: width)
+        var out: [Line] = reduced.enumerated().map { (pair: (offset: Int, element: [Float])) -> Line in
+            Line(position: Double(pair.offset), values: pair.element, between: false)
+        }
+        for b in WavetableSketch.inBetweens(reduced, interpolation: interpolation, perGap: budget.perGap) {
+            out.append(Line(position: b.position, values: b.values, between: true))
+        }
+        return out.sorted { (a: Line, b: Line) -> Bool in a.position > b.position }
+    }
+}
+
+/// The cycle at the slider, over the stack, at its depth. Taken from the drawn (reduced)
+/// frames, so it sits exactly on them: a stored frame, or the in-between the interpolation
+/// gives there (`WavetableSketch.cycle`).
+struct StackHighlightCanvas: View {
+    let frames: [[Float]]
+    let interpolation: Interpolation?
+    let highlight: Double
+
+    var body: some View {
+        Canvas { (context: inout GraphicsContext, size: CGSize) in
+            let stored = WavetableStackCanvas.reducedFrames(frames, interpolation: interpolation, width: size.width)
+            guard let point = WavetableSketch.cycle(at: highlight, in: stored, interpolation: interpolation, columns: stored.first?.count ?? 1) else { return }
+            let geometry = WavetableStackCanvas.Geometry(size: size, showsBetweens: WavetableStackCanvas.showsBetweens(interpolation))
+            context.stroke(geometry.path(point.values, at: CGFloat(highlight)), with: .color(WavetableStackCanvas.highlightColor), lineWidth: 1.6)
+        }
     }
 }
 
@@ -705,11 +788,15 @@ struct ConvertWhatHappens: View {
         VStack(alignment: .leading, spacing: ConvertPreviewFacts.lineSpacing) {
             Text("Output").font(.caption).foregroundStyle(.secondary)
             if plan.canConvert(item) {
-                if let file = state.convertPreviews.preview(item, in: plan) {
-                    ConvertNoteList(file: file, output: plan.expected(for: item), unchanged: plan.unchangedWords(for: item))
+                if let preview = state.convertPreview(item) {
+                    if let file = preview.file {
+                        ConvertNoteList(file: file, output: plan.expected(for: item), unchanged: plan.unchangedWords(for: item))
+                    } else {
+                        Label("The table can’t be converted; the report after converting says why.", systemImage: "xmark.octagon")
+                            .foregroundStyle(.red)
+                    }
                 } else {
-                    Label("The table can’t be converted; the report after converting says why.", systemImage: "xmark.octagon")
-                        .foregroundStyle(.red)
+                    Text("Converting…").foregroundStyle(.secondary)
                 }
             } else if plan.status(item) == .needsFrameSize {
                 // The Input block already says, in red, that no size could be estimated and where
