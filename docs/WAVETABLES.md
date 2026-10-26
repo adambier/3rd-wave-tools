@@ -41,7 +41,7 @@ chunk.[^vital] Most other synths set interpolation on the oscillator, not in the
 |---|---|---|
 | Serum, Vital, Pigments | Mono 32-bit float WAV, 48 kHz, 2,048 per frame, up to 256 frames, with a `clm ` chunk carrying the interpolation | [^serum] [^vital] [^pigments] |
 | MiniFreak V (for the MiniFreak) | The same, with at most 64 frames | [^minifreak] |
-| Tonverk (Elektron) | Mono 32-bit float WAV, 48 kHz, at most 64 frames, its frame size and interpolation in the file name (`Name_wt1024.wav`, `Name_wt128r.wav`) | [^tonverk] |
+| Tonverk | Mono 32-bit float WAV, 48 kHz, at most 64 frames, its frame size and interpolation in the file name (`Name_wt1024.wav`, `Name_wt128r.wav`) | [^tonverk] |
 | Phase Plant | Exactly 256 frames of 2,048, with a `clm ` chunk | [^phaseplant] |
 | Surge XT | A Surge `.wt` (binary, below) | [^surge-code] |
 | WaveEdit, E370 | Mono 16-bit WAV, 44.1 kHz, 64 frames of 256, no extra chunk | [^waveedit] |
@@ -110,8 +110,9 @@ which one it was:
 5. a Serum `.txt` file beside it;
 6. evenly spaced `cue ` points;
 7. a single `smpl` loop starting at sample 0 (the loop over the first frame);
-8. the length, for a mono file: multiples of 2,048 as 2,048 per frame, up to 256 frames, except
-   8,192 and 16,384 samples (below).
+8. the length, for a mono file: multiples of 2,048, up to 256 frames; the size is then the one
+   the samples make likely (below), 2,048 per frame when none stands out, and a choice for
+   8,192 and 16,384 samples.
 
 Rules 1–5 are written for the purpose and are trusted as long as one whole frame fits; when the
 samples run past the last whole frame (as in some editors' files, and in Surge's own library),
@@ -119,8 +120,9 @@ the extra samples are left out, with a note. Cue points and loops (rules 6 and 7
 samples too, so they count only for powers of two up to 4,096 that give at least two frames: a
 single looped cycle is a sample. When two of these disagree, both are noted. When only the
 length suggested a size, the other sizes the length allows can be chosen instead. When nothing
-settles the size, the page assumes the likely size (below) or, when none stands out, lists the
-sizes the length allows and waits for you to choose: a file
+settles the size, the page estimates the likely size (below) and the Input column says
+"estimated", or, when none stands out, lists the sizes the length allows and waits for you to
+choose: a file
 of 8,192 samples is 64 × 128 for the 3rd Wave's Wave Maker (a PPG table) but 4 × 2,048 for Serum,
 Pigments, or Tonverk (whose factory library has one), and one of 16,384 is 64 × 256 for WaveEdit
 but 8 × 2,048 for Serum. A WAV with none of the metadata above is listed only when it is mono, its
@@ -136,8 +138,8 @@ open), and the samples beside them (multisampled notes, single cycles, looped no
 not. DUNE 3's `.wt` files, and Harmor's and Komplexer's, are in formats of their own; the app
 does not read them.
 
-**Estimating from the samples.** When the file's contents state no size, the page rates every
-size the length allows by how alike neighboring frames are at that size, takes the best as its
+**Estimating from the samples.** When nothing but the file's length points to a size (rule 8,
+or a length rule 8 leaves open), the page rates every size the length allows by how alike neighboring frames are at that size, takes the best as its
 estimate (the Input column says "estimated"), and falls back to 2,048, the Serum-style size,
 only when no size stands out; the chooser draws the first frame at each size and marks the
 rated size "likely" whenever another is in use. The rating rests on how alike

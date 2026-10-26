@@ -7,7 +7,7 @@ should parse to, so a new implementation can be checked against it without the 3
 to it.
 
 The files are synthetic: the PgdataFormats and WavetableFormats libraries built them, and they
-contain no one else's sounds, so they can be used freely under this project's MIT licence. They
+contain no one else's sounds, so they can be used freely under this project's MIT license. They
 exercise the structure of each format; they are not meant as sounds, and loading them on the 3rd Wave
 has not been tested.
 

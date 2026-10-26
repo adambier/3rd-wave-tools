@@ -63,7 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let wavetables = urls.filter { ["wav", "wave", "flac"].contains($0.pathExtension.lowercased()) }
         let rest = urls.filter { !wavetables.contains($0) }
         if !wavetables.isEmpty {
-            if state.showsUnderDevelopmentFeatures {
+            if state.showsWavetablesPage {
                 state.addToConvert(urls: wavetables)
                 if rest.isEmpty { state.section = .convert }
             } else {
@@ -308,9 +308,10 @@ final class ToolbarController: NSObject, NSToolbarDelegate, NSMenuDelegate {
         }.store(in: &cancellables)
         // The pages offered, and the audio output beside them, follow View › Show
         // Under-Development Features (the one time this toolbar's items change).
-        appState.$showsUnderDevelopmentFeatures.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] (shows: Bool) in
-            self?.fillSegments()
-            self?.showOutputItem(shows)
+        appState.$showsUnderDevelopmentFeatures.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] _ in
+            guard let self else { return }
+            self.fillSegments()
+            self.showOutputItem(self.appState.showsWavetablesPage)   // not the toggle: the page shows by default once nothing gates it
         }.store(in: &cancellables)
     }
 
@@ -329,7 +330,7 @@ final class ToolbarController: NSObject, NSToolbarDelegate, NSMenuDelegate {
     // toolbar whose items come and go with the page is what the HIG advises against, and the
     // device is one setting for the app.
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, Self.pageItem, .flexibleSpace] + (appState.showsUnderDevelopmentFeatures ? [Self.outputItem] : [])
+        [.flexibleSpace, Self.pageItem, .flexibleSpace] + (appState.showsWavetablesPage ? [Self.outputItem] : [])
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {

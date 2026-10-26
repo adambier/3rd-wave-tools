@@ -27,7 +27,7 @@ not make wavetables from other audio.
   in the ``OutputFile/notes``.
 
 Each preset states what its behavior rests on (``OutputPreset/basis``) and where it has been
-tested (``OutputPreset/testedIn``); a preset not yet tested in its destination says so. The
+tested (``OutputPreset/testedIn``, empty for a preset not yet tested in its destination). The
 formats themselves, with sources, are described in
 [WAVETABLES.md](https://github.com/adambier/3rd-wave-tools/blob/main/docs/WAVETABLES.md), and the
 3rd Wave's own in

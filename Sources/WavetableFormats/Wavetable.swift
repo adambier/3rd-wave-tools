@@ -242,7 +242,7 @@ public enum OutputPreset: String, Equatable, Sendable, CaseIterable {
     /// import and send to a MiniFreak (which stores 64 frames; the writer reduces larger tables
     /// itself rather than leave it to MiniFreak V).
     case miniFreak
-    /// A WAV for Elektron Tonverk, its frame size and interpolation in the file name.
+    /// A WAV for Tonverk, its frame size and interpolation in the file name.
     case tonverk
     /// A WAV of exactly 256 frames of 2,048 samples (Phase Plant).
     case phasePlant

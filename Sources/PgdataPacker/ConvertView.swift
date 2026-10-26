@@ -31,7 +31,7 @@ struct ConvertView: View {
             Divider()
             if state.convertPlan.items.isEmpty {
                 EmptyHint(title: "Drop wavetables here",
-                          detail: "Add WAV and FLAC wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table is then listed with its size (frames × samples per frame) and what converting changes, and previewed on the right; to edit a name, double-click its row or select it and press Return. This page converts existing wavetables between formats; it does not make wavetables from other audio.")
+                          detail: "Add WAV and FLAC wavetables (Serum, Vital, and others), 3rd Wave .wt and .pgdata files, and Surge .wt files; folders work too, and files without wavetables are passed over. Each table is then listed with its size (frames × samples per frame) and what converting changes, and previewed under the table; to edit a name, double-click its row or select it and press Return. This page converts existing wavetables between formats; it does not make wavetables from other audio.")
             } else {
                 HSplitView {
                     // The preview takes the height its content needs (a status display, not a

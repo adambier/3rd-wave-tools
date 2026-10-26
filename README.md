@@ -305,10 +305,10 @@ page.
 #### Frame sizes
 
 The Input column says where each table's frame size comes from. A size the file's contents state
-(a chunk, a header, or a format that fixes it) is taken as it is. One the page estimated, from a
-`_wt<N>` tag in the file name, a Serum `.txt` beside the file, or markers, is the default of a
-choice: click it to see every size the length allows, each drawn so the one that cuts the frames
-in the right place is visible. When the file states nothing, the page estimates the size from
+(a chunk, a header, or a format that fixes it) is taken as it is. One taken from a `_wt<N>` tag
+in the file name, a Serum `.txt` beside the file, or markers, which the file's contents do not
+confirm, is the default of a choice: click it to see every size the length allows, each drawn so
+the one that cuts the frames in the right place is visible. When the file states nothing, the page estimates the size from
 the samples: the size at which the frames are most alike from one to the next, as a wavetable's
 are (see [`docs/WAVETABLES.md`](docs/WAVETABLES.md#3-how-a-frame-size-is-decided)); when no size stands out, it takes 2,048
 samples per frame, the Serum-style size. Either way the column says "estimated", and the chooser
@@ -316,7 +316,8 @@ offers the other sizes the length allows. Two lengths are never settled by conve
 are also well-known tables at other sizes: 8,192 samples (64 × 128, a PPG-style table, or 4 ×
 2,048) and 16,384 (64 × 256, a WaveEdit bank, or 8 × 2,048); for those the page waits for a choice
 when the samples do not decide. With several tables selected, the preview offers one frame size
-for those whose size is estimated, from the sizes all of them allow (⌘A selects every table). For the rare
+for those whose file does not state a size (estimated, or still open), from the sizes all of them
+allow (⌘A selects every table). For the rare
 WAV or FLAC whose chunk states the wrong size, **Override Frame Size…** in the preview opens the
 same chooser. The counts above the table jump to the first table that still needs a size or cannot
 be split into frames; **Show only tables that can't be converted yet** filters to them, and the
@@ -338,7 +339,7 @@ filter field above the table narrows the list by name or file, as on the Pack pa
 The destination applies to every table converted. The chosen row says why its format is separate
 and, in orange, anything its sources leave open that the tables bring about; once the
 under-development notice has gone, also that converting to it has not yet been tested. The book
-icon beside each row (under **Sources**) opens the documents the format rests on; a green seal in
+icon beside each row (under **Sources**) names the documents the format rests on; a green seal in
 its place marks a destination that has been tested. Until the 3rd Wave's tables and Tonverk have
 been tested, the page is shown only with View › **Show Under-Development Features** and carries a
 notice that wavetable conversion is under development; after that, the page is shown by default,
@@ -368,9 +369,9 @@ Shown when a choice applies to the destination and the tables (the captions coun
 The pane under the table shows the selected table: the input and the result stacked frame by
 frame, with the interpolation drawn between frames where a file records one; its file, its frame
 size and what that rests on, its interpolation, and what converting changes. A 3rd Wave result is
-drawn and played the way the 3rd Wave plays it by default: a U table with wavetable smoothing on,
-blending between frames (drawn as a crossfade, an inference from the manual's description), and a
-P table with it off, stepping from frame to frame. For these and the other formats whose file
+drawn and played the way the 3rd Wave plays it by default: a P table with wavetable smoothing
+off, stepping from frame to frame, and a U table with it on, blending between frames (drawn as a
+crossfade, an inference from the manual's description). For these and the other formats whose file
 records no interpolation (Surge XT, WaveEdit), an **Interpolation** pop-up under the pictures chooses what is drawn
 and played there; whenever the table or the destination changes it goes back to the synth's
 default where that is known (the 3rd Wave's), otherwise to none. For a format whose file records the interpolation, the **Interpolation to be saved in
@@ -378,8 +379,9 @@ the output file** option under **Options** decides, and the preview says so in t
 The **Frame** slider sweeps through the table and draws the cycle there large, input and result
 together; the frames in the file are magnetic, so the slider lands on them as it passes and the
 positions between stay reachable. **Listen** plays that cycle, following the slider, at the pitch chosen
-beside it (a piano key and its frequency; A3, 220 Hz, to start), at the volume and through the
-device chosen under **Audio Output**, the speaker icon at the right of the toolbar.
+beside it (a piano key and its frequency; A3, 220 Hz, until you change it), at the volume and
+through the device chosen under **Audio Output**, the speaker icon at the right of the toolbar;
+the pitch, the volume, and the device are kept between sessions.
 Under the output's notes, two notes appear when they apply, since either makes the interpolation
 hard to hear: a caution, in orange, when a small table's frames are repeated to fill the
 destination's frame count (a synth that blends between frames, the 3rd Wave with wavetable

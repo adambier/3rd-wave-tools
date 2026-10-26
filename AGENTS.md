@@ -123,7 +123,7 @@ in their synths (`OutputPreset.testedIn`).
 | `Sources/PgdataPackerCore/` | Library: the app's decisions without UI (pack, unpack, and convert plans, file names, Clean Up Names) |
 | `Sources/PgdataPacker/` | The macOS app (SwiftUI, AppKit); declared in `Package.swift` only on macOS |
 | `Sources/tw3pg/main.swift` | Developer command-line tool: inspect, round-trip, pack, unpack, repack, compare, convert, checks, sweep recordings of what Listen plays, test-file builders |
-| `Tests/PgdataFormatsTests/` | Tests for PgdataFormats (`FormatTests`, `RobustnessTests`, `ConverterTests`, `FactoryLibraryTests`, `FixtureTests`, …) |
+| `Tests/PgdataFormatsTests/` | Tests for PgdataFormats (`FormatTests.swift` with `SourceRefTests`, `ProgramTests`, `PackTests`, and `MultisampleTests`; `RobustnessTests`, `ConverterTests`, `FactoryLibraryTests`, `FixtureTests`, …) |
 | `Tests/WavetableFormatsTests/` | Tests for WavetableFormats; `Resources/FLAC/` holds synthetic FLAC files read by path |
 | `Tests/PgdataPackerCoreTests/` | Tests for PgdataPackerCore: `WorkbenchTests`, `PlanRobustnessTests`, `ConvertPlanTests.swift` (several classes: `ConvertPlanTests`, `ConvertPlanStateTests`, `ConvertChangeWordsTests`, `ConvertExistingChoicesTests`, `ConvertOptionsTextTests`, `WavetableSketchTests`, `FrameSizeFitTests`, …), `ConvertReportTests`, `ReviewFixPlanTests`, `PianoKeyTests`, and `NameFittingTests` (the Pack page and the Wavetables page's writer give the same 3rd Wave name); `TestPrograms.swift` repeats the program builders of `FormatTests.swift` |
 | `fixtures/` | Seven synthetic files, one per format and layout, each with a `<file>.json` of what it parses to; `fixtures/README.md` |
@@ -301,7 +301,8 @@ key, is disabled while text is edited and otherwise removes the focused list's s
 plain Return while a list has the focus edits the selected row's name, Pack's list putting the
 cursor in the program's name field, through an `NSEvent` local monitor) and `ToolbarController`
 (the unified toolbar whose segmented control
-switches pages, with the audio output menu at its trailing end on every page). The Wavetables page
+switches pages, with the audio output menu at its trailing end on every page while the Wavetables
+page is offered, `AppState.showsWavetablesPage`). The Wavetables page
 is shown only while View › Show Under-Development Features is on (`AppState.showsUnderDevelopmentFeatures`,
 `Section.isUnderDevelopment`, `availableSections`), and carries an orange under-development notice
 while `ConvertPlan.conversionUnderDevelopment` is true (a gating destination's `OutputPreset.testedIn`
@@ -337,11 +338,11 @@ a separate manager for the typing (`AppDelegate.windowWillReturnUndoManager`).
 | Read another wavetable format | `Reading.swift` dispatch, a new `Read<Format>.swift`, `SourceFormat` | `ReadingTests`, `CorpusCaseTests`, `RoundTripTests`; WAVETABLES.md |
 | Write for another synth | `OutputPreset` in `Wavetable.swift`, `Writing.swift`, `PresetInfo.swift`; `DestinationInfo.swift` in PgdataPackerCore | `WritingTests`, `RoundTripTests`; WAVETABLES.md section 2; README destination table |
 | Frame size decisions | `ReadWAV.swift`, `FrameSizeEvidence`, `FrameSizeFit.swift`, `ConvertPlan.Item.frameSize`/`frameSizeChoices`/`frameSizeAlternatives`; WAVETABLES.md section 3 | `ReadingTests`, `ReviewFixTests`, `FrameSizeFitTests`, `ReviewFixPlanTests`, `ConvertPlanStateTests` |
-| Listen, pitch, audio output | `AudioPreview.swift`, `PianoKey.swift`, `ToolbarController` in `main.swift` (`NSMenuToolbarItem`) | `PianoKeyTests`, `ResamplingTests` (`bandLimitedCycle`); `tw3pg sweep` records what Listen plays as WAVs (section 9); the engine itself only by running the app |
-| Preview pictures, Frame slider, sweep | `ConvertDetail.swift`, `WavetableSketch.swift` | `WavetableSketchTests`, `WavetableSketchInterpolationTests`, `ResamplingTests` (`spectralBlend`) |
+| Listen, pitch, audio output | `AudioPreview.swift`, `PianoKey.swift`, `ToolbarController` and `VolumeMenuView` in `main.swift` (`NSMenuToolbarItem`; the Volume row is built fresh each time the menu is filled) | `PianoKeyTests`, `ResamplingTests` (`bandLimitedCycle`); `tw3pg sweep` records what Listen plays as WAVs (section 9); the engine itself only by running the app |
+| Preview pictures, Frame slider, sweep, the two sweep notes | `ConvertDetail.swift` (`ConvertSweepControls.snappedPosition`, `ConvertSweepNoteView`), `WavetableSketch.swift`; `ConvertPlan.SweepNote`, `repeatedFramesNote`, `alikeFramesNote`, `neighborDifference`, `alikeThreshold` (0.05, set by ear) in `ConvertPlan.swift` | `WavetableSketchTests`, `WavetableSketchInterpolationTests` (the notes), `FullCycleEdgeTests`, `ResamplingTests` (`spectralBlend`) |
 | Remove, Edit › Delete, Undo | `ListCommands.swift` (`ListCommandSource.set(delete:rename:)` in each list's body and `.listCommands(_:)` on each row), `MenuActions.deleteSelection` in `main.swift`; `AppState.undoManager`, `removePrograms`/`removeContent`/`removeUnpacks`/`removeConvertItems`, `removeAll*`, `renameConvertItem`, `commitUnpackFileName` | no tests; build and use the app |
 | Return to rename, drop hint, first table selected after a drop | `MenuActions.installReturnKey` in `main.swift` and the lists' `rename` handlers, `AppState.focusProgramName`; `AppState.dragIsOverPage` and `LogBar`; `AppState.convertSelectionRequest` | no tests; build and use the app |
-| Showing or hiding the Wavetables page | `AppState.showsUnderDevelopmentFeatures`, `MenuActions.toggleUnderDevelopmentFeatures`, `ToolbarController.fillSegments`/`showOutputItem` | no tests; build and use the app |
+| Showing or hiding the Wavetables page | `ConvertPlan.gatingPresets`, `AppState.showsUnderDevelopmentFeatures`/`hasUnderDevelopmentSections`/`showsWavetablesPage`, `MenuActions.toggleUnderDevelopmentFeatures`, `ToolbarController.fillSegments`/`showOutputItem` | no tests; build and use the app |
 | Pack page behavior (what each source will be, status lines, slot estimate) | `PackPlan` in `Workbench.swift` | `WorkbenchTests`; then `PackView.swift`, `AppState.swift` |
 | Unpack page behavior | `UnpackPlan` in `Workbench.swift` | `WorkbenchTests`; then `UnpackView.swift` |
 | Wavetables page behavior | `ConvertPlan.swift`, `ConvertReport.swift` | `ConvertPlanTests`, `ConvertReportTests`; then `ConvertView.swift`, `ConvertDetail.swift`, `ConvertDestination.swift` |
@@ -456,7 +457,9 @@ new `mutating func` in `Writing.swift`; fill every `switch` in the `OutputPreset
 (`Writing.swift`: `title`, `basis`, `caveat`, `frameSize`, `maxFrameCount`, `requiredFrameCount`,
 `fileExtension`, and `scalesToFit`/`isThirdWave` where they apply; `PresetInfo.swift`:
 `recordsInterpolation`; PgdataPackerCore's `DestinationInfo.swift`: `shortTitle`, `specLine`,
-`distinction`, the page's wording; `ConvertPlan.caveat(for:)`, an exhaustive switch);
+`distinction`, the page's wording; `ConvertPlan.caveat(for:)`, an exhaustive switch; `Job.countReason` in
+`Writing.swift`; `ConvertOverviewPair.hearingHelp` in the app; the preset list in tw3pg's `sweep` usage line;
+`ConvertPlan.gatingPresets` if the destination should gate the page);
 the app lists presets through `OutputPreset.Group.presets`, so no UI list needs editing; add
 `WritingTests` and `RoundTripTests` cases; add a row to `docs/WAVETABLES.md` section 2 with a
 footnoted source and to the README destination table; leave `testedIn` empty.

@@ -47,6 +47,11 @@ final class AppState: ObservableObject {
         Section.allCases.filter { showsUnderDevelopmentFeatures || !$0.isUnderDevelopment }
     }
 
+    /// Whether the Wavetables page is offered, and with it the audio output in the toolbar and
+    /// WAV or FLAC files dropped on the Dock icon: shown by default once nothing gates it, else
+    /// only with View › Show Under-Development Features on.
+    var showsWavetablesPage: Bool { availableSections.contains(.convert) }
+
     /// Whether any page is still under development, so View › Show Under-Development Features
     /// has something to show or hide. When none is, the item leaves the menu: a page that is
     /// complete enough to show by default must not be hidden by a toggle whose purpose is no
