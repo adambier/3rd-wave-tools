@@ -511,9 +511,9 @@ struct ConvertFrameSizeCell: View {
                     Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
                 }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(ConvertChooserStyle())
             .help(item.needsFrameSize
-                  ? "Unable to estimate a frame size from this file. Click to choose one of the sizes its length allows (frames × samples per frame)."
+                  ? "Unable to estimate a frame size from this file. Click to choose one of the sizes the file’s length allows (frames × samples per frame)."
                   : "Input: " + item.sizeDescription + " (frames × samples per frame). " + item.basisDescription + " Click to choose another size.")
 
             .popover(isPresented: $choosing, arrowEdge: .bottom) {
@@ -545,6 +545,25 @@ struct ConvertSizeText: View {
             }
         }
         .padding(.leading, plain ? ConvertFramesBySize.buttonInset : 0)
+        .padding(.vertical, plain ? ConvertChooserStyle.verticalPadding : 0)   // the same row height as a chooser row
+    }
+}
+
+/// The frame-size chooser in a table row: a quiet rounded field behind the text, as tall as
+/// the text plus a little, so rows with a chooser and rows without are the same height (a
+/// bordered button made the chooser rows a third taller: Adam, 2026-10-26). Pressed: a little
+/// darker.
+struct ConvertChooserStyle: ButtonStyle {
+    static let horizontalPadding: CGFloat = 7
+    static let verticalPadding: CGFloat = 2
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, Self.horizontalPadding)
+            .padding(.vertical, Self.verticalPadding)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color.primary.opacity(configuration.isPressed ? 0.18 : 0.09)))
+            .contentShape(Rectangle())
     }
 }
 
@@ -559,10 +578,9 @@ struct ConvertFramesBySize: View {
 
     /// The width of the count's column: room for three digits.
     static let countWidth: CGFloat = 26
-    /// What a bordered button insets its label by, applied to plain text in the same column so
-    /// the × signs line up down the column (measured against a build: 7 left the plain rows
-    /// about 5 points short).
-    static let buttonInset: CGFloat = 12
+    /// What the chooser (`ConvertChooserStyle`) insets its label by, applied to plain text in
+    /// the same column so the × signs line up down the column.
+    static let buttonInset: CGFloat = ConvertChooserStyle.horizontalPadding
 
     var body: some View {
         // Never shortened to "2…": the numbers take the width they need, and when a cell is too
