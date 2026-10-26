@@ -481,7 +481,7 @@ final class ConvertPlanStateTests: XCTestCase {
                       table("Quiet", notes: [ReadNote(disagree, "The sizes differ; the clm chunk wins."),
                                              ReadNote(.highFrameCount(300, limit: 256), "300 frames.")])])
         let loud = p.itemNotes(for: p.items[0])
-        XCTAssertEqual(loud.warnings, ["Peak 1.23 is over full scale (±1); the table is attenuated to fit, so the table plays a little quieter.", "Left channel read."])
+        XCTAssertEqual(loud.warnings, ["Peak 1.23 is over full scale (±1); the table is attenuated to fit and plays a little quieter.", "Left channel read."])
         XCTAssertEqual(loud.information, [])
         XCTAssertEqual(p.notes(for: p.items[0]), loud.all)
         XCTAssertEqual(p.items[0].peak, 1.234, accuracy: 1e-5)
@@ -810,11 +810,11 @@ final class WavetableSketchInterpolationTests: XCTestCase {
         plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Two.wav"), table: t)], factory: FactoryLibrary())
         let note = plan.repeatedFramesNote(for: plan.items[0])
         XCTAssertEqual(note?.kind, .repeatedFrames)
-        XCTAssertEqual(note?.text, "The 2 frames are repeated to make 64, so the 3rd Wave’s wavetable smoothing can blend only where the frame changes; "
-                       + "the sweep is stepped whatever the interpolation. Crossfade New Frames, under Options, makes the sweep continuous.")
+        XCTAssertEqual(note?.text, "The 2 frames are repeated to make 64 frames, so the 3rd Wave’s wavetable smoothing can blend only where the frame changes; "
+                       + "the sweep is stepped whatever the interpolation. Crossfade New Frames, under Options, makes a blend run through the whole sweep.")
         XCTAssertTrue(plan.convert().reports[0].notes.contains(note!.text))
         plan.preset = .phasePlant   // exactly 256 frames
-        XCTAssertEqual(plan.repeatedFramesNote(for: plan.items[0])?.text.hasPrefix("The 2 frames are repeated to make 256, so a synth that blends between frames"), true)
+        XCTAssertEqual(plan.repeatedFramesNote(for: plan.items[0])?.text.hasPrefix("The 2 frames are repeated to make 256 frames, so a synth that blends between frames"), true)
         plan.preset = .miniFreak    // up to 64 frames: a 2-frame table stays 2 frames
         XCTAssertNil(plan.repeatedFramesNote(for: plan.items[0]))
         plan.options.frameCountPolicy = .interpolate
@@ -823,6 +823,13 @@ final class WavetableSketchInterpolationTests: XCTestCase {
         plan.options.frameCountPolicy = .pickEvenly
         plan.preset = .wav2048   // up to 256 frames: the count is kept
         XCTAssertNil(plan.repeatedFramesNote(for: plan.items[0]))
+        // One frame repeated: the sweep cannot change, and the note says so instead of "1 frames".
+        var one = ConvertPlan(preset: .thirdWaveU)
+        one.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/One.wav"),
+                                   table: FoundTable(name: "One", fileName: "One.wav", source: .wav, samples: sine, frameSize: 2048, frameSizeBasis: "clm chunk"))],
+                factory: FactoryLibrary())
+        XCTAssertEqual(one.repeatedFramesNote(for: one.items[0])?.text,
+                       "The one frame is repeated 64 times, so the sweep does not change; the 3rd Wave’s wavetable smoothing has nothing to blend, and Crossfade New Frames would repeat the frame as well.")
     }
 
     /// Neighboring frames that differ little earn the alike-frames note; repeated frames are
@@ -1084,10 +1091,10 @@ final class ConvertExistingChoicesTests: XCTestCase {
         XCTAssertNil(stepped.caveat(for: .wav2048))
         // MiniFreak V and Phase Plant: only for tables with fewer frames than they expect.
         let two = pickerPlan(.miniFreak, [(nil, 2048), (nil, 2048)])
-        XCTAssertEqual(two.caveat(for: .miniFreak), "Both tables have fewer than 64 frames; what MiniFreak V does with fewer frames is not documented.")
+        XCTAssertEqual(two.caveat(for: .miniFreak), "Both tables have fewer than 64 frames; what MiniFreak V does with fewer than 64 frames is not documented.")
         XCTAssertEqual(two.caveat(for: .phasePlant), "Both tables have fewer than 256 frames; whether Phase Plant loads shorter tables is untested, so frames are added to reach 256.")
         let one = pickerPlan(.miniFreak, [(nil, 2048)])
-        XCTAssertEqual(one.caveat(for: .miniFreak), "1 table has fewer than 64 frames; what MiniFreak V does with fewer frames is not documented.")
+        XCTAssertEqual(one.caveat(for: .miniFreak), "1 table has fewer than 64 frames; what MiniFreak V does with fewer than 64 frames is not documented.")
         var tall = ConvertPlan(preset: .miniFreak)
         let wave = (0..<2048).map { Float(sin(Double($0) * 2 * .pi / 2048)) * 0.5 }
         let table = FoundTable(name: "Tall", fileName: "Tall.wav", source: .wav, samples: Array(Array(repeating: wave, count: 64).joined()),
@@ -1113,7 +1120,7 @@ final class ConvertExistingChoicesTests: XCTestCase {
         XCTAssertEqual(plan.unstatedInterpolationCount, 1)
         XCTAssertNil(plan.sharedExistingInterpolation)
         XCTAssertNil(plan.defaultInterpolationItem, "something is stated, so the default item is not the unmarked one")
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped, 1 crossfade, 1 spectral; 1 not stated")
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped, 1 crossfade, 1 spectral; 1 not stated, saved as crossfade")
         // An override does not change what the tables have.
         plan.options.interpolation = .spectral
         XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 1, Interpolation.none: 2, .spectral: 1])
@@ -1126,7 +1133,7 @@ final class ConvertExistingChoicesTests: XCTestCase {
         // One stated value plus a file that says nothing: not shared, and the label says so.
         plan = pickerPlan(.wav2048, [(nil, 2048), (Interpolation.none, 2048), (Interpolation.none, 2048)])
         XCTAssertNil(plan.sharedExistingInterpolation)
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped; 1 not stated")
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped; 1 not stated, saved as crossfade")
         // No tables at all: no counts, no "existing"; the default (crossfade) is the unmarked item.
         plan = ConvertPlan(preset: .wav2048)
         XCTAssertEqual(plan.existingInterpolations(), [:])
@@ -1147,7 +1154,7 @@ final class ConvertExistingChoicesTests: XCTestCase {
         // Tonverk: spectral counts as crossfade (its name can say only stepped or smooth).
         plan.preset = .tonverk
         XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 2, Interpolation.none: 2])
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped, 2 crossfade; 1 not stated")
+        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped, 2 crossfade; 1 not stated, saved as crossfade")
         let smooth = pickerPlan(.tonverk, [(.spectral, 2048), (.crossfade, 1024)])
         XCTAssertEqual(smooth.sharedExistingInterpolation, .crossfade)
         XCTAssertNil(smooth.eachTablesOwnInterpolationLabel)
@@ -1221,5 +1228,47 @@ final class ConvertPresetSwitchTests: XCTestCase {
         XCTAssertEqual(plan.options.interpolation, .crossfade, "crossfade is kept between destinations that record it")
         plan.preset = .thirdWaveU
         XCTAssertNil(plan.options.interpolation, "a 3rd Wave table records no interpolation, and the Options box shows no pop-up")
+        // The same rule at init and on setting the options directly.
+        XCTAssertNil(ConvertPlan(preset: .tonverk, options: OutputOptions(interpolation: .spectral)).options.interpolation)
+        XCTAssertEqual(ConvertPlan(preset: .tonverk, options: OutputOptions(interpolation: .crossfade)).options.interpolation, .crossfade)
+        var tonverk = ConvertPlan(preset: .tonverk)
+        tonverk.options.interpolation = .spectral
+        XCTAssertNil(tonverk.options.interpolation)
+        tonverk.options.interpolation = Interpolation.none
+        XCTAssertEqual(tonverk.options.interpolation, Interpolation.none)
+    }
+}
+
+
+/// `sentencesOfParagraph`, which the Wavetables page's explanations are set with.
+final class SentenceSplitTests: XCTestCase {
+    func testSplitsAtSentenceEnds() {
+        XCTAssertEqual(sentencesOfParagraph("The file doesn’t specify a frame size. The estimate is 2,048 samples per frame. If the frames look wrong, choose another size."),
+                       ["The file doesn’t specify a frame size.", "The estimate is 2,048 samples per frame.", "If the frames look wrong, choose another size."])
+        XCTAssertEqual(sentencesOfParagraph("Attenuated by 0.1 dB to fit (the peak was 1.01): the 3rd Wave’s own tables stay within ±1."),
+                       ["Attenuated by 0.1 dB to fit (the peak was 1.01): the 3rd Wave’s own tables stay within ±1."])
+        // A quotation mark, a parenthesis, or a digit can open a sentence.
+        XCTAssertEqual(sentencesOfParagraph("Written as “Pad.wt”. “Existing” is what the file states. (The rest follows.) 3 tables lose frames."),
+                       ["Written as “Pad.wt”.", "“Existing” is what the file states.", "(The rest follows.)", "3 tables lose frames."])
+        // An abbreviation before a lowercase word, and a period inside parentheses, do not split.
+        XCTAssertEqual(sentencesOfParagraph("Spectral blends (approx.) and crossfades, e.g., between frames."),
+                       ["Spectral blends (approx.) and crossfades, e.g., between frames."])
+        XCTAssertEqual(sentencesOfParagraph(""), [])
+        XCTAssertEqual(sentencesOfParagraph("One sentence"), ["One sentence"])
+    }
+}
+
+/// `WavetableSketch.fullCycle` at the edges: one frame, and the last position.
+final class FullCycleEdgeTests: XCTestCase {
+    func testOneFrameAndLastPosition() throws {
+        let a: [Float] = (0..<64).map { Float($0) / 64 }
+        let b: [Float] = a.map { 1 - $0 }
+        let one = try XCTUnwrap(WavetableSketch.fullCycle(at: 0.5, in: [a], interpolation: .crossfade))
+        XCTAssertEqual(one.values, a); XCTAssertFalse(one.isBetween)
+        let last = try XCTUnwrap(WavetableSketch.fullCycle(at: 1, in: [a, b], interpolation: .crossfade))
+        XCTAssertEqual(last.values, b); XCTAssertEqual(last.lower, 1); XCTAssertFalse(last.isBetween)
+        let beyond = try XCTUnwrap(WavetableSketch.fullCycle(at: 7, in: [a, b], interpolation: .spectral))
+        XCTAssertEqual(beyond.values, b, "positions are clamped to 0…1")
+        XCTAssertNil(WavetableSketch.fullCycle(at: 0, in: [], interpolation: nil))
     }
 }

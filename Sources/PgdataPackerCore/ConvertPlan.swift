@@ -415,18 +415,25 @@ public struct ConvertPlan: Equatable {
     /// Crossfade while the writer noted a spectral morph: Adam, 2026-10-26). The pop-up then
     /// shows each table's own interpolation, or the default.
     public var preset: OutputPreset {
-        didSet {
-            if !preset.recordsInterpolation || (preset == .tonverk && options.interpolation == .spectral) {
-                options.interpolation = nil
-            }
-        }
+        didSet { options = Self.allowed(options, for: preset) }
     }
-    /// The choices that apply to the conversion.
-    public var options: OutputOptions
+    /// The choices that apply to the conversion; an interpolation the destination cannot take
+    /// is dropped (see `preset`).
+    public var options: OutputOptions {
+        didSet { options = Self.allowed(options, for: preset) }
+    }
+
+    /// `options` with an interpolation the destination cannot take dropped: any, for a
+    /// destination whose files record none; spectral, for Tonverk.
+    static func allowed(_ options: OutputOptions, for preset: OutputPreset) -> OutputOptions {
+        var o = options
+        if !preset.recordsInterpolation || (preset == .tonverk && o.interpolation == .spectral) { o.interpolation = nil }
+        return o
+    }
 
     /// An empty plan for a destination.
     public init(preset: OutputPreset = .thirdWaveU, options: OutputOptions = OutputOptions()) {
-        self.preset = preset; self.options = options
+        self.preset = preset; self.options = Self.allowed(options, for: preset)
     }
 
     // MARK: Collecting input
@@ -630,7 +637,7 @@ public struct ConvertPlan: Equatable {
         }
         if item.peak > 1 {
             warnings.insert("Peak \(Wavetable.peakText(item.peak)) is over full scale (±1); "
-                + (destinationScalesToFit ? "the table is attenuated to fit, so the table plays a little quieter."
+                + (destinationScalesToFit ? "the table is attenuated to fit and plays a little quieter."
                                           : "the table is kept as it is, so unless the synth attenuates the table, the loudest parts may clip, which adds a hard, buzzy edge."), at: 0)
         }
         if let slot = item.factorySlot {
@@ -768,7 +775,7 @@ public struct ConvertPlan: Equatable {
         case .miniFreak:
             let short = tables.filter { ($0.frameCount ?? 64) < 64 }.count
             guard short > 0 else { return nil }
-            return "\(Self.tablesHave(short, of: tables.count)) fewer than 64 frames; what MiniFreak V does with fewer frames is not documented."
+            return "\(Self.tablesHave(short, of: tables.count)) fewer than 64 frames; what MiniFreak V does with fewer than 64 frames is not documented."
         case .phasePlant:
             let short = tables.filter { ($0.frameCount ?? 256) < 256 }.count
             guard short > 0 else { return nil }
@@ -820,7 +827,7 @@ public struct ConvertPlan: Equatable {
     /// pictures and Listen: what the file records when the format records it; for the 3rd Wave,
     /// whose files record none, what its Wave Flow does by default (checked on an 8M; FORMATS.md
     /// section 5.1): a U table plays with wavetable smoothing on, taken here to be a crossfade
-    /// between frames (the manual says "interpolation between neighbouring frames"; the method
+    /// between frames (the manual describes it as interpolation between neighboring frames; the method
     /// is an inference), and a P table with it off, stepping from frame to frame. Nil for a
     /// format that records nothing when the synth's default is not known.
     public func interpolationPlayed(for item: Item) -> Interpolation? {
@@ -920,7 +927,7 @@ public struct ConvertPlan: Equatable {
             counts[i].map { "\($0) \(existingWord(i))" }
         }.joined(separator: ", ")
         let unstated = unstatedInterpolationCount
-        if unstated > 0 { parts += "; \(unstated) not stated" }
+        if unstated > 0 { parts += "; \(unstated) not stated, saved as \(existingWord(Self.defaultInterpolation))" }
         return ChoiceLabel(value: "Each table’s own", existing: "existing", detail: parts)
     }
 
@@ -1124,9 +1131,16 @@ public struct ConvertPlan: Equatable {
     public func repeatedFramesNote(for item: Item) -> SweepNote? {
         guard let e = expected(for: item), e.repeatsFrames else { return nil }
         let blender = preset.isThirdWave ? "the 3rd Wave’s wavetable smoothing" : "a synth that blends between frames"
+        let count = Self.formatCount(e.tableFrameCount)
+        if e.frameCountIn == 1 {
+            // One frame repeated: nothing changes across the sweep, and new frames crossfaded
+            // from one frame would all be that frame too.
+            return SweepNote(kind: .repeatedFrames, text:
+                "The one frame is repeated \(count) times, so the sweep does not change; \(blender) has nothing to blend, and Crossfade New Frames would repeat the frame as well.")
+        }
         return SweepNote(kind: .repeatedFrames, text:
-            "The \(Self.formatCount(e.frameCountIn)) frames are repeated to make \(Self.formatCount(e.tableFrameCount)), so \(blender) can blend only where the frame changes; "
-            + "the sweep is stepped whatever the interpolation. Crossfade New Frames, under Options, makes the sweep continuous.")
+            "The \(Self.formatCount(e.frameCountIn)) frames are repeated to make \(count) frames, so \(blender) can blend only where the frame changes; "
+            + "the sweep is stepped whatever the interpolation. Crossfade New Frames, under Options, makes a blend run through the whole sweep.")
     }
 
     /// The alike-frames note for a table's frames (the result's, as the destination gets them),
@@ -1414,6 +1428,11 @@ public final class ConvertPreviewCache {
     private var entries: [UUID: Entry] = [:]
     private let write: (Wavetable, OutputPreset, OutputOptions) throws -> OutputFile
     private let queue = DispatchQueue(label: "pgdata Packer preview", qos: .userInitiated)
+    /// The key each item's latest request was made for, read on the queue before computing, so
+    /// a request the item has moved on from (arrowing through rows, say) is skipped rather than
+    /// computed and discarded ahead of the one wanted.
+    private let wantedLock = NSLock()
+    private var wanted: [UUID: Key] = [:]
     /// How many times the writer has run (for tests).
     public private(set) var writerRuns = 0
 
@@ -1471,7 +1490,11 @@ public final class ConvertPreviewCache {
         entries[item.id] = Entry(key: key, result: nil)
         writerRuns += 1
         let write = self.write
+        wantedLock.lock(); wanted[item.id] = key; wantedLock.unlock()
         queue.async { [weak self] in
+            guard let self else { return }
+            self.wantedLock.lock(); let stillWanted = self.wanted[item.id] == key; self.wantedLock.unlock()
+            guard stillWanted else { return }   // superseded before it started
             let result = Self.compute(item, in: plan, write: write)
             DispatchQueue.main.async { [weak self] in
                 guard let self, let entry = self.entries[item.id], entry.key == key else { return }   // superseded

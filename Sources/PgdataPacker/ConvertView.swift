@@ -126,7 +126,7 @@ struct ConvertDevelopmentNotice: View {
             .foregroundStyle(.orange)
             .frame(maxWidth: .infinity)
             .padding(.top, 8)
-            .help("The Sources beside each destination say whether converting to it has been tested in its synth. This notice goes when the 3rd Wave’s tables and Tonverk have been; the rows of other destinations still untested then say so.")
+            .help("The Sources beside each destination say whether converting to it has been tested in its synth. This notice goes once converting to the 3rd Wave’s tables and to Tonverk has been tested; the rows of other destinations still untested then say so.")
     }
 }
 

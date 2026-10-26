@@ -122,30 +122,6 @@ struct ConvertPresetRow: View {
     }
 }
 
-/// Splits a paragraph into its sentences, at a period, exclamation mark, or question mark
-/// followed by a space and a capital letter or an opening quotation mark; a period inside a
-/// number or a parenthesis stays.
-func sentencesOfParagraph(_ text: String) -> [String] {
-    var out: [String] = []
-    var current = ""
-    let chars = Array(text)
-    var i = 0
-    while i < chars.count {
-        let c = chars[i]
-        current.append(c)
-        if ".!?".contains(c), i + 2 < chars.count, chars[i + 1] == " ",
-           chars[i + 2].isUppercase || chars[i + 2] == "\u{201C}" || chars[i + 2] == "(" {
-            out.append(current.trimmingCharacters(in: .whitespaces))
-            current = ""
-            i += 1   // the space
-        }
-        i += 1
-    }
-    let last = current.trimmingCharacters(in: .whitespaces)
-    if !last.isEmpty { out.append(last) }
-    return out
-}
-
 /// The radio, title, spec line, and (when chosen) why this destination is separate, then its
 /// cautions in orange: what its sources leave open for these tables, if anything, and that
 /// converting to it has not been tested, unless it has (`OutputPreset.testedIn`).

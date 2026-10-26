@@ -176,23 +176,17 @@ final class MenuActions: NSObject, NSMenuItemValidation {
     /// row's name, as in the Finder (`ListCommands`; there is no menu item for it, since Return is
     /// the Finder's way, not a menu shortcut). The event is swallowed only when the list has a
     /// rename to do (one row selected); otherwise it goes on as before. Text being edited keeps
-    /// its Return (the first responder is then the field editor, not the table), as do buttons
-    /// and pop-ups.
+    /// its Return (the first responder is then the field editor, not the table), as do a
+    /// focused button or pop-up, which Return presses (`ListCommands` would otherwise answer
+    /// for the list showing a selection, which is right for Delete but not here).
     func installReturnKey() {
-        returnKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] (event: NSEvent) -> NSEvent? in
+        returnKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { (event: NSEvent) -> NSEvent? in
             let returnKey: UInt16 = 36, keypadEnter: UInt16 = 76
             guard event.keyCode == returnKey || event.keyCode == keypadEnter,
                   event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty,
-                  event.window === NSApp.keyWindow else { return event }
-            guard let rename = ListCommands.shared.handlers(forFirstResponderOf: NSApp.keyWindow)?.rename else {
-                // Return reached no list: say what had the focus, so a list that does not hand
-                // its table view the focus can be found (a diagnostic, in the log only).
-                if let self, !(NSApp.keyWindow?.firstResponder is NSText) {
-                    let responder = NSApp.keyWindow?.firstResponder.map { String(describing: type(of: $0)) } ?? "nothing"
-                    self.appState.note("Return went unhandled: the focus was on \(responder); \(ListCommands.shared.count) lists registered.")
-                }
-                return event
-            }
+                  event.window === NSApp.keyWindow,
+                  !(NSApp.keyWindow?.firstResponder is NSButton),
+                  let rename = ListCommands.shared.handlers(forFirstResponderOf: NSApp.keyWindow)?.rename else { return event }
             rename()
             return nil
         }
@@ -276,8 +270,12 @@ final class MenuActions: NSObject, NSMenuItemValidation {
             menuItem.isHidden = !shown
             return shown
         case #selector(toggleUnderDevelopmentFeatures(_:)):
+            // Out of the menu, with the separator above it, once no page is under development.
+            let gated = AppState.hasUnderDevelopmentSections
+            menuItem.isHidden = !gated
+            menuItem.menu?.items.last(where: { $0.isSeparatorItem })?.isHidden = !gated
             menuItem.state = appState.showsUnderDevelopmentFeatures ? .on : .off
-            return true
+            return gated
         case #selector(toggleLog(_:)):
             menuItem.title = appState.showLog ? "Hide Log" : "Show Log"
             return true
@@ -475,12 +473,6 @@ final class VolumeMenuView: NSView {
     private static var titleInset: CGFloat { if #available(macOS 14, *) { return 32 } else { return 21 } }
     private static var rightMargin: CGFloat { if #available(macOS 14, *) { return 14 } else { return 12 } }
     private static let height: CGFloat = 28
-
-    /// The slider's position, set from the audio state when the menu is filled.
-    var volume: Float {
-        get { Float(slider.doubleValue) }
-        set { slider.doubleValue = Double(newValue) }
-    }
 
     // Laid out by Auto Layout, not by frames: a menu sizes a custom item view from its
     // constraints and intrinsic size, and lays it out when the menu opens, by which time a

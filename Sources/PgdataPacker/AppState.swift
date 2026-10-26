@@ -47,6 +47,12 @@ final class AppState: ObservableObject {
         Section.allCases.filter { showsUnderDevelopmentFeatures || !$0.isUnderDevelopment }
     }
 
+    /// Whether any page is still under development, so View › Show Under-Development Features
+    /// has something to show or hide. When none is, the item leaves the menu: a page that is
+    /// complete enough to show by default must not be hidden by a toggle whose purpose is no
+    /// longer apparent (Adam, 2026-10-26).
+    static var hasUnderDevelopmentSections: Bool { Section.allCases.contains { $0.isUnderDevelopment } }
+
     struct PackItem: Identifiable {
         let id = UUID()
         var url: URL

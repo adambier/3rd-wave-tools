@@ -66,22 +66,22 @@ public extension OutputPreset {
         switch self {
         case .thirdWaveU:
             // Wavetable smoothing on by default for a U table: checked on an 8M (FORMATS.md section 5.1).
-            return "The 3rd Wave’s main set: 64 frames of 1,024 with a mipmap chain, played band-limited and, by default, with wavetable smoothing on (the 3rd Wave blends from frame to frame). Keeps the most of a 2,048-sample table."
+            return "The 3rd Wave’s main set: 64 frames of 1,024 samples with a mipmap chain, played band-limited and, by default, with wavetable smoothing on (the 3rd Wave blends from frame to frame). Keeps the most of a 2,048-sample table."
         case .thirdWaveP:
             // Wavetable smoothing off by default for a P table: checked on an 8M (FORMATS.md section 5.1).
-            return "PPG-style: 64 frames of 128, played as the PPG played wavetables, through the three Wave Flow settings, wavetable smoothing (off by default, so the table steps from frame to frame), waveform smoothing, and use upper wavetable. With \u{201C}use upper wavetable\u{201D} off, the 3rd Wave sweeps positions 0–59 only (60–63 are reached by the wave offset); the PPG waveforms option fills 60–63 the way the PPG-derived factory tables do."
+            return "PPG-style: 64 frames of 128 samples, played as the PPG played wavetables, through the three Wave Flow settings, \u{201C}wavetable smoothing\u{201D} (off by default, so the table steps from frame to frame), \u{201C}waveform smoothing\u{201D}, and \u{201C}use upper wavetable\u{201D}. With \u{201C}use upper wavetable\u{201D} off, the 3rd Wave sweeps positions 0–59 only (60–63 are reached by the wave offset); the PPG waveforms option fills 60–63 the way the PPG-derived factory tables do."
         case .wav2048:
             return "The common 2,048-sample WAV, up to 256 frames; the file records the interpolation, which Serum and Vital read."
         case .miniFreak:
-            return "The same WAV, at most 64 frames: what a MiniFreak keeps. Larger tables are cut down to 64 here, before MiniFreak V reads the file."
+            return "The same WAV, at most 64 frames: what a MiniFreak keeps. Larger tables are cut down to 64 frames here, before MiniFreak V reads the file."
         case .tonverk:
             return "Up to 64 frames; Tonverk reads the frame size, and whether the table steps between frames, from the file name."
         case .phasePlant:
-            return "The same WAV, but exactly 256 frames, as Phase Plant’s documentation asks; a table of any other length is brought to 256."
+            return "The same WAV, but exactly 256 frames, as Phase Plant’s documentation asks; a table of any other length is brought to 256 frames."
         case .surge:
             return "Surge’s own .wt; keeps the source’s frame size when that size is a power of two up to 4,096 (otherwise 2,048)."
         case .waveEdit:
-            return "16-bit, 64 frames of 256: the bank format the E370 and E352 read."
+            return "16-bit, 64 frames of 256 samples: the bank format the E370 and E352 read."
         }
     }
 }

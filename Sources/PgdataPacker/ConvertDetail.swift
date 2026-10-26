@@ -304,7 +304,7 @@ struct ConvertPreviewFacts: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 ConvertFactBlock(label: "Interpolation in the file", value: item.interpolationDescription, detail: nil, alert: false)
                     .frame(width: 150, alignment: .topLeading)
-                    .help("Whether a synth interpolates between frames as the table is swept, and by which method: crossfade (a blend of neighboring frames) or spectral (a blend of the frames’ harmonics); none means no interpolation (it steps from frame to frame). Some files say which; most synths set it on the oscillator instead.")
+                    .help("Whether a synth interpolates between frames as the table is swept, and by which method: crossfade (a blend of neighboring frames) or spectral (a blend of the frames’ harmonics); none means no interpolation (the synth steps from frame to frame). Some files say which; most synths set the interpolation on the oscillator instead.")
             }
             ConvertWhatHappens(state: state, item: item)
         }
@@ -376,7 +376,7 @@ struct ConvertSweepNoteView: View {
             ConvertSentences(note.text, color: isCaution ? Color.orange : Color.primary)
         }
         .help(isCaution
-              ? "The destination needs more frames than the table has, and Original Frames Only fills the count by repeating frames. Blending can only act where one frame gives way to the next, so most of the sweep sounds the same whichever interpolation is chosen."
+              ? "The destination needs more frames than the table has, and Original Frames Only fills the count by repeating frames. Blending can only act where one frame gives way to the next, so most of the sweep sounds the same whatever the Interpolation pop-up is set to."
               : "The frames of this table differ little from one to the next (measured as the typical difference between a frame and the next), so stepping and blending between them can be hard to tell apart by ear. Nothing to change.")
     }
 }
@@ -445,8 +445,9 @@ struct ConvertOverviewPair: View {
             // and slider, and handed to the engine whenever it differs: one path, so a change of
             // table, the result arriving, or the Options cannot leave the engine on a stale
             // cycle (handlers capturing an earlier pass's values did: Adam, 2026-10-26, the
-            // sound not following the selected table).
-            let playedCycle = cycleToPlay(source: source.frames, result: result, resultInterpolation: resultInterpolation)
+            // sound not following the selected table). Computed only while playing, since a
+            // spectral blend costs FFTs and the body runs on every pitch or volume change too.
+            let playedCycle = preview.isPlaying ? cycleToPlay(source: source.frames, result: result, resultInterpolation: resultInterpolation) : []
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 16) {
                     ConvertOverview(frames: source.frames,
@@ -474,15 +475,15 @@ struct ConvertOverviewPair: View {
                 ConvertSweepControls(position: $position, frameCount: (result ?? source.frames).count, preview: preview,
                                      playing: result != nil ? "the \(plan.preset.shortTitle) output" : "the input",
                                      hearing: recorded || result == nil ? nil : $hearing,
-                                     hearingDefault: playedByDefault,
+                                     hearingDefault: playedByDefault, hearingDefaultKnown: plan.interpolationPlayed(for: item) != nil,
                                      hearingHelp: ConvertOverviewPair.hearingHelp(for: plan.preset),
-                                     recordedNote: recorded && result != nil ? ConvertOverviewPair.recordedNote(for: plan.preset) : nil,
+                                     recordedNote: recorded && result != nil ? ConvertOverviewPair.recordedNote : nil,
                                      recordedHelp: ConvertOverviewPair.recordedHelp(for: plan.preset),
-                                     cycle: { playedCycle })
+                                     cycle: { cycleToPlay(source: source.frames, result: result, resultInterpolation: resultInterpolation) })
             }
             .onChange(of: item.id) { _ in hearing = nil }
             .onChange(of: plan.preset) { _ in hearing = nil }
-            .onChange(of: playedCycle) { (cycle: [Float]) in preview.update(cycle) }
+            .onChange(of: playedCycle) { (cycle: [Float]) in if preview.isPlaying { preview.update(cycle) } }
             .onDisappear { preview.stop() }
         }
     }
@@ -492,7 +493,7 @@ struct ConvertOverviewPair: View {
     /// default (checked on an 8M; FORMATS.md section 5.1; `ConvertPlan.interpolationPlayed(for:)`).
     /// Nil for the others' defaults, which are not known.
     static func interpolationNote(for preset: OutputPreset, chosen: Bool) -> String? {
-        if chosen { return "chosen in the Interpolation pop-up" }
+        if chosen { return "selected in the Interpolation pop-up" }
         switch preset {
         case .thirdWaveU: return "the 3rd Wave’s wavetable smoothing, on by default"
         case .thirdWaveP: return "the 3rd Wave’s wavetable smoothing is off by default"
@@ -503,24 +504,27 @@ struct ConvertOverviewPair: View {
     /// In the pop-up's place when the destination's file (or file name) records the interpolation:
     /// where to change it, so the preview and Listen follow. Short enough for the controls row at
     /// the default window size (the tip says the rest).
-    static func recordedNote(for preset: OutputPreset) -> String {
-        "Interpolation: set under Options"
-    }
+    static let recordedNote = "Interpolation: set under Options"
 
     /// The note's tip: where the format records the interpolation.
     static func recordedHelp(for preset: OutputPreset) -> String {
-        (preset == .tonverk ? "Tonverk reads whether the table steps or blends between frames from the file name, "
-                            : "This format saves the interpolation in the file, ")
-            + "so the Interpolation setting under Options in the Convert to pane decides what the file says and what is drawn and played here."
+        preset == .tonverk
+            ? "Tonverk reads whether the table steps or blends between frames from the file name, so the Interpolation pop-up under Options in the Convert to pane decides what the file name says and what is drawn and played here."
+            : "This format saves the interpolation in the file, so the Interpolation pop-up under Options in the Convert to pane decides what the file says and what is drawn and played here."
     }
 
-    /// The Interpolation pop-up's tip: what the choice is for, and what the synth itself does.
+    /// The Interpolation pop-up's tip: what the choice is for, and what the synth itself does
+    /// (known for the 3rd Wave; the pop-up then marks that as the default, and starts at None
+    /// (stepped) for the others).
     static func hearingHelp(for preset: OutputPreset) -> String {
-        let common = "How the result is drawn and played between frames here; the file records no interpolation, so the synth decides as the table plays. "
+        let who = preset.isThirdWave ? "the 3rd Wave" : "the synth"
+        let common = "How the result is drawn and played between frames here; the file records no interpolation, so \(who) decides as the table plays. "
         switch preset {
         case .thirdWaveU: return common + "On the 3rd Wave, wavetable smoothing is on by default for a U table (taken here to be a crossfade) and can be turned off in the program’s Wave Flow settings."
         case .thirdWaveP: return common + "On the 3rd Wave, wavetable smoothing is off by default for a P table and can be turned on in the program’s Wave Flow settings."
-        default: return common + "What \(preset.shortTitle) does by default is not known here."
+        case .surge: return common + "What Surge XT does by default is not known here; the preview starts at None (stepped)."
+        case .waveEdit: return common + "What WaveEdit or the E370 does by default is not known here; the preview starts at None (stepped)."
+        default: return common + "What \(preset.shortTitle) does by default is not known here; the preview starts at None (stepped)."
         }
     }
 
@@ -548,8 +552,10 @@ struct ConvertSweepControls: View {
     /// play the result with (nil in the binding for the synth's default); nil here when the
     /// format records it (the Options box sets it then) or there is no result yet.
     var hearing: Binding<Interpolation?>? = nil
-    /// The synth's default, named in the pop-up.
+    /// The synth's default, named in the pop-up when it is known (the 3rd Wave's); the pop-up
+    /// starts there either way.
     var hearingDefault: Interpolation = Interpolation.none
+    var hearingDefaultKnown: Bool = false
     var hearingHelp: String = ""
     /// For a format whose file records the interpolation: the words in the pop-up's place
     /// pointing to the Options box, which sets it (and so what plays).
@@ -619,7 +625,7 @@ struct ConvertSweepControls: View {
                         get: { hearing.wrappedValue ?? hearingDefault },
                         set: { (value: Interpolation) in hearing.wrappedValue = value == hearingDefault ? nil : value })) {
                         ForEach([Interpolation.none, .crossfade, .spectral], id: \.self) { (value: Interpolation) in
-                            Text(value.displayName + (value == hearingDefault ? " — default" : "")).tag(value)
+                            Text(value.displayName + (value == hearingDefault && hearingDefaultKnown ? " — default" : "")).tag(value)
                         }
                     }
                     .labelsHidden()
@@ -793,7 +799,7 @@ struct ConvertOverviewLegend: View {
             if interpolation == .crossfade {
                 ConvertSwatch(color: WavetableStackCanvas.crossfadeColor(tint), text: "Crossfades" + (note.map { " (" + $0 + ")" } ?? ""))
             } else if interpolation == .spectral {
-                ConvertSwatch(color: WavetableStackCanvas.spectralColor, text: "Spectral blends (approx.)" + (note.map { " (" + $0 + ")" } ?? ""))
+                ConvertSwatch(color: WavetableStackCanvas.spectralColor, text: "Spectral blends (approx." + (note.map { "; " + $0 } ?? "") + ")")
             }
         }
         .font(.caption).foregroundStyle(.secondary)

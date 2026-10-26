@@ -328,21 +328,21 @@ filter field above the table narrows the list by name or file, as on the Pack pa
 |---|---|
 | 3rd Wave P table | a `.wt` of 64 frames of 128 samples, optionally with the PPG's four standard waveforms at 60–63 |
 | 3rd Wave U table | a `.wt` of 64 frames of 1,024 samples, with its mipmap chain |
-| Serum, Vital, Pigments | a 32-bit float WAV of up to 256 frames of 2,048, recording the interpolation |
+| Serum, Vital, Pigments | a 32-bit float WAV of up to 256 frames of 2,048 samples, recording the interpolation |
 | MiniFreak V | the same, with at most 64 frames, for MiniFreak V to send to a MiniFreak |
 | Tonverk | a 32-bit float WAV of up to 64 frames, with the frame size and interpolation in the file name |
-| Phase Plant | a 32-bit float WAV of exactly 256 frames of 2,048 |
+| Phase Plant | a 32-bit float WAV of exactly 256 frames of 2,048 samples |
 | Surge XT | a Surge `.wt` |
-| WaveEdit, E370 | a 16-bit WAV of 64 frames of 256 |
+| WaveEdit, E370 | a 16-bit WAV of 64 frames of 256 samples |
 
 The destination applies to every table converted. The chosen row says why its format is separate
-and, in orange, what is open about it: that converting to it has not yet been tested (none has),
-and anything its sources leave open that the tables bring about. The book
+and, in orange, anything its sources leave open that the tables bring about; once the
+under-development notice has gone, also that converting to it has not yet been tested. The book
 icon beside each row (under **Sources**) opens the documents the format rests on; a green seal in
 its place marks a destination that has been tested. Until the 3rd Wave's tables and Tonverk have
 been tested, the page is shown only with View › **Show Under-Development Features** and carries a
-notice that wavetable conversion is under development; after that, a destination still untested
-says so in its row.
+notice that wavetable conversion is under development; after that, the page is shown by default,
+the menu item goes, and a destination still untested says so in its row.
 [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes what each destination expects, with sources.
 
 #### Options
@@ -356,7 +356,7 @@ Shown when a choice applies to the destination and the tables (the captions coun
   crossfading its neighbors.
 - **Interpolation to be saved in the output file** (for Tonverk, marked in the output file
   name), for formats whose file records it: an interpolation method, crossfade or spectral, or
-  none (no interpolation: the destination steps from frame to frame). The preview shows what each
+  none (no interpolation: the synth steps from frame to frame). The preview shows what each
   table's own input file specifies; by default each table keeps that, and a table whose file says
   nothing gets crossfade.
 - Tonverk's frame size, and the PPG's four standard waveforms for P tables.
@@ -372,20 +372,20 @@ drawn and played the way the 3rd Wave plays it by default: a U table with waveta
 blending between frames (drawn as a crossfade, an inference from the manual's description), and a
 P table with it off, stepping from frame to frame. For these and the other formats whose file
 records no interpolation (Surge XT, WaveEdit), an **Interpolation** pop-up under the pictures chooses what is drawn
-and played there; it goes back to the synth's default whenever the table or the destination
-changes. For a format whose file records the interpolation, the **Interpolation to be saved in
+and played there; whenever the table or the destination changes it goes back to the synth's
+default where that is known (the 3rd Wave's), otherwise to none. For a format whose file records the interpolation, the **Interpolation to be saved in
 the output file** option under **Options** decides, and the preview says so in the pop-up's place.
 The **Frame** slider sweeps through the table and draws the cycle there large, input and result
-together; stored frames are magnetic, so the slider lands on them as it passes and the positions
-between stay reachable. **Listen** plays that cycle, following the slider, at the pitch chosen
+together; the frames in the file are magnetic, so the slider lands on them as it passes and the
+positions between stay reachable. **Listen** plays that cycle, following the slider, at the pitch chosen
 beside it (a piano key and its frequency; A3, 220 Hz, to start), at the volume and through the
 device chosen under **Audio Output**, the speaker icon at the right of the toolbar.
 Under the output's notes, two notes appear when they apply, since either makes the interpolation
 hard to hear: a caution, in orange, when a small table's frames are repeated to fill the
-destination's frame count (a synth that blends between frames, the 3rd Wave's wavetable smoothing
-among them, can then blend only where the frame changes; **Crossfade New Frames** under
-**Options** makes the sweep continuous), and a note when neighboring frames are much alike, so
-that stepping and blending can be hard to tell apart.
+destination's frame count (a synth that blends between frames, the 3rd Wave with wavetable
+smoothing on among them, can then blend only where the frame changes; **Crossfade New Frames**
+under **Options** makes a blend run through the whole sweep), and a note when neighboring frames
+are much alike, so that stepping and blending can be hard to tell apart.
 
 #### Converting
 

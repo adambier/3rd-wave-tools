@@ -55,7 +55,9 @@ final class AudioPreview: ObservableObject {
     @Published var volume: Float {
         didSet {
             UserDefaults.standard.set(Double(volume), forKey: Self.volumeKey)
-            engine.mainMixerNode.outputVolume = volume
+            // Only once the engine is set up (`start()` applies the volume then): touching the
+            // mixer before the device is chosen would connect it at the default device's format.
+            if source != nil { engine.mainMixerNode.outputVolume = volume }
         }
     }
 
@@ -143,7 +145,7 @@ final class AudioPreview: ObservableObject {
         guard isPlaying else { return }
         isPlaying = false
         voice.setGain(0)
-        // Long enough for the gain ramp at any buffer size the engine uses (the ramp is 10 ms;
+        // Long enough for the gain ramp at any buffer size the engine uses (the ramp is 40 ms;
         // a 4,096-frame buffer at 44.1 kHz is 93 ms).
         let work = DispatchWorkItem { [weak self] in
             guard let self, !self.isPlaying else { return }
@@ -223,7 +225,7 @@ final class AudioPreview: ObservableObject {
     // MARK: - The audio thread's side
 
     /// The oscillator the render block runs: one band-limited cycle read with linear
-    /// interpolation at a phase increment, a gain that ramps to its target over about 10 ms, and
+    /// interpolation at a phase increment, a gain that ramps to its target over about 40 ms, and
     /// a crossfade from the cycle before whenever the cycle is replaced.
     ///
     /// Nothing is allocated or freed on the audio thread: the voice owns three buffers of the
@@ -250,7 +252,8 @@ final class AudioPreview: ObservableObject {
         private var phase: Double = 0
         private var gain: Float = 0
         private var targetGain: Float = 0
-        /// Samples of crossfade when the cycle changes, and of gain ramp (at 48 kHz, 10 ms).
+        /// Samples of crossfade when the cycle changes (at 48 kHz, 10 ms); the gain ramp takes
+        /// four times as long (a quarter step per sample).
         private let fadeLength = 480
 
         init(tableSize: Int) {

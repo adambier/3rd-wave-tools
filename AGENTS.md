@@ -270,7 +270,7 @@ PgdataPackerCore (`Sources/PgdataPackerCore/`):
 | `NameCleaner` | `NameCleaner.swift` | Clean Up Names proposals |
 | `OutputPreset` display extensions | `DestinationInfo.swift` | What the Wavetables page says about each destination: `Group` (with `title`, `presets`), `group`, `shortTitle`, `specLine`, `distinction` |
 | `ConvertReport`, `ReportText` | `ConvertReport.swift` | The Wavetables page's report after converting (alert title and text, log text); the item-line form every report uses |
-| `FrameSizeFit`, `WavetableSketch`, `CountWords`, `PianoKey` | own files | Frame-size heuristic (the estimate when the file states no size; 2,048 is the fallback), preview pictures and the cycle at a sweep position, report phrasing, the Listen control's piano keys |
+| `FrameSizeFit`, `WavetableSketch`, `CountWords`, `sentencesOfParagraph`, `PianoKey` | own files (`sentencesOfParagraph` in `CountWords.swift`) | Frame-size heuristic (the estimate when the file states no size; 2,048 is the fallback), preview pictures and the cycle at a sweep position, report phrasing, the sentence splitting the page's explanations are set with (`SentenceSplitTests`), the Listen control's piano keys |
 
 App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle, Help links),
 `AppState.swift` (all state, `ObservableObject`, main thread; `Section` = Pack, Unpack, Wavetables),
@@ -282,8 +282,8 @@ writing with progress), `SearchField.swift` (an `NSSearchField` for SwiftUI), `A
 buffers, band-limiting through `Resampling.bandLimitedCycle`, and the CoreAudio output-device list).
 The Wavetables page: the table (status, Name, Input, Output, Changes; what a file states about
 interpolation is in the preview and the Options box's "existing" marks) with the selected
-table's preview under it across the left side (`ConvertDetailPane`, as tall as its content up to
-45% of the height, pictures and facts side by side, with a fade when it must scroll), and the
+table's preview under it across the left side (`ConvertDetailPane`, 340 points, growing for taller
+content up to half the page, pictures and facts side by side, with a fade when it must scroll), and the
 destination pane on the right, narrow, one line per destination (Adam, 2026-10-26: the table
 needs the width, the preview and destination should not scroll); its buttons are Pack's (Remove
 Selected, Remove All…, **Convert Selected…**, **Convert All…**, the last two through
@@ -304,13 +304,18 @@ cursor in the program's name field, through an `NSEvent` local monitor) and `Too
 switches pages, with the audio output menu at its trailing end on every page). The Wavetables page
 is shown only while View › Show Under-Development Features is on (`AppState.showsUnderDevelopmentFeatures`,
 `Section.isUnderDevelopment`, `availableSections`), and carries an orange under-development notice
-while `ConvertPlan.conversionUnderDevelopment` is true (any `OutputPreset.testedIn` empty). Scroll bars follow the system setting; menus carry
+while `ConvertPlan.conversionUnderDevelopment` is true (a gating destination's `OutputPreset.testedIn`
+empty: `ConvertPlan.gatingPresets`, the 3rd Wave's P and U tables and Tonverk); once none is, the
+page is shown by default and the menu item leaves the View menu (`AppState.hasUnderDevelopmentSections`),
+so a page complete enough to show cannot be hidden by a toggle whose purpose is gone (Adam, 2026-10-26). Scroll bars follow the system setting; menus carry
 the shortcuts (⌘O, ⇧⌘E, ⌘1–⌘3, ⌥⌘L, ⌫, ⌘A, ⌘Z); the Info.plist declares the file types with
 `LSHandlerRank` None, so files open by Dock-icon drop without the app claiming any type.
-`ListCommands.swift` is how Delete and Return reach a list: each `List` or `Table` registers its
-closures with `.listCommands(delete:rename:)`, whose bridge view finds the `NSTableView` behind the
-list and keys them by it, and `MenuActions` looks up the window's first responder (SwiftUI's
-`.onCommand` on a `List` or `Table` did not answer `NSApp.target(forAction:)` on macOS 13). Every
+`ListCommands.swift` is how Delete and Return reach a list: each `List` or `Table` keeps a
+`ListCommandSource` in its `@State`, sets its closures with `set(delete:rename:)` on every body pass,
+and puts `.listCommands(_:)` on each row, whose bridge view walks up to the `NSTableView` and keys the
+source by it; `MenuActions` looks up the window's first responder (SwiftUI's `.onCommand` on a
+`List` or `Table` did not answer `NSApp.target(forAction:)` on macOS 13), and when that is a button
+or slider rather than a table or a text being edited, the one visible list with a selection answers. Every
 list that holds added items (Pack's programs and its added files, Unpack's `.pgdata` files, the
 Wavetables table) removes by selection, with no per-row button; Unpack's file table lists outputs
 and removes nothing (Write unchecks one). Removals and committed renames are undoable through
@@ -334,7 +339,7 @@ a separate manager for the typing (`AppDelegate.windowWillReturnUndoManager`).
 | Frame size decisions | `ReadWAV.swift`, `FrameSizeEvidence`, `FrameSizeFit.swift`, `ConvertPlan.Item.frameSize`/`frameSizeChoices`/`frameSizeAlternatives`; WAVETABLES.md section 3 | `ReadingTests`, `ReviewFixTests`, `FrameSizeFitTests`, `ReviewFixPlanTests`, `ConvertPlanStateTests` |
 | Listen, pitch, audio output | `AudioPreview.swift`, `PianoKey.swift`, `ToolbarController` in `main.swift` (`NSMenuToolbarItem`) | `PianoKeyTests`, `ResamplingTests` (`bandLimitedCycle`); `tw3pg sweep` records what Listen plays as WAVs (section 9); the engine itself only by running the app |
 | Preview pictures, Frame slider, sweep | `ConvertDetail.swift`, `WavetableSketch.swift` | `WavetableSketchTests`, `WavetableSketchInterpolationTests`, `ResamplingTests` (`spectralBlend`) |
-| Remove, Edit › Delete, Undo | `ListCommands.swift` (`.listCommands(delete:rename:)` on each list), `MenuActions.deleteSelection` in `main.swift`; `AppState.undoManager`, `removePrograms`/`removeContent`/`removeUnpacks`/`removeConvertItems`, `removeAll*`, `renameConvertItem`, `commitUnpackFileName` | no tests; build and use the app |
+| Remove, Edit › Delete, Undo | `ListCommands.swift` (`ListCommandSource.set(delete:rename:)` in each list's body and `.listCommands(_:)` on each row), `MenuActions.deleteSelection` in `main.swift`; `AppState.undoManager`, `removePrograms`/`removeContent`/`removeUnpacks`/`removeConvertItems`, `removeAll*`, `renameConvertItem`, `commitUnpackFileName` | no tests; build and use the app |
 | Return to rename, drop hint, first table selected after a drop | `MenuActions.installReturnKey` in `main.swift` and the lists' `rename` handlers, `AppState.focusProgramName`; `AppState.dragIsOverPage` and `LogBar`; `AppState.convertSelectionRequest` | no tests; build and use the app |
 | Showing or hiding the Wavetables page | `AppState.showsUnderDevelopmentFeatures`, `MenuActions.toggleUnderDevelopmentFeatures`, `ToolbarController.fillSegments`/`showOutputItem` | no tests; build and use the app |
 | Pack page behavior (what each source will be, status lines, slot estimate) | `PackPlan` in `Workbench.swift` | `WorkbenchTests`; then `PackView.swift`, `AppState.swift` |

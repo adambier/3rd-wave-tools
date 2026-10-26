@@ -115,7 +115,7 @@ public enum WavetableWriter {
             reshape()
             if preset == .miniFreak, plan.frameCountIn < 64 {
                 let n = plan.frameCountIn
-                notes.append("\(n) frame\(n == 1 ? "" : "s"), fewer than the 64 a MiniFreak stores; the count is left at \(n), since how MiniFreak V treats fewer than 64 is not documented.")
+                notes.append("\(n) frame\(n == 1 ? "" : "s"), fewer than the 64 a MiniFreak stores; the count is kept, since how MiniFreak V treats fewer than 64 frames is not documented.")
             }
             if plan.scalesToFit { scaleToFit() } else { notePeakKept() }
             if plan.addsPPGWaves {
@@ -153,8 +153,8 @@ public enum WavetableWriter {
                 // passes spectral for Tonverk; the first wording is for other callers.)
                 let plays = "Tonverk plays the table as a crossfade (Tonverk’s manual says “smooth”, taken here to mean a crossfade)."
                 notes.append(options.interpolation == .spectral
-                    ? "A Tonverk file name can mark a table only as stepped (a trailing “r”) or not, so the spectral morph given as the interpolation option is left unmarked: " + plays
-                    : "The source file records a spectral morph, which a Tonverk file name cannot mark (only stepped, with a trailing “r”, or not): " + plays)
+                    ? "A Tonverk file name can mark a table only as stepped (a trailing “r”) or not, so the spectral interpolation given as the interpolation option is left unmarked: " + plays
+                    : "The source file records spectral interpolation, which a Tonverk file name cannot mark (only stepped, with a trailing “r”, or not): " + plays)
             }
             noteDefaultInterpolation(prefix: "", result: "so the file name carries no “r” and Tonverk plays the table as a crossfade (Tonverk’s manual says “smooth”, taken here to mean a crossfade)")
             let named = WavetableWriter.Names.fileStem(table.name)
@@ -253,7 +253,7 @@ public enum WavetableWriter {
             // which would read as "0.0 dB".
             let dB = decimal(-20 * log10(Double(g)), 1)
             let amount = dB == "0.0" ? "by less than 0.1 dB" : "by \(dB) dB"
-            notes.append("Attenuated \(amount) to fit within ±1 (the peak was \(Wavetable.peakText(peak))): \(reason).")
+            notes.append("Attenuated \(amount) to fit (the peak was \(Wavetable.peakText(peak))): \(reason).")
         }
 
         mutating func notePeakKept() {
@@ -269,7 +269,7 @@ public enum WavetableWriter {
         mutating func noteDefaultInterpolation(prefix: String = "This format records whether and how a synth interpolates between frames. ",
                                                result: String = "so crossfade is saved") {
             if options.interpolation == nil && table.interpolation == nil {
-                notes.append("\(prefix)The source file says nothing about interpolation, and none was selected in the Interpolation setting, \(result).")
+                notes.append("\(prefix)The source file says nothing about interpolation, and the Interpolation setting is left at its default, \(result).")
             }
         }
 

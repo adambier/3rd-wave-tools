@@ -114,7 +114,7 @@ final class WritingTests: XCTestCase {
         notes(out, contain: "Resized from 2,048 to 1,024")
         notes(out, contain: "Frame count changed from 3 to 64")
         notes(out, contain: "repeating frames")
-        notes(out, contain: "Attenuated by 3.5 dB to fit within ±1 (the peak was 1.50")
+        notes(out, contain: "Attenuated by 3.5 dB to fit (the peak was 1.50")
     }
 
     func testThirdWaveNameSanitised() throws {
@@ -263,11 +263,11 @@ final class WritingTests: XCTestCase {
 
         let spectral = try write(t, .tonverk, OutputOptions(interpolation: .spectral))
         XCTAssertEqual(spectral.fileName, "Test Table_wt1024.wav")
-        notes(spectral, contain: "spectral morph given as the interpolation option is left unmarked")
+        notes(spectral, contain: "spectral interpolation given as the interpolation option is left unmarked")
         var spectralFile = t; spectralFile.interpolation = .spectral
         let fromFile = try write(spectralFile, .tonverk)
         XCTAssertEqual(fromFile.fileName, "Test Table_wt1024.wav")
-        notes(fromFile, contain: "The source file records a spectral morph, which a Tonverk file name cannot mark")
+        notes(fromFile, contain: "The source file records spectral interpolation, which a Tonverk file name cannot mark")
     }
 
     func testTonverkReplacesExistingTag() throws {
@@ -331,7 +331,7 @@ final class WritingTests: XCTestCase {
     func testWaveEditScalesToFit() throws {
         let out = try write(table(frames: 64, size: 256, peak: 2), .waveEdit)
         XCTAssertEqual(parseWAV(out.data).samples.map(abs).max(), 32_767)
-        notes(out, contain: "Attenuated by 6.0 dB to fit within ±1 (the peak was 2.00")
+        notes(out, contain: "Attenuated by 6.0 dB to fit (the peak was 2.00")
     }
 
     // MARK: Names, validation, presets
@@ -417,7 +417,7 @@ final class WritingTests: XCTestCase {
         notes(try write(square, .thirdWaveP), contain: "Attenuated by")
         // A peak just over 1 is attenuated by less than 0.05 dB; the note does not say "0.0 dB".
         let barely = Wavetable(name: "Barely", frames: (0..<64).map { _ in (0..<1024).map { Float(1.00001) * sin(Float($0) * 2 * .pi / 1024) } })
-        notes(try write(barely, .thirdWaveU), contain: "Attenuated by less than 0.1 dB to fit within ±1 (the peak was just over 1)")
+        notes(try write(barely, .thirdWaveU), contain: "Attenuated by less than 0.1 dB to fit (the peak was just over 1)")
         // A change of frame count alone cannot raise the peak.
         XCTAssertEqual(WavetableWriter.plan(frameSize: 1024, frameCount: 256, peak: 1, interpolation: nil, preset: .thirdWaveU).scaling, .none)
 
@@ -543,5 +543,26 @@ final class TonverkNameTagTests: XCTestCase {
         XCTAssertNil(WavetableWriter.Names.removeTonverkTag("KOMPLEXER_WT1").removed)
         XCTAssertNil(WavetableWriter.Names.removeTonverkTag("Pad_wt100").removed)
         XCTAssertEqual(WavetableWriter.Names.removeTonverkTag("Pad_wt1024r").stem, "Pad")
+    }
+}
+
+/// The writer's notes on interpolation: where a value came from, in words that name the place.
+final class InterpolationNoteTests: XCTestCase {
+    private func sine(_ n: Int = 2048) -> [Float] { (0..<n).map { Float(sin(Double($0) * 2 * .pi / Double(n))) * 0.5 } }
+
+    func testDefaultAndUnrecordedNotes() throws {
+        let plain = Wavetable(name: "T", frames: [sine(), sine()])
+        // A file that says nothing, with the option at its default: crossfade, and the note says both.
+        let serum = try WavetableWriter.write(plain, preset: .wav2048)
+        XCTAssertTrue(serum.notes.contains { $0.contains("The source file says nothing about interpolation, and the Interpolation setting is left at its default, so crossfade is saved.") }, "\(serum.notes)")
+        let tonverk = try WavetableWriter.write(plain, preset: .tonverk)
+        XCTAssertTrue(tonverk.notes.contains { $0.hasPrefix("The source file says nothing about interpolation, and the Interpolation setting is left at its default, so the file name carries no “r”") }, "\(tonverk.notes)")
+        // A destination whose files record none: the option, or the source file's value, is reported as not written.
+        var stated = plain; stated.interpolation = .spectral
+        let u = try WavetableWriter.write(stated, preset: .thirdWaveU)
+        XCTAssertTrue(u.notes.contains { $0 == "This format doesn’t store the interpolation method, so what the source file records (spectral) is not carried over; the 3rd Wave sets how frames blend." }, "\(u.notes)")
+        let surge = try WavetableWriter.write(plain, preset: .surge, options: OutputOptions(interpolation: Interpolation.none))
+        XCTAssertTrue(surge.notes.contains { $0 == "This format doesn’t store the interpolation method, so the interpolation option (no interpolation) is not written; the synth sets how frames blend." }, "\(surge.notes)")
+        XCTAssertFalse(try WavetableWriter.write(plain, preset: .thirdWaveP).notes.contains { $0.contains("interpolation method") }, "nothing to report when neither says")
     }
 }

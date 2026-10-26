@@ -23,7 +23,7 @@ not make wavetables from other audio.
   Serum's and Vital's morphs.
 - ``WavetableWriter`` writes a ``Wavetable`` for an ``OutputPreset``: the 3rd Wave's P and U
   tables; Serum-style WAV files for Serum, Vital, Pigments, MiniFreak V, and Phase Plant; WAV
-  files for Elektron Tonverk and WaveEdit; and Surge XT's `.wt`. Every change it makes is listed
+  files for Tonverk and WaveEdit; and Surge XT's `.wt`. Every change it makes is listed
   in the ``OutputFile/notes``.
 
 Each preset states what its behavior rests on (``OutputPreset/basis``) and where it has been
