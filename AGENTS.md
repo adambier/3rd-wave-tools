@@ -97,8 +97,9 @@ over real exports: every unmodified file must come back identical.
   into a free slot (P36–P47, U56–U63 for tables), with an offer to overwrite the last ones when none
   is free.
 - Imports come from the USB drive (volume `THIRDWAVE`): `PROGRAMS` for `.pro` and `.pgdata`, `WAVES`
-  for `.wt`, `AUDIO` for `.bin` and `.wav`. **Import unified program data file** takes files without
-  asking; **Bulk program import** and **Bulk wavetable import** process files in plain character order
+  for `.wt`, `AUDIO` for `.bin` and `.wav`. **Import unified program data file** takes the first
+  `.pgdata` in `PROGRAMS` (plain character order) without offering a choice; **Bulk program
+  import** and **Bulk wavetable import** process files in plain character order
   (`B05P100` sorts between `B05P10` and `B05P11`: number with three digits).
 - A `.pgdata` carries no format tag, and the 3rd Wave's `.pgdata` import does not fully convert
   older programs; convert them first (`ProgramConverter`, FORMATS.md §6).
@@ -124,7 +125,7 @@ in their synths (`OutputPreset.testedIn`).
 | `Sources/tw3pg/main.swift` | Developer command-line tool: inspect, round-trip, pack, unpack, repack, compare, convert, checks, test-file builders |
 | `Tests/PgdataFormatsTests/` | Tests for PgdataFormats (`FormatTests`, `RobustnessTests`, `ConverterTests`, `FactoryLibraryTests`, `FixtureTests`, …) |
 | `Tests/WavetableFormatsTests/` | Tests for WavetableFormats; `Resources/FLAC/` holds synthetic FLAC files read by path |
-| `Tests/PgdataPackerCoreTests/` | Tests for PgdataPackerCore: `WorkbenchTests`, `PlanRobustnessTests`, `ConvertPlanTests`, `ConvertReportTests`, `ReviewFixPlanTests`, and `NameFittingTests` (the Pack page and the Wavetables page's writer give the same 3rd Wave name); `TestPrograms.swift` repeats the program builders of `FormatTests.swift` |
+| `Tests/PgdataPackerCoreTests/` | Tests for PgdataPackerCore: `WorkbenchTests`, `PlanRobustnessTests`, `ConvertPlanTests.swift` (several classes: `ConvertPlanTests`, `ConvertPlanStateTests`, `ConvertChangeWordsTests`, `ConvertExistingChoicesTests`, `ConvertOptionsTextTests`, `WavetableSketchTests`, `FrameSizeFitTests`, …), `ConvertReportTests`, `ReviewFixPlanTests`, `PianoKeyTests`, and `NameFittingTests` (the Pack page and the Wavetables page's writer give the same 3rd Wave name); `TestPrograms.swift` repeats the program builders of `FormatTests.swift` |
 | `fixtures/` | Seven synthetic files, one per format and layout, each with a `<file>.json` of what it parses to; `fixtures/README.md` |
 | `docs/FORMATS.md` | The 3rd Wave format reference (sections 1–10 and an appendix); every claim about the 3rd Wave lives here with its evidence in footnotes |
 | `docs/WAVETABLES.md` | Other synths' wavetable formats, with sources; the destinations the Wavetables page writes |
@@ -217,8 +218,9 @@ Don't:
 - Don't embed factory wavetables in a `.pgdata` in the app's plans (`PackPlan` lists a factory slot
   as `.reference`), and don't repoint multisample oscillators (`Oscillator.repointTargets` offers
   wavetable slots and analog waves only).
-- Don't guess a frame size silently: a `FoundTable` with `frameSize == nil` must be settled by the
-  user from `candidateFrameSizes`.
+- Don't guess a frame size silently: a `FoundTable` with `frameSize == nil` is settled by the
+  user from `candidateFrameSizes`, or by `FrameSizeFit`'s likely size only where the Input column
+  says "assumed" (`ConvertPlan.Item.frameSize`, `sizeQualifier`); never by 2,048 alone.
 - Don't commit files from other people's sound sets, factory banks, or synth exports; tests build
   their inputs synthetically (see the headers of `CorpusCaseTests.swift` and `ReadingTests.swift`).
 - Don't import a module a test target does not depend on in `Package.swift` (section 4): a
@@ -255,7 +257,7 @@ WavetableFormats (`Sources/WavetableFormats/`):
 | `WavetableReader` | `Reading.swift` + `ReadWAV.swift`, `ReadFLAC.swift`, `ReadSurge.swift`, `ReadThirdWave.swift` | `read(url:)`, `read(_:fileName:sidecarText:)`: detection by content, not extension |
 | `WavetableWriter`, `WritePlan` | `Writing.swift` + `WriteWAV.swift`, `WriteNames.swift` | `write(_:preset:options:) -> OutputFile`; `plan(...) -> WritePlan`, the one statement of what a conversion will do (the writer and the app's preview both derive from it); per-preset facts (`frameSize`, `maxFrameCount`, `basis`, `caveat`, `testedIn`) as `OutputPreset` extensions |
 | `OutputPreset.recordsInterpolation`, `Interpolation.displayName` | `PresetInfo.swift` | Whether a format records the interpolation; the words for an interpolation (used in the writer's notes) |
-| `Resampling` | `Resampling.swift`, `FFT.swift` | `resizeCycle`, `changeFrameCount`, `thirdWaveMipmapChain` |
+| `Resampling` | `Resampling.swift`, `FFT.swift` | `resizeCycle`, `changeFrameCount`, `thirdWaveMipmapChain`; `bandLimitedCycle` (a cycle as a band-limited oscillator plays it, for Listen); `spectralBlend` and `CycleSpectrum` (a blend of two cycles by spectrum, an approximation of Serum's and Vital's morphs) |
 | `PPGStandardWaves` | `PPGWaves.swift` | The PPG's four standard waveforms, which P tables from the PPG carry as frames 60–63 |
 
 PgdataPackerCore (`Sources/PgdataPackerCore/`):
@@ -263,7 +265,7 @@ PgdataPackerCore (`Sources/PgdataPackerCore/`):
 | Type | File | Role |
 |---|---|---|
 | `ContentFile`, `PackPlan`, `UnpackPlan`, `OutputNames`, `Oscillator`, `ProgramFile.repointed` | `Workbench.swift` | Pack and Unpack page decisions and output file names |
-| `ConvertPlan`, `ConvertPreviewCache` | `ConvertPlan.swift` | Wavetables page decisions: collecting files, collapsing duplicates, frame-size choice, expected results, reports |
+| `ConvertPlan`, `ConvertPreviewCache` | `ConvertPlan.swift` | Wavetables page decisions: collecting files, collapsing duplicates, frame-size choice (`Item.frameSize`, `frameSizeChoices`, `sizeQualifier`, `SizeSource`), the preview's override (`Item.frameSizeAlternatives`, `sizeIsStated`), one frame size for several tables (`adjustableItems(in:)`, `commonFrameSizes(of:)`, `sharedFrameSize(of:)`, `chooseFrameSize(_:forAll:)`), blocked-table jumps (`firstItem(with:)`), expected results, the under-development notice (`conversionUnderDevelopment`, `testingStatus(_:)`), reports |
 | `NameCleaner` | `NameCleaner.swift` | Clean Up Names proposals |
 | `OutputPreset` display extensions | `DestinationInfo.swift` | What the Wavetables page says about each destination: `Group` (with `title`, `presets`), `group`, `shortTitle`, `specLine`, `distinction` |
 | `ConvertReport`, `ReportText` | `ConvertReport.swift` | The Wavetables page's report after converting (alert title and text, log text); the item-line form every report uses |
@@ -275,15 +277,23 @@ App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle
 `ConvertDestination.swift`, `ConvertDetail.swift`, `RepointSheet.swift`, `NameCleanupSheet.swift`,
 `Panels.swift` (AppKit open/save panels, confirmations and the overwrite choice as sheets, background
 writing with progress), `SearchField.swift` (an `NSSearchField` for SwiftUI), `AudioPreview.swift`
-(the Listen control's engine: `AVAudioEngine` with a source node, band-limiting through
-`Resampling.bandLimitedCycle`, and the CoreAudio output-device list). `main.swift` also holds
+(the Listen control's engine: `AVAudioEngine` with a source node whose `Voice` owns three fixed
+buffers, band-limiting through `Resampling.bandLimitedCycle`, and the CoreAudio output-device list).
+`ConvertView.swift` also holds `TableReveal` (scrolls the Wavetables table to a row through the
+`NSTableView` behind SwiftUI's `Table`; the summary strip's blocked counts jump to
+`ConvertPlan.firstItem(with:)`) and `ConvertPaneDivider` (the preview's height,
+`AppState.convertPreviewHeight`); `ConvertDetail.swift` holds the preview: `ConvertSweepControls`
+(Frame slider, Listen/Stop, pitch pop-up over `AudioPreview.pitches`, C2–C6), `ConvertSweepView`,
+`ConvertSizeOverrideLink` (Override Frame Size…, over `Item.frameSizeAlternatives`), and
+`ConvertSeveralFrameSize` (one frame size for several selected tables). `main.swift` also holds
 `MenuActions` (the File, Edit, and View menus' targets and validation; Edit › Delete, on the Delete
 key, is disabled while text is edited and otherwise reaches the focused list through
 `.onCommand(MenuActions.removeSelected)`; removals are undoable through `AppState.undoManager`,
 which the window returns) and `ToolbarController` (the unified toolbar whose segmented control
-switches pages, with the audio output pop-up at its trailing end on every page). The Wavetables page
-carries an orange under-development notice while `ConvertPlan.conversionUnderDevelopment` is true
-(any `OutputPreset.testedIn` empty). Scroll bars follow the system setting; menus carry
+switches pages, with the audio output menu at its trailing end on every page). The Wavetables page
+is shown only while View › Show Under-Development Features is on (`AppState.showsUnderDevelopmentFeatures`,
+`Section.isUnderDevelopment`, `availableSections`), and carries an orange under-development notice
+while `ConvertPlan.conversionUnderDevelopment` is true (any `OutputPreset.testedIn` empty). Scroll bars follow the system setting; menus carry
 the shortcuts (⌘O, ⇧⌘E, ⌘1–⌘3, ⌥⌘L, ⌫, ⌘A, ⌘Z); the Info.plist declares the file types with
 `LSHandlerRank` None, so files open by Dock-icon drop without the app claiming any type.
 
@@ -301,7 +311,11 @@ the shortcuts (⌘O, ⇧⌘E, ⌘1–⌘3, ⌥⌘L, ⌫, ⌘A, ⌘Z); the Info.p
 | Names, 31-character limit, file names | `ByteIO.swift` (`NameField.fitted`, which `NameField.init`, `WriteNames.swift`, `PackPlan.nameWarnings`, and the app's `NameLengthNote` all apply), `SafeFileName.swift`, `ExportNames`, `OutputNames` | `NameFittingTests`, `SafeFileNameTests`, `WorkbenchTests` |
 | Read another wavetable format | `Reading.swift` dispatch, a new `Read<Format>.swift`, `SourceFormat` | `ReadingTests`, `CorpusCaseTests`, `RoundTripTests`; WAVETABLES.md |
 | Write for another synth | `OutputPreset` in `Wavetable.swift`, `Writing.swift`, `PresetInfo.swift`; `DestinationInfo.swift` in PgdataPackerCore | `WritingTests`, `RoundTripTests`; WAVETABLES.md section 2; README destination table |
-| Frame size decisions | `ReadWAV.swift`, `FrameSizeEvidence`, `FrameSizeFit.swift`; WAVETABLES.md section 3 | `ReadingTests`, `ReviewFixTests`, `FrameSizeFitTests`, `ReviewFixPlanTests` |
+| Frame size decisions | `ReadWAV.swift`, `FrameSizeEvidence`, `FrameSizeFit.swift`, `ConvertPlan.Item.frameSize`/`frameSizeChoices`/`frameSizeAlternatives`; WAVETABLES.md section 3 | `ReadingTests`, `ReviewFixTests`, `FrameSizeFitTests`, `ReviewFixPlanTests`, `ConvertPlanStateTests` |
+| Listen, pitch, audio output | `AudioPreview.swift`, `PianoKey.swift`, `ToolbarController` in `main.swift` (`NSMenuToolbarItem`) | `PianoKeyTests`, `ResamplingTests` (`bandLimitedCycle`); the engine itself only by running the app |
+| Preview pictures, Frame slider, sweep | `ConvertDetail.swift`, `WavetableSketch.swift` | `WavetableSketchTests`, `WavetableSketchInterpolationTests`, `ResamplingTests` (`spectralBlend`) |
+| Remove, Edit › Delete, Undo | `MenuActions.deleteSelection` in `main.swift`; `AppState.undoManager`, `removePrograms`/`removeContent`/`removeUnpacks`/`removeConvertItems`, `removeAll*` | no tests; build and use the app |
+| Showing or hiding the Wavetables page | `AppState.showsUnderDevelopmentFeatures`, `MenuActions.toggleUnderDevelopmentFeatures`, `ToolbarController.fillSegments`/`showOutputItem` | no tests; build and use the app |
 | Pack page behaviour (what each source will be, status lines, slot estimate) | `PackPlan` in `Workbench.swift` | `WorkbenchTests`; then `PackView.swift`, `AppState.swift` |
 | Unpack page behaviour | `UnpackPlan` in `Workbench.swift` | `WorkbenchTests`; then `UnpackView.swift` |
 | Wavetables page behaviour | `ConvertPlan.swift`, `ConvertReport.swift` | `ConvertPlanTests`, `ConvertReportTests`; then `ConvertView.swift`, `ConvertDetail.swift`, `ConvertDestination.swift` |
@@ -318,8 +332,8 @@ Library tests (XCTest, one test target per library; tests use `@testable import`
 |---|---|
 | Linux, Windows | `swift test` |
 | macOS (full Xcode 15 or later) | `./run-tests.sh` or `PGDATA_TESTS=1 swift test` |
-| One test class | add `--filter <ClassName>` (e.g. `--filter FixtureTests`) |
-| One library's tests | add `--filter <TargetName>` (e.g. `--filter PgdataPackerCoreTests`) |
+| One test class | add `--filter <ClassName>` (e.g., `--filter FixtureTests`) |
+| One library's tests | add `--filter <TargetName>` (e.g., `--filter PgdataPackerCoreTests`) |
 
 Other checks:
 
@@ -357,13 +371,21 @@ No tests cover the SwiftUI views; a UI change is verified by building and using 
 - No third-party sound-set, program, or author names in README, docs, or app text (code comments,
   tests, and screenshots may carry them).
 - App vocabulary: add (files), pack, embed, unpack, convert; 3rd Wave functions in bold in
-  README and FORMATS.md (e.g. **Import program**), in curly quotes in the app.
+  README and FORMATS.md (e.g., **Import program**), in curly quotes in the app.
 - Code comments that state a fact about the 3rd Wave cite the FORMATS.md section
-  (e.g. "See section 2 of FORMATS.md").
+  (e.g., "See section 2 of FORMATS.md").
 - Plain, short words; one term for one thing (table, frame, frame size, interpolation, destination,
-  "to convert"); nothing said twice in one view, report, or paragraph; counts that read naturally
-  ("Both tables", "1 change"; see `CountWords`); labels that say exactly what they mean (name the
-  company or document, not "the maker"); every distinct label actually different.
+  "to convert", input and output for the page's columns); nothing said twice in one view, report,
+  or paragraph; counts that read naturally ("Both tables", "1 change"; see `CountWords`); labels
+  that say exactly what they mean (name the company or document, not "the maker"); every distinct
+  label actually different.
+- "Frame" for a cycle in a table, never "wave" (which is kept for the analog oscillator's waves,
+  the PPG's four standard waveforms, and names: Wave Maker, the `WAVES` folder). Crossfade and
+  spectral are interpolation methods; "none" is the absence of interpolation, not a method.
+- P tables before U tables wherever both are listed (P00–P35, U00–U55; P36–P47, U56–U63).
+- Quotation marks around words taken from synth documentation (Tonverk's manual says "smooth"),
+  and an inference marked when such a word is read as one of ours ("taken here to mean a
+  crossfade").
 - **Language review before a build is handed over, docs are merged, or a release is made:** read
   every user-facing string and document that changed for accuracy against the evidence, currency
   after renames (page, column, and feature names), agreement of tense, number, case, and mood, and
@@ -384,8 +406,9 @@ and the DocC overview; update the README "Wavetables" paragraph.
 **Add a destination (writer preset)**: add an `OutputPreset` case; handle it in `Job.run()` and a
 new `mutating func` in `Writing.swift`; fill every `switch` in the `OutputPreset` extensions
 (`Writing.swift`: `title`, `basis`, `caveat`, `frameSize`, `maxFrameCount`, `requiredFrameCount`,
-`fileExtension`; `PresetInfo.swift`: `recordsInterpolation`; PgdataPackerCore's
-`DestinationInfo.swift`: `shortTitle`, `specLine`, `distinction`, the page's wording);
+`fileExtension`, and `scalesToFit`/`isThirdWave` where they apply; `PresetInfo.swift`:
+`recordsInterpolation`; PgdataPackerCore's `DestinationInfo.swift`: `shortTitle`, `specLine`,
+`distinction`, the page's wording; `ConvertPlan.caveat(for:)`, an exhaustive switch);
 the app lists presets through `OutputPreset.Group.presets`, so no UI list needs editing; add
 `WritingTests` and `RoundTripTests` cases; add a row to `docs/WAVETABLES.md` section 2 with a
 footnoted source and to the README destination table; leave `testedIn` empty.
@@ -430,6 +453,12 @@ credentials that are not in the repository.
   build on `PgdataPackerCore`, whose API may change between versions more than `PgdataFormats`'s.
 - `WavetableFormats` is provisional in 1.1: its API may change until a 1.1.x release, once its
   destinations have been tested in their synths.
+- Listen and the preview's spectral lines use `Resampling.spectralBlend`, an approximation: Serum's
+  and Vital's morph methods are not published. `FrameSizeFit` is a heuristic (frames alike at lag
+  n, unlike at n/2); the Input column says "assumed" wherever it decided.
+- The preview writes the converted bytes and reads them back on the main thread (`ConvertPreviewCache`);
+  a 256 × 2,048 table to a U table takes a noticeable moment per selection. Computing it off the main
+  thread, or taking the frames from the writer without the text round trip, is open.
 
 ## 13. Glossary
 
@@ -444,13 +473,13 @@ credentials that are not in the repository.
 | `SourceRef` | The library's enum for a source: `.p`, `.u`, `.analog`, `.s`, `.unknown` |
 | Slot | A position on the 3rd Wave a source id names: P00–P47, U00–U63, S*n*; what plays is whatever that 3rd Wave holds there |
 | Factory slot, factory table | P00–P35 and U00–U55, holding Groove Synthesis's tables; known here by name and fingerprint, never embedded by the app |
-| User slot | P36–P47 and U56–U63 (8 U and 12 P slots for the user's own tables) |
+| User slot | P36–P47 and U56–U63 (12 P and 8 U slots for the user's own tables) |
 | P table | PPG-style wavetable: 64 frames of 128 samples, each point stored with its difference to the next (16,384 values) |
 | U table | Wavetable of 64 frames of 1,024 samples followed by its mipmap chain (131,072 values) |
 | Frame | One cycle of a waveform; a wavetable is a sequence of frames of equal length. The 3rd Wave's own terms (its wave offset and wave envelope, the manual's counts of waves) and WaveEdit's say "wave" for the same thing; this project says frame throughout, and keeps "wave" for the analog oscillator's waves, for the PPG's four standard waveforms, and in names (Wave Maker, the `WAVES` folder) |
-| Frame size | Samples per frame (128, 1,024, 2,048, …); for WAV and FLAC sources it is settled by metadata, file name, sidecar, markers, or length (`FrameSizeEvidence`), or left to the user |
+| Frame size | Samples per frame (128, 1,024, 2,048, …); for WAV and FLAC sources it is settled by metadata, file name, sidecar, markers, or length (`FrameSizeEvidence`), or by the samples' fit (`FrameSizeFit`, said to be assumed), or left to the user |
 | Mipmap chain | The band-limited copies of a U table's 64 frames at 512, 256, 128, 64, and 64 samples (65,536 values) that follow the frames in a `.wt` |
 | Fingerprint | 64-bit FNV-1a of a table's values as little-endian float32 (`fnv1a64`); how factory tables and duplicates are recognised |
-| Preset (`OutputPreset`) | A conversion destination (3rd Wave U or P table, Serum-style WAV, MiniFreak V, Tonverk, Phase Plant, Surge XT, WaveEdit) |
+| Preset (`OutputPreset`) | A conversion destination (3rd Wave P or U table, Serum-style WAV, MiniFreak V, Tonverk, Phase Plant, Surge XT, WaveEdit) |
 | Plan | A `PgdataPackerCore` value describing what a page will do (`PackPlan`, `UnpackPlan`, `ConvertPlan`) |
 | Layout | A program's values per part, floats per part, and globals (current: 181/137/182); older layouts are converted |

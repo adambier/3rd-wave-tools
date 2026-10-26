@@ -77,7 +77,8 @@ bytes (see [Names](#8-names-file-names-and-the-usb-drive)).
 
 **Menu items.** The 3rd Wave's functions are named in bold as its Global menu writes them:
 **Import program**, **Bulk program import**, **Bulk program export**, **Import unified program data
-file** (called "the `.pgdata` import" here).
+file** (called "the `.pgdata` import" here), **Bulk wavetable import**, **Export Wavetable**, and
+**Wave Maker**.
 
 **Parts.** A program has four parts (layers), numbered 1–4 on the 3rd Wave and 0–3 in the files.
 The 24K and 24M play all four; the 8M plays parts 1 and 2 only.[^parts]
@@ -275,9 +276,8 @@ A `.pgdata` is a program together with the wavetables and multisamples it uses, 
 same on another 3rd Wave. It has no format tag: its program part is always expected to be in the
 current layout (see [6](#6-converting-older-programs)).
 
-It is a container. Its own layout is fully known, but the program inside it is the same program
-values as a `.pro`, so knowing the container says where those values are, not what they mean: most
-of them are as unknown here as in a `.pro` (section [3.4](#34-what-the-values-mean)).
+It is a container. Its own layout is fully known; the program values inside it are a `.pro`'s
+(section [3.4](#34-what-the-values-mean)).
 
 ### 4.1 Layout
 
@@ -662,12 +662,12 @@ Tested on an 8M (OS 2.0d) unless a footnote says otherwise; section
   does not offer a choice.[^24m] **Bulk program import** takes the files in plain
   character order, so `B05P100` comes between `B05P10` and `B05P11`; a batch that includes a program
   100 therefore needs three-digit numbers throughout.[^24m]
-- **An export onto an existing file does not shorten it.** A bulk export over a longer file of the
-  same name leaves the end of the old file after the new program (seen once, on the 24M). Empty
-  `PROGRAMS` before exporting.
-- **Exporting while the USB drive is mounted on a computer** writes empty (0-byte) files for the
-  first programs of a bulk export; with the USB cable unplugged during the export, every file is
-  complete (seen in one session).
+- **An export onto an existing file has been observed not to shorten it.** A bulk export over a
+  longer file of the same name left the end of the old file after the new program (once, on the
+  24M). Empty `PROGRAMS` before exporting.
+- **Exporting while the USB drive is mounted on a computer** has been observed to write empty
+  (0-byte) files for the first programs of a bulk export; with the USB cable unplugged during the
+  export, every file was complete (one session).
 
 ## 8. Names, file names, and the USB drive
 

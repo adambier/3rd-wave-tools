@@ -8,7 +8,7 @@ Each statement names its source: the company's manual, or its own source code. W
 statement is an inference, it says so. Nothing here has been tested with this project's files
 unless it says so. The app labels each destination the same way: the book icon beside its row
 opens its sources, a green seal in its place marks one that has been tested, and where the
-sources leave something open (the questions at the end), the row says so in the open.
+sources leave something open (the questions at the end), the chosen row says so.
 Corrections and test results are welcome; see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 This project is not affiliated with Groove Synthesis or with any maker named here; their product
@@ -58,7 +58,7 @@ Notes on each:
 - **Pigments** places each 2,048 samples in a position, up to 256 positions, and reads no
   metadata; interpolation is the engine's Morph setting.[^pigments]
 - **MiniFreak V** imports tables (including Pigments') and sends them to a MiniFreak over USB; on
-  import it truncates them to 24-bit, 512 samples per cycle, and 64 cycles. How it reduces a
+  import it truncates them to 24-bit, 512 samples per frame, and 64 frames. How it reduces a
   2,048-sample frame to 512, or more than 64 frames to 64, is not documented, so larger tables
   are cut down to 64 frames here, by the method you choose, before MiniFreak V sees the file.[^minifreak]
 - **Tonverk** reads the frame size from a `_wt<N>` tag at the end of the file name (2,048 when
@@ -77,7 +77,7 @@ Notes on each:
 - **The 3rd Wave** imports `.wt` files with **Bulk wavetable import** and tables embedded in a
   `.pgdata` with **Import unified program data file**. Its **Wave Maker** also imports a Serum
   wavetable WAV into the U set, and takes a WAV of exactly 8,192 samples (64 × 128) as a P
-  table.[^3w-manual] The page's 3rd Wave output adds formats and frame sizes Wave Maker does not
+  table.[^3w-manual] The page's 3rd Wave destinations add formats and frame sizes Wave Maker does not
   read, many tables at once, and **Send to Pack**. The page does not make wavetables from other
   audio: that is what Wave Maker is for.
 
@@ -119,7 +119,8 @@ the extra samples are left out, with a note. Cue points and loops (rules 6 and 7
 samples too, so they count only for powers of two up to 4,096 that give at least two frames: a
 single looped cycle is a sample. When two of these disagree, both are noted. When only the
 length suggested a size, the other sizes the length allows can be chosen instead. When nothing
-settles the size, the page lists the sizes the length allows and waits for you to choose: a file
+settles the size, the page assumes the likely size (below) or, when none stands out, lists the
+sizes the length allows and waits for you to choose: a file
 of 8,192 samples is 64 × 128 for the 3rd Wave's Wave Maker (a PPG table) but 4 × 2,048 for Serum,
 Pigments, or Tonverk (whose factory library has one), and one of 16,384 is 64 × 256 for WaveEdit
 but 8 × 2,048 for Serum. A WAV with none of the metadata above is listed only when it is mono, its
@@ -146,9 +147,10 @@ too small fails the second test, since a smooth cycle is about as like itself a 
 half a fragment later; a multiple of the right size passes neither better than the right size
 does, and when several sizes pass, the smallest is marked. The pictures themselves are not
 decisive either: a size twice too large shows the cycle repeated, and one too small shows part
-of it, both of them smooth. A bank of unrelated frames (a WaveEdit bank, say) fits no size, and
-the chooser says so. When nothing states a size and the length does not allow 2,048, the likely
-size is assumed, and the Input column says so; the chooser stays, for another choice.
+of it, both of them smooth. A bank of unrelated frames (a WaveEdit bank, say) fits no size; when
+the sizes fit equally badly the chooser says so. For the two lengths left open (8,192 and 16,384
+samples), the likely size is assumed, and the Input column says so; the chooser stays, for another
+choice.
 
 **Single-cycle files are not listed.** A WAV holding one cycle (for example, a single-cycle
 library's 600-sample cycles, each looped over the whole file) is a building block for a wavetable
@@ -205,7 +207,7 @@ When a destination needs a different number of frames, you choose how:
   bringing it up to more repeats each original in order (16 → 64 repeats each about 4 times).
 - **Crossfade New Frames** makes each new frame by crossfading its two neighbours, once, when
   converting. This is separate from the interpolation a file records, which is whether and how
-  the synth interpolates between frames as it plays.
+  a synth interpolates between frames as it plays.
 
 The report after converting says what was done to each table.
 

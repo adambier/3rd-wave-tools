@@ -12,11 +12,15 @@ not make wavetables from other audio.
 - ``WavetableReader`` finds the wavetables in a file by its content, not its name: WAV and FLAC
   files with their `clm `, `srge`, `uhWT`, `cue `, and `smpl` chunks (or the matching FLAC
   blocks), a Tonverk-style `_wt<N>` tag in the name, or a Serum `.txt` file beside them; Surge
-  `.wt` files; and the 3rd Wave's `.wt` and `.pgdata` files (through PgdataFormats). Each ``FoundTable`` says how its frame size was
-  decided, and leaves it open, with the sizes that fit, when nothing in the file settles it.
+  `.wt` files; and the 3rd Wave's `.wt` and `.pgdata` files (through PgdataFormats). Each
+  ``FoundTable`` says how its frame size was decided, and leaves it open, with the sizes that
+  fit, when nothing in the file settles it.
 - ``Resampling`` resizes single cycles by their spectrum, changes a table's frame count by
-  picking frames evenly or by crossfading, and builds the mipmap chain a 3rd Wave U table
-  carries.
+  picking frames evenly or by crossfading, builds the mipmap chain a 3rd Wave U table carries,
+  band-limits a cycle to the harmonics a player keeps at a pitch
+  (``Resampling/bandLimitedCycle(_:to:maxHarmonic:)``), and blends two cycles by spectrum
+  (``Resampling/spectralBlend(_:_:t:)``, ``Resampling/CycleSpectrum``), an approximation of
+  Serum's and Vital's morphs.
 - ``WavetableWriter`` writes a ``Wavetable`` for an ``OutputPreset``: the 3rd Wave's P and U
   tables; Serum-style WAV files for Serum, Vital, Pigments, MiniFreak V, and Phase Plant; WAV
   files for Elektron Tonverk and WaveEdit; and Surge XT's `.wt`. Every change it makes is listed

@@ -10,7 +10,7 @@ import Foundation
 //                      unpacking, program conversion, factory table fingerprints; Foundation only,
 //                      builds on macOS, Linux, and Windows
 //   WavetableFormats   wavetables in the 3rd Wave's and other synths' formats: finding them in files,
-//                      resizing them, and writing them for a destination (the Convert tab)
+//                      resizing them, and writing them for a destination (the Wavetables page)
 //   PgdataPackerCore   pgdata Packer's own decisions (pack and unpack plans, file names, Clean Up
 //                      Names), without UI, for other front ends (a command-line tool, or a GUI on
 //                      another platform) that should behave like the app; its API may change more

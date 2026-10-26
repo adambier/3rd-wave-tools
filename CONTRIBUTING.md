@@ -9,7 +9,7 @@ the format reference is as appreciated as code.
   wavetables, [`docs/WAVETABLES.md`](docs/WAVETABLES.md), including a test of one of the
   Wavetables page's destinations in the synth it is for. If something there is
   wrong, incomplete, or still listed as unknown, and you know better, please say so, whether you
-  found out on the 3rd Wave or another instrument, from its maker's documents, or from files.
+  found out on the 3rd Wave or another instrument, from the company's documents, or from files.
 - **Bug reports** for the app, the libraries, or `tw3pg`, with the files that show the problem if
   you can share them.
 - **Word of what you build.** If you write a tool that reads or writes the 3rd Wave's files, open
@@ -38,8 +38,9 @@ bank 3"), or share only your own programs and exports.
 - **The app** (macOS 13 or later, Xcode command-line tools): `./make-app.sh`, then
   `open "pgdata Packer.app"`. The first build downloads Sparkle.
 - **The tests:** `./run-tests.sh` on a Mac with a full Xcode installation (15 or later), or
-  `swift test` on Linux or Windows (Swift 5.9 or later; tested with 6.0 on Linux and macOS and 6.2
-  on Windows, where 6.0 cannot build against the current Windows SDK).
+  `swift test` on Linux or Windows (Swift 5.9 or later; CI tests with 6.0 on Linux, the macos-15
+  runner's Xcode on macOS, and 6.2 on Windows, where 6.0 cannot build against the current Windows
+  SDK).
 - **The test files** in [`fixtures/`](fixtures/): after a deliberate change to what the libraries
   write, rebuild them with
   `PGDATA_TESTS=1 PGDATA_REGENERATE_FIXTURES=1 swift test --filter FixtureTests` and include the
@@ -81,6 +82,8 @@ The README, FORMATS.md, the documentation, and the app's text follow a few conve
   destination); nothing said twice in one view, report, or paragraph; counts that read naturally
   ("Both tables", "1 change", never "All 2 tables" or "1 changes"); labels that say exactly what
   they mean ("Xfer Records, Serum 2 User Guide", not "the maker's documentation").
+- AGENTS.md section 10 has the full list ("frame", never "wave", for a cycle in a table; P tables
+  before U tables; quotation marks around words taken from synth documentation; and more).
 
 **Language review.** A change to user-facing text or documentation gets a careful read before it
 is merged, checking that each statement is accurate against its evidence and still current (names

@@ -57,16 +57,23 @@ command-line tools alone. Such a build has no Sparkle, so no **Check for Updates
 
 ## Using it
 
-The window has three pages, **Pack**, **Unpack**, and **Wavetables**, chosen in the toolbar or from
-the View menu (⌘1, ⌘2, ⌘3). There is nothing to set up. Files and folders can be dropped onto a
-page, chosen with **Add Files or Folders…** (⌘O) in the File menu or on the page, or dropped onto
-the app's icon in the Dock, which sends each file to the page that reads it (the app does not
-claim any of these file types as its own). Every report or list of problems the app shows has a
-copy icon beside its title that puts the text on the clipboard.
+The window has two pages, **Pack** and **Unpack**, chosen in the toolbar or from the View menu
+(⌘1, ⌘2), and a third, **Wavetables** (⌘3), that is still being tested: View › **Show
+Under-Development Features** adds it, with the audio output control that goes with it. There is
+nothing else to set up.
+
+Files and folders can be dropped onto a page, chosen with **Add Files or Folders…** (⌘O) in the
+File menu or on the page, or dropped onto the app's icon in the Dock, which sends each file to the
+page that reads it (the app does not claim any of these file types as its own). Selected rows go
+with **Remove Selected** or Edit › **Delete** (the Delete key); **Remove All…** clears a page; both
+can be undone with Edit › **Undo**. Files on disk are never touched by either. The status bar
+shows the last thing the app did, and **Show Log** (⌥⌘L) everything it has done this session.
+Every report or list of problems the app shows has a copy icon beside its title that puts the text
+on the clipboard.
 
 ### Factory wavetables
 
-The app never embeds factory wavetables. A program that uses a factory slot (U00–U55, P00–P35)
+The app never embeds factory wavetables. A program that uses a factory slot (P00–P35, U00–U55)
 lists the slot without data, and the 3rd Wave that loads the file plays its own factory table, unless
 you add a different table for that slot (see Pack).
 
@@ -81,10 +88,12 @@ Synthesis's factory `.wt` files; only names and fingerprints are stored). It use
 - skip, when unpacking, tables identical to the factory table in their slot, and never offer
   factory tables for renaming.
 
-**U48–U55.** These joined the factory set in 2025, alongside OS 1.9 (which also brought `.pgdata`).
-The 8M ships with them. 24K and 24M owners download them from Groove Synthesis's support site
-(after logging in) and load them with Global → **Bulk wavetable import**. The app assumes the 3rd
-Wave that loads a `.pgdata` has them.
+#### U48–U55
+
+These joined the factory set in 2025, alongside OS 1.9 (which also brought `.pgdata`); the 8M's
+factory programs use them, so every 8M has them. 24K and 24M owners download them from Groove
+Synthesis's support site (after logging in) and load them with Global → **Bulk wavetable
+import**. The app assumes the 3rd Wave that loads a `.pgdata` has them.
 
 Before 2025 those were user slots, and some older program sets used them for their own tables,
 shipped as `.wt` files named with the slot (e.g., `U48 Warm Pad.wt`). So in a program saved before
@@ -126,14 +135,20 @@ how many free slots the 3rd Wave will need; or what the program still needs befo
 The list on the left can be filtered by name or location, or limited to programs needing
 attention.
 
-A program in a layout not seen before (a format other than `W3_PROG_3` to `_5`, or an unusual
-number of values per part) gets a warning: the app finds the oscillator sources from the layout, so
-check them, and check the program on the 3rd Wave after importing. A source number outside every
-known range shows as an unknown source, and the program is not written until those oscillators are
-pointed elsewhere. Content that does not look like the 3rd Wave's own is flagged too: a wavetable
-whose samples go beyond ±1, or a multisample whose samples are out of key order or carry values
-outside the ranges Groove Synthesis specifies. A file that cannot be read at all (empty, cut
-short, or not the kind its extension says) is reported once, with the reason, and left out.
+#### Checks
+
+- A program in a layout not seen before (a format other than `W3_PROG_3` to `_5`, or an unusual
+  number of values per part) gets a warning: the app finds the oscillator sources from the layout,
+  so check them, and check the program on the 3rd Wave after importing.
+- A source number outside every known range shows as an unknown source, and the program is not
+  written until those oscillators are pointed elsewhere.
+- Content that does not look like the 3rd Wave's own is flagged: a wavetable whose samples go
+  beyond ±1, or a multisample whose samples are out of key order or carry values outside the ranges
+  Groove Synthesis specifies.
+- A file that cannot be read at all (empty, cut short, or not the kind its extension says) is
+  reported once, with the reason, and left out.
+
+#### Older programs
 
 **Programs in an older format are converted as they are packed.** A program saved by older
 firmware (`W3_PROG_3`, `W3_PROG_4`, or a `W3_PROG_5` from before OS 2.0) is brought up to the
@@ -155,10 +170,10 @@ play:
 - a file you added (listed first). When the program needs a slot that has nothing yet (e.g., U57),
   the sheet preselects an added file that has no slot yet and assigns it to that slot, so the
   oscillators stay as they are;
-- any factory U or P slot (searchable by slot or name);
+- any factory P or U slot (searchable by slot or name);
 - an analog wave (A00–A06).
 
-The Source column then shows, for example, **U01 → U56**, with a button to undo. Only the
+The Source column then shows, for example, **U01 → U56**, with a button to point it back. Only the
 `.pgdata` changes; the `.pro` is not modified. Multisample oscillators are not repointed.
 
 ![The sheet for changing what oscillators play: oscillators to change on the left, and on the right the files added, the factory slots, and the analog waves](docs/change-what-plays.png)
@@ -166,9 +181,8 @@ The Source column then shows, for example, **U01 → U56**, with a button to und
 Parts 3 and 4 play only on the 4-part models (24K, 24M). In every program saved on an 8M seen so
 far, they hold filler (P02, U01, and an analog wave).
 
-Added files that no program uses are flagged in the files table ("Not used", or "Not used: the
-slot plays something else" when the slot is filled some other way; the tooltip gives the reason). **Point a program
-here…** opens the same sheet for the file. Unused files are listed again after packing.
+Added files that no program uses are flagged in the files table ("Not used"; the tooltip says
+why), and listed again after packing. **Point a Program Here…** opens the same sheet for the file.
 
 #### Names
 
@@ -196,6 +210,8 @@ Every proposal is shown, can be edited, and can be unchecked. New names go into 
 its file name. Source files are not changed, and unpacking keeps names as they are.
 
 ![Clean Up Names: options at the top, and each current name with its proposed new name](docs/clean-up-names.png)
+
+#### Name limits
 
 Name fields hold 31 characters, and the 3rd Wave displays all 31 for programs, wavetables, and
 multisamples. The fields hold single-byte (Latin-1) characters only. A name they cannot hold is
@@ -289,13 +305,16 @@ The Input column says where each table's frame size comes from. A size the file'
 (a chunk, a header, or a format that fixes it) is taken as it is. One the page estimated, from a
 `_wt<N>` tag in the file name, a Serum `.txt` beside the file, or markers, is the default of a
 choice: click it to see every size the length allows, each drawn so the one that cuts the frames
-in the right place is visible. When the file states nothing, the page assumes a size and says so:
-2,048 samples per frame, the Serum-style size, when the length allows it; otherwise the size
-whose frames are most alike from one to the next, marked "likely" in the chooser. A size nothing
-settles must be chosen before the table can be converted. With several tables selected, the
-preview offers one frame size for those whose file does not state one, from the sizes all of
-them allow (⌘A selects every table). For the rare WAV whose chunk states the wrong size,
-**Override Frame Size…** in the preview opens the same chooser.
+in the right place is visible. When the file states nothing, the page assumes 2,048 samples per
+frame, the Serum-style size, and says so. Two lengths are left open, since they are also well-known
+tables at other sizes: 8,192 samples (64 × 128, a PPG-style table, or 4 × 2,048) and 16,384 (64 ×
+256, a WaveEdit bank, or 8 × 2,048); for those the page assumes the size whose frames are most
+alike from one to the next, marked "likely" in the chooser, or waits for a choice when no size
+stands out. With several tables selected, the preview offers one frame size for those whose size
+is assumed or estimated, from the sizes all of them allow (⌘A selects every table). For the rare
+WAV or FLAC whose chunk states the wrong size, **Override Frame Size…** in the preview opens the
+same chooser. The counts above the table jump to the first table that still needs a size or cannot
+be split into frames; **Show only tables that can't be converted yet** filters to them.
 
 #### Destinations
 
@@ -314,7 +333,8 @@ The destination applies to every table marked to convert. The chosen row says wh
 separate and, in orange, what is open about it: that converting to it has not yet been tested
 (none has), and anything its sources leave open that the tables to convert bring about. The book
 icon beside each row (under **Sources**) opens the documents the format rests on; a green seal in
-its place marks a destination that has been tested.
+its place marks a destination that has been tested. While any destination is untested, the page
+carries a notice that wavetable conversion is under development.
 [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes what each destination expects, with sources.
 
 #### Options
@@ -326,7 +346,7 @@ Shown when a choice applies to the destination and the tables to convert:
   order for more, making no new waveforms; **Crossfade New Frames** makes each new frame by
   crossfading its neighbours.
 - **Interpolation**, for formats whose file records it: an interpolation method, crossfade or
-  spectral, or none (no interpolation: the synth steps from frame to frame). The Interpolation
+  spectral, or none (no interpolation: the destination steps from frame to frame). The Interpolation
   column shows what each table's own file specifies; by default each table keeps that, and a
   table whose file says nothing gets crossfade.
 - Tonverk's frame size, and the PPG's four standard waveforms for P tables.
@@ -337,8 +357,8 @@ The pane below the table shows the selected table: the input and the result stac
 frame, with the interpolation drawn between frames where a file records one; its file, its frame
 size and what that rests on, its interpolation, and what converting changes. The **Frame** slider
 sweeps through the table and draws the cycle there large, input and result together. **Listen** plays that cycle, following the slider, at the pitch chosen
-beside it (a piano key with its number; A3, 220 Hz, to start) through the audio output chosen in
-the toolbar.
+beside it (a piano key with its number; A3, 220 Hz, to start) through the device chosen under
+**Audio Output**, the speaker icon at the right of the toolbar.
 
 #### Converting
 
@@ -380,7 +400,8 @@ Checked on an 8M (OS 2.0d), and most points on a 24M as well
 > finished.
 >
 > **Empty the `PROGRAMS` folder before exporting.** An export onto an existing file of the same name
-> does not shorten it, so a longer old file leaves its tail behind the new program. (The app
+> has been observed not to shorten it (once, on a 24M), so a longer old file leaves its tail behind
+> the new program. (The app
 > recognises such a file by its header, drops the leftover values when packing or unpacking it,
 > and says so.)
 >
@@ -438,10 +459,7 @@ in any language. Everything here is open source under the MIT licence.
 
 ## Formats
 
-[`docs/FORMATS.md`](docs/FORMATS.md) is the full reference: what is known about `.pro`, `.pgdata`,
-`.wt`, and `.bin` files and the oscillator source ids, how the 3rd Wave converts older programs, and
-what is still open. Footnotes give the evidence for each statement, and inferences are said to
-be inferences. In brief:
+[`docs/FORMATS.md`](docs/FORMATS.md) is the full reference (see For developers above). In brief:
 
 - **.pro**: text, one value per line: the format tag (`W3_PROG_3` to `_5`), the name, four sizes
   (integers and floats per part, global values, sequence events), then four integer part blocks
