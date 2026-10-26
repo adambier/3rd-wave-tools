@@ -437,9 +437,16 @@ No tests cover the SwiftUI views; a UI change is verified by building and using 
   crossfade").
 - **Language review before a build is handed over, docs are merged, or a release is made:** read
   every user-facing string and document that changed for accuracy against the evidence, currency
-  after renames (page, column, and feature names), agreement of tense, number, case, and mood, and
-  the rules above; fix, and report any change of meaning. Tests assert some strings
-  (`ConvertPlanTests`, `ConvertReportTests`, `WorkbenchTests`, `ReadingTests`): keep them in step.
+  after renames (page, column, and feature names), agreement of tense, number, case, and mood,
+  the rules above, and **readability**: no wall of text. A prose paragraph longer than about
+  eight lines (120 words) in the README, the docs, a DocC page, a report, or a tooltip is broken
+  into paragraphs, or into a list where the parts are parallel (the cases of a rule, the steps
+  of a procedure, the notes of a report); an explanation in the app is set a sentence to a
+  paragraph (`ConvertSentences`). Fix, and report any change of meaning. When the review is
+  delegated to an agent, its brief names every check in this bullet, the readability one
+  included (a review briefed on accuracy and names alone missed four walls of text in the README
+  on 2026-10-26). Tests assert some strings (`ConvertPlanTests`, `ConvertReportTests`,
+  `WorkbenchTests`, `ReadingTests`): keep them in step.
 
 ## 11. Recipes
 

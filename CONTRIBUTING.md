@@ -91,8 +91,10 @@ The README, FORMATS.md, the documentation, and the app's text follow a few conve
 
 **Language review.** A change to user-facing text or documentation gets a careful read before it
 is merged, checking that each statement is accurate against its evidence and still current (names
-of pages, columns, and features change), that tense, number, case, and mood agree, and that the
-conventions above hold. Say in the pull request if a sentence's meaning changed.
+of pages, columns, and features change), that tense, number, case, and mood agree, that the
+conventions above hold, and that nothing is a wall of text: a prose paragraph longer than about
+eight lines is broken into paragraphs, or into a list where the parts are parallel. Say in the
+pull request if a sentence's meaning changed.
 
 ## Pull requests
 
