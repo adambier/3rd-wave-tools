@@ -370,7 +370,7 @@ struct ConvertOverviewPair: View {
     /// The slider's place through the table, 0 (first frame) to 1 (last).
     @State private var position: Double = 0
     /// For a destination whose file records no interpolation, what the result is drawn and
-    /// played with instead of the synth's default (the Hear pop-up); nil for the default. Back
+    /// played with instead of the synth's default (the Between frames pop-up); nil for the default. Back
     /// to the default whenever the table or the destination changes (Adam, 2026-10-26).
     @State private var hearing: Interpolation?
 
@@ -384,7 +384,7 @@ struct ConvertOverviewPair: View {
             // What the destination's synth plays, for the result's in-betweens and Listen: what
             // the file records; else the 3rd Wave's wavetable smoothing by default (a U table
             // blends, a P table steps), or nothing for a synth whose default is not known; and
-            // for those formats, the Hear pop-up's choice over the default.
+            // for those formats, the Between frames pop-up's choice over the default.
             let recorded = plan.preset.recordsInterpolation
             let playedByDefault = plan.interpolationPlayed(for: item) ?? Interpolation.none
             let resultInterpolation: Interpolation? = recorded ? plan.interpolationPlayed(for: item) : (hearing ?? playedByDefault)
@@ -432,11 +432,11 @@ struct ConvertOverviewPair: View {
     }
 
     /// Why the result is drawn and played with its interpolation when its file records none:
-    /// the Hear pop-up's choice, or for the 3rd Wave what its wavetable smoothing does by
+    /// the Between frames pop-up's choice, or for the 3rd Wave what its wavetable smoothing does by
     /// default (checked on an 8M; FORMATS.md section 5.1; `ConvertPlan.interpolationPlayed(for:)`).
     /// Nil for the others' defaults, which are not known.
     static func interpolationNote(for preset: OutputPreset, chosen: Bool) -> String? {
-        if chosen { return "chosen under Hear" }
+        if chosen { return "chosen under Between frames" }
         switch preset {
         case .thirdWaveU: return "the 3rd Wave’s wavetable smoothing, on by default"
         case .thirdWaveP: return "the 3rd Wave’s wavetable smoothing is off by default"
@@ -444,7 +444,7 @@ struct ConvertOverviewPair: View {
         }
     }
 
-    /// The Hear pop-up's tip: what the choice is for, and what the synth itself does.
+    /// The Between frames pop-up's tip: what the choice is for, and what the synth itself does.
     static func hearingHelp(for preset: OutputPreset) -> String {
         let common = "How the result is drawn and played between frames here; the file records no interpolation, so the synth decides when it plays the table. "
         switch preset {
@@ -486,15 +486,20 @@ struct ConvertSweepControls: View {
     let cycle: () -> [Float]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        // Two rows, each kept to the pictures' width: the slider alone on the first, so it has
+        // the room; Listen, the pitch, and the between-frames choice on the second. Labels never
+        // wrap (a narrow column once broke "Frame" in two).
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 10) {
-                Text("Frame").font(.caption).foregroundStyle(.secondary)
+                Text("Frame").font(.caption).foregroundStyle(.secondary).fixedSize()
                 Slider(value: $position, in: 0...1)
                     .controlSize(.small)
                     .frame(minWidth: 80)
                     .accessibilityLabel("Frame")
                     .accessibilityValue(Text("\(Int((position * 100).rounded())) percent through the table"))
                     .help("Sweep through the table: the frame at the slider is drawn in pink in the pictures and large in the third; Listen plays it")
+            }
+            HStack(spacing: 10) {
                 Button {
                     if preview.isPlaying { preview.stop() } else { preview.play(cycle()) }
                 } label: {
@@ -503,20 +508,22 @@ struct ConvertSweepControls: View {
                 }
                 .controlSize(.small)
                 .help(preview.isPlaying ? "Stop playing" : "Play the cycle at the slider from \(playing), at the pitch chosen, until stopped")
+                Text("Pitch").font(.caption).foregroundStyle(.secondary).fixedSize()
                 Picker("Pitch", selection: $preview.pitch) {
                     ForEach(AudioPreview.pitches) { (key: PianoKey) in
                         Text(key.label).tag(key)
                     }
                 }
+                .labelsHidden()
                 .pickerStyle(.menu)
                 .controlSize(.small)
                 .fixedSize()
                 .help("The pitch Listen plays at: a piano key and its frequency (A4 is 440 Hz)")
                 if let hearing {
-                    // "Hear": what plays between frames, for a format whose file leaves that to
-                    // the synth. The default is the synth's own where it is known.
-                    Text("Hear").font(.caption).foregroundStyle(.secondary)
-                    Picker("Hear", selection: Binding<Interpolation>(
+                    // What plays between frames, for a format whose file leaves that to the
+                    // synth. The default is the synth's own where it is known.
+                    Text("Between frames").font(.caption).foregroundStyle(.secondary).fixedSize()
+                    Picker("Between frames", selection: Binding<Interpolation>(
                         get: { hearing.wrappedValue ?? hearingDefault },
                         set: { (value: Interpolation) in hearing.wrappedValue = value == hearingDefault ? nil : value })) {
                         ForEach([Interpolation.none, .crossfade, .spectral], id: \.self) { (value: Interpolation) in

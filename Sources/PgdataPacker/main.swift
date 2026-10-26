@@ -460,9 +460,18 @@ final class ToolbarController: NSObject, NSToolbarDelegate, NSMenuDelegate {
 
 /// A menu item's view: "Volume", then a slider between a quiet and a loud speaker icon, for the
 /// level Listen plays at (`AudioPreview.volume`). The system's Sound menu has the same shape.
+/// The label starts where the menu's item titles do (after the check-mark column), and the
+/// slider runs to the menu's right margin, whatever width the menu takes.
 final class VolumeMenuView: NSView {
     private let slider = NSSlider(value: 1, minValue: 0, maxValue: 1, target: nil, action: nil)
+    private let label = NSTextField(labelWithString: "Volume")
+    private let quiet = NSImageView(image: NSImage(systemSymbolName: "speaker.fill", accessibilityDescription: nil) ?? NSImage())
+    private let loud = NSImageView(image: NSImage(systemSymbolName: "speaker.wave.3.fill", accessibilityDescription: nil) ?? NSImage())
     private let changed: (Float) -> Void
+
+    /// Where a menu item's title begins: the check-mark column's width.
+    private static let titleInset: CGFloat = 21
+    private static let rightMargin: CGFloat = 12
 
     /// The slider's position, set from the audio state when the menu is filled.
     var volume: Float {
@@ -472,16 +481,12 @@ final class VolumeMenuView: NSView {
 
     init(volume: Float, changed: @escaping (Float) -> Void) {
         self.changed = changed
-        super.init(frame: NSRect(x: 0, y: 0, width: 230, height: 24))
-        let label = NSTextField(labelWithString: "Volume")
+        super.init(frame: NSRect(x: 0, y: 0, width: 280, height: 26))
+        autoresizingMask = [.width]   // the menu gives the view its width
         label.font = NSFont.menuFont(ofSize: 0)
-        label.frame = NSRect(x: 14, y: 4, width: 56, height: 17)
         addSubview(label)
-        let quiet = NSImageView(image: NSImage(systemSymbolName: "speaker.fill", accessibilityDescription: nil) ?? NSImage())
-        quiet.frame = NSRect(x: 70, y: 5, width: 14, height: 14)
         quiet.contentTintColor = .secondaryLabelColor
         addSubview(quiet)
-        slider.frame = NSRect(x: 88, y: 2, width: 110, height: 20)
         slider.controlSize = .small
         slider.isContinuous = true
         slider.doubleValue = Double(volume)
@@ -489,13 +494,29 @@ final class VolumeMenuView: NSView {
         slider.action = #selector(slid(_:))
         slider.setAccessibilityLabel("Volume")
         addSubview(slider)
-        let loud = NSImageView(image: NSImage(systemSymbolName: "speaker.wave.3.fill", accessibilityDescription: nil) ?? NSImage())
-        loud.frame = NSRect(x: 202, y: 5, width: 18, height: 14)
         loud.contentTintColor = .secondaryLabelColor
         addSubview(loud)
+        layoutSubviews()
     }
 
     required init?(coder: NSCoder) { nil }
+
+    override func layout() {
+        super.layout()
+        layoutSubviews()
+    }
+
+    private func layoutSubviews() {
+        let height = bounds.height
+        label.sizeToFit()
+        label.frame.origin = NSPoint(x: Self.titleInset, y: (height - label.frame.height) / 2)
+        let quietX = label.frame.maxX + 10
+        quiet.frame = NSRect(x: quietX, y: (height - 14) / 2, width: 14, height: 14)
+        let loudWidth: CGFloat = 18
+        loud.frame = NSRect(x: bounds.width - Self.rightMargin - loudWidth, y: (height - 14) / 2, width: loudWidth, height: 14)
+        let sliderX = quiet.frame.maxX + 6
+        slider.frame = NSRect(x: sliderX, y: (height - 20) / 2, width: max(60, loud.frame.minX - 6 - sliderX), height: 20)
+    }
 
     @objc private func slid(_ sender: NSSlider) {
         changed(Float(sender.doubleValue))

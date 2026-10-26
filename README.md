@@ -370,8 +370,9 @@ size and what that rests on, its interpolation, and what converting changes. A 3
 drawn and played the way the 3rd Wave plays it by default: a U table with wavetable smoothing on,
 blending between frames (drawn as a crossfade, an inference from the manual's description), and a
 P table with it off, stepping from frame to frame. For these and the other formats whose file
-records no interpolation (Surge XT, WaveEdit), a **Hear** pop-up chooses what is drawn and played
-between frames; it goes back to the synth's default whenever the table or the destination changes.
+records no interpolation (Surge XT, WaveEdit), a **Between frames** pop-up chooses what is drawn
+and played there; it goes back to the synth's default whenever the table or the destination
+changes.
 The **Frame** slider sweeps through the table and draws the cycle there large, input and result
 together. **Listen** plays that cycle, following the slider, at the pitch chosen beside it (a
 piano key and its frequency; A3, 220 Hz, to start), at the volume and through the device chosen

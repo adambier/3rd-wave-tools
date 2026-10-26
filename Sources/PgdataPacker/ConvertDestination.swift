@@ -122,6 +122,30 @@ struct ConvertPresetRow: View {
     }
 }
 
+/// Splits a paragraph into its sentences, at a period, exclamation mark, or question mark
+/// followed by a space and a capital letter or an opening quotation mark; a period inside a
+/// number or a parenthesis stays.
+func sentencesOfParagraph(_ text: String) -> [String] {
+    var out: [String] = []
+    var current = ""
+    let chars = Array(text)
+    var i = 0
+    while i < chars.count {
+        let c = chars[i]
+        current.append(c)
+        if ".!?".contains(c), i + 2 < chars.count, chars[i + 1] == " ",
+           chars[i + 2].isUppercase || chars[i + 2] == "\u{201C}" || chars[i + 2] == "(" {
+            out.append(current.trimmingCharacters(in: .whitespaces))
+            current = ""
+            i += 1   // the space
+        }
+        i += 1
+    }
+    let last = current.trimmingCharacters(in: .whitespaces)
+    if !last.isEmpty { out.append(last) }
+    return out
+}
+
 /// The radio, title, spec line, and (when chosen) why this destination is separate, then its
 /// cautions in orange: what its sources leave open for these tables, if anything, and that
 /// converting to it has not been tested, unless it has (`OutputPreset.testedIn`).
@@ -129,6 +153,9 @@ struct ConvertPresetRowLabel: View {
     let preset: OutputPreset
     let chosen: Bool
     let caveat: String?
+
+    /// The distinction's sentences, one paragraph each (see `sentencesOfParagraph`).
+    static func sentences(of text: String) -> [String] { sentencesOfParagraph(text) }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -145,10 +172,15 @@ struct ConvertPresetRowLabel: View {
                     Text(preset.specLine).font(.caption).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
                 }
                 if chosen {
-                    Text(preset.distinction)
-                        .font(.caption)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 2)
+                    // One sentence per paragraph, a little apart, rather than a block of small
+                    // type (Adam, 2026-10-26).
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(Array(ConvertPresetRowLabel.sentences(of: preset.distinction).enumerated()), id: \.offset) { (pair: (offset: Int, element: String)) in
+                            Text(pair.element).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .font(.caption)
+                    .padding(.top, 2)
                     if let caveat { ConvertCaution(text: caveat) }
                     // While the page carries its under-development notice, the row does not say
                     // "untested" a second time; the Sources popover still does.
