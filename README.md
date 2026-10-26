@@ -28,8 +28,9 @@ Why you might want it:
 - You're vibe-coding and want to get a head start by importing agent-optimized data about this
   project and associated file-format analyses (`AGENTS.md`).
 
-Not affiliated with or endorsed by Groove Synthesis (but many thanks to them for creating such a fantastic instrument!). Everything here was worked out from files and
-checked on an 8M and a 24M, both running OS 2.0d.
+Not affiliated with or endorsed by Groove Synthesis (but many thanks to them for creating such a
+fantastic instrument!). Everything here was worked out from files and checked on an 8M and a 24M,
+both running OS 2.0d.
 
 **Building something for the 3rd Wave?** The file formats are (unofficially) documented as far as
 they're understood, and the libraries behind this app, test files, and a developer tool are free to
