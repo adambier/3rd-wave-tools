@@ -16,8 +16,7 @@ Why you might want to use it:
   app, and for sharing.
 - You'd like to check a set of programs for the wavetables or samples they need and don't have,
   and for added files that no program uses.
-- You'd like to extract the program, wavetable, and sample files from unified program files, many
-  at a time.
+- You'd like to extract the program, wavetable, and sample files from unified program files.
 - You'd like to convert wavetables from other hardware and software synths' formats to the 3rd
   Wave's, or 3rd Wave P and U tables to formats other synths read&mdash;one at a time or in bulk.
 - You'd like to look at a set of wavetables and listen to them, the frames of each drawn stacked
