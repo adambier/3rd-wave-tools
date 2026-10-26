@@ -417,6 +417,7 @@ struct ConvertOverviewPair: View {
                                      hearing: recorded || result == nil ? nil : $hearing,
                                      hearingDefault: playedByDefault,
                                      hearingHelp: ConvertOverviewPair.hearingHelp(for: plan.preset),
+                                     recordedNote: recorded && result != nil ? ConvertOverviewPair.recordedNote(for: plan.preset) : nil,
                                      cycle: { cycleToPlay(source: source.frames, result: result, resultInterpolation: resultInterpolation) })
             }
             .onChange(of: item.id) { _ in hearing = nil }
@@ -442,6 +443,13 @@ struct ConvertOverviewPair: View {
         case .thirdWaveP: return "the 3rd Wave’s wavetable smoothing is off by default"
         default: return nil
         }
+    }
+
+    /// In the pop-up's place when the destination's file (or file name) records the interpolation:
+    /// where to change it, so the preview and Listen follow.
+    static func recordedNote(for preset: OutputPreset) -> String {
+        preset == .tonverk ? "Between frames: as marked in the file name, set under Options"
+                           : "Between frames: as saved in the file, set under Options"
     }
 
     /// The Between frames pop-up's tip: what the choice is for, and what the synth itself does.
@@ -483,6 +491,9 @@ struct ConvertSweepControls: View {
     /// The synth's default, named in the pop-up.
     var hearingDefault: Interpolation = Interpolation.none
     var hearingHelp: String = ""
+    /// For a format whose file records the interpolation: the words in the pop-up's place
+    /// pointing to the Options box, which sets it (and so what plays).
+    var recordedNote: String? = nil
     let cycle: () -> [Float]
 
     var body: some View {
@@ -535,6 +546,9 @@ struct ConvertSweepControls: View {
                     .controlSize(.small)
                     .fixedSize()
                     .help(hearingHelp)
+                } else if let recordedNote {
+                    Text(recordedNote).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        .help("This format records the interpolation, so the Interpolation setting under Options in the Convert to pane decides what the file says and what plays here.")
                 }
             }
             if let problem = preview.problem {
