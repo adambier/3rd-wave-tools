@@ -493,7 +493,10 @@ the evidence (model, OS version, steps, files, or the Groove Synthesis document 
 reader or writer changed, regenerate `fixtures/`; if it is only an inference, say so in both places.
 
 **Releases** (owner only): `VERSION` in `make-app.sh` is the app and library version; tags are
-`v<VERSION>`, and `PgdataFormats` is versioned with the app (tags `v1.0.5` and on). The Help menu
+`v<VERSION>`, and `PgdataFormats` is versioned with the app (tags `v1.0.5` and on). The copyright
+line (`NSHumanReadableCopyright`: "Copyright © 2026 Adam Arthur Bier. MIT License.", the years
+running from `FIRST_YEAR` to the build's year) is set by `make-app.sh`; `LICENSE` carries the
+year by hand, so extend its year at the first release of a new year. The Help menu
 opens the README at the running version's tag. The build number is the commit count. A published
 tag is never moved. Signing, notarization, and the Sparkle appcast are the owner's steps and need
 credentials that are not in the repository.

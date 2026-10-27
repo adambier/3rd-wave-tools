@@ -83,7 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let credits = NSMutableAttributedString(
             string: "Packs and unpacks unified program data (.pgdata) files for the Groove Synthesis 3rd Wave, and converts wavetables to and from its formats.\n"
                 + "Not affiliated with or endorsed by Groove Synthesis.\n"
-                + "Source: \(source)",   // the license is the panel’s copyright line (NSHumanReadableCopyright)
+                + "Source: \(source)",   // the copyright and license are the panel’s own bottom line (NSHumanReadableCopyright, set by make-app.sh)
             attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
                          .foregroundColor: NSColor.secondaryLabelColor,
                          .paragraphStyle: para])

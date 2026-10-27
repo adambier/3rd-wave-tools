@@ -90,6 +90,12 @@ VERSION="1.0.5"
 # The build number must rise with every release (an updater compares it): the number of commits.
 BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 DEPLOYMENT_TARGET="13.0"
+# The copyright line the Finder's Get Info and the About panel show (NSHumanReadableCopyright):
+# the year of first publication through the year of this build, kept current by the build itself.
+FIRST_YEAR="2026"
+THIS_YEAR="$(date +%Y)"
+COPYRIGHT_YEARS="$FIRST_YEAR"; [ "$THIS_YEAR" -gt "$FIRST_YEAR" ] && COPYRIGHT_YEARS="$FIRST_YEAR–$THIS_YEAR"
+COPYRIGHT="Copyright © $COPYRIGHT_YEARS Adam Arthur Bier. MIT License."
 
 # A second item for the same version would carry a new build number and signature but point at the
 # same download, which then fails to verify if the uploaded zip is not this run's. Checked before
@@ -236,7 +242,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>LSApplicationCategoryType</key><string>public.app-category.music</string>
     <key>LSMinimumSystemVersion</key>   <string>$DEPLOYMENT_TARGET</string>
     <key>NSHighResolutionCapable</key>  <true/>
-    <key>NSHumanReadableCopyright</key> <string>MIT License</string>
+    <key>NSHumanReadableCopyright</key> <string>$COPYRIGHT</string>
     <key>NSPrincipalClass</key>         <string>NSApplication</string>
     <key>SUFeedURL</key>                <string>$FEED_URL</string>
     <key>SUPublicEDKey</key>            <string>$SPARKLE_PUBLIC_ED_KEY</string>
