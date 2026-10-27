@@ -580,7 +580,7 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(Interpolation.none.displayName, "None (stepped)")
         XCTAssertEqual(Interpolation.displayName(nil), "Not stated")
         XCTAssertEqual(Interpolation.displayName(.spectral), "Spectral")
-        XCTAssertEqual(ConvertPlan.testingStatus(.tonverk), "Tested in Tonverk, OS 1.4.1.")
+        XCTAssertEqual(ConvertPlan.testingStatus(.tonverk), "Tested in Tonverk OS 1.4.1.")
         XCTAssertEqual(ConvertPlan.testingStatus(.waveEdit), "Converting to this destination has not yet been tested in its synth.")
         XCTAssertEqual(ConvertPlan.testingStatus(.wav2048), "Tested in Pigments 7.0.1, Serum 2.1.5, and Vital 1.6.4.")
         XCTAssertEqual(ConvertPlan.testingStatus(.thirdWaveU), "Tested on the 3rd Wave 8M, OS 2.0d.")
@@ -1052,7 +1052,7 @@ final class ConvertExistingChoicesTests: XCTestCase {
         var serum = pickerPlan(.wav2048, [(nil, 2048), (.crossfade, 2048)])
         XCTAssertNil(serum.caveat(for: .wav2048))
         serum.options.interpolation = .spectral
-        XCTAssertEqual(serum.caveat(for: .wav2048), "Pigments does not read the interpolation saved in the file (Vital does; Serum does for a file loaded from its Tables folder).")
+        XCTAssertEqual(serum.caveat(for: .wav2048), "Pigments does not read the interpolation saved in the file (Vital does; Serum does for a file loaded from Serum’s Tables folder).")
         var stepped = pickerPlan(.wav2048, [(Interpolation.none, 2048), (nil, 2048)])
         XCTAssertNotNil(stepped.caveat(for: .wav2048))
         stepped.options.interpolation = .crossfade   // the override makes every file crossfade

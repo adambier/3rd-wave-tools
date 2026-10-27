@@ -23,18 +23,20 @@ final class AppState: ObservableObject {
             case .convert: return "waveform"
             }
         }
-        /// Whether the page is still under development, so it is shown only when View › Show
-        /// Under-Development Features is on (`AppState.showsUnderDevelopmentFeatures`): the
-        /// Wavetables page, until the destinations that gate it have been tested
-        /// (`ConvertPlan.conversionUnderDevelopment`).
+        /// Whether the page is under development, so it is shown only when View › Show
+        /// Under-Development Features is on (`AppState.showsUnderDevelopmentFeatures`). The
+        /// Wavetables page was, until the destinations that gate it were tested
+        /// (`ConvertPlan.conversionUnderDevelopment`, false since 2026-10-27); the mechanism
+        /// stays for a future page.
         var isUnderDevelopment: Bool { self == .convert && ConvertPlan.conversionUnderDevelopment }
     }
 
     private static let underDevelopmentKey = "ShowUnderDevelopmentFeatures"
 
-    /// Whether the pages still under development (the Wavetables page, with Listen and the audio
-    /// output in the toolbar) are shown: View › Show Under-Development Features. Off by default;
-    /// kept between sessions. Turning it off while such a page is current goes back to Pack.
+    /// Whether pages under development are shown: View › Show Under-Development Features, in
+    /// the menu only while some page is gated (none since the Wavetables page's destinations
+    /// were tested). Off by default; kept between sessions. Turning it off while such a page is
+    /// current goes back to Pack.
     @Published var showsUnderDevelopmentFeatures: Bool = UserDefaults.standard.bool(forKey: AppState.underDevelopmentKey) {
         didSet {
             UserDefaults.standard.set(showsUnderDevelopmentFeatures, forKey: Self.underDevelopmentKey)

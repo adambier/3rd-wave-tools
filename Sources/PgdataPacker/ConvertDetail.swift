@@ -490,14 +490,16 @@ struct ConvertOverviewPair: View {
     }
 
     /// Why the result is drawn and played with its interpolation when its file records none:
-    /// the Interpolation pop-up's choice, or for the 3rd Wave what its wavetable smoothing does by
-    /// default (checked on an 8M; FORMATS.md section 5.1; `ConvertPlan.interpolationPlayed(for:)`).
-    /// Nil for the others' defaults, which are not known.
+    /// the Interpolation pop-up's choice, for the 3rd Wave what its wavetable smoothing does by
+    /// default (checked on an 8M; FORMATS.md section 5.1; `ConvertPlan.interpolationPlayed(for:)`),
+    /// or for Tonverk the blend it always makes (heard in Tonverk OS 1.4.1). Nil for the others'
+    /// defaults, which are not known.
     static func interpolationNote(for preset: OutputPreset, chosen: Bool) -> String? {
         if chosen { return "selected in the Interpolation pop-up" }
         switch preset {
         case .thirdWaveU: return "the 3rd Wave’s wavetable smoothing, on by default"
         case .thirdWaveP: return "the 3rd Wave’s wavetable smoothing is off by default"
+        case .tonverk: return "Tonverk’s own blend between frames, taken here to be a crossfade"
         default: return nil
         }
     }
@@ -532,7 +534,7 @@ struct ConvertOverviewPair: View {
         switch preset {
         case .thirdWaveU: return common + "On the 3rd Wave, wavetable smoothing is on by default for a U table (taken here to be a crossfade) and can be turned off in the program’s Wave Flow settings."
         case .thirdWaveP: return common + "On the 3rd Wave, wavetable smoothing is off by default for a P table and can be turned on in the program’s Wave Flow settings."
-        case .tonverk: return common + "Tonverk blends between frames whatever the file name says (heard in Tonverk OS 1.4.1), taken here to be a crossfade; the pop-up starts there."
+        case .tonverk: return common + "Tonverk blends between frames whatever the file name says (heard in Tonverk OS 1.4.1), taken here to be a crossfade; the pop-up starts at Crossfade."
         case .surge: return common + "What Surge XT does by default is not known here; the preview starts at None (stepped)."
         case .waveEdit: return common + "What WaveEdit or the E370 does by default is not known here; the preview starts at None (stepped)."
         default: return common + "What \(preset.shortTitle) does by default is not known here; the preview starts at None (stepped)."

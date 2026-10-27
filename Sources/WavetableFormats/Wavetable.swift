@@ -166,7 +166,7 @@ public struct ReadNote: Equatable, Sendable {
         /// In a FLAC file, a comment mentions frames, cycles, or wavetables; it is not used.
         case commentMentionsFrames(key: String, value: String)
         /// The file name ends in Tonverk's `r` (`_wt128r.wav`), which asks Tonverk to play each
-        /// frame's samples raw, without interpolation between them. The table's samples are what
+        /// frame's samples raw, each sample held until the next. The table's samples are what
         /// they are; the mark is about Tonverk's playback (see ``OutputOptions/tonverkRawSamples``).
         case tonverkRawSamples
     }
@@ -342,7 +342,7 @@ public struct OutputOptions: Equatable, Sendable {
     /// Tonverk accepts it, otherwise 2,048.
     public var tonverkFrameSize: Int?
     /// Tonverk only: end the file name in `r`, which asks Tonverk to play each frame's samples
-    /// raw, without interpolation between them, as the PPG played its tables (Tonverk User
+    /// raw, each sample held until the next, as the PPG played its tables (Tonverk User
     /// Manual OS 1.4.1, section 5.2.5, and tests in Tonverk OS 1.4.1: the `r` changes the
     /// playback of the samples, not the blend between frames, which Tonverk always makes).
     /// False: the name carries no `r`, whatever the source file's name said. Nil: the caller

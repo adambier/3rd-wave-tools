@@ -149,7 +149,7 @@ public enum WavetableWriter {
             let raw = options.tonverkRawSamples ?? false
             let tag = "_wt\(plan.frameSizeOut)" + (raw ? "r" : "")
             if raw {
-                notes.append("The file name ends in “r”: Tonverk plays each frame’s samples raw, without interpolation between them, as the PPG played its tables (with a bright, stepped edge on frames of 64 or 128 samples).")
+                notes.append("The file name ends in “r”: Tonverk plays each frame’s samples raw, each sample held until the next, as the PPG played wavetables (a bright edge on frames of 64 samples).")
             } else if let old = untagged.removed, old.hasSuffix("r") || old.hasSuffix("R") {
                 notes.append("The source file’s name ended in “r”, Tonverk’s mark for raw sample playback; the new name does not.")
             }
@@ -256,13 +256,13 @@ public enum WavetableWriter {
         }
 
         /// For destinations that record the interpolation: says that the file records a
-        /// crossfade because the source file doesn't specify
-        /// the interpolation and no other choice was made. `prefix` opens the note (a sentence
-        /// and a space, or nothing); `result` closes it, after "so".
+        /// crossfade because the source file doesn't specify the interpolation and no other
+        /// choice was made. `prefix` opens the note (a sentence and a space, or nothing);
+        /// `result` closes it, after "so".
         mutating func noteDefaultInterpolation(prefix: String = "This format records whether and how a synth interpolates between frames. ",
                                                result: String = "so crossfade is saved") {
             if options.interpolation == nil && table.interpolation == nil {
-                notes.append("\(prefix)The source file says nothing about interpolation, and the Interpolation setting is left at its default, \(result).")
+                notes.append("\(prefix)The source file says nothing about interpolation, and the Interpolation pop-up under Options is left at its default, \(result).")
             }
         }
 
@@ -416,29 +416,33 @@ public extension OutputPreset {
     }
 
     /// Where converting to the preset has been tested, each entry with its preposition ("on the
-    /// 3rd Wave 8M, OS 2.0d", "in Serum"), for "Tested …" lines; empty while the preset rests on
-    /// its sources alone. The 3rd Wave's P and U tables: eight tables written by the app (P
-    /// tables with and without the PPG's waveforms at 60–63; U tables from Serum-style and u-he
-    /// files, resized and with their frame counts changed both ways) imported with **Bulk
-    /// wavetable import** into an 8M, played as written, and exported again the same to the
-    /// export's six decimal places (section 9 of FORMATS.md, 2026-10-26). Tonverk: tables of 4
-    /// and 64 frames at 64, 128, 1,024, and 2,048 samples per frame loaded through the Sample
-    /// Browser and the Wavefinder's SLOT, played in order at the right pitch, and Tonverk's
-    /// own recordings of a 64-sample sine showed the `r` switching its sample interpolation off
-    /// (2026-10-27, OS 1.4.1; docs/WAVETABLES.md section 2). Pigments 7.0.1 and Serum 2.1.5
-    /// (from Serum's Tables folder; a drop goes through Serum's re-slicing instead): frames in
-    /// order, the `clm ` flag followed by Serum, Pigments' Morph button deciding; MiniFreak V
-    /// 5.1.0: frames in order, a 4-frame table spread over the whole sweep. Vital 1.6.4: frames
-    /// in order, the `clm ` flag followed (a "none" table stepped). Phase Plant 2.4.6: the 256
-    /// frames played in order, held frames held; a 64-frame file loaded and played as well.
-    /// Surge XT 1.3.4: `.wt` files of 2,048 and 128 samples per frame at the right pitch, 64 and
-    /// 128 frames in order (all 2026-10-27). WaveEdit's format: the files played in Vital as 64
-    /// frames of 256 (Vital's WaveEdit rule), but neither WaveEdit nor an E370 has read them, so
-    /// that destination stays untested.
+    /// 3rd Wave 8M, OS 2.0d", "in Serum 2.1.5"), for "Tested …" lines; empty while the preset
+    /// rests on its sources alone. The tests (docs/WAVETABLES.md section 2 and its footnotes):
+    ///
+    /// - The 3rd Wave's P and U tables: eight tables written by the app (P tables with and
+    ///   without the PPG's waveforms at 60–63; U tables from Serum-style and u-he files, resized
+    ///   and with their frame counts changed both ways) imported with **Bulk wavetable import**
+    ///   into an 8M, played as written, and exported again the same to the export's six decimal
+    ///   places (section 9 of FORMATS.md, 2026-10-26).
+    /// - Tonverk OS 1.4.1: tables of 4 and 64 frames at 64, 128, 1,024, and 2,048 samples per
+    ///   frame loaded through the Sample Browser and the Wavefinder's SLOT and played in order
+    ///   at the right pitch; Tonverk's own recordings of a 64-sample sine showed the `r`
+    ///   switching the smoothing between samples off (2026-10-27).
+    /// - Pigments 7.0.1 and Serum 2.1.5 (from Serum's Tables folder; a drop goes through
+    ///   Serum's re-slicing instead): frames in order, the `clm ` flag followed by Serum,
+    ///   Pigments' Morph button deciding. MiniFreak V 5.1.0: frames in order, a 4-frame table
+    ///   spread over the whole sweep. Vital 1.6.4: frames in order, the `clm ` flag followed (a
+    ///   "none" table stepped). Phase Plant 2.4.6: the 256 frames played in order, repeated
+    ///   frames held; a 64-frame file loaded and played as well. Surge XT 1.3.4: `.wt` files
+    ///   of 2,048 and 128 samples per frame at the right pitch, 64 and 128 frames in order (all
+    ///   2026-10-27).
+    /// - WaveEdit's format: the files played in Vital as 64 frames of 256 (Vital's WaveEdit
+    ///   rule), but neither WaveEdit nor an E370 has read them, so that destination stays
+    ///   untested.
     var testedIn: [String] {
         switch self {
         case .thirdWaveP, .thirdWaveU: return ["on the 3rd Wave 8M, OS 2.0d"]
-        case .tonverk: return ["in Tonverk, OS 1.4.1"]
+        case .tonverk: return ["in Tonverk OS 1.4.1"]
         case .wav2048: return ["in Pigments 7.0.1", "in Serum 2.1.5", "in Vital 1.6.4"]
         case .miniFreak: return ["in MiniFreak V 5.1.0"]
         case .phasePlant: return ["in Phase Plant 2.4.6"]
@@ -477,11 +481,11 @@ public extension OutputPreset {
     var caveat: String? {
         switch self {
         case .wav2048:
-            return "Pigments reads no metadata, so the interpolation saved in the file does not reach it. Serum reads it for a file loaded from its Tables folder; a file dropped on an oscillator goes through Serum’s own slicing choices instead."
+            return "Pigments reads no metadata, so the interpolation saved in the file does not reach Pigments. Serum reads the saved interpolation for a file loaded from Serum’s Tables folder; a file dropped on an oscillator goes through Serum’s own re-slicing choices instead."
         case .miniFreak:
             return "How MiniFreak V reduces 2,048-sample frames to 512 for the MiniFreak is not documented, and the MiniFreak itself has not been tested here."
         case .waveEdit:
-            return "Neither WaveEdit nor an E370 has read the files; Vital has played them as 64 frames of 256, the shape WaveEdit saves."
+            return "Neither WaveEdit nor an E370 has read the files; Vital has played the files as 64 frames of 256, the shape WaveEdit saves."
         case .thirdWaveU, .thirdWaveP, .tonverk, .phasePlant, .surge:
             // Phase Plant 2.4.6 has been observed to load a 64-frame table as well as the 256
             // frames Kilohearts documents (2026-10-27), so writing 256 leaves nothing open.

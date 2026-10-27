@@ -55,10 +55,9 @@ Notes on each:
   Tested in Serum 2.1.5: a file dropped on an oscillator goes through Serum's re-slicing
   choices (pitch detection, a fixed frame size, an FFT size) whatever the `clm ` chunk says,
   while a file in Serum's Tables folder loads as the chunk says, frames in order. A table
-  whose chunk says crossfade or spectral showed 256 frames in Serum after loading, a table
-  whose chunk says none kept its count (4 and 64); the inference taken here is that Serum 2
-  renders the interpolation into 256 positions on load, and the table plays as it
-  should.[^wav-tests]
+  whose chunk says crossfade or spectral showed 256 frames after loading, while a table whose
+  chunk says none kept its count (4 and 64); the inference taken here is that Serum renders
+  the interpolation into 256 positions on load.[^wav-tests]
 - **Vital** slices `.wav` files at 2,048 per frame and does not read the `clm ` chunk's frame size,
   only its interpolation digit. A file of exactly 16,384 samples whose spectrum looks like a
   WaveEdit table is sliced at 256 instead.[^vital] Tested in Vital 1.6.4: tables of 4, 64, and
@@ -80,20 +79,22 @@ Notes on each:
 - **Tonverk** reads the frame size from a `_wt<N>` tag at the end of the file name (2,048 when
   there is none) and takes up to 64 frames, picking evenly spaced ones from a larger
   table.[^tonverk] The manual says a name ending in `r` loads the table "without interpolation"
-  (its example is `strings_wt128r.wav`). Tested in Tonverk OS 1.4.1, the `r` switches off the
-  interpolation between each frame's **samples** (raw, sample-and-hold playback, as the PPG
-  played its tables), not the blend between frames, which Tonverk makes whatever the name
-  says.[^tonverk-tests] So the app writes the `r` for 3rd Wave P tables, the PPG-style tables,
-  and for files already marked, never as the interpolation and with no setting of its own
-  (`OutputOptions.tonverkRawSamples` lets another tool choose); the reader notes the mark and
-  reads no interpolation from it. An explicit size tag is always written, and any tag the name
-  already has is replaced.
+  (the manual's example is `strings_wt128r.wav`).
+
+  Tests in Tonverk OS 1.4.1 showed that the `r` switches off the smoothing between each
+  frame's **samples** (raw, sample-and-hold playback, as the PPG played its tables), not the
+  blend between frames, which Tonverk makes whatever the name says.[^tonverk-tests]
+
+  So the app writes the `r` for 3rd Wave P tables, the PPG-style tables, and for files already
+  marked, by rule and with no setting of its own (`OutputOptions.tonverkRawSamples` lets another
+  tool choose), and the reader notes the mark and reads no interpolation from it. An explicit
+  size tag is always written, and any tag the name already has is replaced.
 - **Phase Plant** documents its wavetables as exactly 256 frames of 2,048 samples (524,288 in
   all).[^phaseplant] Tested in Phase Plant 2.4.6: the 256-frame files played in order, a table
   expanded by repeating its frames played as held shapes with jumps, and a 64-frame file loaded
   and blended through as well, so 256 is the documented count rather than a requirement. The
-  page still writes 256, the documented count, which also keeps the repeated-frame expansion
-  as a way to hold each frame.[^other-tests]
+  page still writes 256, which also keeps the repeated-frame expansion as a way to hold each
+  frame.[^other-tests]
 - **Surge XT** reads its own `.wt` and WAV files with the chunks above, with frame sizes from 2 to
   4,096 (powers of two) and up to 512 frames.[^surge-code] Tested in Surge XT 1.3.4: `.wt` files
   of 2,048 and of 128 samples per frame loaded with the counts the header states (64 and 128),
@@ -266,9 +267,10 @@ The report after converting says what was done to each table.
 
 Results from any of these are welcome:
 
-- Whether Tonverk's `r` works without a `_wt<N>` tag (every form tested had the tag or was
-  tested for the wrong property), and whether Tonverk's factory library, whose files carry no
-  tags, is read at 2,048 throughout (one file, `All Waves.wav`, is 8,192 samples).
+- Whether Tonverk's `r` works without a `_wt<N>` tag (the names without a tag were tested only
+  for the blend between frames, which the `r` does not change), and whether Tonverk's factory
+  library, whose files carry no tags, is read at 2,048 throughout (one file, `All Waves.wav`, is
+  8,192 samples).
 - How MiniFreak V reduces 2,048-sample frames to 512, and what a MiniFreak itself plays from the
   tables MiniFreak V sends it (only the plug-in has been tested).
 - Whether WaveEdit and the E370 read the app's WaveEdit-format files (Vital takes them as 64
@@ -289,41 +291,51 @@ Results from any of these are welcome:
     <https://www.arturia.com/api/download/products/minifreak-v/manual/minifreak-v_Manual_5_1_0_EN.pdf>
 [^tonverk]: *Tonverk User Manual*, OS 1.4.1, section 5.2.5, "Wavetables".
     <https://www.elektron.se/wp-content/uploads/2026/09/Tonverk-User-Manual_ENG_OS1.4.1_260923.pdf>
-[^tonverk-tests]: Tests in Tonverk OS 1.4.1, 2026-10-27. Tables written by the app (4 and 64
-    frames of 64, 128, 1,024, and 2,048 samples) loaded through the Sample Browser and the
-    Wavefinder's SLOT and played in order at the right pitch for every tag. The blend between
-    frames: a four-frame table alternating a sine with silence faded gradually under six name
-    forms (`_wt2048r`, `_wt2048R`, with and without spaces, `r` with and without a tag). The
-    samples: Tonverk's own recordings of a 64-sample sine at C4, with the name `Test Stairs
-    A_wt64.wav` a pure sine, and with `_wt64r` (also `_wt64R`, and without spaces) the same
-    sine plus lines at 63 × and 65 × the note at −36 dB, the images of a 64-step staircase
-    (1/64 = −36 dB): the `r` turns the interpolation between samples off. A Serum-style `clm `
-    chunk in the file changed nothing, and an unknown chunk after the audio was ignored.
+[^tonverk-tests]: Tests in Tonverk OS 1.4.1, 2026-10-27, with tables written by the app (4 and
+    64 frames of 64, 128, 1,024, and 2,048 samples).
+
+    - Loading: every table loaded through the Sample Browser and the Wavefinder's SLOT and
+      played in order at the right pitch for every size tag.
+    - The blend between frames: a four-frame table alternating a sine with silence faded
+      gradually under six name forms (`_wt2048r`, `_wt2048R`, with and without spaces, `r`
+      with and without a tag).
+    - The samples: Tonverk's own recordings of a 64-sample sine at C4, with the name `Test
+      Stairs A_wt64.wav` a pure sine, and with `_wt64r` (also `_wt64R`, and without spaces)
+      the same sine plus lines at 63 × and 65 × the note at −36 dB, the images of a 64-step
+      staircase (1/64 = −36 dB): the `r` turns the smoothing between samples off.
+    - A Serum-style `clm ` chunk in the file changed nothing, and an unknown chunk after the
+      audio was ignored.
 [^wav-tests]: Tests on 2026-10-27 with tables written by the app: a 64-frame sine-to-square
     morph (crossfade), a 4-frame table of four shapes (none), a 64-frame table adding one
-    harmonic per frame (none), and a 128-frame table (spectral). Pigments 7.0.1: each loaded
-    with the expected count of positions, the frames in order, the Morph button deciding the
-    blend. MiniFreak V 5.1.0: imported through the wavetable browser's Import button; the
-    64-frame tables in order, the 4-frame table's shapes spread over the whole sweep. Serum
-    2.1.5: dropped on an oscillator, every file went through Serum's re-slicing choices;
-    loaded from Serum's Tables folder, the 4-frame table showed 4 frames and stepped, the
-    64-frame "none" table 64, and the crossfade and spectral tables 256 frames, each playing
-    its frames in order; a second copy of a file under another name never appeared in the
-    list, which suggests a listing by content. Vital 1.6.4: the 64-frame crossfade table
-    blended through its four shapes in order, the 4-frame "none" table stepped, the 128-frame
-    table swept cleanly, and the 64-frame "none" table stepped at the same pitch.
-[^other-tests]: Tests on 2026-10-27 with tables written by the app. Phase Plant 2.4.6: the
-    64-frame morph expanded to 256 by crossfading played its four shapes in order and blended;
-    the 4-frame table expanded by repeating played four held shapes with jumps; the 128-frame
-    table, each frame doubled, swept cleanly; the factory U26 played as on the 3rd Wave; and
-    the 64-frame morph from the Serum-style set, 64 frames of 2,048, loaded and played in order.
-    Surge XT 1.3.4: the 64-frame morph (2,048 per frame) showed 64 frames and played in order;
-    the harmonic-steps table (128 per frame) at the same pitch, brighter frame by frame; the
-    128-frame table showed 128 and swept cleanly; the factory P03 (peak 1.33) played as on the
-    3rd Wave, with the PPG waveforms at 60–63. Vital 1.6.4 with the WaveEdit-format files: the
-    morph at the same pitch as the 2,048-sample version (so sliced at 256, not 2,048), the four
-    shapes in order; the harmonic-steps table at the same pitch, brighter toward the top; P03
-    as on the 3rd Wave.
+    harmonic per frame (none), and a 128-frame table (spectral).
+
+    - Pigments 7.0.1: each loaded with the expected count of positions, the frames in order,
+      the Morph button deciding the blend.
+    - MiniFreak V 5.1.0: imported through the wavetable browser's Import button; the 64-frame
+      tables in order, the 4-frame table's shapes spread over the whole sweep.
+    - Serum 2.1.5: dropped on an oscillator, every file went through Serum's re-slicing
+      choices; loaded from Serum's Tables folder, the 4-frame table showed 4 frames and
+      stepped, the 64-frame "none" table 64, and the crossfade and spectral tables 256 frames,
+      each playing its frames in order; a second copy of a file under another name never
+      appeared in the list, which suggests a listing by content.
+    - Vital 1.6.4: the 64-frame crossfade table blended through its four shapes in order, the
+      4-frame "none" table stepped, the 128-frame table swept cleanly, and the 64-frame "none"
+      table stepped at the same pitch. Vital's frame control ran from 0 to 256 for every table
+      and showed no frame count.
+[^other-tests]: Tests on 2026-10-27 with tables written by the app.
+
+    - Phase Plant 2.4.6: the 64-frame morph expanded to 256 by crossfading played its four
+      shapes in order and blended; the 4-frame table expanded by repeating played four held
+      shapes with jumps; the 128-frame table, each frame doubled, swept cleanly; the factory
+      U26 played as on the 3rd Wave; and the 64-frame morph from the Serum-style set, 64 frames
+      of 2,048, loaded and played in order.
+    - Surge XT 1.3.4: the 64-frame morph (2,048 per frame) showed 64 frames and played in
+      order; the harmonic-steps table (128 per frame) at the same pitch, brighter frame by
+      frame; the 128-frame table showed 128 and swept cleanly; the factory P03 (peak 1.33)
+      played as on the 3rd Wave, with the PPG waveforms at 60–63.
+    - Vital 1.6.4 with the WaveEdit-format files: the morph at the same pitch as the
+      2,048-sample version (so sliced at 256, not 2,048), the four shapes in order; the
+      harmonic-steps table at the same pitch, brighter toward the top; P03 as on the 3rd Wave.
 [^phaseplant]: Kilohearts, Phase Plant manual and "Wavetables".
     <https://kilohearts.com/docs/wavetables>
 [^flac]: RFC 9639, "Free Lossless Audio Codec" (IETF, 2024).

@@ -768,7 +768,7 @@ public struct ConvertPlan: Equatable {
                 let saved = WavetableWriter.interpolationRecorded(for: preset, source: item.table.interpolation, options: options)
                 return saved != nil && saved != .crossfade
             }
-            return notCrossfade ? "Pigments does not read the interpolation saved in the file (Vital does; Serum does for a file loaded from its Tables folder)." : nil
+            return notCrossfade ? "Pigments does not read the interpolation saved in the file (Vital does; Serum does for a file loaded from Serum’s Tables folder)." : nil
         case .thirdWaveU, .thirdWaveP, .tonverk, .miniFreak, .phasePlant, .surge, .waveEdit:
             // MiniFreak V has been observed to spread a table of fewer than 64 frames over the
             // whole sweep (5.1.0), and Phase Plant 2.4.6 to load a 64-frame table (both

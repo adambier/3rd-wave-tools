@@ -535,12 +535,11 @@ credentials that are not in the repository.
   tables imported, played, and exported back, 2026-10-26; FORMATS.md section 9) and Tonverk OS
   1.4.1 for the Tonverk destination (WAVETABLES.md section 2: the tags read, the frames in order;
   Tonverk's own recordings showed that the `r` at the end of a name switches off the
-  interpolation between a frame's samples, not the blend between frames, which Tonverk always
+  smoothing between a frame's samples, not the blend between frames, which Tonverk always
   makes, so the page writes the `r` by rule, with no setting: 3rd Wave P tables and files
   already marked, `FoundTable.tonverkRawSamplesDefault`, which `ConvertPlan.options(for:)` puts
   into `OutputOptions.tonverkRawSamples` when that is nil; other callers may set it either way;
-  a Tonverk name records no interpolation,
-  `recordsInterpolation` false).
+  a Tonverk name records no interpolation, `recordsInterpolation` false).
   `testedIn` also names Pigments 7.0.1, Serum 2.1.5, and Vital 1.6.4 for the Serum-style WAV,
   MiniFreak V 5.1.0, Phase Plant 2.4.6, and Surge XT 1.3.4 (2026-10-27, WAVETABLES.md section 2
   and its `[^wav-tests]` and `[^other-tests]` footnotes: frames in order; Serum follows the

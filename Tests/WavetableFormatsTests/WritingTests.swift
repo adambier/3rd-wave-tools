@@ -581,7 +581,7 @@ final class InterpolationNoteTests: XCTestCase {
         let plain = Wavetable(name: "T", frames: [sine(), sine()])
         // A file that says nothing, with the option at its default: crossfade, and the note says both.
         let serum = try WavetableWriter.write(plain, preset: .wav2048)
-        XCTAssertTrue(serum.notes.contains { $0.contains("The source file says nothing about interpolation, and the Interpolation setting is left at its default, so crossfade is saved.") }, "\(serum.notes)")
+        XCTAssertTrue(serum.notes.contains { $0.contains("The source file says nothing about interpolation, and the Interpolation pop-up under Options is left at its default, so crossfade is saved.") }, "\(serum.notes)")
         let tonverk = try WavetableWriter.write(plain, preset: .tonverk)
         XCTAssertFalse(tonverk.notes.contains { $0.contains("interpolation") }, "a Tonverk name records none, and a file that says nothing gets no note: \(tonverk.notes)")
         // A destination whose files record none: the option, or the source file's value, is reported as not written.

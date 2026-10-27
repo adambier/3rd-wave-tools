@@ -429,7 +429,7 @@ struct ConvertTonverkSizeOption: View {
             }
             .labelsHidden()
             .frame(maxWidth: 260, alignment: .leading)
-            .help((plan.eachTablesOwnFrameSizeLabel.map { $0.text + "\n" } ?? "") + "\u{201C}Existing\u{201D} is the frame size the tables already have; Tonverk takes 64 to 4,096 (powers of two), and a table of another size is written at 2,048. Any other choice resamples every table to that size. The size goes into the file name as a _wt tag (the preview shows each table’s); a trailing \u{201C}r\u{201D} asks Tonverk for raw sample playback, written for 3rd Wave P tables and files already marked.")
+            .help((plan.eachTablesOwnFrameSizeLabel.map { $0.text + "\n" } ?? "") + "\u{201C}Existing\u{201D} is the frame size the tables already have; Tonverk takes 64 to 4,096 (powers of two), and a table of another size is written at 2,048. Any other choice resamples every table to that size. The size goes into the file name as a _wt tag (the preview shows each table’s tag); a trailing \u{201C}r\u{201D} asks Tonverk for raw sample playback, written for 3rd Wave P tables and files already marked.")
             // The breakdown the "Each table’s own" item leaves out.
             if let detail = plan.eachTablesOwnFrameSizeLabel?.detail {
                 ConvertSentences("Each table’s own keeps the sizes the tables have: \(detail).")

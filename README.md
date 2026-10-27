@@ -11,21 +11,12 @@ those of other synths.
 
 Why you might want to use it:
 
-- You have 3rd Wave programs you created or downloaded, whose wavetables or samples come as
-  separate files, and you'd like each bundled into one file, for archiving, for import into the
-  3rd Wave Terminal app, and for sharing.
-- You'd like to check a set of programs for the wavetables or samples they need and don't have,
-  and for added files that no program uses.
-- You'd like to extract the program, wavetable, and sample files from unified program files.
-- You'd like to convert wavetables from other hardware and software synths' formats to the 3rd
-  Wave's, or 3rd Wave P and U tables to formats other synths read—one at a time or in bulk.
-- You'd like to look at a set of wavetables and listen to them, the frames of each drawn stacked
-  front to back and played at the pitch you choose, and see what each file says about its frame
-  size and interpolation.
-- You're developing software for the 3rd Wave and would like the file formats documented and the
-  code behind this app free to use.
-- You're vibe-coding and want to get a head start by importing agent-optimized data about this
-  project and associated file-format analyses (`AGENTS.md`).
+* You have 3rd Wave programs with wavetables and samples as separate files, and you'd like each bundled into one file for archiving, importing into the 3rd Wave Terminal app, or sharing.
+* You'd like to check a set of 3rd Wave programs to make sure they have the wavetables and samples they need and identify orphan wavetables and samples not used by any program.
+* You'd like to extract 3rd Wave program, wavetable, and sample files from unified program files.
+* You'd like to convert wavetables from other hardware and software synths' formats to the 3rd Wave's, or 3rd Wave P and U tables to formats other synths read (or between other synths' formats)—one at a time or in bulk.
+* You'd like to preview wavetables and listen to them, with data on their frame sizes and interpolation settings.
+* You're developing your own software for use with the 3rd Wave and would like to check out the file-format documentation and code for this app. An agent-optimized specification (AGENTS.md) is included for all your vibe-coding needs.
 
 Not affiliated with or endorsed by Groove Synthesis (but many thanks to them for creating such a
 fantastic instrument!). Everything here was worked out from files and checked on an 8M and a 24M,
@@ -366,7 +357,7 @@ field above the table narrows the list by name or file, as on the Pack page.
 | 3rd Wave U table | a `.wt` of 64 frames of 1,024 samples, with its mipmap chain |
 | Serum, Vital, Pigments | a 32-bit float WAV of up to 256 frames of 2,048 samples, recording the interpolation |
 | MiniFreak V | the same, with at most 64 frames, for MiniFreak V to send to a MiniFreak |
-| Tonverk | a 32-bit float WAV of up to 64 frames, with the frame size in the file name, and an "r" at its end when raw sample playback is asked for |
+| Tonverk | a 32-bit float WAV of up to 64 frames, with the frame size in the file name, and an "r" at the end of the name for raw sample playback (3rd Wave P tables, and files already marked) |
 | Phase Plant | a 32-bit float WAV of exactly 256 frames of 2,048 samples |
 | Surge XT | a Surge `.wt` |
 | WaveEdit, E370 | a 16-bit WAV of 64 frames of 256 samples |
@@ -376,7 +367,8 @@ converted by the page, four of each kind, were imported with **Bulk wavetable im
 as written, and came back the same from **Export Wavetable** (to the export's six decimals).
 Pigments 7.0.1, Serum 2.1.5, Vital 1.6.4, MiniFreak V 5.1.0, Phase Plant 2.4.6, Surge XT 1.3.4,
 and Tonverk OS 1.4.1 have played the page's tables as well. The WaveEdit, E370 destination rests
-on its sources and on a check of the files' shape in Vital until someone with an E370 tests it.
+on its sources and on a check of the files' shape in Vital until someone with WaveEdit or an
+E370 tests it.
 
 The destination applies to every table converted. The chosen row says why its format is separate
 and, in orange, anything its sources leave open that the tables bring about. The book icon beside
@@ -384,25 +376,29 @@ each row (under **Sources**) names the documents the format rests on; an orange 
 destination's name marks one not yet tested in its synth. [`docs/WAVETABLES.md`](docs/WAVETABLES.md)
 describes what each destination expects, with sources.
 
-Tonverk has been tested as well (OS 1.4.1): tables of 4 and 64 frames at 64, 128, 1,024, and
-2,048 samples per frame loaded through its Sample Browser and the Wavefinder's SLOT and played in
-order at the right pitch. Tonverk's own recordings settled what the "r" at the end of a file
-name does, which its manual describes as loading the table "without interpolation": it switches
-off the interpolation between each frame's samples (the PPG's raw, stepped playback, audible on
-frames of 64 or 128 samples as a bright edge), while Tonverk blends between frames either way.
-The page ends the name in "r" for 3rd Wave P tables, the PPG-style tables, and for files already
-marked, and never otherwise; there is nothing to set.
+In Tonverk (OS 1.4.1), tables of 4 and 64 frames at 64, 128, 1,024, and 2,048 samples per frame
+loaded through the Sample Browser and the Wavefinder's SLOT and played in order at the right
+pitch. Tonverk's own recordings settled what the "r" at the end of a file name does, which
+Tonverk's manual describes as loading the table "without interpolation": the "r" switches off
+the smoothing between each frame's samples (raw sample playback, as on the PPG; on frames of 64
+samples, the held samples put a bright edge on the sound), while Tonverk blends between frames
+either way.
 
-Pigments, MiniFreak V, Serum, Vital, Phase Plant, and Surge XT (the plug-ins) played tables of
-4, 64, and 128 frames in order. Pigments reads no metadata, so its Morph button decides between
-a blend and steps. MiniFreak V spread a 4-frame table over the whole sweep (what a MiniFreak
-itself plays has not been tested). Serum follows the file's interpolation when the file is
-loaded from its Tables folder; a file dropped on an oscillator goes through Serum's own
-re-slicing choices instead, and a table that records a crossfade or spectral interpolation shows
-256 frames once loaded. Vital follows the file's interpolation and took the WaveEdit-format
-files as 64 frames of 256. Phase Plant loaded a 64-frame table as well as the 256 frames its
-documentation describes; the page still writes 256, the documented count. A destination still
-untested says so in its row.
+The page ends the name in "r" for 3rd Wave P tables, the PPG-style tables, and for files
+already marked, and never otherwise; there is nothing to set.
+
+In Pigments, MiniFreak V, Serum, Vital, Phase Plant, and Surge XT, the page's tables played with
+their frames in order. What each showed besides:
+
+- Pigments reads no metadata, so its Morph button decides between a blend and steps.
+- MiniFreak V spread a 4-frame table over the whole sweep (what a MiniFreak itself plays has not
+  been tested).
+- Serum follows the file's interpolation when the file is loaded from its Tables folder; a file
+  dropped on an oscillator goes through Serum's own re-slicing choices instead. A table that
+  records a crossfade or spectral interpolation shows 256 frames once loaded.
+- Vital follows the file's interpolation, and took the WaveEdit-format files as 64 frames of 256.
+- Phase Plant loaded a 64-frame table as well as the 256 frames its documentation describes; the
+  page still writes 256, the documented count.
 
 #### Options
 
@@ -437,10 +433,10 @@ How the result is drawn and played between frames depends on whether the destina
 records the interpolation:
 
 - For formats whose file records none (the 3rd Wave's tables, Tonverk, Surge XT, WaveEdit), an
-  **Interpolation** pop-up under the pictures chooses it, for the preview only, as a line under
-  it says while an interpolation is chosen: the output file is not affected. Whenever the table or the destination changes, the
-  pop-up goes back to the synth's default where that is known (the 3rd Wave's, and Tonverk's,
-  which blends between frames) and otherwise to none.
+  **Interpolation** pop-up under the pictures chooses it, for the preview only: the output file
+  is not affected, as a line under the pop-up says while an interpolation is chosen. Whenever
+  the table or the destination changes, the pop-up goes back to the synth's default where that
+  is known (the 3rd Wave's, and Tonverk's, which blends between frames) and otherwise to none.
 - For formats whose file records it (Serum-style WAVs), the **Interpolation to be saved in the
   output file** option under **Options** decides, and the preview says so in the pop-up's place.
 
