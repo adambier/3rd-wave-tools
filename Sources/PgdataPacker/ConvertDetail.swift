@@ -517,7 +517,7 @@ struct ConvertOverviewPair: View {
     static func hearingCaption(for preset: OutputPreset) -> String {
         switch preset {
         case .thirdWaveU, .thirdWaveP:
-            return "Interpolation here is for the preview only: the file records none, so the 3rd Wave decides as the table plays (its Wave Flow settings)."
+            return "Interpolation here is for the preview only: the file records none; interpolation on the 3rd Wave is controlled by the \u{201C}wavetable smoothing\u{201D} setting (under Wave Flow)."
         case .tonverk:
             return "Interpolation here is for the preview only: the file records none, and Tonverk blends between frames."
         default:
