@@ -517,11 +517,11 @@ struct ConvertOverviewPair: View {
     static func hearingCaption(for preset: OutputPreset) -> String {
         switch preset {
         case .thirdWaveU, .thirdWaveP:
-            return "For the preview only: the file records no interpolation, so the 3rd Wave decides as the table plays (its Wave Flow settings)."
+            return "Interpolation here is for the preview only: the file records none, so the 3rd Wave decides as the table plays (its Wave Flow settings)."
         case .tonverk:
-            return "For the preview only: the file records no interpolation, and Tonverk blends between frames."
+            return "Interpolation here is for the preview only: the file records none, and Tonverk blends between frames."
         default:
-            return "For the preview only: the file records no interpolation, so the synth decides as the table plays."
+            return "Interpolation here is for the preview only: the file records none, so the synth decides as the table plays."
         }
     }
 
@@ -570,8 +570,9 @@ struct ConvertSweepControls: View {
     var hearingDefault: Interpolation = Interpolation.none
     var hearingDefaultKnown: Bool = false
     var hearingHelp: String = ""
-    /// Under the pop-up: that the choice is for the preview only, since the file records none
-    /// (Adam, 2026-10-27: a reader could take the pop-up for a setting of the output).
+    /// Under the pop-up, while an interpolation is chosen: that the choice is for the preview
+    /// only, since the file records none (Adam, 2026-10-27: a reader could take the pop-up for
+    /// a setting of the output). Names the pop-up, so the line reads as its own.
     var hearingCaption: String = ""
     /// For a format whose file records the interpolation: the words in the pop-up's place
     /// pointing to the Options box, which sets it (and so what plays).
@@ -654,7 +655,9 @@ struct ConvertSweepControls: View {
                         .help(recordedHelp)
                 }
             }
-            if hearing != nil, !hearingCaption.isEmpty {
+            // Only while an interpolation is chosen: with None (stepped) there is no blend the
+            // reader could take for a setting of the output (Adam, 2026-10-27).
+            if let hearing, (hearing.wrappedValue ?? hearingDefault) != Interpolation.none, !hearingCaption.isEmpty {
                 Text(hearingCaption).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
