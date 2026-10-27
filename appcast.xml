@@ -3,6 +3,50 @@
     <channel>
         <title>pgdata Packer</title>
         <item>
+            <title>1.1.0</title>
+            <pubDate>Tue, 27 Oct 2026 16:15:11 -0700</pubDate>
+            <sparkle:version>348</sparkle:version>
+            <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## Wavetables
+
+A third page, **Wavetables**, converts wavetables between the 3rd Wave's formats and other synths'.
+
+- **Reads** WAV and FLAC wavetables (the kinds Serum, Vital, Phase Plant, and many other synths use), the 3rd Wave's `.wt` and `.pgdata` files, and Surge `.wt` files; dropped files and folders are searched, and files without wavetables are passed over. Each table is listed once, with its frames, frame size, and what converting it changes; identical copies are noted beside it, and Groove Synthesis's factory tables are marked.
+- **Writes** for eight destinations: 3rd Wave P and U tables, Serum/Vital/Pigments, MiniFreak V, Tonverk, Phase Plant, Surge XT, and WaveEdit's format for the E370. Frames are resized through their spectrum, frame counts changed by keeping original frames or crossfading new ones, and P tables can carry the PPG's four standard waveforms at positions 60–63. **Convert All…** and **Convert Selected…** write the files, with a report of every change; for a 3rd Wave destination, the `.wt` files can go straight to the Pack page.
+- **Frame sizes** come from what the file states, from its name or markers (shown as a choice), or from the samples themselves (said to be estimated); the Input column says which, and a chooser draws every size the length allows.
+- **Preview**: pictures of the selected table and of what the destination will hold, a Frame slider, and **Listen**, which plays the table through a sweep at a chosen pitch, with the interpolation the options set, through the audio output chosen in the toolbar.
+- **Options** per destination: the interpolation a file records (crossfade, spectral, or none), how a table reaches the destination's frame count, the PPG waveforms, and Tonverk's frame size. Tonverk's "r", for raw sample playback, is written by rule: for 3rd Wave P tables and for files already marked.
+- **Tested in the synths.** On the 3rd Wave 8M (OS 2.0d), P and U tables converted by the page imported with **Bulk wavetable import**, played, and exported back identical to six decimals. In Tonverk OS 1.4.1, Pigments 7.0.1, Serum 2.1.5, Vital 1.6.4, MiniFreak V 5.1.0, Phase Plant 2.4.6, and Surge XT 1.3.4, the page's tables loaded and played with their frames in order. Tonverk's own recordings settled what the "r" at the end of a file name does. The WaveEdit, E370 destination is the one not yet tested in its synth, and says so after its name.
+
+## Pack and Unpack
+
+- A `.wt` with a value line longer than 31 characters gets a warning: the 3rd Wave has been observed to read such a line as two values when importing the `.wt` itself (the values packed into a `.pgdata` are not affected).
+- Surge `.wt` and WAV files dropped on the Pack page are pointed to the Wavetables page.
+- Names the 3rd Wave would shorten are handled by one rule everywhere the app writes a name, on the Pack page and in the tables the Wavetables page writes.
+- The Pack and Unpack pages were reviewed against Apple's Human Interface Guidelines: controls, names, the filter fields, and renaming in place.
+
+## The app
+
+- A standard menu bar with shortcuts (⌘O, ⇧⌘E, ⌘1–⌘3, ⌥⌘L, ⌫, ⌘A, ⌘Z); the pages switched from the toolbar; files dropped on the Dock icon go to the page that reads them.
+- Selected rows are removed with **Remove Selected** or the Delete key, a page is cleared with **Remove All…**, and both can be undone; a name is edited by double-clicking its row or pressing Return, as in the Finder.
+- Every text that can be cut short shows its full text on hover; reports have a copy icon beside their title.
+- Long work (reading many files, writing) runs off the main thread with progress shown.
+- A new app icon, with the waveforms drawn exactly at the larger sizes; the copyright and license line in the Finder's Get Info window and the About panel.
+
+## For developers
+
+- **`WavetableFormats`**, a third library: finding wavetables in WAV, FLAC, Surge `.wt`, and 3rd Wave files, resizing them, and writing them for other synths. Provisional in 1.1: its API may change until a 1.1.x release, once the command-line tool planned next has shown what belongs in a library. Documented at [adambier.github.io/3rd-wave-tools](https://adambier.github.io/3rd-wave-tools/documentation/wavetableformats/).
+- **[`docs/WAVETABLES.md`](https://github.com/adambier/3rd-wave-tools/blob/v1.1.0/docs/WAVETABLES.md)**: the other synths' wavetable formats, with sources, how a frame size is decided, and what each test in a synth found.
+- **[`docs/FORMATS.md`](https://github.com/adambier/3rd-wave-tools/blob/v1.1.0/docs/FORMATS.md)**: findings from tests on the 3rd Wave 8M: the ids of P36–P47 and U55; **Bulk wavetable import**'s slot order; **Export Wavetable**'s six decimals and 31-character lines; how "use upper wavetable" governs positions 60–63 of a P table; the layout of 3rd Wave Terminal's P exports; and more identified program values (oscillator and part levels, a filter cutoff, envelope decay and release, the amplifier envelope amount).
+- **[`AGENTS.md`](https://github.com/adambier/3rd-wave-tools/blob/v1.1.0/AGENTS.md)**: an orientation for AI coding tools and for anyone building a tool on the libraries.
+- **`tw3pg`** gained `wtscan`, `wtdump`, `sweep`, `wtconvert`, `wtmatch`, and `makewavetests`, for testing destinations in their synths without the app.
+- The tests run on Linux, macOS, and Windows for every change, and the app's four source folders are type-checked as one module, as `make-app.sh` compiles them.
+
+]]></description>
+            <enclosure url="https://github.com/adambier/3rd-wave-tools/releases/download/v1.1.0/pgdata-Packer-1.1.0.zip" length="3742154" type="application/octet-stream" sparkle:edSignature="Q7tAxQI/nHqxRWlbmPwD7sHONBEFL7jsxWctzwRQ8kGYY8qMI+nWN3N66waPndY2eoKmBwNX0SM21HDjdjZQCA=="/>
+        </item>
+        <item>
             <title>1.0.5</title>
             <pubDate>Sat, 24 Oct 2026 16:45:57 -0700</pubDate>
             <sparkle:version>162</sparkle:version>
