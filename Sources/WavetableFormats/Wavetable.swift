@@ -30,11 +30,27 @@ public struct Wavetable: Equatable, Sendable {
     /// A peak as the reader's, the writer's, and the app's notes show it: two decimals ("1.14"),
     /// or enough to show that a peak just over full scale is over it ("1.0003"; "just over 1"
     /// when four decimals still read 1.0000), so a note never says "peak 1.00, over full scale".
+    /// A peak of 10,000 or more, which only a damaged file has, is written as a power of ten
+    /// ("2.2 × 10³⁶") rather than as a row of digits.
     public static func peakText(_ peak: Float) -> String {
+        if peak >= 10_000 {
+            let exponent = Int(log10(Double(peak)).rounded(.down))
+            let mantissa = Double(peak) / pow(10, Double(exponent))
+            let digits = String(format: "%.1f", mantissa)
+            // 9.96 rounds to "10.0": one more power of ten instead.
+            if digits == "10.0" { return "1.0 × 10" + superscript(exponent + 1) }
+            return digits + " × 10" + superscript(exponent)
+        }
         let shown = String(format: "%.2f", Double(peak))
         guard shown == "1.00", peak > 1 else { return shown }
         let finer = String(format: "%.4f", Double(peak))
         return finer == "1.0000" ? "just over 1" : finer
+    }
+
+    /// An exponent in superscript digits, for ``peakText(_:)``.
+    static func superscript(_ n: Int) -> String {
+        let digits: [Character] = ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"]
+        return String(n).map { c -> Character in c.wholeNumberValue.map { digits[$0] } ?? c }.reduce(into: "") { $0.append($1) }
     }
 }
 

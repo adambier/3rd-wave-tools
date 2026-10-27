@@ -2,6 +2,9 @@ import Foundation
 #if canImport(PgdataFormats)
 import PgdataFormats   // SwiftPM build; absent in the app’s single-module swiftc build
 #endif
+#if canImport(WavetableFormats)
+import WavetableFormats   // for Wavetable.peakText, the one rule for writing a peak
+#endif
 
 // Decision logic behind pgdata Packer, kept free of UI code so it can be unit-tested and reused by
 // other front ends (a command-line tool, or a GUI on another platform). These are the app's own
@@ -36,7 +39,7 @@ public struct ContentFile: Identifiable, Equatable {
             var found: [String] = []
             let peak = w.peak
             if peak > 1.0001 {
-                found.append("its samples reach ±\(String(format: "%.2f", peak)); the 3rd Wave’s own tables stay within ±1, so the file may be damaged or not normalized")
+                found.append("its samples reach ±\(Wavetable.peakText(peak)); the 3rd Wave’s own tables stay within ±1, so the file may be damaged or not normalized")
             }
             if let first = w.longLines.first {
                 // Section 5.1 of FORMATS.md: the 3rd Wave has been observed to read a value line longer
@@ -566,7 +569,7 @@ public struct UnpackPlan {
             let peak = w.peak
             items.append(Item(ref: ref, fileName: name, data: w.serialized(), description: "",
                               isFactoryDuplicate: false, write: true, defaultFileName: name, fingerprint: fp, contentName: w.name,
-                              problem: peak > 1.0001 ? "samples reach ±\(String(format: "%.2f", peak)), beyond the ±1 of the 3rd Wave’s own tables" : nil))
+                              problem: peak > 1.0001 ? "samples reach ±\(Wavetable.peakText(peak)), beyond the ±1 of the 3rd Wave’s own tables" : nil))
         }
         for (ref, m) in up.multisamples {
             let secs = m.samples.reduce(0.0) { $0 + Double($1.length) / Double(max($1.sampleRate, 1)) }

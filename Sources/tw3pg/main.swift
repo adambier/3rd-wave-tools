@@ -118,7 +118,7 @@ func describe(_ u: URL) throws -> String {
     case "wt":
         let w = try WavetableFile(data: d)
         var s = "\(w.kind.letter) \"\(w.name)\" fingerprint \(String(w.fingerprint, radix: 16))"
-        if w.peak > 1.0001 { s += String(format: w.peak < 1000 ? ", peak %.3f" : ", peak %.3g", w.peak) }
+        if w.peak > 1.0001 { s += ", peak \(Wavetable.peakText(w.peak))" }
         if let first = w.longLines.first {
             s += ", \(w.longLines.count) value line\(w.longLines.count == 1 ? "" : "s") over \(WavetableFile.lineLimit) characters (first: line \(first); the 3rd Wave reads such a line as two values)"
         }
