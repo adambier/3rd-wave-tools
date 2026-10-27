@@ -183,6 +183,9 @@ final class WritingTests: XCTestCase {
         XCTAssertEqual(w.chunkOrder, ["fmt ", "clm ", "data"])
         XCTAssertEqual([w.formatTag, w.channels, w.sampleRate, w.blockAlign, w.bits], [3, 1, 48_000, 4, 32])
         XCTAssertEqual(w.clmText, "<!>2048 10000000 wavetable (pgdata Packer)")
+        // Another tool signs its own files.
+        let signed = try write(table(frames: 64, size: 2048), .wav2048, OutputOptions(clmSignature: "my tool"))
+        XCTAssertEqual(parseWAV(signed.data).clmText, "<!>2048 10000000 wavetable (my tool)")
         XCTAssertEqual(w.samples, t.frames.flatMap { $0 })
         notes(out, contain: "crossfade")
     }

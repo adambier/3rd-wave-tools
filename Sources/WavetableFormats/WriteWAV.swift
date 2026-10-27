@@ -14,14 +14,14 @@ extension WavetableWriter {
         /// frame size (at least four digits) and F the interpolation digit: 0 none, 1 crossfade,
         /// 2 spectral. Serum treats 2, 3, and 4 as spectral variants and Vital anything above 1;
         /// 2 is what Vital itself writes.
-        static func clmText(frameSize: Int, interpolation: Interpolation) -> String {
+        static func clmText(frameSize: Int, interpolation: Interpolation, signature: String = "pgdata Packer") -> String {
             let digit: Character
             switch interpolation {
             case .none: digit = "0"
             case .crossfade: digit = "1"
             case .spectral: digit = "2"
             }
-            return "<!>" + String(format: "%04d", frameSize) + " \(digit)0000000 wavetable (pgdata Packer)"
+            return "<!>" + String(format: "%04d", frameSize) + " \(digit)0000000 wavetable (\(signature))"
         }
 
         /// A mono WAV of `samples`, with a `clm ` chunk when `clm` is given. Float32 keeps values

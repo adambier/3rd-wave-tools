@@ -63,7 +63,9 @@ try Packer.pack(program, content: content).serialized().write(to: pgdataURL)
 
 // 3. Convert a Serum-style WAV to a 3rd Wave U table.
 for found in try WavetableReader.read(url: wavURL) {
-    guard let table = found.wavetable() else { continue }   // nil: the frame size is open; ask the user (found.candidateFrameSizes)
+    // nil: the file leaves the frame size open. found.estimatedFrameSize() is the app's estimate
+    // (say "estimated" where it decided), or ask the user to choose from found.candidateFrameSizes.
+    guard let table = found.wavetable(frameSize: found.estimatedFrameSize()) else { continue }
     let out = try WavetableWriter.write(table, preset: .thirdWaveU)
     try out.data.write(to: wavesFolder.appendingPathComponent(out.fileName))
     out.notes.forEach { print($0) }   // every change made: resized, frames reduced, turned down
@@ -129,8 +131,8 @@ formats it reads and writes, and a consumer links only what it uses.
 | `Sources/PgdataPacker/` | The macOS app (SwiftUI, AppKit); declared in `Package.swift` only on macOS |
 | `Sources/tw3pg/main.swift` | Developer command-line tool: inspect, round-trip, pack, unpack, repack, compare, convert, checks, sweep recordings of what Listen plays, the Wavetables page's conversion without the app (`wtconvert`), identifying `.wt` files by content (`wtmatch`), test-file builders |
 | `Tests/PgdataFormatsTests/` | Tests for PgdataFormats (`FormatTests.swift` with `SourceRefTests`, `ProgramTests`, `PackTests`, and `MultisampleTests`; `RobustnessTests`, `ConverterTests`, `FactoryLibraryTests`, `FixtureTests`, …) |
-| `Tests/WavetableFormatsTests/` | Tests for WavetableFormats; `Resources/FLAC/` holds synthetic FLAC files read by path |
-| `Tests/PgdataPackerCoreTests/` | Tests for PgdataPackerCore: `WorkbenchTests`, `PlanRobustnessTests`, `ConvertPlanTests.swift` (several classes: `ConvertPlanTests`, `ConvertPlanStateTests`, `ConvertChangeWordsTests`, `ConvertExistingChoicesTests`, `ConvertOptionsTextTests`, `WavetableSketchTests`, `FrameSizeFitTests`, …), `ConvertReportTests`, `ReviewFixPlanTests`, `PianoKeyTests`, and `NameFittingTests` (the Pack page and the Wavetables page's writer give the same 3rd Wave name); `TestPrograms.swift` repeats the program builders of `FormatTests.swift` |
+| `Tests/WavetableFormatsTests/` | Tests for WavetableFormats (`ReadingTests`, `WritingTests`, `RoundTripTests`, `FrameSizeFitTests`, …); `Resources/FLAC/` holds synthetic FLAC files read by path |
+| `Tests/PgdataPackerCoreTests/` | Tests for PgdataPackerCore: `WorkbenchTests`, `PlanRobustnessTests`, `ConvertPlanTests.swift` (several classes: `ConvertPlanTests`, `ConvertPlanStateTests`, `ConvertChangeWordsTests`, `ConvertExistingChoicesTests`, `ConvertOptionsTextTests`, `WavetableSketchTests`, `FrameSizeFitPlanTests`, …), `ConvertReportTests`, `ReviewFixPlanTests`, `PianoKeyTests`, and `NameFittingTests` (the Pack page and the Wavetables page's writer give the same 3rd Wave name); `TestPrograms.swift` repeats the program builders of `FormatTests.swift` |
 | `fixtures/` | Seven synthetic files, one per format and layout, each with a `<file>.json` of what it parses to; `fixtures/README.md` |
 | `docs/FORMATS.md` | The 3rd Wave format reference (sections 1–10 and an appendix); every claim about the 3rd Wave lives here with its evidence in footnotes |
 | `docs/WAVETABLES.md` | Other synths' wavetable formats, with sources; the destinations the Wavetables page writes |
@@ -224,9 +226,10 @@ Don't:
   as `.reference`), and don't repoint multisample oscillators (`Oscillator.repointTargets` offers
   wavetable slots and analog waves only).
 - Don't guess a frame size silently: a `FoundTable` with `frameSize == nil` is settled by the
-  user from `candidateFrameSizes`, or by `FrameSizeFit`'s likely size only where the Input column
-  says "estimated" (`ConvertPlan.Item.estimatedFrameSize`, `sizeQualifier`); 2,048, the Serum-style
-  convention, is the estimate only when the samples point to no size.
+  user from `candidateFrameSizes`, or by `FrameSizeFit`'s likely size only where the tool says
+  "estimated" (the rule is `FoundTable.estimatedFrameSize(fit:)` in the library; the app applies it
+  through `ConvertPlan.Item.estimatedFrameSize` and says so in `sizeQualifier`); 2,048, the
+  Serum-style convention, is the estimate only when the samples point to no size.
 - Don't commit files from other people's sound sets, factory banks, or synth exports; tests build
   their inputs synthetically (see the headers of `CorpusCaseTests.swift` and `ReadingTests.swift`).
 - Don't import a module a test target does not depend on in `Package.swift` (section 4): a
@@ -263,6 +266,7 @@ WavetableFormats (`Sources/WavetableFormats/`):
 | `WavetableReader` | `Reading.swift` + `ReadWAV.swift`, `ReadFLAC.swift`, `ReadSurge.swift`, `ReadThirdWave.swift` | `read(url:)`, `read(_:fileName:sidecarText:)`: detection by content, not extension |
 | `WavetableWriter`, `WritePlan` | `Writing.swift` + `WriteWAV.swift`, `WriteNames.swift` | `write(_:preset:options:) -> OutputFile`; `plan(...) -> WritePlan`, the one statement of what a conversion will do (the writer and the app's preview both derive from it); per-preset facts (`frameSize`, `maxFrameCount`, `basis`, `caveat`, `testedIn`) as `OutputPreset` extensions |
 | `OutputPreset.recordsInterpolation`, `Interpolation.displayName` | `PresetInfo.swift` | Whether a format records the interpolation; the words for an interpolation (used in the writer's notes) |
+| `FrameSizeFit` | `FrameSizeFit.swift` | The frame-size heuristic (frames alike at lag n, unlike at n/2): `rate`, `verdict`, `likelySize`; `FoundTable.frameSizeFit()` rates the sizes a file leaves open and `FoundTable.estimatedFrameSize(fit:)` is the one estimate rule (the file's own size, a length-only size giving way to the likely one); `FoundTable.tonverkRawSamplesDefault` is the one rule for Tonverk's `r` |
 | `Resampling` | `Resampling.swift`, `FFT.swift` | `resizeCycle`, `changeFrameCount`, `thirdWaveMipmapChain`; `bandLimitedCycle` (a cycle as a band-limited oscillator plays it, for Listen); `spectralBlend` and `CycleSpectrum` (a blend of two cycles by spectrum, an approximation of Serum's and Vital's morphs) |
 | `PPGStandardWaves` | `PPGWaves.swift` | The PPG's four standard waveforms, which P tables from the PPG carry as frames 60–63 |
 
@@ -275,7 +279,7 @@ PgdataPackerCore (`Sources/PgdataPackerCore/`):
 | `NameCleaner` | `NameCleaner.swift` | Clean Up Names proposals |
 | `OutputPreset` display extensions | `DestinationInfo.swift` | What the Wavetables page says about each destination: `Group` (with `title`, `presets`), `group`, `shortTitle`, `specLine`, `distinction` |
 | `ConvertReport`, `ReportText` | `ConvertReport.swift` | The Wavetables page's report after converting (alert title and text, log text); the item-line form every report uses |
-| `FrameSizeFit`, `WavetableSketch`, `CountWords`, `sentencesOfParagraph`, `PianoKey` | own files (`sentencesOfParagraph` in `CountWords.swift`) | Frame-size heuristic (the estimate when the file states no size; 2,048 is the fallback), preview pictures and the cycle at a sweep position, report phrasing, the sentence splitting the page's explanations are set with (`SentenceSplitTests`), the Listen control's piano keys |
+| `WavetableSketch`, `CountWords`, `sentencesOfParagraph`, `PianoKey` | own files (`sentencesOfParagraph` in `CountWords.swift`) | Preview pictures and the cycle at a sweep position, report phrasing, the sentence splitting the page's explanations are set with (`SentenceSplitTests`), the Listen control's piano keys |
 
 App (`Sources/PgdataPacker/`): `main.swift` (AppDelegate, menus, window, Sparkle, Help links),
 `AppState.swift` (all state, `ObservableObject`, main thread; `Section` = Pack, Unpack, Wavetables),
@@ -344,7 +348,7 @@ a separate manager for the typing (`AppDelegate.windowWillReturnUndoManager`).
 | Names, 31-character limit, file names | `ByteIO.swift` (`NameField.fitted`, which `NameField.init`, `WriteNames.swift`, `PackPlan.nameWarnings`, and the app's `NameLengthNote` all apply), `SafeFileName.swift`, `ExportNames`, `OutputNames` | `NameFittingTests`, `SafeFileNameTests`, `WorkbenchTests` |
 | Read another wavetable format | `Reading.swift` dispatch, a new `Read<Format>.swift`, `SourceFormat` | `ReadingTests`, `CorpusCaseTests`, `RoundTripTests`; WAVETABLES.md |
 | Write for another synth | `OutputPreset` in `Wavetable.swift`, `Writing.swift`, `PresetInfo.swift`; `DestinationInfo.swift` in PgdataPackerCore | `WritingTests`, `RoundTripTests`; WAVETABLES.md section 2; README destination table |
-| Frame size decisions | `ReadWAV.swift`, `FrameSizeEvidence`, `FrameSizeFit.swift`, `ConvertPlan.Item.frameSize`/`frameSizeChoices`/`frameSizeAlternatives`; WAVETABLES.md section 3 | `ReadingTests`, `ReviewFixTests`, `FrameSizeFitTests`, `ReviewFixPlanTests`, `ConvertPlanStateTests` |
+| Frame size decisions | `ReadWAV.swift`, `FrameSizeEvidence`, `FrameSizeFit.swift` and `FoundTable.estimatedFrameSize(fit:)` (WavetableFormats), `ConvertPlan.Item.frameSize`/`frameSizeChoices`/`frameSizeAlternatives`; WAVETABLES.md section 3 | `ReadingTests`, `ReviewFixTests`, `FrameSizeFitTests`, `ReviewFixPlanTests`, `FrameSizeFitPlanTests`, `ConvertPlanStateTests` |
 | Listen, pitch, audio output | `AudioPreview.swift`, `PianoKey.swift`, `ToolbarController` and `VolumeMenuView` in `main.swift` (`NSMenuToolbarItem`; the Volume row is built fresh each time the menu is filled) | `PianoKeyTests`, `ResamplingTests` (`bandLimitedCycle`); `tw3pg sweep` records what Listen plays as WAVs (section 9); the engine itself only by running the app |
 | Preview pictures, Frame slider, sweep, the two sweep notes | `ConvertDetail.swift` (`ConvertSweepControls.snappedPosition`, `ConvertSweepNoteView`), `WavetableSketch.swift`; `ConvertPlan.SweepNote`, `repeatedFramesNote`, `alikeFramesNote`, `neighborDifference`, `alikeThreshold` (0.05, set by ear) in `ConvertPlan.swift` | `WavetableSketchTests`, `WavetableSketchInterpolationTests` (the notes), `FullCycleEdgeTests`, `ResamplingTests` (`spectralBlend`) |
 | Remove, Edit › Delete, Undo | `ListCommands.swift` (`ListCommandSource.set(delete:rename:)` in each list's body and `.listCommands(_:)` on each row), `MenuActions.deleteSelection` in `main.swift`; `AppState.undoManager`, `removePrograms`/`removeContent`/`removeUnpacks`/`removeConvertItems`, `removeAll*`, `renameConvertItem`, `commitUnpackFileName` | no tests; build and use the app |
@@ -532,8 +536,9 @@ credentials that are not in the repository.
   Tonverk's own recordings showed that the `r` at the end of a name switches off the
   interpolation between a frame's samples, not the blend between frames, which Tonverk always
   makes, so the page writes the `r` by rule, with no setting: 3rd Wave P tables and files
-  already marked, `ConvertPlan.tonverkRawDefault(for:)`, through `OutputOptions.tonverkRawSamples`,
-  which other callers of the library may set; a Tonverk name records no interpolation,
+  already marked, `FoundTable.tonverkRawSamplesDefault`, which `ConvertPlan.options(for:)` puts
+  into `OutputOptions.tonverkRawSamples` when that is nil; other callers may set it either way;
+  a Tonverk name records no interpolation,
   `recordsInterpolation` false).
   `testedIn` also names Pigments 7.0.1, Serum 2.1.5, and Vital 1.6.4 for the Serum-style WAV,
   MiniFreak V 5.1.0, Phase Plant 2.4.6, and Surge XT 1.3.4 (2026-10-27, WAVETABLES.md section 2
@@ -564,7 +569,10 @@ credentials that are not in the repository.
 - Listen and the preview's spectral lines use `Resampling.spectralBlend`, an approximation: Serum's
   and Vital's morph methods are not published. `FrameSizeFit` is a heuristic (frames alike at lag
   n, unlike at n/2); the Input column says "estimated" wherever it decided, and the samples
-  outrank the Serum-style convention (Adam, 2026-10-26).
+  outrank the Serum-style convention (Adam, 2026-10-26). The heuristic, the estimate rule, and
+  Tonverk's `r` rule moved into `WavetableFormats` before 1.1.0 (a tool on the library alone
+  gets the app's answers), and a Serum-style file's `clm ` signature is
+  `OutputOptions.clmSignature` ("pgdata Packer" by default) so another tool signs its own files.
 - The preview writes the converted bytes and reads them back (`ConvertPreviewCache`), on a
   background queue since 1.1 (`result(_:in:ready:)`; the result's picture shows a spinner until it
   is in). The read-back is kept because it is what the picture claims to show (the file the page

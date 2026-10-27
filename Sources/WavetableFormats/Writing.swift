@@ -167,7 +167,8 @@ public enum WavetableWriter {
         mutating func serumStyleWAV() -> OutputFile {
             noteDefaultInterpolation()
             // These presets record the interpolation, so the plan always has one.
-            let clm = WavetableWriter.Bytes.clmText(frameSize: plan.frameSizeOut, interpolation: plan.interpolationRecorded ?? .crossfade)
+            let clm = WavetableWriter.Bytes.clmText(frameSize: plan.frameSizeOut, interpolation: plan.interpolationRecorded ?? .crossfade,
+                                                    signature: options.clmSignature)
             let data = WavetableWriter.Bytes.wav(samples: frames.flatMap { $0 }, sampleRate: 48_000, format: .float32, clm: clm)
             return OutputFile(fileName: stem() + "." + plan.fileExtension, data: data, notes: notes)
         }

@@ -939,8 +939,9 @@ final class ConvertChangeWordsTests: XCTestCase {
 }
 
 
-/// The aid for choosing a frame size: how alike neighboring frames are at each candidate size.
-final class FrameSizeFitTests: XCTestCase {
+/// The fit verdict as the plan stores it with each item (the library computes it; see
+/// `FrameSizeFitTests` in WavetableFormatsTests).
+final class FrameSizeFitPlanTests: XCTestCase {
     /// `frames` cycles of `size` samples; frame k is a sine with a little of harmonic 2 + k/8,
     /// so neighboring frames are alike but not identical.
     private func table(frames: Int, size: Int) -> [Float] {
@@ -951,39 +952,6 @@ final class FrameSizeFitTests: XCTestCase {
                 return 0.7 * sin(x) + 0.2 * sin(h * x)
             }
         }
-    }
-
-    func testTheRightSizeIsLikelyAndNeitherAFragmentNorAMultipleIs() {
-        let samples = table(frames: 64, size: 128)   // 8,192 samples: 64 × 128 or 4 × 2,048
-        let ratings = FrameSizeFit.rate(samples, sizes: [128, 2048])
-        XCTAssertEqual(ratings.map(\.size), [128, 2048])
-        XCTAssertTrue(ratings[0].isPlausible, "\(ratings[0].difference)")
-        XCTAssertLessThan(ratings[1].difference, 0.5, "a multiple of the right size also has alike frames")
-        XCTAssertFalse(ratings[1].isPlausible, "but no more alike than its half-frames: \(ratings[1].difference) against \(ratings[1].halfDifference)")
-        XCTAssertEqual(FrameSizeFit.verdict(samples, sizes: [128, 2048]), .likely(128))
-
-        let serum = table(frames: 4, size: 2048)      // the same length, but 4 frames of 2,048
-        let r = FrameSizeFit.rate(serum, sizes: [128, 2048])
-        XCTAssertFalse(r[0].isPlausible, "a fragment of a cycle differs from the next fragment: \(r[0].difference)")
-        XCTAssertTrue(r[1].isPlausible, "\(r[1].difference)")
-        XCTAssertEqual(FrameSizeFit.verdict(serum, sizes: [128, 2048]), .likely(2048))
-    }
-
-    func testUnrelatedFramesFitNoSizeAndSilenceSaysNothing() {
-        // 64 frames of noise-like, unrelated frames: neither size stands out.
-        var seed: UInt32 = 7
-        let bank: [Float] = (0..<16_384).map { _ in
-            seed = seed &* 1_664_525 &+ 1_013_904_223
-            return Float(seed >> 8) / Float(1 << 24) * 2 - 1
-        }
-        let v = FrameSizeFit.verdict(bank, sizes: [256, 2048])
-        XCTAssertNotEqual(v, .likely(256))
-        XCTAssertNotEqual(v, .likely(2048))
-        XCTAssertEqual(FrameSizeFit.rate([Float](repeating: 0, count: 4096), sizes: [2048]), [])
-        XCTAssertEqual(FrameSizeFit.verdict([Float](repeating: 0, count: 4096), sizes: [2048]), .unclear)
-        XCTAssertEqual(FrameSizeFit.rate(table(frames: 1, size: 2048), sizes: [2048]), [], "one frame cannot be compared with a next one")
-        XCTAssertEqual(FrameSizeFit.likelySize(.likely(128)), 128)
-        XCTAssertNil(FrameSizeFit.likelySize(.tie))
     }
 
     func testTheVerdictIsStoredWithTheItem() {
@@ -1169,7 +1137,7 @@ final class ConvertExistingChoicesTests: XCTestCase {
         let plain = FoundTable(name: "W", fileName: "w.wav", source: .wav, samples: wave(0.8), frameSize: 128, frameSizeBasis: "clm chunk")
         var plan = ConvertPlan(preset: .tonverk)
         plan.add([p, u, marked, plain].map { ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/\($0.fileName)"), table: $0) }, factory: FactoryLibrary())
-        XCTAssertEqual(plan.items.map { plan.tonverkRawDefault(for: $0) }, [true, false, true, false])
+        XCTAssertEqual(plan.items.map { $0.table.tonverkRawSamplesDefault }, [true, false, true, false])
         XCTAssertNil(plan.options.tonverkRawSamples)
         XCTAssertEqual(plan.items.map { plan.options(for: $0).tonverkRawSamples }, [true, false, true, false])
         XCTAssertEqual(plan.convert().files.map(\.fileName), ["P_wt128r.wav", "U_wt128.wav", "M_wt128r.wav", "W_wt128.wav"])

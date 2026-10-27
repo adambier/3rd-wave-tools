@@ -245,6 +245,47 @@ public struct FoundTable: Equatable, Sendable {
     /// The largest absolute sample (computed each time; cache it when it is needed often).
     public var peak: Float { samples.reduce(0) { max($0, abs($1)) } }
 
+    /// How the frame sizes open to this table fit its samples (see ``FrameSizeFit``): the file's
+    /// own size and the other sizes its length allows are rated, even when the length allows one
+    /// size only, so a length-only file whose frames are alike at the Serum-style size is
+    /// "likely" rather than a bare convention. `.unclear` when the file's contents state the
+    /// size (``FrameSizeEvidence/statedInFile``) or no size is open. Rates every sample, so
+    /// call it once and keep the result.
+    public func frameSizeFit() -> FrameSizeFit.Verdict {
+        if case .statedInFile = frameSizeEvidence { return .unclear }
+        let choices = (frameSize.map { [$0] } ?? []) + candidateFrameSizes.filter { $0 != frameSize }
+        return choices.isEmpty ? .unclear : FrameSizeFit.verdict(samples, sizes: choices)
+    }
+
+    /// The frame size to take when the user has chosen none, given the verdict from
+    /// ``frameSizeFit()``: the file's own, except that a size taken from the file's length alone
+    /// (the Serum-style 2,048) gives way to the size the samples make likely, since the samples
+    /// are better evidence than a convention; with no size from the file, the likely one; nil
+    /// when nothing settles it (then ``candidateFrameSizes`` are the choices to offer). This is
+    /// pgdata Packer's rule; a tool that applies it should say "estimated" wherever the verdict
+    /// decided.
+    public func estimatedFrameSize(fit: FrameSizeFit.Verdict) -> Int? {
+        if case .length = frameSizeEvidence, let n = FrameSizeFit.likelySize(fit) { return n }
+        return frameSize ?? FrameSizeFit.likelySize(fit)
+    }
+
+    /// ``estimatedFrameSize(fit:)`` with the verdict computed here (rates every sample).
+    public func estimatedFrameSize() -> Int? { estimatedFrameSize(fit: frameSizeFit()) }
+
+    /// Whether a Tonverk file written from this table should end its name in `r`, the mark for
+    /// raw sample playback: a 3rd Wave P table (a PPG-style table, meant for the PPG's raw
+    /// playback), or a file whose name carries the mark already (which came from Tonverk, or
+    /// was meant for it). ``OutputOptions/tonverkRawSamples`` left nil is resolved to this by
+    /// pgdata Packer; the writer itself, which sees a ``Wavetable`` and not where it came from,
+    /// treats nil as false.
+    public var tonverkRawSamplesDefault: Bool {
+        if isMarkedForTonverkRawSamples { return true }
+        switch source {
+        case .thirdWaveWavetable(isP: true), .unifiedProgram(_, isP: true): return true
+        default: return false
+        }
+    }
+
     /// The table cut into frames of `size` samples (default: `frameSize`); nil when no size is
     /// known or the samples do not divide evenly.
     public func wavetable(frameSize size: Int? = nil) -> Wavetable? {
@@ -302,20 +343,28 @@ public struct OutputOptions: Equatable, Sendable {
     /// Manual OS 1.4.1, section 5.2.5, and tests in Tonverk OS 1.4.1: the `r` changes the
     /// playback of the samples, not the blend between frames, which Tonverk always makes).
     /// False: the name carries no `r`, whatever the source file's name said. Nil: the caller
-    /// decides per table (pgdata Packer marks 3rd Wave P tables, the PPG-style tables, and files
-    /// already marked, with no setting of its own); the writer itself treats nil as false.
+    /// decides per table, from ``FoundTable/tonverkRawSamplesDefault`` (3rd Wave P tables, the
+    /// PPG-style tables, and files already marked; pgdata Packer has no setting of its own); the
+    /// writer itself treats nil as false.
     public var tonverkRawSamples: Bool?
+    /// Who wrote the file, as the `clm ` chunk of a Serum-style WAV says it after "wavetable"
+    /// (`<!>2048 10000000 wavetable (pgdata Packer)`; Serum writes its web address there). A
+    /// tool built on the library should name itself.
+    public var clmSignature: String
     /// 3rd Wave P tables only: fit the table into frames 0–59 (by `frameCountPolicy`, keeping its
     /// first and last frames) and put the PPG's four standard waveforms (triangle, narrow pulse,
     /// square, sawtooth) at 60–63, as the 3rd Wave's PPG-derived tables have them.
     public var appendPPGStandardWaves: Bool
 
-    /// Creates options; the defaults pick frames evenly and keep the source's interpolation.
+    /// Creates options; the defaults pick frames evenly, keep the source's interpolation, and
+    /// sign Serum-style files as pgdata Packer.
     public init(frameCountPolicy: FrameCountPolicy = .pickEvenly, interpolation: Interpolation? = nil,
-                tonverkFrameSize: Int? = nil, tonverkRawSamples: Bool? = nil, appendPPGStandardWaves: Bool = false) {
+                tonverkFrameSize: Int? = nil, tonverkRawSamples: Bool? = nil, appendPPGStandardWaves: Bool = false,
+                clmSignature: String = "pgdata Packer") {
         self.frameCountPolicy = frameCountPolicy; self.interpolation = interpolation
         self.tonverkFrameSize = tonverkFrameSize; self.tonverkRawSamples = tonverkRawSamples
         self.appendPPGStandardWaves = appendPPGStandardWaves
+        self.clmSignature = clmSignature
     }
 }
 

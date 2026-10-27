@@ -93,15 +93,12 @@ public struct ConvertPlan: Equatable {
         /// The frame size used: the user's choice, else the page's estimate. Nil when nothing
         /// settles it.
         public var frameSize: Int? { chosenFrameSize ?? estimatedFrameSize }
-        /// The size the page settles on when the user has chosen none: the file's own, except
-        /// that a size taken from the file's length alone (the Serum-style 2,048) gives way to
-        /// the size the samples make likely (`FrameSizeFit`), since the samples are better
-        /// evidence than a convention; with no size from the file, the likely one; nil when
-        /// nothing settles it. The Input column says "estimated" wherever this decided.
-        public var estimatedFrameSize: Int? {
-            if case .length = table.frameSizeEvidence, let n = FrameSizeFit.likelySize(frameSizeFit) { return n }
-            return table.frameSize ?? FrameSizeFit.likelySize(frameSizeFit)
-        }
+        /// The size the page settles on when the user has chosen none: the library's rule,
+        /// `FoundTable.estimatedFrameSize(fit:)` (the file's own, except that a size taken from
+        /// the file's length alone gives way to the size the samples make likely; with no size
+        /// from the file, the likely one; nil when nothing settles it). The Input column says
+        /// "estimated" wherever this decided.
+        public var estimatedFrameSize: Int? { table.estimatedFrameSize(fit: frameSizeFit) }
         /// The sizes the Input column offers, when the size is open, an estimate
         /// (`sizeIsEstimate`), or overridden (`chosenFrameSize`): the file's own first, then the
         /// other sizes its length allows (`WavetableReader.fittingFrameSizes`). Empty when the
@@ -538,12 +535,7 @@ public struct ConvertPlan: Equatable {
                 factorySlot = nil
                 factoryName = nil
             }
-            // Rated unless the file's contents state the size; even when the length allows one
-            // size only, so a length-only file whose frames are alike at the Serum-style size is
-            // "likely" rather than a bare convention.
-            let choices = (t.frameSize.map { [$0] } ?? []) + t.candidateFrameSizes.filter { $0 != t.frameSize }
-            let stated: Bool = { if case .statedInFile = t.frameSizeEvidence { return true }; return false }()
-            fit = stated || choices.isEmpty ? .unclear : FrameSizeFit.verdict(t.samples, sizes: choices)
+            fit = t.frameSizeFit()
         }
     }
 
@@ -835,24 +827,13 @@ public struct ConvertPlan: Equatable {
 
     // MARK: Tonverk's raw sample playback
 
-    /// Whether a table's Tonverk name gets the “r” that asks for raw sample playback: a 3rd Wave
-    /// P table, a PPG-style table meant for the PPG's raw playback, or a file whose name carries
-    /// the mark already (which came from Tonverk, or was meant for it). The page has no setting
-    /// for this (Adam, 2026-10-27: the rule is safe to assume); `OutputOptions.tonverkRawSamples`
-    /// set to true or false overrides it for other callers of the library.
-    public func tonverkRawDefault(for item: Item) -> Bool {
-        if item.table.isMarkedForTonverkRawSamples { return true }
-        switch item.table.source {
-        case .thirdWaveWavetable(isP: true), .unifiedProgram(_, isP: true): return true
-        default: return false
-        }
-    }
-
     /// `options` as the writer gets them for one table: `tonverkRawSamples` left nil is resolved
-    /// to that table's own (`tonverkRawDefault(for:)`).
+    /// to that table's own (`FoundTable.tonverkRawSamplesDefault`: a 3rd Wave P table, or a file
+    /// already marked). The page has no setting for this (Adam, 2026-10-27: the rule is safe to
+    /// assume).
     public func options(for item: Item) -> OutputOptions {
         var o = options
-        if preset == .tonverk, o.tonverkRawSamples == nil { o.tonverkRawSamples = tonverkRawDefault(for: item) }
+        if preset == .tonverk, o.tonverkRawSamples == nil { o.tonverkRawSamples = item.table.tonverkRawSamplesDefault }
         return o
     }
 

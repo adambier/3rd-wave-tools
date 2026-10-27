@@ -6,10 +6,10 @@ import Foundation
 /// and much closer than the two halves of a frame are to each other. At a size that is too
 /// small a "frame" is a fragment of the cycle, and a smooth cycle is about as like itself a
 /// fragment later as half a fragment later; at a multiple of the right size the frames are
-/// alike, but no more alike than at the right size. This is a heuristic: its size is the
-/// page's estimate only when the file's contents state no size (`ConvertPlan.Item.estimatedFrameSize`),
-/// and the Input column says "estimated" there; a table whose frames differ sharply (a bank
-/// of unrelated frames) fits no size well.
+/// alike, but no more alike than at the right size. This is a heuristic: its size is an
+/// estimate, taken only when the file's contents state no size (``FoundTable/estimatedFrameSize(fit:)``
+/// is the rule, and a tool should say "estimated" where it decided); a table whose frames differ
+/// sharply (a bank of unrelated frames) fits no size well.
 public enum FrameSizeFit {
     /// How a candidate size fits.
     public struct Rating: Equatable {

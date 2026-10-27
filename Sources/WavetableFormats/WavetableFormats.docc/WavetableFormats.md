@@ -45,8 +45,9 @@ import Foundation
 import WavetableFormats
 
 for found in try WavetableReader.read(url: inputURL) {
-    // nil when the file leaves the frame size open; choose from found.candidateFrameSizes.
-    guard let table = found.wavetable() else { continue }
+    // nil when the file leaves the frame size open: found.estimatedFrameSize() is pgdata Packer's
+    // estimate (say "estimated" where it decided), or let the user choose from found.candidateFrameSizes.
+    guard let table = found.wavetable(frameSize: found.estimatedFrameSize()) else { continue }
     print("\(found.name): \(table.frameCount) × \(table.frameSize), from \(found.frameSizeBasis)")
     let out = try WavetableWriter.write(table, preset: .tonverk,
                                         options: OutputOptions(frameCountPolicy: .interpolate))
