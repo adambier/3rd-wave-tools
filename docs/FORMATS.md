@@ -125,15 +125,17 @@ slot, so two 3rd Waves can play different tables for the same program.[^8m]
 are free for the user's own.[^factory-slots] U48–U55 became factory slots in 2025 (the factory
 files for them are dated April 2025); before that, some program sets used them for their own tables.
 
-*How this was established:* ids 34 (U00), 1000 (P34), 2000 (U07), and all seven analog ids were read
-from the 3rd Wave's OSC screen for programs that use them.[^osc-ids] The rest of each range follows
-from those and from the names of tables embedded in `.pgdata` files ("Wavetable P15" under id 15,
-for example). P36–P47 as ids 1002–1013 is an assumption: no file using them has been seen.
+*How this was established:* ids 34 (U00), 1000 (P34), 1002 (P36), 2000 (U07), 2048 (U55), and all
+seven analog ids were read from the 3rd Wave's OSC screen for programs that use them.[^osc-ids] The
+rest of each range follows from those and from the names of tables embedded in `.pgdata` files
+("Wavetable P15" under id 15, for example).
 
 [^factory-slots]: Groove Synthesis's user manual (v1.9) gives P00–P35 as the factory P tables.
     For the U tables, Groove Synthesis's support page lists U00–U55 and offers U48–U55 as a
     separate download; the manual still gives U00–U47.
-[^osc-ids]: Read on an 8M's OSC screen (OS 2.0d), 21–23 October 2026.
+[^osc-ids]: Read on an 8M's OSC screen (OS 2.0d), 21–23 October 2026; 1002 and 2048 on 26 October
+    2026, from programs written with those ids, whose oscillators showed P36 and U55 with the
+    tables imported there.
 
 ## 3. Program (.pro)
 
@@ -213,7 +215,8 @@ not interpreted.
 | Value | Meaning |
 |---|---|
 | 0, 1, 2 | Source ids of oscillators 1, 2, and 3 (section [2](#2-oscillator-sources)).[^osc-ids] |
-| 34 | Amp envelope amount, probably (3rd Wave Terminal labels it Amp Env Amount); 100 = +100, and setting the amount to 127 on an 8M wrote 127.[^edited] A `W3_PROG_3` program packed unconverted, with 0 here, plays silently (section 6.1).[^8m] Groove Synthesis's 8M "Init Program" carries 0 here (and 1.0 in float 113) and is not silent, so this is not the only route to the amplifier. |
+| 34 | Amp envelope amount, probably (3rd Wave Terminal labels it Amp Env Amount); 100 = +100, and setting the amount to 127 on an 8M wrote 127.[^edited] A `W3_PROG_3` program packed unconverted, with 0 here, plays silently (section 6.1).[^8m] Groove Synthesis's 8M "Init Program" carries 0 here (and 1.0 in float 113) and is not silent: its amp section's Velocity amount is 127, and the amp follows the sum of the two amounts.[^amp] |
+| 26, 30 | The amp envelope's decay and release, probably: 80 and 82 in the 8M's "Init Program", whose amp envelope reads A 0, D 80, S 127, R 82 on the 3rd Wave, and both 0 after decay and release were set to 0. Integers 25 and 29 (87 and 74, also set to 0 then) are probably the filter envelope's decay and release, by their position.[^edited] |
 
 **Float part blocks**
 
@@ -226,17 +229,20 @@ not interpreted.
 | 113 | Probably a second amp envelope amount, 0 = full, 1 = none; in a `W3_PROG_3` program OS 2.0 folds it into integer 34 when converting.[^bulk] OS 2.0d still writes both: setting the amp envelope amount to 127 wrote integer 34 = 127 and float 113 = 0.0, from 0 and 1.0.[^edited] |
 | 124 | Pan, probably (3rd Wave Terminal's Pan knob): 0 = left, 0.5 = center, 1 = right. |
 
-Values that changed together when a program was edited on the 3rd Wave so that both envelopes
-had 0 attack, decay, release, and delay with sustain 127, the wave envelope was off, the mod wheel
-was routed to every oscillator's wave offset at 127, and nothing else was modulated: part 1's
-integers 5, 21, 25, 26, 29, and 30 (2, 34, 87, 80, 74, and 82 → 0) and globals 9, 146, 147, 179,
-and 180. Which value holds which setting has not been separated.[^edited]
+Values that also changed when that program was edited so that both envelopes had 0 attack,
+decay, release, and delay with sustain 127, the wave envelope was off, and nothing but the mod
+wheel (already routed to every oscillator's wave offset) modulated anything: part 1's integers 5
+and 21 (2 and 34 → 0) and globals 9, 146, 147, 179, and 180. Which value holds which setting has
+not been separated.[^edited]
 
 [^edited]: One program on an 8M (OS 2.0d), 26 October 2026: Groove Synthesis's "Init Program"
     (8M factory bank) with its sources changed, imported, edited on the 3rd Wave as described,
     and exported; every value that differs between the two files is accounted for here or in
     section 6.3 (float 102). "Probably" because the attribution of each value to a setting rests
     on that one comparison.
+[^amp]: Tests on an 8M (OS 2.0d), October 2026: the amp envelope always shapes the amplifier,
+    with a depth that is the sum of the amp section's Env Amount and its Velocity amount, capped
+    at 127; both at 0 is silent, and either alone at 127 follows the envelope.
 
 **Global values.** These apply to the whole program. Apart from value 0, the meanings below are
 inferences: from how the values change when the 3rd Wave converts or fits a program to an 8M, from
