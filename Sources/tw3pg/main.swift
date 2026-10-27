@@ -727,17 +727,29 @@ case "wtmatch":
     // Identifies 3rd Wave .wt files by content: for each file in the second set (e.g., the WAVES
     // folder after Export Wavetable, whose names are a counter), the file in the first set with
     // the same values (the 64 frames, which are what the 3rd Wave identifies a table by, and a U
-    // table's mipmap chain separately), or the nearest one and how far off it is.
+    // table's mipmap chain separately), or the nearest one and how far off it is. The 3rd Wave
+    // writes each value with six decimal places (see section 5.1 of FORMATS.md), so a value
+    // within 0.0000006 of the expected one (half of the sixth decimal, and float32's own
+    // rounding of the decimal read back) counts as the same value, and the report says when the
+    // match is exact and when it is to that precision.
     need(2, rest, "wtmatch <expected .wt files or dirs> -- <files or dirs to identify>")
     let split = rest.firstIndex(of: "--") ?? 1
     let expected = try files(under: Array(rest[..<split]), ext: ["wt"]).map { ($0.lastPathComponent, try WavetableFile(data: load($0))) }
     let actual = files(under: Array(rest[min(split + 1, rest.count)...]), ext: ["wt"])
-    func differing(_ a: [Float], _ b: [Float]) -> (count: Int, maxDelta: Float) {
-        var n = 0, m: Float = 0
-        for (x, y) in zip(a, b) where x != y { n += 1; m = max(m, abs(x - y)) }
-        return (n + abs(a.count - b.count), m)
+    let exportPrecision: Float = 0.0000006   // half of the last decimal place the 3rd Wave writes, and float32 rounding
+    func differing(_ a: [Float], _ b: [Float]) -> (count: Int, exact: Bool, maxDelta: Float) {
+        var n = 0, m: Float = 0, exact = a.count == b.count
+        for (x, y) in zip(a, b) where x != y {
+            exact = false
+            let d = abs(x - y); m = max(m, d)
+            if d > exportPrecision { n += 1 }
+        }
+        return (n + abs(a.count - b.count), exact, m)
     }
     func count(_ n: Int) -> String { ConvertPlan.formatCount(n) }
+    func precisionWords(_ d: (count: Int, exact: Bool, maxDelta: Float)) -> String {
+        d.exact ? "identical" : "the same to the export’s six decimal places (largest difference \(d.maxDelta))"
+    }
     var identical = 0
     for u in actual {
         let w: WavetableFile
@@ -746,18 +758,21 @@ case "wtmatch":
         let label = "\(u.lastPathComponent)  \(w.kind.letter) “\(w.name)”"
         let same = expected.filter { $0.1.kind == w.kind }
         guard !same.isEmpty else { print("\(label): no \(w.kind.letter) table to compare with"); continue }
-        let scored = same.map { ($0.0, $0.1, differing($0.1.frames.flatMap { $0 }, frames)) }.sorted { $0.2.count < $1.2.count }
+        let scored = same.map { ($0.0, $0.1, differing($0.1.frames.flatMap { $0 }, frames)) }
+            .sorted { ($0.2.count, $0.2.maxDelta) < ($1.2.count, $1.2.maxDelta) }
         let (name, e, d) = scored[0]
         if d.count == 0 {
-            if w.kind == .u, let c1 = e.mipmapChain, let c2 = w.mipmapChain, c1 != c2 {
+            var line = "\(label)  = \(name): the 64 frames are \(precisionWords(d))"
+            if w.kind == .u, let c1 = e.mipmapChain, let c2 = w.mipmapChain {
                 let dc = differing(c1, c2)
-                print("\(label)  = \(name): the 64 frames are identical; the mipmap chain differs in \(count(dc.count)) of \(count(c1.count)) values (largest difference \(dc.maxDelta))")
-            } else {
-                print("\(label)  = \(name): identical (\(count(w.values.count)) values)" + (w.name == e.name ? "" : "; the name differs: expected “\(e.name)”"))
+                line += dc.count == 0 ? "; the mipmap chain is \(precisionWords(dc))"
+                                      : "; the mipmap chain differs in \(count(dc.count)) of \(count(c1.count)) values (largest difference \(dc.maxDelta))"
             }
+            if w.name != e.name { line += "; the name differs: expected “\(e.name)”" }
+            print(line)
             identical += 1
         } else {
-            print("\(label)  ≠ nearest \(name): \(count(d.count)) of \(count(frames.count)) frame values differ (largest difference \(d.maxDelta))")
+            print("\(label)  ≠ nearest \(name): \(count(d.count)) of \(count(frames.count)) frame values differ by more than the export’s precision (largest difference \(d.maxDelta))")
         }
     }
     print("\(identical) of \(actual.count) files have the same 64 frames as a file of the first set")

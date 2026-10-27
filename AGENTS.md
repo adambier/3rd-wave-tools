@@ -513,8 +513,11 @@ credentials that are not in the repository.
 - P36 as id 1002 and U55 as 2048 were read on the 3rd Wave (2026-10-26); P37–P47 as 1003–1013
   follow from the range. The upper S-slot limit has not been checked (`SourceRef.sMax = 127` is
   the library's limit, not the 3rd Wave's).
-- `OutputPreset.testedIn` is empty for every destination: no converted file has yet been loaded in
-  its synth through this project. WAVETABLES.md "Open questions" lists what each test would settle.
+- `OutputPreset.testedIn` names the 3rd Wave 8M (OS 2.0d) for the P and U tables (eight converted
+  tables imported, played, and exported back, 2026-10-26; FORMATS.md section 9) and is empty for
+  every other destination: no converted file has yet been loaded in those synths through this
+  project. WAVETABLES.md "Open questions" lists what each test would settle. Tonverk still gates
+  the Wavetables page (`ConvertPlan.gatingPresets`).
 - The mipmap chain written for U tables uses ideal spectral cut-offs; the factory filter is unknown
   (the 3rd Wave identifies a table by its first 65,536 values, so the chain need not match).
 - `fixtures/` exercise structure, not sound, and have not been loaded on the 3rd Wave.

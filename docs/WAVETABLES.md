@@ -45,8 +45,8 @@ chunk.[^vital] Most other synths set interpolation on the oscillator, not in the
 | Phase Plant | Exactly 256 frames of 2,048, with a `clm ` chunk | [^phaseplant] |
 | Surge XT | A Surge `.wt` (binary, below) | [^surge-code] |
 | WaveEdit, E370 | Mono 16-bit WAV, 44.1 kHz, 64 frames of 256, no extra chunk | [^waveedit] |
-| 3rd Wave P table | A `.wt`: 64 frames of 128, each sample stored with the difference to the next | [FORMATS.md](FORMATS.md) 5.1 |
-| 3rd Wave U table | A `.wt`: 64 frames of 1,024, then the mipmap chain | [FORMATS.md](FORMATS.md) 5.1 |
+| 3rd Wave P table | A `.wt`: 64 frames of 128, each sample stored with the difference to the next. Tested on the 3rd Wave 8M, OS 2.0d | [FORMATS.md](FORMATS.md) 5.1 and 9 |
+| 3rd Wave U table | A `.wt`: 64 frames of 1,024, then the mipmap chain. Tested on the 3rd Wave 8M, OS 2.0d | [FORMATS.md](FORMATS.md) 5.1 and 9 |
 
 Notes on each:
 

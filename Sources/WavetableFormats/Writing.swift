@@ -421,9 +421,19 @@ public extension OutputPreset {
         }
     }
 
-    /// The apps or hardware the preset has been tested in (empty while it rests on its sources
-    /// alone). Nothing has been tested with this app yet, so every preset's list is empty.
-    var testedIn: [String] { [] }
+    /// Where converting to the preset has been tested, each entry with its preposition ("on the
+    /// 3rd Wave 8M, OS 2.0d", "in Serum"), for "Tested …" lines; empty while the preset rests on
+    /// its sources alone. The 3rd Wave's P and U tables: eight tables written by the app (U tables
+    /// from Serum-style and u-he files, resized and with their frame counts changed both ways; P
+    /// tables with and without the PPG's waveforms at 60–63) imported with **Bulk wavetable
+    /// import** into an 8M, played as written, and exported again the same to the export's six
+    /// decimal places (section 9 of FORMATS.md, 2026-10-26). Nothing else has been tested yet.
+    var testedIn: [String] {
+        switch self {
+        case .thirdWaveP, .thirdWaveU: return ["on the 3rd Wave 8M, OS 2.0d"]
+        default: return []
+        }
+    }
 
     /// The sources the preset follows, each with its publisher, for the tooltip (e.g., "Elektron,
     /// Tonverk User Manual OS 1.4.1, §5.2.5"). docs/WAVETABLES.md gives the links.

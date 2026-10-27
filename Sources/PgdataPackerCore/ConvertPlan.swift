@@ -732,11 +732,11 @@ public struct ConvertPlan: Equatable {
 
     /// Whether converting to a destination has been tested (`OutputPreset.testedIn`): the
     /// chosen row says so in orange when it has not, and the sources popover either way.
-    /// "Converting to this destination has not yet been tested in its synth." or "Tested in
-    /// Pigments and Serum."
+    /// "Converting to this destination has not yet been tested in its synth." or "Tested on the
+    /// 3rd Wave 8M, OS 2.0d." (each entry of `testedIn` carries its preposition).
     public static func testingStatus(_ preset: OutputPreset) -> String {
         preset.testedIn.isEmpty ? "Converting to this destination has not yet been tested in its synth."
-                                : "Tested in " + listPhrase(preset.testedIn) + "."
+                                : "Tested " + listPhrase(preset.testedIn) + "."
     }
 
     /// The destinations whose testing decides whether wavetable conversion is still under

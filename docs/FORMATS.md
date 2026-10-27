@@ -389,8 +389,10 @@ Plain text, LF or CRLF line ends.
 - A **P table** has 16,384 values and a **U table** 131,072 (below).
 - The file has no slot number; the slot is chosen when it is imported.[^8m]
 - Number formatting varies between files: Groove Synthesis's factory P tables use 12–14 digits and
-  exponents. The library writes six decimals when that gives back the exact float, and the
-  shortest exact form otherwise.
+  exponents, with `//waveform` comment lines; **Export Wavetable** writes every value with six
+  decimals (`0.004909f`) and no comments, so an exported table carries each value rounded to the
+  sixth decimal.[^wt-export] The library writes six decimals when that gives back the exact
+  float, and the shortest exact form otherwise.
 
 **P tables (PPG-style).** The P set is the 3rd Wave's form of the PPG Wave's wavetables. P00–P31
 are derived from the PPG Wave 2.2/2.3's own tables (P30 is the PPG's *upper wavetable*), P32 and
@@ -727,6 +729,12 @@ Tested on an 8M (OS 2.0d) unless a footnote says otherwise; section
   (`.wt`), `AUDIO` (`.bin` and exported `.wav`), and `FIRMWARE` when mounted on a Mac.[^8m]
   Groove Synthesis's READMEs write them as `program/`, `waves/`, and `audio/`.
 
+[^wt-export]: 8M, OS 2.0d, 26 October 2026: eight tables written by pgdata Packer with the
+    shortest exact decimals, imported, and exported with **Export Wavetable**: every value in
+    every export, frames and mipmap chains alike, was the imported value rounded to six decimals
+    (largest difference 0.0000005), and nothing else differed. Whether the 3rd Wave would match
+    such an export to the original by content on a second import is untested; by the rounding,
+    an inference says not.
 [^wt-import]: 8M, OS 2.0d, 26 October 2026: the wavetable-conversion test of pgdata Packer 1.1
     (eight tables written by the app's Wavetables page). The P slots were free; U55 was chosen
     as the starting U slot in the import's prompt.
@@ -770,6 +778,9 @@ are damaged as distributed (empty or cut short).
 | 24M: a `.pgdata` carrying a new U table (U08 at half level) with its chain zeroed, then **Export Wavetable** | stored in U56, played the same from C2 to C7, exported with the zeros intact: the chain is not used |
 | 24M: the 2022 program of section 6.5 that gains a copy of part 1, packed unconverted (`W3_PROG_3` layout) and imported with the `.pgdata` import | part 2 still blank, tempo 120, velocity 5: the fixes are not applied; parts 1 and 2 both shown active (cause not examined) |
 | 24M: two `.pgdata` files carrying the same multisample labeled S20 and S21 | the first stored it in S11 ("Updating sample voice memory"); the second pointed its program at S11 ("Updating Sample Data"): reused by content |
+| Eight `.wt` files written by pgdata Packer's Wavetables page (four U tables: from Serum-style and u-he files resized from 2,048 to 1,024 samples per frame, one reduced from 174 frames to 64, one crossfaded from 4 frames to 64; four P tables: from 64 × 128 files and from Serum-style files resized to 128, one with the PPG's waveforms at 60–63), by **Bulk wavetable import** (26 October 2026) | stored in consecutive slots from the one chosen (P36–P39, U55–U58); every table played as written, the U tables blending between frames and the P tables stepping; **Export Wavetable** gave every table back the same to six decimals (section 5.1) |
+| A user P table carrying the PPG's four waveforms at 60–63, wave offset set to 60–63 by hand | with **use upper wavetable** off, one unchanging waveform; with it on, the triangle, narrow pulse, square, and sawtooth as written (section 5.1) |
+| Programs written with source ids 1002 and 2048 | the OSC screen showed P36 and U55 with the tables imported there (section 2) |
 
 **Implemented from this document alone.** As a check that section 6 describes the conversion fully
 enough to reproduce it, a converter was written by

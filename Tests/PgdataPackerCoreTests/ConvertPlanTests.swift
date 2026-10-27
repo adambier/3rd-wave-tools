@@ -581,6 +581,7 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(Interpolation.displayName(nil), "Not stated")
         XCTAssertEqual(Interpolation.displayName(.spectral), "Spectral")
         XCTAssertEqual(ConvertPlan.testingStatus(.tonverk), "Converting to this destination has not yet been tested in its synth.")
+        XCTAssertEqual(ConvertPlan.testingStatus(.thirdWaveU), "Tested on the 3rd Wave 8M, OS 2.0d.")
         XCTAssertEqual(ConvertPlan.tablesHave(1, of: 5), "1 table has")
         XCTAssertEqual(ConvertPlan.tablesHave(2, of: 2), "Both tables have")
         XCTAssertEqual(ConvertPlan.tablesHave(2, of: 5), "2 tables have")
