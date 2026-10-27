@@ -424,9 +424,10 @@ How the result is drawn and played between frames depends on whether the destina
 records the interpolation:
 
 - For formats whose file records none (the 3rd Wave's tables, Tonverk, Surge XT, WaveEdit), an
-  **Interpolation** pop-up under the pictures chooses it. Whenever the table or the destination
-  changes, the pop-up goes back to the synth's default where that is known (the 3rd Wave's, and
-  Tonverk's, which blends between frames) and otherwise to none.
+  **Interpolation** pop-up under the pictures chooses it, for the preview only, as the line under
+  it says: the output file is not affected. Whenever the table or the destination changes, the
+  pop-up goes back to the synth's default where that is known (the 3rd Wave's, and Tonverk's,
+  which blends between frames) and otherwise to none.
 - For formats whose file records it (Serum-style WAVs), the **Interpolation to be saved in the
   output file** option under **Options** decides, and the preview says so in the pop-up's place.
 

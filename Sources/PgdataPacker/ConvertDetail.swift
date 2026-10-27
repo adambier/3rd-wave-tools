@@ -477,6 +477,7 @@ struct ConvertOverviewPair: View {
                                      hearing: recorded || result == nil ? nil : $hearing,
                                      hearingDefault: playedByDefault, hearingDefaultKnown: plan.interpolationPlayed(for: item) != nil,
                                      hearingHelp: ConvertOverviewPair.hearingHelp(for: plan.preset),
+                                     hearingCaption: ConvertOverviewPair.hearingCaption(for: plan.preset),
                                      recordedNote: recorded && result != nil ? ConvertOverviewPair.recordedNote : nil,
                                      recordedHelp: ConvertOverviewPair.recordedHelp(for: plan.preset),
                                      cycle: { cycleToPlay(source: source.frames, result: result, resultInterpolation: resultInterpolation) })
@@ -509,6 +510,19 @@ struct ConvertOverviewPair: View {
     /// The note's tip: where the format records the interpolation.
     static func recordedHelp(for preset: OutputPreset) -> String {
         "This format saves the interpolation in the file, so the Interpolation pop-up under Options in the Convert to pane decides what the file says and what is drawn and played here."
+    }
+
+    /// The line under the Interpolation pop-up: the choice is for the preview only, since the
+    /// file records none; who decides as the table plays.
+    static func hearingCaption(for preset: OutputPreset) -> String {
+        switch preset {
+        case .thirdWaveU, .thirdWaveP:
+            return "For the preview only: the file records no interpolation, so the 3rd Wave decides as the table plays (its Wave Flow settings)."
+        case .tonverk:
+            return "For the preview only: the file records no interpolation, and Tonverk blends between frames."
+        default:
+            return "For the preview only: the file records no interpolation, so the synth decides as the table plays."
+        }
     }
 
     /// The Interpolation pop-up's tip: what the choice is for, and what the synth itself does
@@ -556,6 +570,9 @@ struct ConvertSweepControls: View {
     var hearingDefault: Interpolation = Interpolation.none
     var hearingDefaultKnown: Bool = false
     var hearingHelp: String = ""
+    /// Under the pop-up: that the choice is for the preview only, since the file records none
+    /// (Adam, 2026-10-27: a reader could take the pop-up for a setting of the output).
+    var hearingCaption: String = ""
     /// For a format whose file records the interpolation: the words in the pop-up's place
     /// pointing to the Options box, which sets it (and so what plays).
     var recordedNote: String? = nil
@@ -636,6 +653,10 @@ struct ConvertSweepControls: View {
                     Text(recordedNote).font(.caption).foregroundStyle(.secondary).fixedSize()
                         .help(recordedHelp)
                 }
+            }
+            if hearing != nil, !hearingCaption.isEmpty {
+                Text(hearingCaption).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if let problem = preview.problem {
                 Text(problem).font(.caption).foregroundStyle(.red)
