@@ -431,15 +431,22 @@ public extension OutputPreset {
     /// (2026-10-27, OS 1.4.1; docs/WAVETABLES.md section 2). Pigments 7.0.1 and Serum 2.1.5
     /// (from Serum's Tables folder; a drop goes through Serum's re-slicing instead): frames in
     /// order, the `clm ` flag followed by Serum, Pigments' Morph button deciding; MiniFreak V
-    /// 5.1.0: frames in order, a 4-frame table spread over the whole sweep (2026-10-27). Vital,
-    /// Phase Plant, Surge XT, and WaveEdit's format have not been tested yet.
+    /// 5.1.0: frames in order, a 4-frame table spread over the whole sweep. Vital 1.6.4: frames
+    /// in order, the `clm ` flag followed (a "none" table stepped). Phase Plant 2.4.6: the 256
+    /// frames played in order, held frames held; a 64-frame file loaded and played as well.
+    /// Surge XT 1.3.4: `.wt` files of 2,048 and 128 samples per frame at the right pitch, 64 and
+    /// 128 frames in order (all 2026-10-27). WaveEdit's format: the files played in Vital as 64
+    /// frames of 256 (Vital's WaveEdit rule), but neither WaveEdit nor an E370 has read them, so
+    /// that destination stays untested.
     var testedIn: [String] {
         switch self {
         case .thirdWaveP, .thirdWaveU: return ["on the 3rd Wave 8M, OS 2.0d"]
         case .tonverk: return ["in Tonverk, OS 1.4.1"]
-        case .wav2048: return ["in Pigments 7.0.1", "in Serum 2.1.5"]
+        case .wav2048: return ["in Pigments 7.0.1", "in Serum 2.1.5", "in Vital 1.6.4"]
         case .miniFreak: return ["in MiniFreak V 5.1.0"]
-        default: return []
+        case .phasePlant: return ["in Phase Plant 2.4.6"]
+        case .surge: return ["in Surge XT 1.3.4"]
+        case .waveEdit: return []
         }
     }
 
@@ -452,17 +459,17 @@ public extension OutputPreset {
         case .thirdWaveP:
             return "Groove Synthesis, 3rd Wave User Manual v1.9; the factory .wt files (FORMATS.md 5.1)"
         case .wav2048:
-            return "Xfer Records, Serum 2 User Guide, p. 38; Vital Audio, Vital’s public source code; Arturia, Pigments User Manual 7.0, §8.12"
+            return "Xfer Records, Serum 2 User Guide, p. 38; Vital Audio, Vital’s public source code; Arturia, Pigments User Manual 7.0, §8.12; tests in Pigments 7.0.1, Serum 2.1.5, and Vital 1.6.4 (WAVETABLES.md 2)"
         case .miniFreak:
-            return "Arturia, MiniFreak V User Manual 5.1.0, pp. 30–31"
+            return "Arturia, MiniFreak V User Manual 5.1.0, pp. 30–31; tests in MiniFreak V 5.1.0 (WAVETABLES.md 2)"
         case .tonverk:
             return "Elektron, Tonverk User Manual OS 1.4.1, §5.2.5, pp. 19–20; tests in Tonverk OS 1.4.1 (WAVETABLES.md 2)"
         case .phasePlant:
-            return "Kilohearts, Phase Plant manual (Wavetable Oscillator) and its Wavetables page"
+            return "Kilohearts, Phase Plant manual (Wavetable Oscillator) and its Wavetables page; tests in Phase Plant 2.4.6 (WAVETABLES.md 2)"
         case .surge:
-            return "Surge Synth Team, Surge XT source code (WT fileformat.txt, Wavetable.h)"
+            return "Surge Synth Team, Surge XT source code (WT fileformat.txt, Wavetable.h); tests in Surge XT 1.3.4 (WAVETABLES.md 2)"
         case .waveEdit:
-            return "Synthesis Technology, E370 Quick Start 1.4; WaveEdit’s source code (WaveEdit.hpp, bank.cpp)"
+            return "Synthesis Technology, E370 Quick Start 1.4; WaveEdit’s source code (WaveEdit.hpp, bank.cpp); the files’ shape checked in Vital 1.6.4 (WAVETABLES.md 2)"
         }
     }
 
@@ -473,12 +480,14 @@ public extension OutputPreset {
     var caveat: String? {
         switch self {
         case .wav2048:
-            return "Vital’s behavior is taken from its public source code; the current release may differ. Pigments reads no metadata, so the interpolation saved in the file does not reach it."
+            return "Pigments reads no metadata, so the interpolation saved in the file does not reach it. Serum reads it for a file loaded from its Tables folder; a file dropped on an oscillator goes through Serum’s own slicing choices instead."
         case .miniFreak:
             return "How MiniFreak V reduces 2,048-sample frames to 512 for the MiniFreak is not documented, and the MiniFreak itself has not been tested here."
-        case .phasePlant:
-            return "Kilohearts documents exactly 256 frames; whether a shorter table loads is untested, so 256 are always written."
-        case .thirdWaveU, .thirdWaveP, .tonverk, .surge, .waveEdit:
+        case .waveEdit:
+            return "Neither WaveEdit nor an E370 has read the files; Vital has played them as 64 frames of 256, the shape WaveEdit saves."
+        case .thirdWaveU, .thirdWaveP, .tonverk, .phasePlant, .surge:
+            // Phase Plant 2.4.6 has been observed to load a 64-frame table as well as the 256
+            // frames Kilohearts documents (2026-10-27), so writing 256 leaves nothing open.
             return nil
         }
     }

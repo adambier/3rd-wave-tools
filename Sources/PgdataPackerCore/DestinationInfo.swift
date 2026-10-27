@@ -77,7 +77,7 @@ public extension OutputPreset {
         case .tonverk:
             return "Up to 64 frames; Tonverk reads the frame size from the file name. An “r” after the size tag at the end of a name (Name_wt128r.wav) asks Tonverk to play each frame’s samples raw, each sample held until the next, as the PPG played its tables: with a bright, stepped edge on frames of 64 or 128 samples. A 3rd Wave P table, or an input file already named with the “r” suffix, is written with the suffix; any other table is written without. Tonverk blends between frames either way."
         case .phasePlant:
-            return "The same WAV, but exactly 256 frames, as Phase Plant’s documentation asks; a table of any other length is brought to 256 frames."
+            return "The same WAV, but exactly 256 frames, as Phase Plant’s documentation asks; a table of any other length is brought to 256 frames. Phase Plant 2.4.6 has been observed to load a 64-frame table as well; 256 is the documented count."
         case .surge:
             return "Surge’s own .wt; keeps the source’s frame size when that size is a power of two up to 4,096 (otherwise 2,048)."
         case .waveEdit:

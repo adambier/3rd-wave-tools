@@ -535,14 +535,18 @@ credentials that are not in the repository.
   already marked, `ConvertPlan.tonverkRawDefault(for:)`, through `OutputOptions.tonverkRawSamples`,
   which other callers of the library may set; a Tonverk name records no interpolation,
   `recordsInterpolation` false).
-  `testedIn` also names Pigments 7.0.1 and Serum 2.1.5 for the Serum-style WAV and MiniFreak V
-  5.1.0 for the MiniFreak destination (2026-10-27, WAVETABLES.md section 2 and its
-  `[^wav-tests]` footnote: frames in order; Serum follows the `clm ` digit only for files loaded
-  from its Tables folder and shows 256 frames for a crossfade or spectral table; MiniFreak V
-  spreads a short table over the sweep, so `ConvertPlan.caveat(for: .miniFreak)` is nil).
-  `testedIn` is empty for Phase Plant, Surge XT, and WaveEdit: no converted file has yet been
-  loaded in those synths through this project. WAVETABLES.md "Open questions" lists what each
-  test would settle.
+  `testedIn` also names Pigments 7.0.1, Serum 2.1.5, and Vital 1.6.4 for the Serum-style WAV,
+  MiniFreak V 5.1.0, Phase Plant 2.4.6, and Surge XT 1.3.4 (2026-10-27, WAVETABLES.md section 2
+  and its `[^wav-tests]` and `[^other-tests]` footnotes: frames in order; Serum follows the
+  `clm ` digit only for files loaded from its Tables folder and shows 256 frames for a crossfade
+  or spectral table; MiniFreak V spreads a short table over the sweep and Phase Plant loads one,
+  so `ConvertPlan.caveat(for:)` is nil for both; Phase Plant still gets 256 frames, the
+  documented count, which keeps the repeated-frame expansion as a way to hold frames).
+  `testedIn` is empty for WaveEdit only: Vital played the files as 64 frames of 256, but neither
+  WaveEdit nor an E370 has read them. The destination pane marks an untested row with the orange
+  caution triangle after its name (`ConvertPresetRowLabel.untested`); the sources button is the
+  same closed book on every row (Adam, 2026-10-27: a seal on most rows was confusing).
+  `ConvertPlan.testingStatus(_:)` joins the entries with one preposition.
 - The mipmap chain written for U tables uses ideal spectral cut-offs; the factory filter is unknown
   (the 3rd Wave identifies a table by its first 65,536 values, so the chain need not match).
 - `.wt` value lines must stay within 31 characters: the 3rd Wave has been observed to read a longer line as two values

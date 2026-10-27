@@ -388,7 +388,7 @@ final class WritingTests: XCTestCase {
             XCTAssertFalse(p.title.isEmpty)
             // Each entry carries its preposition, for the page's "Tested …" line.
             for entry in p.testedIn { XCTAssertTrue(entry.hasPrefix("on ") || entry.hasPrefix("in "), entry) }
-            XCTAssertEqual(p.testedIn.isEmpty, [.phasePlant, .surge, .waveEdit].contains(p), "\(p)")
+            XCTAssertEqual(p.testedIn.isEmpty, p == .waveEdit, "\(p)")
             XCTAssertFalse(p.basis.isEmpty)
             XCTAssertLessThanOrEqual(p.requiredFrameCount ?? 0, p.maxFrameCount)
         }

@@ -124,7 +124,10 @@ struct ConvertPresetRow: View {
 
 /// The radio, title, spec line, and (when chosen) why this destination is separate, then its
 /// cautions in orange: what its sources leave open for these tables, if anything, and that
-/// converting to it has not been tested, unless it has (`OutputPreset.testedIn`).
+/// converting to it has not been tested, unless it has (`OutputPreset.testedIn`). A destination
+/// not yet tested also carries the caution triangle after its title on every row, chosen or
+/// not, so the exception shows at a glance now that most destinations are tested (Adam,
+/// 2026-10-27); the sources button beside the row looks the same for every destination.
 struct ConvertPresetRowLabel: View {
     let preset: OutputPreset
     let chosen: Bool
@@ -143,6 +146,12 @@ struct ConvertPresetRowLabel: View {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(preset.shortTitle)
                     Text(preset.specLine).font(.caption).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
+                    if untested {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.caption).foregroundStyle(.orange)
+                            .help(ConvertPlan.testingStatus(preset))
+                            .accessibilityLabel("not yet tested")
+                    }
                 }
                 if chosen {
                     // One sentence per paragraph, a little apart, rather than a block of small
@@ -150,15 +159,17 @@ struct ConvertPresetRowLabel: View {
                     ConvertSentences(preset.distinction, color: .primary)
                         .padding(.top, 2)
                     if let caveat { ConvertCaution(text: caveat) }
-                    // While the page carries its under-development notice, the row does not say
-                    // "untested" a second time; the Sources popover still does.
-                    if preset.testedIn.isEmpty, !ConvertPlan.conversionUnderDevelopment { ConvertCaution(text: ConvertPlan.testingStatus(preset)) }
+                    if untested { ConvertCaution(text: ConvertPlan.testingStatus(preset)) }
                 }
             }
             Spacer(minLength: 0)
         }
         .contentShape(Rectangle())
     }
+
+    /// While the page carries its under-development notice, the rows do not say "untested" a
+    /// second time; the Sources popover still does.
+    private var untested: Bool { preset.testedIn.isEmpty && !ConvertPlan.conversionUnderDevelopment }
 }
 
 /// One caution under a destination: a triangle and a sentence or two, in orange.
@@ -177,7 +188,8 @@ struct ConvertCaution: View {
 }
 
 /// Heads the column of book icons: "Sources" with an info icon, so it reads as something to
-/// click; it opens a note on what the icons show and why to look.
+/// click; it opens a note on what the books show, why to look, and what the orange triangle on a
+/// row means.
 struct ConvertSourcesHeader: View {
     @State private var showing = false
 
@@ -194,8 +206,13 @@ struct ConvertSourcesHeader: View {
                 Text("Sources").font(.headline)
                 Text("Each destination follows the documents or source code published for that synth. Click a destination’s book to see those sources, what the sources leave open, and whether a converted file has been tested in the synth.")
                     .fixedSize(horizontal: false, vertical: true)
-                Label("A green seal marks a destination that has been tested.", systemImage: "checkmark.seal.fill")
-                    .foregroundStyle(.secondary)
+                Label {
+                    Text("A destination not yet tested in its synth carries this mark after its name.")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+                }
             }
             .padding(12)
             .frame(width: 320, alignment: .leading)
@@ -204,19 +221,17 @@ struct ConvertSourcesHeader: View {
     }
 }
 
-/// A book when the destination rests on its sources alone, a green seal when it has been tested.
-/// Clicking it shows the sources (publisher and document), what they leave open, and whether
-/// converting to the destination has been tested.
+/// The closed book beside every destination, the same whether or not the destination has been
+/// tested (the row's title line carries the untested mark). Clicking it shows the sources
+/// (publisher and document), what they leave open, and whether converting to the destination
+/// has been tested.
 struct ConvertSourcesButton: View {
     let preset: OutputPreset
     @State private var showing = false
 
-    private var tested: Bool { !preset.testedIn.isEmpty }
-
     var body: some View {
         Button { showing.toggle() } label: {
-            Image(systemName: tested ? "checkmark.seal.fill" : "book.closed")
-                .foregroundStyle(tested ? Color.green : Color.secondary)
+            Image(systemName: "book.closed").foregroundStyle(Color.secondary)
         }
         .buttonStyle(.borderless)
         .accessibilityLabel("Sources for \(preset.shortTitle)")

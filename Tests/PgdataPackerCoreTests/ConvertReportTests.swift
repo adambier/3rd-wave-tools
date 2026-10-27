@@ -212,7 +212,7 @@ final class ConvertReportTests: XCTestCase {
         }
         XCTAssertTrue(OutputPreset.wav2048.basis.hasPrefix("Xfer Records, Serum 2 User Guide"))
         XCTAssertTrue(OutputPreset.tonverk.basis.hasPrefix("Elektron, "))
-        XCTAssertEqual(OutputPreset.allCases.filter { $0.caveat != nil }, [.wav2048, .miniFreak, .phasePlant])
+        XCTAssertEqual(OutputPreset.allCases.filter { $0.caveat != nil }, [.wav2048, .miniFreak, .waveEdit])
         XCTAssertNil(OutputPreset.tonverk.caveat, "Convert always writes a size tag, so the open question about a bare trailing r does not reach the user")
     }
 

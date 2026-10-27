@@ -733,8 +733,16 @@ public struct ConvertPlan: Equatable {
     /// "Converting to this destination has not yet been tested in its synth." or "Tested on the
     /// 3rd Wave 8M, OS 2.0d." (each entry of `testedIn` carries its preposition).
     public static func testingStatus(_ preset: OutputPreset) -> String {
-        preset.testedIn.isEmpty ? "Converting to this destination has not yet been tested in its synth."
-                                : "Tested " + listPhrase(preset.testedIn) + "."
+        let places = preset.testedIn
+        if places.isEmpty { return "Converting to this destination has not yet been tested in its synth." }
+        // Each entry carries its preposition ("in Serum 2.1.5", "on the 3rd Wave 8M, OS 2.0d");
+        // when every entry starts with the same one, say it once: "Tested in Pigments 7.0.1,
+        // Serum 2.1.5, and Vital 1.6.4."
+        let heads = places.map { $0.prefix { !$0.isWhitespace } }
+        if places.count > 1, let head = heads.first, heads.allSatisfy({ $0 == head }) {
+            return "Tested \(head) " + listPhrase(places.map { String($0.dropFirst(head.count + 1)) }) + "."
+        }
+        return "Tested " + listPhrase(places) + "."
     }
 
     /// The destinations whose testing decides whether wavetable conversion is still under
@@ -756,10 +764,10 @@ public struct ConvertPlan: Equatable {
     /// only when the tables to convert, or a choice made, bring it about:
     /// - Serum, Vital, Pigments: an interpolation other than crossfade is saved for some table,
     ///   which Pigments does not read.
-    /// - Phase Plant: some table has fewer than the 256 frames its documentation asks for, so
-    ///   frames are added.
     /// The 3rd Wave destinations have none: how many tables fit is a matter for the 3rd Wave
-    /// (section 7 of FORMATS.md), not a caution the page raises.
+    /// (section 7 of FORMATS.md), not a caution the page raises. Phase Plant's short-table
+    /// caution went when Phase Plant 2.4.6 was observed to load a 64-frame table (2026-10-27);
+    /// the 256 frames written are the documented count, and the Changes column says so.
     public func caveat(for preset: OutputPreset) -> String? {
         let tables = includedItems.filter(canConvert)
         switch preset {
@@ -768,23 +776,13 @@ public struct ConvertPlan: Equatable {
                 let saved = WavetableWriter.interpolationRecorded(for: preset, source: item.table.interpolation, options: options)
                 return saved != nil && saved != .crossfade
             }
-            return notCrossfade ? "Pigments does not read the interpolation saved in the file (Serum and Vital do)." : nil
-        case .phasePlant:
-            let short = tables.filter { ($0.frameCount ?? 256) < 256 }.count
-            guard short > 0 else { return nil }
-            return "\(Self.tablesHave(short, of: tables.count)) fewer than 256 frames; whether Phase Plant loads shorter tables is untested, so frames are added to reach 256."
-        case .thirdWaveU, .thirdWaveP, .tonverk, .miniFreak, .surge, .waveEdit:
+            return notCrossfade ? "Pigments does not read the interpolation saved in the file (Vital does; Serum does for a file loaded from its Tables folder)." : nil
+        case .thirdWaveU, .thirdWaveP, .tonverk, .miniFreak, .phasePlant, .surge, .waveEdit:
             // MiniFreak V has been observed to spread a table of fewer than 64 frames over the
-            // whole sweep (5.1.0, 2026-10-27), so short tables raise no caution.
+            // whole sweep (5.1.0), and Phase Plant 2.4.6 to load a 64-frame table (both
+            // 2026-10-27), so short tables raise no caution.
             return nil
         }
-    }
-
-    /// "1 table has", "12 tables have"; "Both tables have" or "All 12 tables have" when every
-    /// table to convert is meant (`CountWords.all`).
-    static func tablesHave(_ n: Int, of total: Int) -> String {
-        if n == 1 { return "1 table has" }
-        return (n == total ? CountWords.all(n, "tables") : "\(n) tables") + " have"
     }
 
     /// The report's first line: "Converted 74 tables for Phase Plant into “output”." (the

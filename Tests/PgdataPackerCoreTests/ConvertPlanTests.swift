@@ -581,12 +581,9 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(Interpolation.displayName(nil), "Not stated")
         XCTAssertEqual(Interpolation.displayName(.spectral), "Spectral")
         XCTAssertEqual(ConvertPlan.testingStatus(.tonverk), "Tested in Tonverk, OS 1.4.1.")
-        XCTAssertEqual(ConvertPlan.testingStatus(.surge), "Converting to this destination has not yet been tested in its synth.")
+        XCTAssertEqual(ConvertPlan.testingStatus(.waveEdit), "Converting to this destination has not yet been tested in its synth.")
+        XCTAssertEqual(ConvertPlan.testingStatus(.wav2048), "Tested in Pigments 7.0.1, Serum 2.1.5, and Vital 1.6.4.")
         XCTAssertEqual(ConvertPlan.testingStatus(.thirdWaveU), "Tested on the 3rd Wave 8M, OS 2.0d.")
-        XCTAssertEqual(ConvertPlan.tablesHave(1, of: 5), "1 table has")
-        XCTAssertEqual(ConvertPlan.tablesHave(2, of: 2), "Both tables have")
-        XCTAssertEqual(ConvertPlan.tablesHave(2, of: 5), "2 tables have")
-        XCTAssertEqual(ConvertPlan.tablesHave(5, of: 5), "All 5 tables have")
         XCTAssertEqual(ConvertPlan.methodWord(.pickEvenly, grows: true), "repeated")
         XCTAssertEqual(ConvertPlan.methodWord(.pickEvenly, grows: false), "picked evenly")
         XCTAssertEqual(ConvertPlan.methodWord(.interpolate, grows: true), "crossfaded")
@@ -1087,28 +1084,26 @@ final class ConvertExistingChoicesTests: XCTestCase {
         var serum = pickerPlan(.wav2048, [(nil, 2048), (.crossfade, 2048)])
         XCTAssertNil(serum.caveat(for: .wav2048))
         serum.options.interpolation = .spectral
-        XCTAssertEqual(serum.caveat(for: .wav2048), "Pigments does not read the interpolation saved in the file (Serum and Vital do).")
+        XCTAssertEqual(serum.caveat(for: .wav2048), "Pigments does not read the interpolation saved in the file (Vital does; Serum does for a file loaded from its Tables folder).")
         var stepped = pickerPlan(.wav2048, [(Interpolation.none, 2048), (nil, 2048)])
         XCTAssertNotNil(stepped.caveat(for: .wav2048))
         stepped.options.interpolation = .crossfade   // the override makes every file crossfade
         XCTAssertNil(stepped.caveat(for: .wav2048))
-        // Phase Plant: only for tables with fewer frames than it expects. MiniFreak V spreads a
-        // short table over the sweep (observed in 5.1.0), so it raises none.
+        // Short tables raise no caution: MiniFreak V spreads them over the sweep and Phase Plant
+        // loads them (observed in 5.1.0 and 2.4.6).
         let two = pickerPlan(.miniFreak, [(nil, 2048), (nil, 2048)])
         XCTAssertNil(two.caveat(for: .miniFreak))
-        XCTAssertEqual(two.caveat(for: .phasePlant), "Both tables have fewer than 256 frames; whether Phase Plant loads shorter tables is untested, so frames are added to reach 256.")
-        let one = pickerPlan(.phasePlant, [(nil, 2048)])
-        XCTAssertEqual(one.caveat(for: .phasePlant), "1 table has fewer than 256 frames; whether Phase Plant loads shorter tables is untested, so frames are added to reach 256.")
+        XCTAssertNil(two.caveat(for: .phasePlant))
         var tall = ConvertPlan(preset: .miniFreak)
         let wave = (0..<2048).map { Float(sin(Double($0) * 2 * .pi / 2048)) * 0.5 }
         let table = FoundTable(name: "Tall", fileName: "Tall.wav", source: .wav, samples: Array(Array(repeating: wave, count: 64).joined()),
                                frameSize: 2048, frameSizeBasis: "clm chunk")
         tall.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/Tall.wav"), table: table)], factory: FactoryLibrary())
         XCTAssertNil(tall.caveat(for: .miniFreak))
-        XCTAssertNotNil(tall.caveat(for: .phasePlant))
-        // Destinations whose sources settle their behavior never warn, the 3rd Wave ones among
-        // them (how many tables fit is the 3rd Wave's matter, not a caution here).
-        for preset in [OutputPreset.thirdWaveU, .thirdWaveP, .tonverk, .surge, .waveEdit] {
+        XCTAssertNil(tall.caveat(for: .phasePlant))
+        // Destinations whose sources or tests settle their behavior never warn, the 3rd Wave ones
+        // among them (how many tables fit is the 3rd Wave's matter, not a caution here).
+        for preset in [OutputPreset.thirdWaveU, .thirdWaveP, .tonverk, .miniFreak, .phasePlant, .surge, .waveEdit] {
             XCTAssertNil(two.caveat(for: preset), "\(preset)")
         }
         let nine = pickerPlan(.thirdWaveU, Array(repeating: (Interpolation?.none, 2048), count: 9))

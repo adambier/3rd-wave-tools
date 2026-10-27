@@ -7,8 +7,8 @@ and U tables, and the tables a `.pgdata` embeds) are in [FORMATS.md](FORMATS.md)
 Each statement names its source: the company's manual, or its own source code. Where a
 statement is an inference, it says so. Nothing here has been tested with this project's files
 unless it says so. The app labels each destination the same way: the book icon beside its row
-opens its sources, a green seal in its place marks one that has been tested, and where the
-sources leave something open (the questions at the end), the chosen row says so.
+opens its sources, an orange triangle after its name marks one not yet tested in its synth, and
+where the sources leave something open (the questions at the end), the chosen row says so.
 Corrections and test results are welcome; see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 This project is not affiliated with Groove Synthesis or with any maker named here; their product
@@ -39,12 +39,12 @@ chunk.[^vital] Most other synths set interpolation on the oscillator, not in the
 
 | Destination | What is written | Source |
 |---|---|---|
-| Serum, Vital, Pigments | Mono 32-bit float WAV, 48 kHz, 2,048 per frame, up to 256 frames, with a `clm ` chunk carrying the interpolation. Tested in Pigments 7.0.1 and Serum 2.1.5 | [^serum] [^vital] [^pigments] [^wav-tests] |
+| Serum, Vital, Pigments | Mono 32-bit float WAV, 48 kHz, 2,048 per frame, up to 256 frames, with a `clm ` chunk carrying the interpolation. Tested in Pigments 7.0.1, Serum 2.1.5, and Vital 1.6.4 | [^serum] [^vital] [^pigments] [^wav-tests] |
 | MiniFreak V (for the MiniFreak) | The same, with at most 64 frames. Tested in MiniFreak V 5.1.0 | [^minifreak] [^wav-tests] |
 | Tonverk | Mono 32-bit float WAV, 48 kHz, at most 64 frames, its frame size in the file name, and an `r` at the end for raw sample playback (`Name_wt1024.wav`, `Name_wt128r.wav`). Tested in Tonverk OS 1.4.1 | [^tonverk] [^tonverk-tests] |
-| Phase Plant | Exactly 256 frames of 2,048, with a `clm ` chunk | [^phaseplant] |
-| Surge XT | A Surge `.wt` (binary, below) | [^surge-code] |
-| WaveEdit, E370 | Mono 16-bit WAV, 44.1 kHz, 64 frames of 256, no extra chunk | [^waveedit] |
+| Phase Plant | Exactly 256 frames of 2,048, with a `clm ` chunk. Tested in Phase Plant 2.4.6 | [^phaseplant] [^other-tests] |
+| Surge XT | A Surge `.wt` (binary, below). Tested in Surge XT 1.3.4 | [^surge-code] [^other-tests] |
+| WaveEdit, E370 | Mono 16-bit WAV, 44.1 kHz, 64 frames of 256, no extra chunk. The files' shape checked in Vital 1.6.4; not tested in WaveEdit or on an E370 | [^waveedit] [^other-tests] |
 | 3rd Wave P table | A `.wt`: 64 frames of 128, each sample stored with the difference to the next. Tested on the 3rd Wave 8M, OS 2.0d | [FORMATS.md](FORMATS.md) 5.1 and 9 |
 | 3rd Wave U table | A `.wt`: 64 frames of 1,024, then the mipmap chain. Tested on the 3rd Wave 8M, OS 2.0d | [FORMATS.md](FORMATS.md) 5.1 and 9 |
 
@@ -61,7 +61,11 @@ Notes on each:
   should.[^wav-tests]
 - **Vital** slices `.wav` files at 2,048 per frame and does not read the `clm ` chunk's frame size,
   only its interpolation digit. A file of exactly 16,384 samples whose spectrum looks like a
-  WaveEdit table is sliced at 256 instead.[^vital]
+  WaveEdit table is sliced at 256 instead.[^vital] Tested in Vital 1.6.4: tables of 4, 64, and
+  128 frames played in order, a table marked "none" stepped and one marked crossfade blended,
+  and the app's WaveEdit-format files played as 64 frames of 256, at the right pitch. Vital
+  spreads any table over its frame control's range of 0 to 256 and shows no frame
+  count.[^wav-tests] [^other-tests]
 - **Pigments** places each 2,048 samples in a position, up to 256 positions, and reads no
   metadata; interpolation is the engine's Morph setting.[^pigments] Tested in Pigments 7.0.1:
   tables of 4, 64, and 128 frames loaded with the frames in order, and the Morph button
@@ -85,12 +89,20 @@ Notes on each:
   reads no interpolation from it. An explicit size tag is always written, and any tag the name
   already has is replaced.
 - **Phase Plant** documents its wavetables as exactly 256 frames of 2,048 samples (524,288 in
-  all).[^phaseplant] Whether it accepts shorter files is not documented; 256 frames are always
-  written, the table expanded or reduced by the method you choose.
+  all).[^phaseplant] Tested in Phase Plant 2.4.6: the 256-frame files played in order, a table
+  expanded by repeating its frames played as held shapes with jumps, and a 64-frame file loaded
+  and blended through as well, so 256 is the documented count rather than a requirement. The
+  page still writes 256, the documented count, which also keeps the repeated-frame expansion
+  as a way to hold each frame.[^other-tests]
 - **Surge XT** reads its own `.wt` and WAV files with the chunks above, with frame sizes from 2 to
-  4,096 (powers of two) and up to 512 frames.[^surge-code]
+  4,096 (powers of two) and up to 512 frames.[^surge-code] Tested in Surge XT 1.3.4: `.wt` files
+  of 2,048 and of 128 samples per frame loaded with the counts the header states (64 and 128),
+  at the right pitch, the frames in order; a table over full scale (peak 1.33) played without
+  audible clipping.[^other-tests]
 - **WaveEdit** (Synthesis Technology's editor for the E370 and E352) saves a bank of 64 tables of
-  256 samples as a 16-bit, 44.1 kHz WAV of 16,384 samples with no extra chunk.[^waveedit]
+  256 samples as a 16-bit, 44.1 kHz WAV of 16,384 samples with no extra chunk.[^waveedit] The
+  app's files have been played in Vital 1.6.4 as 64 frames of 256 (Vital's WaveEdit rule), which
+  checks their shape; neither WaveEdit nor an E370 has read them.[^other-tests]
 - **The 3rd Wave** imports `.wt` files with **Bulk wavetable import** and tables embedded in a
   `.pgdata` with **Import unified program data file**. Its **Wave Maker** also imports a Serum
   wavetable WAV into the U set, and takes a WAV of exactly 8,192 samples (64 × 128) as a P
@@ -254,14 +266,13 @@ The report after converting says what was done to each table.
 
 Results from any of these are welcome:
 
-- Whether Phase Plant loads tables of fewer than 256 frames.
 - Whether Tonverk's `r` works without a `_wt<N>` tag (every form tested had the tag or was
   tested for the wrong property), and whether Tonverk's factory library, whose files carry no
   tags, is read at 2,048 throughout (one file, `All Waves.wav`, is 8,192 samples).
 - How MiniFreak V reduces 2,048-sample frames to 512, and what a MiniFreak itself plays from the
   tables MiniFreak V sends it (only the plug-in has been tested).
-- Whether Vital follows the `clm ` chunk's interpolation digit, and whether it takes the app's
-  WaveEdit-format files as 64 frames of 256.
+- Whether WaveEdit and the E370 read the app's WaveEdit-format files (Vital takes them as 64
+  frames of 256).
 - Whether the app's 3rd Wave U table from a Serum WAV matches what Wave Maker makes from the same
   file.
 
@@ -298,7 +309,21 @@ Results from any of these are welcome:
     loaded from Serum's Tables folder, the 4-frame table showed 4 frames and stepped, the
     64-frame "none" table 64, and the crossfade and spectral tables 256 frames, each playing
     its frames in order; a second copy of a file under another name never appeared in the
-    list, which suggests a listing by content.
+    list, which suggests a listing by content. Vital 1.6.4: the 64-frame crossfade table
+    blended through its four shapes in order, the 4-frame "none" table stepped, the 128-frame
+    table swept cleanly, and the 64-frame "none" table stepped at the same pitch.
+[^other-tests]: Tests on 2026-10-27 with tables written by the app. Phase Plant 2.4.6: the
+    64-frame morph expanded to 256 by crossfading played its four shapes in order and blended;
+    the 4-frame table expanded by repeating played four held shapes with jumps; the 128-frame
+    table, each frame doubled, swept cleanly; the factory U26 played as on the 3rd Wave; and
+    the 64-frame morph from the Serum-style set, 64 frames of 2,048, loaded and played in order.
+    Surge XT 1.3.4: the 64-frame morph (2,048 per frame) showed 64 frames and played in order;
+    the harmonic-steps table (128 per frame) at the same pitch, brighter frame by frame; the
+    128-frame table showed 128 and swept cleanly; the factory P03 (peak 1.33) played as on the
+    3rd Wave, with the PPG waveforms at 60–63. Vital 1.6.4 with the WaveEdit-format files: the
+    morph at the same pitch as the 2,048-sample version (so sliced at 256, not 2,048), the four
+    shapes in order; the harmonic-steps table at the same pitch, brighter toward the top; P03
+    as on the 3rd Wave.
 [^phaseplant]: Kilohearts, Phase Plant manual and "Wavetables".
     <https://kilohearts.com/docs/wavetables>
 [^flac]: RFC 9639, "Free Lossless Audio Codec" (IETF, 2024).

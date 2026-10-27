@@ -372,15 +372,15 @@ field above the table narrows the list by name or file, as on the Pack page.
 The two 3rd Wave destinations have been tested on the 3rd Wave (an 8M, OS 2.0d): eight tables
 converted by the page, four of each kind, were imported with **Bulk wavetable import**, played
 as written, and came back the same from **Export Wavetable** (to the export's six decimals).
-Pigments 7.0.1, Serum 2.1.5, MiniFreak V 5.1.0, and Tonverk OS 1.4.1 have played the page's
-tables as well; the others rest on their synths' documents and source code until someone tests
-them.
+Pigments 7.0.1, Serum 2.1.5, Vital 1.6.4, MiniFreak V 5.1.0, Phase Plant 2.4.6, Surge XT 1.3.4,
+and Tonverk OS 1.4.1 have played the page's tables as well. The WaveEdit, E370 destination rests
+on its sources and on a check of the files' shape in Vital until someone with an E370 tests it.
 
 The destination applies to every table converted. The chosen row says why its format is separate
 and, in orange, anything its sources leave open that the tables bring about. The book icon beside
-each row (under **Sources**) names the documents the format rests on; a green seal in its place
-marks a destination that has been tested. [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes
-what each destination expects, with sources.
+each row (under **Sources**) names the documents the format rests on; an orange triangle after a
+destination's name marks one not yet tested in its synth. [`docs/WAVETABLES.md`](docs/WAVETABLES.md)
+describes what each destination expects, with sources.
 
 Tonverk has been tested as well (OS 1.4.1): tables of 4 and 64 frames at 64, 128, 1,024, and
 2,048 samples per frame loaded through its Sample Browser and the Wavefinder's SLOT and played in
@@ -391,12 +391,15 @@ frames of 64 or 128 samples as a bright edge), while Tonverk blends between fram
 The page ends the name in "r" for 3rd Wave P tables, the PPG-style tables, and for files already
 marked, and never otherwise; there is nothing to set.
 
-Pigments, MiniFreak V, and Serum (the plug-ins) played tables of 4, 64, and 128 frames in order.
-Pigments reads no metadata, so its Morph button decides between a blend and steps. MiniFreak V
-spread a 4-frame table over the whole sweep (what a MiniFreak itself plays has not been tested).
-Serum follows the file's interpolation when the file is loaded from its Tables folder; a file
-dropped on an oscillator goes through Serum's own re-slicing choices instead, and a table that
-records a crossfade or spectral interpolation shows 256 frames once loaded. A destination still
+Pigments, MiniFreak V, Serum, Vital, Phase Plant, and Surge XT (the plug-ins) played tables of
+4, 64, and 128 frames in order. Pigments reads no metadata, so its Morph button decides between
+a blend and steps. MiniFreak V spread a 4-frame table over the whole sweep (what a MiniFreak
+itself plays has not been tested). Serum follows the file's interpolation when the file is
+loaded from its Tables folder; a file dropped on an oscillator goes through Serum's own
+re-slicing choices instead, and a table that records a crossfade or spectral interpolation shows
+256 frames once loaded. Vital follows the file's interpolation and took the WaveEdit-format
+files as 64 frames of 256. Phase Plant loaded a 64-frame table as well as the 256 frames its
+documentation describes; the page still writes 256, the documented count. A destination still
 untested says so in its row.
 
 #### Options
