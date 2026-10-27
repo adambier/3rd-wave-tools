@@ -67,6 +67,32 @@ final class RobustnessTests: XCTestCase {
         XCTAssertTrue(error { try WavetableFile(data: Data("PNAME\nBad\n0.5f\nabc\n".utf8)) }.contains("Line 4 of wavetable \"Bad\" is not a number"))
     }
 
+    /// Section 5.1 of FORMATS.md: the 3rd Wave has been observed to read a value line longer than
+    /// 31 characters as two values. The reader reports such lines; the writer never makes one.
+    func testLongValueLinesAreReportedAndNeverWritten() throws {
+        let huge = "-261953457593075210649600.0000000000000f"   // 40 characters, as a tool wrote it
+        var lines = ["PNAME", "Long Lines", "// comment lines do not count, however long they are: " + huge]
+        lines += (0..<16_384).map { $0 == 10 || $0 == 4_000 ? huge : "0.25f" }
+        let w = try WavetableFile(data: Data((lines.joined(separator: "\n") + "\n").utf8))
+        XCTAssertEqual(w.longLines, [14, 4_004])                 // file line numbers, counting from 1
+        XCTAssertEqual(w.values[10], -2.6195346e+23)             // read correctly here all the same
+        XCTAssertEqual(w.serialized(), Data((lines.joined(separator: "\n") + "\n").utf8))   // unmodified
+        // A line of exactly 31 characters is within the limit; CRLF endings do not count.
+        let edge = "-26195345759307521064960.00000f"
+        XCTAssertEqual(edge.count, 31)
+        let crlf = (["PNAME", "Edge"] + (0..<16_384).map { $0 == 0 ? edge : "0.25f" }).joined(separator: "\r\n") + "\r\n"
+        XCTAssertEqual(try WavetableFile(data: Data(crlf.utf8)).longLines, [])
+        // Rewritten, the out-of-range value takes its short exponent form, and renaming clears the list.
+        var again = w; again.name = "Renamed"
+        XCTAssertEqual(again.longLines, [])
+        let text = String(decoding: again.serialized(), as: UTF8.self)
+        XCTAssertTrue(text.split(separator: "\n").allSatisfy { $0.count <= WavetableFile.lineLimit }, "a written line exceeds 31 characters")
+        XCTAssertEqual(try WavetableFile(data: again.serialized()).values, w.values)
+        XCTAssertEqual(WavetableFile.literal(-2.6195346e+23), "-2.6195346e+23")
+        XCTAssertEqual(WavetableFile.literal(0.963237), "0.963237")
+        XCTAssertEqual(WavetableFile(kind: .p, name: "Made", values: [1]).longLines, [])
+    }
+
     // MARK: .bin
 
     func testOlderMultisampleVersionsAndErrors() throws {

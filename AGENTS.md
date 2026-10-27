@@ -240,7 +240,7 @@ PgdataFormats (`Sources/PgdataFormats/`):
 |---|---|---|
 | `SourceRef` | `SourceRef.swift` | What an oscillator plays: `.p(n)`, `.u(n)`, `.analog(n)`, `.s(n)`, `.unknown(id)`; id mapping, labels, `isFactorySlot` |
 | `ProgramFile` | `ProgramFile.swift` | `.pro` text: `version`, `name`, `values` (`Value.int`/`.float` with original text), `sources`, `serialized()` |
-| `WavetableFile` | `WavetableFile.swift` | `.wt` text: `Kind` (`.p`/`.u`), `frames`, `mipmapChain`, `dataBytes`, `fingerprint`, `peak` |
+| `WavetableFile` | `WavetableFile.swift` | `.wt` text: `Kind` (`.p`/`.u`), `frames`, `mipmapChain`, `dataBytes`, `fingerprint`, `peak`, `longLines` (value lines over `lineLimit` = 31 characters), `compare` and `exportTolerance` (what **Export Wavetable** gives back) |
 | `Multisample` | `Multisample.swift` | `.bin` v1/v4/v5: `slotName`, `samples: [Sample]`, `binData()`, `problems` |
 | `UnifiedProgram` | `UnifiedProgram.swift` | `.pgdata`: `sources: [Source]` (`ref`, `payload`), `programName`, `words`, `serialized()` |
 | `Packer`, `Unpacker`, `SourceContent`, `UnpackedProgram`, `PackError` | `PackUnpack.swift` | `Packer.pack(_:content:)` and `Unpacker.unpack(_:)` |
@@ -523,10 +523,12 @@ credentials that are not in the repository.
 - The mipmap chain written for U tables uses ideal spectral cut-offs; the factory filter is unknown
   (the 3rd Wave identifies a table by its first 65,536 values, so the chain need not match).
 - `.wt` value lines must stay within 31 characters: the 3rd Wave has been observed to read a longer line as two values
-  (FORMATS.md section 5.1). The library's writers never exceed 18; `WavetableFile` does not yet
-  warn about a file that does. 3rd Wave Terminal's P exports (256 plain samples per `//waveform`
-  block) read as pairs give the table's samples, which is also how the 3rd Wave imports them, so
-  the reader needs no second layout.
+  (FORMATS.md section 5.1). `WavetableFile.longLines` lists such lines (`lineLimit` = 31), the
+  Pack page warns about them in its notes (`ContentFile.problems`), `tw3pg inspect` reports them,
+  and `WavetableFile.serialized()` never writes one (an out-of-range value takes its exponent
+  form). 3rd Wave Terminal's P exports (256 plain samples per `//waveform` block) read as pairs
+  give the table's samples, which is also how the 3rd Wave imports them, so the reader needs no
+  second layout.
 - `fixtures/` exercise structure, not sound, and have not been loaded on the 3rd Wave.
 - The app is macOS-only; CI compiles it but has no tests for it. A Linux or Windows front end would
   build on `PgdataPackerCore`, whose API may change between versions more than `PgdataFormats`'s.

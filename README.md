@@ -165,8 +165,10 @@ attention.
 - A source number outside every known range shows as an unknown source, and the program is not
   written until those oscillators are pointed elsewhere.
 - Content that does not look like the 3rd Wave's own is flagged: a wavetable whose samples go
-  beyond ±1, or a multisample whose samples are out of key order or carry values outside the ranges
-  Groove Synthesis specifies.
+  beyond ±1, a `.wt` with a value line longer than 31 characters (the 3rd Wave has been observed
+  to read such a line as two values when importing the `.wt` itself; the values packed here are
+  not affected), or a multisample whose samples are out of key order or carry values outside the
+  ranges Groove Synthesis specifies.
 - A file that cannot be read at all (empty, cut short, or not the kind its extension says) is
   reported once, with the reason, and left out.
 

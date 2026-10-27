@@ -30,12 +30,25 @@ public struct WavetableFile: Equatable, Sendable {
 
     /// Whether this is a P or a U table.
     public var kind: Kind
-    /// The table's display name, line 2. Changing it discards ``originalBytes``.
-    public var name: String { didSet { originalBytes = nil } }
-    /// The table's values, ``Kind/valueCount`` of them. Changing them discards ``originalBytes``.
-    public var values: [Float] { didSet { originalBytes = nil } }
+    /// The table's display name, line 2. Changing it discards ``originalBytes`` and ``longLines``.
+    public var name: String { didSet { originalBytes = nil; longLines = [] } }
+    /// The table's values, ``Kind/valueCount`` of them. Changing them discards ``originalBytes``
+    /// and ``longLines``.
+    public var values: [Float] { didSet { originalBytes = nil; longLines = [] } }
     /// Original file bytes, kept so an unmodified file is written back unchanged.
     public var originalBytes: [UInt8]?
+    /// The file's line numbers (counting from 1) of the value lines longer than ``lineLimit``
+    /// characters, in order; empty for a table made in memory or changed since it was read.
+    ///
+    /// Such a file reads correctly here, but the 3rd Wave has been observed to read a longer line
+    /// as two values when it imports the `.wt` itself, which shifts every frame after it (section
+    /// 5.1 of FORMATS.md). The same values embedded in a `.pgdata` are not affected. Only
+    /// out-of-range values written in fixed notation reach the limit; ``serialized()`` never
+    /// writes such a line.
+    public private(set) var longLines: [Int] = []
+    /// The longest value line the 3rd Wave has been observed to read as one value: 31 characters,
+    /// the `f` suffix included (section 5.1 of FORMATS.md; a 32-byte buffer is the inference).
+    public static let lineLimit = 31
 
     /// Creates a wavetable from its kind, name, and values.
     ///
@@ -119,18 +132,22 @@ public struct WavetableFile: Equatable, Sendable {
         name = lines[1]
         var vals: [Float] = []
         vals.reserveCapacity(k.valueCount)
+        var long: [Int] = []
         for (i, raw) in lines.dropFirst(2).enumerated() {
             let s = raw.trimmingCharacters(in: .whitespaces)
             if s.isEmpty || s.hasPrefix("//") { continue }
             let t = s.hasSuffix("f") || s.hasSuffix("F") ? String(s.dropLast()) : s
             guard let f = Float(t), f.isFinite else { throw FormatError.invalid("Line \(i + 3) of wavetable \"\(name)\" is not a number: \"\(s)\".") }
             vals.append(f)
+            // The line as the 3rd Wave sees it, the line ending aside (section 5.1 of FORMATS.md).
+            if raw.count > Self.lineLimit { long.append(i + 3) }
         }
         guard vals.count == k.valueCount else {
             throw FormatError.invalid("Wavetable \"\(name)\" has \(vals.count) values; a \(k.letter) table needs \(k.valueCount).")
         }
         values = vals
         originalBytes = bytes
+        longLines = long
     }
 
     /// Values as the little-endian float32 bytes a .pgdata stores.
@@ -186,7 +203,7 @@ public struct WavetableFile: Equatable, Sendable {
     ///
     /// An unmodified file read with ``init(data:)`` is written back unchanged. Otherwise each value
     /// is written with six decimals when that reproduces it exactly, and in the shortest exact form
-    /// otherwise, with LF line endings.
+    /// otherwise, with LF line endings. No value line exceeds ``lineLimit`` characters.
     public func serialized() -> Data {
         if let o = originalBytes { return Data(o) }
         var s = kind.rawValue + "\n" + name + "\n"
@@ -195,12 +212,14 @@ public struct WavetableFile: Equatable, Sendable {
         return Data(s.latin1Bytes)
     }
 
-    /// Six decimals (the 3rd Wave's own "%f" style) when that reproduces the float32 exactly;
-    /// otherwise the shortest text that does. Groove Synthesis's factory P tables use 12–14 digits and
-    /// exponent forms ("1.38777878078e-17f"), so the 3rd Wave reads both.
+    /// Six decimals (the 3rd Wave's own "%f" style) when that reproduces the float32 exactly and
+    /// fits a ``lineLimit``-character line with the `f` suffix; otherwise the shortest text that
+    /// reproduces it. Groove Synthesis's factory P tables use 12–14 digits and exponent forms
+    /// ("1.38777878078e-17f"), so the 3rd Wave reads both. Only an out-of-range value (beyond
+    /// about ±10²⁴) is too long in six decimals; its exponent form is short.
     static func literal(_ v: Float) -> String {
         let six = String(format: "%f", Double(v))
-        if Float(six) == v { return six }
+        if Float(six) == v, six.count < lineLimit { return six }
         return "\(v)"
     }
 }

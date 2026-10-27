@@ -24,8 +24,8 @@ public struct ContentFile: Identifiable, Equatable {
     /// Identity of the content (a hash of its values), computed once: it is compared on every
     /// plan, and computing it means re-serializing the whole table.
     public let fingerprint: UInt64
-    /// Things about the content worth a warning when it is packed (see `Multisample.problems`
-    /// and `WavetableFile.peak`), computed once.
+    /// Things about the content worth a warning when it is packed (see `Multisample.problems`,
+    /// `WavetableFile.peak`, and `WavetableFile.longLines`), computed once.
     public let problems: [String]
 
     public init(url: URL, body: Body, slot: SourceRef?) {
@@ -33,8 +33,20 @@ public struct ContentFile: Identifiable, Equatable {
         switch body {
         case let .wavetable(w):
             fingerprint = w.fingerprint
+            var found: [String] = []
             let peak = w.peak
-            problems = peak > 1.0001 ? ["its samples reach ±\(String(format: "%.2f", peak)); the 3rd Wave’s own tables stay within ±1, so the file may be damaged or not normalized"] : []
+            if peak > 1.0001 {
+                found.append("its samples reach ±\(String(format: "%.2f", peak)); the 3rd Wave’s own tables stay within ±1, so the file may be damaged or not normalized")
+            }
+            if let first = w.longLines.first {
+                // Section 5.1 of FORMATS.md: the 3rd Wave has been observed to read a value line longer
+                // than 31 characters as two values. The values are packed as numbers, so the .pgdata is
+                // not affected; the warning is for the .wt file itself.
+                let count = w.longLines.count
+                let which = count == 1 ? "line \(first) is" : "\(count) of its value lines are"
+                found.append("\(which) longer than \(WavetableFile.lineLimit) characters\(count == 1 ? "" : " (the first is line \(first))"); “Bulk wavetable import” has been observed to read such a line as two values, which shifts the frames after it, so import the packed .pgdata rather than this .wt")
+            }
+            problems = found
         case let .multisample(m):
             fingerprint = m.fingerprint
             problems = m.problems

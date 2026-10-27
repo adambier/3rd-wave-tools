@@ -410,6 +410,8 @@ Plain text, LF or CRLF line ends.
   characters per value, cutting the six-decimal form of longer ones short. A 32-byte buffer is
   the inference.[^long-lines] Ordinary values take at most 18 characters, so only out-of-range
   values written in fixed notation (`-261953457593075210649600.0000000000000f`) reach the limit.
+  The library reports such lines (`WavetableFile.longLines`), the Pack page warns about them, and
+  the library never writes one: an out-of-range value takes its exponent form.
 - **3rd Wave Terminal writes P tables differently:** the one 3rd Wave Terminal export examined
   holds a P table as 64 `//waveform` blocks of 256 plain samples, each cycle at twice the
   resolution, instead of 128 sample-and-difference pairs. The even values follow the table's

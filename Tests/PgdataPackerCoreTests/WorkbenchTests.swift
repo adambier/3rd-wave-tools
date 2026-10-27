@@ -164,6 +164,26 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertEqual(PackPlan.make(program: old, files: [obx], factory: lib2).rows[0].choice, .reference)
     }
 
+    /// A `.wt` with a value line longer than 31 characters (section 5.1 of FORMATS.md) gets a warning
+    /// naming the file and the line; the values are packed as numbers all the same.
+    func testLongValueLinesAreWarnedAbout() throws {
+        let huge = "-261953457593075210649600.0000000000000f"
+        var text = "PNAME\nLong\n"
+        for i in 0..<16_384 { text += i == 20 ? huge + "\n" : "0.25f\n" }
+        let u = dir.appendingPathComponent("long.wt"); try Data(text.utf8).write(to: u)
+        var cf = try ContentFile.load(u); cf.slot = .p(36)
+        XCTAssertEqual(cf.problems.count, 2)   // the out-of-range peak, then the line
+        XCTAssertTrue(cf.problems[0].hasPrefix("its samples reach ±"))
+        XCTAssertEqual(cf.problems[1], "line 23 is longer than 31 characters; “Bulk wavetable import” has been observed to read such a line as two values, which shifts the frames after it, so import the packed .pgdata rather than this .wt")
+        let plan = PackPlan.make(program: makeProgram(sources: [1002] + Array(repeating: 42, count: 11)), files: [cf], factory: FactoryLibrary())
+        XCTAssertTrue(plan.warnings.contains { $0.hasPrefix("long.wt: line 23 is longer than 31 characters") })
+        // Several lines: the count and the first.
+        text = "PNAME\nLong\n"
+        for i in 0..<16_384 { text += i % 1_000 == 8 ? huge + "\n" : "0.25f\n" }
+        try Data(text.utf8).write(to: u)
+        XCTAssertTrue(try ContentFile.load(u).problems.last?.hasPrefix("17 of its value lines are longer than 31 characters (the first is line 11);") == true)
+    }
+
     func testLongNamesAreWarnedAboutAndFactoryIdenticalFilesExplained() throws {
         let long = String(repeating: "x", count: 40)
         var pro = makeProgram(sources: [2050] + Array(repeating: 42, count: 11))
