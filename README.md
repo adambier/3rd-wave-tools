@@ -11,7 +11,7 @@ those of other synths.
 
 Why you might want to use it:
 
-* You have 3rd Wave programs with wavetables and samples as separate files, and you'd like each bundled into one file for archiving, importing into the 3rd Wave Terminal app, or sharing.
+* You have 3rd Wave programs with wavetables and samples as separate files and you'd like each bundled into one file for archiving, importing into the 3rd Wave Terminal app, or sharing.
 * You'd like to check a set of 3rd Wave programs to make sure they have the wavetables and samples they need and identify orphan wavetables and samples not used by any program.
 * You'd like to extract 3rd Wave program, wavetable, and sample files from unified program files.
 * You'd like to convert wavetables from other hardware and software synths' formats to the 3rd Wave's, or 3rd Wave P and U tables to formats other synths read (or between other synths' formats)—one at a time or in bulk.
