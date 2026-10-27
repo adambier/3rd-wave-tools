@@ -409,10 +409,12 @@ Plain text, LF or CRLF line ends.
   is the inference.[^long-lines] Ordinary values take 8 to 18 characters, so only out-of-range
   values written in fixed notation (`-261953457593075210649600.0000000000000f`) reach the limit.
 - **A second layout exists:** 3rd Wave Terminal exports a P table as 64 `//waveform` blocks of
-  256 plain samples, each cycle at twice the resolution (the odd values midway between the even
-  ones) instead of 128 sample-and-difference pairs. Read as pairs, the even values are the
-  table's 128 samples, so the 3rd Wave imports such a file as the table it came from (one
-  test).[^long-lines]
+  256 plain samples, each cycle at twice the resolution, instead of 128 sample-and-difference
+  pairs. The even values follow the table's 128 samples closely (within 0.008 in the one file
+  examined, a median of 0.0002; whether the 3rd Wave sends 256 samples over SysEx or Terminal
+  resamples is not known), and the odd values lie between them. Read as pairs, the even values
+  become the samples, so the 3rd Wave imports such a file as a close copy of the table it came
+  from (one test).[^long-lines]
 
 **P tables (PPG-style).** The P set is the 3rd Wave's form of the PPG Wave's wavetables. P00–P31
 are derived from the PPG Wave 2.2/2.3's own tables (P30 is the PPG's *upper wavetable*), P32 and
@@ -427,9 +429,10 @@ the user's own.[^manual] The format:
   float precision, and over SysEx the 3rd Wave sends a P table as 64 × 128 plain samples.[^p-diff]
   A writer should compute the differences
   from the samples. The 3rd Wave stores and exports the second value of each pair as given: a
-  file whose second values were not differences came back from **Export Wavetable** with those
-  values unchanged, and its samples played as the table, so the second values appear not to be
-  used in playback, at least with that program's Wave Flow settings (one test, by ear).[^long-lines]
+  file whose second values were not differences (they lay between the samples instead) came
+  back from **Export Wavetable** with those values unchanged, and its samples played as the
+  table, so the second values appear not to be used in playback, at least with that program's
+  Wave Flow settings (one test, by ear).[^long-lines]
 - **The samples are floats within ±1**, not quantized to the PPG's 8-bit levels, although the
   manual calls the P set "8-bit" and says the **Wave Maker** converts imported audio "to the correct
   sample rate and bit depth" for it. So any reduction the 3rd Wave applies is presumably made when
@@ -770,7 +773,8 @@ Tested on an 8M (OS 2.0d) unless a footnote says otherwise; section
     `//waveform` blocks of 256 plain samples; three blocks of out-of-range values from a corrupted
     transfer, written as 34- to 53-character lines) imported with **Bulk wavetable import** without
     complaint and exported again. In the export, every clean block came back as its even values
-    (the samples) and odd values (the second of each pair, unchanged), and each of the three long-line
+    (the samples, which match the original table within 0.008) and odd values (the second of
+    each pair, unchanged), and each of the three long-line
     blocks came back as two frames whose samples were the block's values in order with 0 as every
     second value, shifting the following frames by one each time (frames 11–12, 23–24, and 29–30
     held the garbage); the export's longest line is 31 characters. The table played as the

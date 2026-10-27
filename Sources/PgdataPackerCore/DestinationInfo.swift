@@ -69,7 +69,7 @@ public extension OutputPreset {
             return "The 3rd Wave’s main set: 64 frames of 1,024 samples with a mipmap chain, played band-limited and, by default, with wavetable smoothing on (the 3rd Wave blends from frame to frame). Keeps the most of a 2,048-sample table."
         case .thirdWaveP:
             // Wavetable smoothing off by default for a P table: checked on an 8M (FORMATS.md section 5.1).
-            return "PPG-style: 64 frames of 128 samples, played as the PPG played wavetables, through the three Wave Flow settings, \u{201C}wavetable smoothing\u{201D} (off by default, so the table steps from frame to frame), \u{201C}waveform smoothing\u{201D}, and \u{201C}use upper wavetable\u{201D}. With \u{201C}use upper wavetable\u{201D} off, the 3rd Wave plays positions 0–59 only; with it on, 60–63 play too; the PPG waveforms option fills 60–63 the way the PPG-derived factory tables do."
+            return "PPG-style: 64 frames of 128 samples, played as the PPG played wavetables, through the three Wave Flow settings, \u{201C}wavetable smoothing\u{201D} (off by default, so the table steps from frame to frame), \u{201C}waveform smoothing\u{201D}, and \u{201C}use upper wavetable\u{201D}. With \u{201C}use upper wavetable\u{201D} off, the 3rd Wave plays positions 0–59 only. With the setting on, positions 60–63 play too. \u{201C}Add the PPG\u{2019}s standard waveforms at 60–63\u{201D}, under Options, fills those four positions the way the PPG-derived factory tables do."
         case .wav2048:
             return "The common 2,048-sample WAV, up to 256 frames; the file records the interpolation, which Serum and Vital read."
         case .miniFreak:

@@ -380,10 +380,12 @@ Other checks:
   `Resampling.bandLimitedCycle`, a 480-sample crossfade into each new cycle);
   `tw3pg wtconvert <out dir> [--preset <name>] [options] <files or dirs>` converts as the
   Wavetables page's Convert All does, through `ConvertPlan` itself (the Options box's choices as
-  flags), so a destination can be tested in its synth without the app; `tw3pg wtmatch <expected>
-  -- <files>` identifies 3rd Wave `.wt` files by content (the 64 frames, and a U table's mipmap
-  chain separately), for checking **Export Wavetable**'s `01.wt`, `02.wt`, … against the files
-  imported; `tw3pg makewavetests <out dir>` writes three synthetic tables recognizable by ear
+  flags, the app's own writing and report), so a destination can be tested in its synth without
+  the app; `tw3pg wtmatch <expected> -- <files>` identifies 3rd Wave `.wt` files by content (the
+  64 frames; a U table's mipmap chain and a P table's differences reported separately; values
+  within `WavetableFile.exportTolerance` count as the same, since **Export Wavetable** writes six
+  decimals), for checking `01.wt`, `02.wt`, … against the files imported; `tw3pg makewavetests
+  <out dir>` writes three synthetic tables recognizable by ear
   (a sine-to-square morph, four shapes, harmonics added frame by frame) for such tests.
 - **Fixtures**: `FixtureTests` runs with the suite; regenerate after a deliberate change with
   `PGDATA_TESTS=1 PGDATA_REGENERATE_FIXTURES=1 swift test --filter FixtureTests` and commit the files.

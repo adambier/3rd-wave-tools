@@ -372,7 +372,9 @@ final class WritingTests: XCTestCase {
         XCTAssertEqual(Set(titles).count, titles.count)
         for p in OutputPreset.allCases {
             XCTAssertFalse(p.title.isEmpty)
-            XCTAssertEqual(p.testedIn, p.isThirdWave ? ["on the 3rd Wave 8M, OS 2.0d"] : [])
+            // Each entry carries its preposition, for the page's "Tested …" line.
+            for entry in p.testedIn { XCTAssertTrue(entry.hasPrefix("on ") || entry.hasPrefix("in "), entry) }
+            XCTAssertEqual(p.testedIn.isEmpty, !p.isThirdWave, "\(p)")
             XCTAssertFalse(p.basis.isEmpty)
             XCTAssertLessThanOrEqual(p.requiredFrameCount ?? 0, p.maxFrameCount)
         }

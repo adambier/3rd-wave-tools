@@ -29,11 +29,12 @@ import WavetableFormats
 //                                        last, one WAV per interpolation, with the difference between cycles
 //   tw3pg wtconvert <out dir> [--preset <name>] [--new-frames original|crossfade] [--interpolation <mode>]
 //                [--ppg-waves] [--tonverk-size N] [--frame-size N] [--name-suffix text] <files or dirs>...
-//                                        convert as the Wavetables page's Convert All does (the same plan and
-//                                        writer), without the app
+//                                        convert as the Wavetables page's Convert All does (the same plan,
+//                                        writer, and writing), without the app, printing the page's report
 //   tw3pg wtmatch <expected .wt files or dirs> -- <files or dirs to identify>   identify 3rd Wave .wt files by
 //                                        content (e.g., Export Wavetable's 01.wt, 02.wt, … against the files
-//                                        imported), reporting identical, chain-only, or nearest with the difference
+//                                        imported): identical, the same to the export's six decimals, the same
+//                                        frames with a differing chain, or the nearest with the difference
 //   tw3pg makewavetests <out dir>        three synthetic tables for testing destinations in their synths
 //   tw3pg maketests | maketest5 | maketest6 ...   build the hardware-test files (see each command's usage line)
 
@@ -53,6 +54,51 @@ func files(under paths: [String], ext: Set<String>) -> [URL] {
 }
 
 func load(_ u: URL) throws -> Data { try Data(contentsOf: u) }
+
+/// Takes `--name value` out of `args` and returns the value; stops with a message when the
+/// option is given without a value or more than once. Nil when it is absent.
+func takeOption(_ name: String, from args: inout [String]) -> String? {
+    guard let i = args.firstIndex(of: name) else { return nil }
+    guard i + 1 < args.count, !args[i + 1].hasPrefix("--") else { print("option \(name) needs a value"); exit(2) }
+    let v = args[i + 1]; args.removeSubrange(i...(i + 1))
+    if args.contains(name) { print("option \(name) given more than once"); exit(2) }
+    return v
+}
+
+/// Takes `--name` out of `args`; true when it was there.
+func takeFlag(_ name: String, from args: inout [String]) -> Bool {
+    guard let i = args.firstIndex(of: name) else { return false }
+    args.remove(at: i); return true
+}
+
+/// The integer an option names, or a message and exit when it is not one.
+func integerOption(_ name: String, _ text: String?) -> Int? {
+    guard let text else { return nil }
+    guard let n = Int(text), n > 0 else { print("option \(name) needs a whole number above 0, not \(text)"); exit(2) }
+    return n
+}
+
+/// Stops when an unknown `--option` is left among the arguments.
+func rejectUnknownOptions(_ args: [String]) {
+    if let stray = args.first(where: { $0.hasPrefix("--") }) { print("unknown option \(stray)"); exit(2) }
+}
+
+/// A mono float32 WAV (the layout the Wavetables page writes for Serum-style files): fmt, an
+/// optional clm chunk, data.
+func monoFloatWAV(_ samples: [Float], rate: Int, clm: String? = nil) -> Data {
+    var wav = Data()
+    func le32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { wav.append(contentsOf: $0) } }
+    func le16(_ v: UInt16) { withUnsafeBytes(of: v.littleEndian) { wav.append(contentsOf: $0) } }
+    let clmBytes = clm.map { Array($0.utf8) } ?? []
+    let clmPadded = clmBytes + (clmBytes.count % 2 == 1 ? [0] : [])
+    let clmSize = clmBytes.isEmpty ? 0 : 8 + clmPadded.count
+    wav.append(contentsOf: Array("RIFF".utf8)); le32(UInt32(4 + 24 + clmSize + 8 + samples.count * 4)); wav.append(contentsOf: Array("WAVE".utf8))
+    wav.append(contentsOf: Array("fmt ".utf8)); le32(16); le16(3); le16(1); le32(UInt32(rate)); le32(UInt32(rate) * 4); le16(4); le16(32)
+    if !clmBytes.isEmpty { wav.append(contentsOf: Array("clm ".utf8)); le32(UInt32(clmBytes.count)); wav.append(contentsOf: clmPadded) }
+    wav.append(contentsOf: Array("data".utf8)); le32(UInt32(samples.count * 4))
+    for s in samples { le32(s.bitPattern) }
+    return wav
+}
 
 func describe(_ u: URL) throws -> String {
     let d = try load(u)
@@ -467,17 +513,14 @@ case "sweep":
     // each new cycle crossfaded in over 480 samples (10 ms at 48 kHz) as AudioPreview.Voice does;
     // the slider's position is taken 60 times a second, the display's rate.
     var sweepArgs = rest
-    func option(_ name: String) -> String? {
-        guard let i = sweepArgs.firstIndex(of: name), i + 1 < sweepArgs.count else { return nil }
-        let v = sweepArgs[i + 1]; sweepArgs.removeSubrange(i...(i + 1)); return v
-    }
-    let presetName = option("--preset")
-    let modeName = option("--interpolation") ?? "all"
-    let seconds = Double(option("--seconds") ?? "8") ?? 8
-    let pitch = Double(option("--pitch") ?? "220") ?? 220
-    let rate = Double(option("--rate") ?? "48000") ?? 48_000
-    let forcedSize = option("--frame-size").flatMap(Int.init)
-    let newFrames = option("--new-frames") ?? "original"
+    let presetName = takeOption("--preset", from: &sweepArgs)
+    let modeName = takeOption("--interpolation", from: &sweepArgs) ?? "all"
+    let seconds = Double(takeOption("--seconds", from: &sweepArgs) ?? "8") ?? 8
+    let pitch = Double(takeOption("--pitch", from: &sweepArgs) ?? "220") ?? 220
+    let rate = Double(takeOption("--rate", from: &sweepArgs) ?? "48000") ?? 48_000
+    let forcedSize = integerOption("--frame-size", takeOption("--frame-size", from: &sweepArgs))
+    let newFrames = takeOption("--new-frames", from: &sweepArgs) ?? "original"
+    rejectUnknownOptions(sweepArgs)
     need(2, sweepArgs, "sweep <file> <out dir> [--preset thirdWaveP|thirdWaveU|wav2048|miniFreak|tonverk|phasePlant|surge|waveEdit] "
          + "[--interpolation none|crossfade|spectral|all] [--new-frames original|crossfade] [--seconds 8] [--pitch 220] [--rate 48000] [--frame-size N]")
     let frameCountPolicy: FrameCountPolicy = try {
@@ -579,16 +622,8 @@ case "sweep":
             phase += pitch / rate
             if phase >= 1 { phase -= 1 }
         }
-        // A mono float32 WAV (the same layout the Wavetables page writes for Serum-style files).
-        var wav = Data()
-        func le32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { wav.append(contentsOf: $0) } }
-        func le16(_ v: UInt16) { withUnsafeBytes(of: v.littleEndian) { wav.append(contentsOf: $0) } }
-        wav.append(contentsOf: Array("RIFF".utf8)); le32(UInt32(36 + out.count * 4)); wav.append(contentsOf: Array("WAVE".utf8))
-        wav.append(contentsOf: Array("fmt ".utf8)); le32(16); le16(3); le16(1); le32(UInt32(rate)); le32(UInt32(rate) * 4); le16(4); le16(32)
-        wav.append(contentsOf: Array("data".utf8)); le32(UInt32(out.count * 4))
-        for s in out { le32(s.bitPattern) }
         let fileName = "\(stem)-\(what)-\(mode.rawValue).wav"
-        try wav.write(to: outDir.appendingPathComponent(fileName))
+        try monoFloatWAV(out, rate: Int(rate)).write(to: outDir.appendingPathComponent(fileName))
         let mean = differences.isEmpty ? 0 : differences.reduce(0, +) / Float(differences.count)
         print("  \(fileName): \(changes) cycles played; between consecutive cycles the RMS difference is "
               + String(format: "%.4f on average, %.4f at most (at position %.2f)", mean, largestJump.rms, largestJump.position))
@@ -600,10 +635,12 @@ case "makewavetests":
     //   Test Morph.wav          64 frames of 2,048: sine → triangle → sawtooth → square
     //   Test Four Frames.wav     4 frames of 2,048: sine, triangle, sawtooth, square (for the
     //                           frame-count options: repeated, or crossfaded into 64 frames)
-    //   Test Harmonic Steps.wav 64 frames of 128: frame n adds the nth harmonic (a P table's size)
+    //   Test Harmonic Steps.wav 64 frames of 128: frame n holds harmonics 1 to n + 1 (a P table's
+    //                           size; harmonic 64 would be the frames' Nyquist, so the last frame
+    //                           holds 1 to 63 and frame 63 repeats it)
     // The first two are Serum-style files written by the library; the third is a plain WAV with a
-    // clm chunk stating its frame size.
-    need(1, rest, "makewavetests <out dir>")
+    // clm chunk stating its frame size. Existing files of these names are replaced.
+    need(1, rest, "makewavetests <out dir>   (writes Test Morph.wav, Test Four Frames.wav, and Test Harmonic Steps.wav, replacing them)")
     let outDir = URL(fileURLWithPath: rest[0])
     try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
     let twoPi = 2 * Float.pi
@@ -628,7 +665,7 @@ case "makewavetests":
     }
     let steps: [[Float]] = (0..<64).map { f in
         var cycle = [Float](repeating: 0, count: 128)
-        for h in 1...min(f + 1, 60) {
+        for h in 1...min(f + 1, 63) {
             for i in 0..<128 { cycle[i] += sin(twoPi * Float(h * i) / 128) / Float(h) }
         }
         let peak = cycle.map(abs).max() ?? 1
@@ -641,47 +678,33 @@ case "makewavetests":
         print("\(out.fileName): \(frames.count) frames of 2,048 samples")
     }
     // A mono float32 WAV whose clm chunk states 128 samples per frame.
-    var wav = Data()
-    func le32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { wav.append(contentsOf: $0) } }
-    func le16(_ v: UInt16) { withUnsafeBytes(of: v.littleEndian) { wav.append(contentsOf: $0) } }
-    let samples = steps.flatMap { $0 }
-    let clm = Array("<!>128 00000000 wavetable (pgdata Packer test)".utf8)
-    let clmPadded = clm + (clm.count % 2 == 1 ? [0] : [])
-    wav.append(contentsOf: Array("RIFF".utf8)); le32(UInt32(4 + 24 + 8 + clmPadded.count + 8 + samples.count * 4)); wav.append(contentsOf: Array("WAVE".utf8))
-    wav.append(contentsOf: Array("fmt ".utf8)); le32(16); le16(3); le16(1); le32(44_100); le32(44_100 * 4); le16(4); le16(32)
-    wav.append(contentsOf: Array("clm ".utf8)); le32(UInt32(clm.count)); wav.append(contentsOf: clmPadded)
-    wav.append(contentsOf: Array("data".utf8)); le32(UInt32(samples.count * 4))
-    for s in samples { le32(s.bitPattern) }
-    try wav.write(to: outDir.appendingPathComponent("Test Harmonic Steps.wav"))
+    try monoFloatWAV(steps.flatMap { $0 }, rate: 44_100, clm: "<!>128 00000000 wavetable (pgdata Packer test)")
+        .write(to: outDir.appendingPathComponent("Test Harmonic Steps.wav"))
     print("Test Harmonic Steps.wav: 64 frames of 128 samples")
 
 case "wtconvert":
-    // Converts files as the Wavetables page's Convert All does, through the same plan
-    // (ConvertPlan: the same reading, duplicate collapsing, frame-size verdicts, and writer), so a
-    // destination can be tested in its synth without the app, or the app's output checked
-    // against the library's. Options are the Options box's: --new-frames original|crossfade
-    // (Original Frames Only, Crossfade New Frames), --interpolation none|crossfade|spectral (the
-    // Interpolation pop-up; dropped where the destination records none), --ppg-waves (the P
-    // table's "Add the PPG's standard waveforms at 60–63"), --tonverk-size N. --frame-size N
-    // settles every table whose size the file does not state (the chooser in the Input column);
-    // --name-suffix adds to every table's name (as renaming in the Name column would).
+    // Converts files as the Wavetables page's Convert All does, through the same plan and the
+    // same writing (ConvertPlan: the same reading, duplicate collapsing, frame-size verdicts,
+    // writer, WAVES subfolder for 3rd Wave files, and no replacing of an existing file), and
+    // prints the page's own report, so a destination can be tested in its synth without the
+    // app, or the app's output checked against the library's. Options are the Options box's:
+    // --new-frames original|crossfade (Original Frames Only, Crossfade New Frames),
+    // --interpolation none|crossfade|spectral (the Interpolation pop-up; dropped where the
+    // destination records none), --ppg-waves (the P table's "Add the PPG's standard waveforms at
+    // 60–63"), --tonverk-size N. --frame-size N is the page's one frame size for several
+    // tables: it settles every table whose file does not state a size and whose length allows
+    // N, and says which tables it did not apply to. --name-suffix adds to every table's name
+    // (as renaming in the Name column would).
     var convertArgs = rest
-    func option(_ name: String) -> String? {
-        guard let i = convertArgs.firstIndex(of: name), i + 1 < convertArgs.count else { return nil }
-        let v = convertArgs[i + 1]; convertArgs.removeSubrange(i...(i + 1)); return v
-    }
-    func flag(_ name: String) -> Bool {
-        guard let i = convertArgs.firstIndex(of: name) else { return false }
-        convertArgs.remove(at: i); return true
-    }
-    let presetName = option("--preset") ?? "thirdWaveU"
-    let newFrames = option("--new-frames") ?? "original"
-    let modeName = option("--interpolation")
-    let ppgWaves = flag("--ppg-waves")
-    let tonverkSize = option("--tonverk-size").flatMap(Int.init)
-    let forcedSize = option("--frame-size").flatMap(Int.init)
-    let suffix = option("--name-suffix") ?? ""
-    need(2, convertArgs, "wtconvert <out dir> [--preset thirdWaveU|thirdWaveP|wav2048|miniFreak|tonverk|phasePlant|surge|waveEdit] "
+    let presetName = takeOption("--preset", from: &convertArgs) ?? "thirdWaveU"
+    let newFrames = takeOption("--new-frames", from: &convertArgs) ?? "original"
+    let modeName = takeOption("--interpolation", from: &convertArgs)
+    let ppgWaves = takeFlag("--ppg-waves", from: &convertArgs)
+    let tonverkSize = integerOption("--tonverk-size", takeOption("--tonverk-size", from: &convertArgs))
+    let forcedSize = integerOption("--frame-size", takeOption("--frame-size", from: &convertArgs))
+    let suffix = takeOption("--name-suffix", from: &convertArgs) ?? ""
+    rejectUnknownOptions(convertArgs)
+    need(2, convertArgs, "wtconvert <out dir> [--preset thirdWaveP|thirdWaveU|wav2048|miniFreak|tonverk|phasePlant|surge|waveEdit] "
          + "[--new-frames original|crossfade] [--interpolation none|crossfade|spectral] [--ppg-waves] [--tonverk-size N] "
          + "[--frame-size N] [--name-suffix text] <files or dirs>...")
     guard let preset = OutputPreset(rawValue: presetName) else {
@@ -705,77 +728,76 @@ case "wtconvert":
     var plan = ConvertPlan(preset: preset, options: options)
     let collected = ConvertPlan.collect(urls: inputs)
     for p in collected.problems { print("not read: \(p)") }
-    plan.add(collected.found)
+    let added = plan.add(collected.found)
+    print("\(added.added) tables listed; \(added.duplicates) duplicates recorded under them; \(added.repeated) repeated; "
+          + "\(collected.withoutTables) files without tables; \(collected.ignored) files skipped by name")
+    if let forcedSize { plan.chooseFrameSize(forcedSize, forAll: Set(plan.items.map(\.id))) }
     for item in plan.items {
-        if !item.sizeIsStated, let forcedSize { plan.chooseFrameSize(item.id, forcedSize) }
         if !suffix.isEmpty { plan.rename(item.id, to: item.name + suffix) }
+        print("\(item.name): \(item.sizeDescription)" + (item.sizeQualifier.map { " (\($0))" } ?? ""))
+        if let forcedSize, item.frameSize != forcedSize {
+            print("    --frame-size \(forcedSize) not applied: " + (item.sizeIsStated ? "the file states its size" : "the file’s length does not allow it"))
+        }
     }
     for item in plan.items where !plan.isIncluded(item) {
         print("left out (as Convert All leaves it): \(item.name)")
     }
     let conversion = plan.convert()
-    try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
-    for (file, report) in zip(conversion.files, conversion.reports) {
-        try file.data.write(to: outDir.appendingPathComponent(file.fileName))
-        print("\(file.fileName)  ← \(report.name)")
-        for n in report.notes { print("    \(n)") }
-    }
-    for e in conversion.errors { print("not converted: \(e)") }
-    print("\(conversion.files.count) files written to \(outDir.path) for \(preset.title)")
+    let written = ConvertPlan.write(conversion.files, into: outDir)
+    print(ConvertReport(plan: plan, conversion: conversion, written: written, folder: outDir, packFiles: []).log)
 
 case "wtmatch":
     // Identifies 3rd Wave .wt files by content: for each file in the second set (e.g., the WAVES
     // folder after Export Wavetable, whose names are a counter), the file in the first set with
-    // the same values (the 64 frames, which are what the 3rd Wave identifies a table by, and a U
-    // table's mipmap chain separately), or the nearest one and how far off it is. The 3rd Wave
-    // writes each value with six decimal places (see section 5.1 of FORMATS.md), so a value
-    // within 0.0000006 of the expected one (half of the sixth decimal, and float32's own
-    // rounding of the decimal read back) counts as the same value, and the report says when the
-    // match is exact and when it is to that precision.
-    need(2, rest, "wtmatch <expected .wt files or dirs> -- <files or dirs to identify>")
-    let split = rest.firstIndex(of: "--") ?? 1
-    let expected = try files(under: Array(rest[..<split]), ext: ["wt"]).map { ($0.lastPathComponent, try WavetableFile(data: load($0))) }
-    let actual = files(under: Array(rest[min(split + 1, rest.count)...]), ext: ["wt"])
-    let exportPrecision: Float = 0.0000006   // half of the last decimal place the 3rd Wave writes, and float32 rounding
-    func differing(_ a: [Float], _ b: [Float]) -> (count: Int, exact: Bool, maxDelta: Float) {
-        var n = 0, m: Float = 0, exact = a.count == b.count
-        for (x, y) in zip(a, b) where x != y {
-            exact = false
-            let d = abs(x - y); m = max(m, d)
-            if d > exportPrecision { n += 1 }
-        }
-        return (n + abs(a.count - b.count), exact, m)
+    // the same values, or the nearest one and how far off it is. A U table is matched on its 64
+    // frames (its first 65,536 values, what the 3rd Wave identifies it by; section 5.1 of
+    // FORMATS.md) with its mipmap chain reported separately; a P table on its samples, with the
+    // differences the file carries reported separately. The 3rd Wave writes each value with six
+    // decimals, so a value within WavetableFile.exportTolerance of the expected one counts as
+    // the same value, and the report says when a match is exact and when it is to that precision.
+    guard let split = rest.firstIndex(of: "--"), split >= 1 else {
+        print("usage: tw3pg wtmatch <expected .wt files or dirs> -- <files or dirs to identify>"); exit(2)
     }
+    var expected: [(name: String, file: WavetableFile)] = []
+    for u in files(under: Array(rest[..<split]), ext: ["wt"]) {
+        do { expected.append((u.lastPathComponent, try WavetableFile(data: load(u)))) }
+        catch { print("\(u.lastPathComponent): not a 3rd Wave wavetable, left out of the expected set (\(error))") }
+    }
+    let actual = files(under: Array(rest[(split + 1)...]), ext: ["wt"])
     func count(_ n: Int) -> String { ConvertPlan.formatCount(n) }
-    func precisionWords(_ d: (count: Int, exact: Bool, maxDelta: Float)) -> String {
-        d.exact ? "identical" : "the same to the export’s six decimal places (largest difference \(d.maxDelta))"
+    func words(_ d: (differing: Int, exact: Bool, largest: Float), _ what: String, total: Int) -> String {
+        if d.exact { return "\(what) identical" }
+        if d.differing == 0 { return "\(what) the same to the export’s six decimal places (largest difference \(d.largest))" }
+        return "\(what) differ in \(count(d.differing)) of \(count(total)) values (largest difference \(d.largest))"
     }
-    var identical = 0
+    var same = 0
     for u in actual {
         let w: WavetableFile
         do { w = try WavetableFile(data: load(u)) } catch { print("\(u.lastPathComponent): not a 3rd Wave wavetable (\(error))"); continue }
         let frames = w.frames.flatMap { $0 }
         let label = "\(u.lastPathComponent)  \(w.kind.letter) “\(w.name)”"
-        let same = expected.filter { $0.1.kind == w.kind }
-        guard !same.isEmpty else { print("\(label): no \(w.kind.letter) table to compare with"); continue }
-        let scored = same.map { ($0.0, $0.1, differing($0.1.frames.flatMap { $0 }, frames)) }
-            .sorted { ($0.2.count, $0.2.maxDelta) < ($1.2.count, $1.2.maxDelta) }
+        let candidates = expected.filter { $0.file.kind == w.kind }
+        guard !candidates.isEmpty else { print("\(label): no \(w.kind.letter) table to compare with"); continue }
+        let scored = candidates.map { ($0.name, $0.file, WavetableFile.compare($0.file.frames.flatMap { $0 }, frames)) }
+            .sorted { ($0.2.differing, $0.2.largest) < ($1.2.differing, $1.2.largest) }
         let (name, e, d) = scored[0]
-        if d.count == 0 {
-            var line = "\(label)  = \(name): the 64 frames are \(precisionWords(d))"
+        if d.differing == 0 {
+            var line = "\(label)  = \(name): " + words(d, "the 64 frames are", total: frames.count)
             if w.kind == .u, let c1 = e.mipmapChain, let c2 = w.mipmapChain {
-                let dc = differing(c1, c2)
-                line += dc.count == 0 ? "; the mipmap chain is \(precisionWords(dc))"
-                                      : "; the mipmap chain differs in \(count(dc.count)) of \(count(c1.count)) values (largest difference \(dc.maxDelta))"
+                line += "; " + words(WavetableFile.compare(c1, c2), "the mipmap chain is", total: c1.count).replacingOccurrences(of: "chain is differ", with: "chain values differ")
+            } else if w.kind == .p {
+                let ed = stride(from: 1, to: e.values.count, by: 2).map { e.values[$0] }
+                let wd = stride(from: 1, to: w.values.count, by: 2).map { w.values[$0] }
+                line += "; " + words(WavetableFile.compare(ed, wd), "the differences are", total: ed.count).replacingOccurrences(of: "are differ", with: "differ")
             }
             if w.name != e.name { line += "; the name differs: expected “\(e.name)”" }
             print(line)
-            identical += 1
+            same += 1
         } else {
-            print("\(label)  ≠ nearest \(name): \(count(d.count)) of \(count(frames.count)) frame values differ by more than the export’s precision (largest difference \(d.maxDelta))")
+            print("\(label)  ≠ nearest \(name): \(count(d.differing)) of \(count(frames.count)) frame values differ by more than the export’s precision (largest difference \(d.largest))")
         }
     }
-    print("\(identical) of \(actual.count) files have the same 64 frames as a file of the first set")
+    print("\(same) of \(actual.count) files have the same 64 frames as a file of the first set")
 
 default:
     print("unknown command \(cmd)"); exit(2)

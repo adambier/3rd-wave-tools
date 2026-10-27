@@ -51,8 +51,9 @@ def squircle_path(x, y, w, h, n=5.0, steps=96):
 def leaned_sine(a, x):
     """A sine leaned like a saw by phase distortion: the rise takes (1 + a) / 2 of the cycle and
     the fall the rest, with no corners. a = 0 is a sine; a = 0.55 is clearly saw-like. At 32 px
-    and below the box icon's frames are a = 0 and 0.55, back and front, so the morph between
-    them is visible where exact shapes would not be (Adam, 2026-10-26: highlight the morphing)."""
+    and below the box icon draws two frames, a = 0 at the back and 0.55 in front, so the morph
+    between them is visible where exact shapes would not be (Adam, 2026-10-26: highlight the
+    morphing)."""
     p = (x / (2 * math.pi)) % 1.0
     r = 0.5 * (1 + a)
     u = (p / r) * 0.5 if p < r else 0.5 + (p - r) / (1 - r) * 0.5
@@ -89,7 +90,8 @@ AMBER_TOP, AMBER_BOTTOM = "#f7bd5c", "#d8862a"
 # The box icon's frames, back to front: cyan, white, pink, so the three read as three even at
 # 32 px, where their shapes no longer do.
 FRAME_COLORS = ("#7fdcff", "#ffffff", "#ff5fae")
-FRAME_LEANS = (0.0, 0.3, 0.55)        # the leaned sines of the small sizes
+FRAME_LEANS = {0: 0.0, 2: 0.55}       # the two leaned sines of the small sizes, by frame index (back, front)
+FRAME_STROKES_SMALL = {0: 70, 2: 86}  # their stroke widths
 FRAME_CYCLES = {4: 2, 3: 1}           # cycles per frame by detail: two from 128 px up, one at 64 px
 
 def glyph_box(detail):
@@ -122,7 +124,7 @@ def glyph_box(detail):
             elif i == 1: pts = triangle_points(cx, base, width, amp, cycles)
             else: pts = sawtooth_points(cx, base, width, amp, cycles)
         else:
-            stroke = (70, 0, 86)[i]
+            stroke = FRAME_STROKES_SMALL[i]
             pts = shape_points(lambda x, a=FRAME_LEANS[i]: leaned_sine(a, x), cx, base, width, amp)
         out.append(f'<path d="{path_d(pts)}" fill="none" stroke="{FRAME_COLORS[i]}" stroke-width="{stroke}" '
                    f'stroke-linecap="round" stroke-linejoin="round" opacity="{opacity:.2f}"/>')

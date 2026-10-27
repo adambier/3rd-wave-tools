@@ -94,7 +94,8 @@ DEPLOYMENT_TARGET="13.0"
 # the year of first publication through the year of this build, kept current by the build itself.
 FIRST_YEAR="2026"
 THIS_YEAR="$(date +%Y)"
-COPYRIGHT_YEARS="$FIRST_YEAR"; [ "$THIS_YEAR" -gt "$FIRST_YEAR" ] && COPYRIGHT_YEARS="$FIRST_YEAR–$THIS_YEAR"
+COPYRIGHT_YEARS="$FIRST_YEAR"
+if [ "$THIS_YEAR" -gt "$FIRST_YEAR" ]; then COPYRIGHT_YEARS="$FIRST_YEAR–$THIS_YEAR"; fi
 COPYRIGHT="Copyright © $COPYRIGHT_YEARS Adam Arthur Bier. MIT License."
 
 # A second item for the same version would carry a new build number and signature but point at the

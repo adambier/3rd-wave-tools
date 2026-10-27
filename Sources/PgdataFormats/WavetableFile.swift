@@ -147,6 +147,30 @@ public struct WavetableFile: Equatable, Sendable {
     /// tables that differ only in their mipmap chains have different fingerprints here.
     public var fingerprint: UInt64 { fnv1a64(dataBytes) }
 
+    /// How far two lists of values are apart: how many positions differ by more than
+    /// `tolerance` (a difference in length counts as that many), whether every value is exactly
+    /// equal, and the largest difference. For checking what the 3rd Wave gives back against what
+    /// it was given: **Export Wavetable** writes each value with six decimals (section 5.1 of
+    /// FORMATS.md), so a value within ``exportTolerance`` of the original is the same value as
+    /// the 3rd Wave exports it.
+    public static func compare(_ a: [Float], _ b: [Float], tolerance: Float = exportTolerance)
+        -> (differing: Int, exact: Bool, largest: Float) {
+        var n = 0, largest: Float = 0, exact = a.count == b.count
+        for (x, y) in zip(a, b) where x != y {
+            exact = false
+            let d = abs(x - y)
+            largest = max(largest, d)
+            if d > tolerance { n += 1 }
+        }
+        return (n + abs(a.count - b.count), exact, largest)
+    }
+
+    /// Half of the sixth decimal, which is the last one **Export Wavetable** writes, plus a
+    /// little for float32's own rounding of the decimal read back (section 5.1 of FORMATS.md):
+    /// 0.0000006. Checked on an 8M (OS 2.0d): eight tables exported after import differed from
+    /// the files imported by at most 0.0000005 in every value.
+    public static let exportTolerance: Float = 0.0000006
+
     /// The largest absolute sample. The 3rd Wave's own tables stay within ±1 (seen in every
     /// factory table, and in SysEx dumps from an 8M), so more suggests a damaged or unnormalized file.
     /// A P table stores each point as a sample and the difference to the next (FORMATS.md 5.1),
