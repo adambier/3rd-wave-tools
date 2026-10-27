@@ -520,6 +520,11 @@ credentials that are not in the repository.
   the Wavetables page (`ConvertPlan.gatingPresets`).
 - The mipmap chain written for U tables uses ideal spectral cut-offs; the factory filter is unknown
   (the 3rd Wave identifies a table by its first 65,536 values, so the chain need not match).
+- `.wt` value lines must stay within 31 characters: the 3rd Wave reads a longer line as two values
+  (FORMATS.md section 5.1). The library's writers never exceed 18; `WavetableFile` does not yet
+  warn about a file that does. 3rd Wave Terminal's P exports (256 plain samples per `//waveform`
+  block) read as pairs give the table's samples, which is also how the 3rd Wave imports them, so
+  the reader needs no second layout.
 - `fixtures/` exercise structure, not sound, and have not been loaded on the 3rd Wave.
 - The app is macOS-only; CI compiles it but has no tests for it. A Linux or Windows front end would
   build on `PgdataPackerCore`, whose API may change between versions more than `PgdataFormats`'s.

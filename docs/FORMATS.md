@@ -402,6 +402,17 @@ Plain text, LF or CRLF line ends.
   decimals (`0.004909f`) and no comments, so an exported table carries each value rounded to the
   sixth decimal.[^wt-export] The library writes six decimals when that gives back the exact
   float, and the shortest exact form otherwise.
+- **Keep every value line within 31 characters.** The 3rd Wave reads the values as one stream,
+  comment lines aside, and a line longer than 31 characters has been observed to be read as two
+  values (the first 31 characters and the rest), which shifts everything after it; **Export
+  Wavetable** also writes at most 31 characters per value, cutting longer ones. A 32-byte buffer
+  is the inference.[^long-lines] Ordinary values take 8 to 18 characters, so only out-of-range
+  values written in fixed notation (`-261953457593075210649600.0000000000000f`) reach the limit.
+- **A second layout exists:** 3rd Wave Terminal exports a P table as 64 `//waveform` blocks of
+  256 plain samples, each cycle at twice the resolution (the odd values midway between the even
+  ones) instead of 128 sample-and-difference pairs. Read as pairs, the even values are the
+  table's 128 samples, so the 3rd Wave imports such a file as the table it came from (one
+  test).[^long-lines]
 
 **P tables (PPG-style).** The P set is the 3rd Wave's form of the PPG Wave's wavetables. P00–P31
 are derived from the PPG Wave 2.2/2.3's own tables (P30 is the PPG's *upper wavetable*), P32 and
@@ -415,8 +426,10 @@ the user's own.[^manual] The format:
   derived data: in every factory P table examined it equals the next sample minus this one to
   float precision, and over SysEx the 3rd Wave sends a P table as 64 × 128 plain samples.[^p-diff]
   A writer should compute the differences
-  from the samples; what the 3rd Wave does when a file's differences disagree with its samples has
-  not been tested.
+  from the samples. The 3rd Wave stores and exports the second value of each pair as given: a
+  file whose second values were not differences came back from **Export Wavetable** with those
+  values unchanged, and its samples played as the table, so the second values appear not to be
+  used in playback, at least with that program's Wave Flow settings (one test, by ear).[^long-lines]
 - **The samples are floats within ±1**, not quantized to the PPG's 8-bit levels, although the
   manual calls the P set "8-bit" and says the **Wave Maker** converts imported audio "to the correct
   sample rate and bit depth" for it. So any reduction the 3rd Wave applies is presumably made when
@@ -753,6 +766,15 @@ Tested on an 8M (OS 2.0d) unless a footnote says otherwise; section
     (largest difference 0.0000005), and nothing else differed. Whether the 3rd Wave would match
     such an export to the original by content on a second import is untested; by the rounding,
     an inference says not.
+[^long-lines]: 8M, OS 2.0d, 26 October 2026: a P table exported by 3rd Wave Terminal (64
+    `//waveform` blocks of 256 plain samples; three blocks of out-of-range values from a corrupted
+    transfer, written as 34- to 53-character lines) imported with **Bulk wavetable import** without
+    complaint and exported again. In the export, every clean block came back as its even values
+    (the samples) and odd values (the second of each pair, unchanged), and each of the three long-line
+    blocks came back as two frames whose samples were the block's values in order with 0 as every
+    second value, shifting the following frames by one each time (frames 11–12, 23–24, and 29–30
+    held the garbage); the export's longest line is 31 characters. The table played as the
+    original apart from those frames.
 [^wt-import]: 8M, OS 2.0d, 26 October 2026: the wavetable-conversion test of pgdata Packer 1.1
     (eight tables written by the app's Wavetables page). The P slots were free; U55 was chosen
     as the starting U slot in the import's prompt.
@@ -803,6 +825,7 @@ one run. The exceptions are 12 third-party `.pgdata` files that are damaged as d
 | Eight `.wt` files written by pgdata Packer's Wavetables page (four U tables: from Serum-style and u-he files resized from 2,048 to 1,024 samples per frame, one reduced from 174 frames to 64, one crossfaded from 4 frames to 64; four P tables: from 64 × 128 files and from Serum-style files resized to 128, one with the PPG's waveforms at 60–63), by **Bulk wavetable import** (26 October 2026) | stored in consecutive slots from the one chosen (P36–P39, U55–U58); every table played as written, the U tables blending between frames and the P tables stepping; **Export Wavetable** gave every table back the same to six decimals (section 5.1) |
 | A user P table carrying the PPG's four waveforms at 60–63, wave offset set to 60–63 by hand | with **use upper wavetable** off, one unchanging waveform; with it on, the triangle, narrow pulse, square, and sawtooth as written (section 5.1) |
 | Programs written with source ids 1002 and 2048 | the OSC screen showed P36 and U55 with the tables imported there (section 2) |
+| A P table exported by 3rd Wave Terminal (256 plain samples per block, three blocks of garbage on 34- to 53-character lines), by **Bulk wavetable import**, then **Export Wavetable** | imported without complaint and played as the original; the long lines were read as two values each, shifting later frames (section 5.1) |
 
 **Implemented from this document alone.** As a check that section 6 describes the conversion fully
 enough to reproduce it, a converter was written by
