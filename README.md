@@ -327,6 +327,8 @@ what the 3rd Wave's **Wave Maker** does. Wave Maker also imports a Serum wavetab
 page adds other formats and frame sizes, many tables at once, and a step straight to the Pack
 page.
 
+![The Wavetables page with 18 tables of several kinds listed, two of them factory tables; the selected table's preview under the list, with pictures of the input and of the 3rd Wave U table it becomes, the cycle at the Frame slider, the facts and notes beside them, and the Listen controls; on the right, the destinations with the 3rd Wave U table chosen and its options](docs/wavetables-window.png)
+
 #### Frame sizes
 
 The Input column says where each table's frame size comes from:

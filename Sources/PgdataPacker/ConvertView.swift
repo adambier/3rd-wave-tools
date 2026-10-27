@@ -35,15 +35,17 @@ struct ConvertView: View {
             } else {
                 HSplitView {
                     // The preview takes the height its content needs (a status display, not a
-                    // pane to resize or scroll), up to a share of the height that leaves the
-                    // table its rows; laid out across the whole left side, it is short.
+                    // pane to resize or scroll), up to what leaves the table its filter row,
+                    // header, and five rows (`ConvertTablesPane.minimumHeight`; half the page
+                    // cut off Phase Plant's five notes, Adam, 2026-10-27); laid out across the
+                    // whole left side, it is short.
                     GeometryReader { (geo: GeometryProxy) in
                         VStack(spacing: 0) {
                             ConvertTablesPane(selection: $selection)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                             Divider()
                             ConvertDetailPane(selection: selection,
-                                              maxHeight: max(ConvertDetailPane.minimumHeight, geo.size.height * 0.5))
+                                              maxHeight: max(ConvertDetailPane.minimumHeight, geo.size.height - ConvertTablesPane.minimumHeight))
                         }
                     }
                     .frame(minWidth: 660, maxWidth: .infinity, maxHeight: .infinity)
@@ -135,6 +137,10 @@ struct ConvertDevelopmentNotice: View {
 struct ConvertTablesPane: View {
     @EnvironmentObject var state: AppState
     @Binding var selection: Set<UUID>
+
+    /// The least the table keeps when the preview under it grows for tall content: the filter
+    /// row and the summary line (about 80 points), the header, and five rows of 36.
+    static let minimumHeight: CGFloat = 300
 
     /// The rows shown (`AppState.convertShownItems`): every table, those matching the filter
     /// field, or only those that can't be converted yet, as the Pack page's list filters.

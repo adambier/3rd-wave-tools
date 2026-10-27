@@ -226,6 +226,14 @@ final class WritingTests: XCTestCase {
         XCTAssertEqual(Wavetable.peakText(10_000), "1.0 × 10⁴")
         XCTAssertEqual(Wavetable.peakText(2.2462696e+36), "2.2 × 10³⁶")
         XCTAssertEqual(Wavetable.peakText(99_600), "1.0 × 10⁵")
+        // A damaged .pgdata can carry an infinity (its payload is float32 bit patterns, unchecked).
+        XCTAssertEqual(Wavetable.peakText(.infinity), "infinite")
+        var bytes = [UInt8](repeating: 0, count: 16_384 * 4)
+        bytes[0] = 0x00; bytes[1] = 0x00; bytes[2] = 0x80; bytes[3] = 0x7F   // +inf, little-endian float32
+        let damaged = WavetableFile(kind: .p, name: "Damaged", dataBytes: bytes)
+        XCTAssertEqual(damaged.peak, .infinity)
+        let found = WavetableReader.thirdWaveTable(damaged, name: "Damaged", fileName: "d.pgdata", source: .unifiedProgram(slot: "P36", isP: true))
+        XCTAssertTrue(found.notes.contains { $0.contains("infinite") }, "\(found.notes)")
         let barely = try write(table(frames: 4, size: 2048, peak: 1.0003), .wav2048)
         notes(barely, contain: "Peak 1.0003 kept, over full scale")
         let turned = try write(table(frames: 4, size: 1024, peak: 1.0003), .thirdWaveU)

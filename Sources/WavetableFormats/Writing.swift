@@ -100,10 +100,6 @@ public enum WavetableWriter {
             plan = WavetableWriter.plan(for: table, preset: preset, options: options)
         }
 
-        /// The interpolation asked for (the option, else the table's, else crossfade), which the
-        /// notes speak of; `plan.interpolationRecorded` is what the file gets.
-        var interpolation: Interpolation { options.interpolation ?? table.interpolation ?? .crossfade }
-
         mutating func run() throws -> OutputFile {
             if preset == .tonverk, let asked = options.tonverkFrameSize, !WavetableWriter.tonverkFrameSizes.contains(asked) {
                 throw WavetableError(.cannotConvert, "Tonverk takes frames of 64, 128, 256, 512, 1,024, 2,048, or 4,096 samples, not \(grouped(asked)).")

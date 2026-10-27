@@ -33,6 +33,9 @@ public struct Wavetable: Equatable, Sendable {
     /// A peak of 10,000 or more, which only a damaged file has, is written as a power of ten
     /// ("2.2 × 10³⁶") rather than as a row of digits.
     public static func peakText(_ peak: Float) -> String {
+        // A `.pgdata` payload is read as float32 bit patterns unchecked, so a damaged one can
+        // carry an infinity; `Int(log10(inf))` would trap.
+        guard peak.isFinite else { return "infinite" }
         if peak >= 10_000 {
             let exponent = Int(log10(Double(peak)).rounded(.down))
             let mantissa = Double(peak) / pow(10, Double(exponent))

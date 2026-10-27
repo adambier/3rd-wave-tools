@@ -215,8 +215,8 @@ public struct WavetableFile: Equatable, Sendable {
     /// Six decimals (the 3rd Wave's own "%f" style) when that reproduces the float32 exactly and
     /// fits a ``lineLimit``-character line with the `f` suffix; otherwise the shortest text that
     /// reproduces it. Groove Synthesis's factory P tables use 12–14 digits and exponent forms
-    /// ("1.38777878078e-17f"), so the 3rd Wave reads both. Only an out-of-range value (beyond
-    /// about ±10²⁴) is too long in six decimals; its exponent form is short.
+    /// ("1.38777878078e-17f"), so the 3rd Wave reads both. Only an out-of-range value (from
+    /// 10²³, or −10²² and below) is too long in six decimals; its exponent form is short.
     static func literal(_ v: Float) -> String {
         let six = String(format: "%f", Double(v))
         if Float(six) == v, six.count < lineLimit { return six }

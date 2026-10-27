@@ -291,8 +291,9 @@ writing with progress), `SearchField.swift` (an `NSSearchField` for SwiftUI), `A
 buffers, band-limiting through `Resampling.bandLimitedCycle`, and the CoreAudio output-device list).
 The Wavetables page: the table (status, Name, Input, Output, Changes; what a file states about
 interpolation is in the preview and the Options box's "existing" marks) with the selected
-table's preview under it across the left side (`ConvertDetailPane`, 340 points, growing for taller
-content up to half the page, pictures and facts side by side, with a fade when it must scroll), and the
+table's preview under it across the left side (`ConvertDetailPane`, 320 points, growing for taller
+content as far as leaves the table its header and five rows, `ConvertTablesPane.minimumHeight`,
+pictures and facts side by side, with a fade when it must scroll), and the
 destination pane on the right, narrow, one line per destination (Adam, 2026-10-26: the table
 needs the width, the preview and destination should not scroll); its buttons are Pack's (Remove
 Selected, Remove All…, **Convert Selected…**, **Convert All…**, the last two through

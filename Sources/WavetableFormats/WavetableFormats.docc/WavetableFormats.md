@@ -70,6 +70,12 @@ Add the library to a Swift package with the product `WavetableFormats` of
 - ``FrameSizeSource``
 - ``ReadNote``
 
+### Frame size
+
+- ``FrameSizeFit``
+- ``FoundTable/frameSizeFit()``
+- ``FoundTable/estimatedFrameSize(fit:)``
+
 ### Tables
 
 - ``Wavetable``

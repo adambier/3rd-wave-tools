@@ -19,7 +19,7 @@ import PgdataPackerCore
 struct ConvertDetailPane: View {
     @EnvironmentObject var state: AppState
     let selection: Set<UUID>
-    /// The most height the pane may take (what leaves the destination below its minimum).
+    /// The most height the pane may take (what leaves the table above it its minimum).
     let maxHeight: CGFloat
     /// The height the content asks for, measured as it lays out.
     @State private var contentHeight: CGFloat = 0
@@ -479,7 +479,7 @@ struct ConvertOverviewPair: View {
                                      hearingHelp: ConvertOverviewPair.hearingHelp(for: plan.preset),
                                      hearingCaption: ConvertOverviewPair.hearingCaption(for: plan.preset),
                                      recordedNote: recorded && result != nil ? ConvertOverviewPair.recordedNote : nil,
-                                     recordedHelp: ConvertOverviewPair.recordedHelp(for: plan.preset),
+                                     recordedHelp: ConvertOverviewPair.recordedHelp,
                                      cycle: { cycleToPlay(source: source.frames, result: result, resultInterpolation: resultInterpolation) })
             }
             .onChange(of: item.id) { _ in hearing = nil }
@@ -508,9 +508,7 @@ struct ConvertOverviewPair: View {
     static let recordedNote = "Interpolation: set under Options"
 
     /// The note's tip: where the format records the interpolation.
-    static func recordedHelp(for preset: OutputPreset) -> String {
-        "This format saves the interpolation in the file, so the Interpolation pop-up under Options in the Convert to pane decides what the file says and what is drawn and played here."
-    }
+    static let recordedHelp = "This format saves the interpolation in the file, so the Interpolation pop-up under Options in the Convert to pane decides what the file says and what is drawn and played here."
 
     /// The line under the Interpolation pop-up: the choice is for the preview only, since the
     /// file records none; who decides as the table plays.
