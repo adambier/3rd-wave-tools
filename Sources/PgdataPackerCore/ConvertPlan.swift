@@ -840,10 +840,11 @@ public struct ConvertPlan: Equatable {
 
     // MARK: Tonverk's raw sample playback
 
-    /// Whether a table gets Tonverk's “r” when the Raw Sample Playback setting is Each Table’s
-    /// Own (`options.tonverkRawSamples == nil`): a 3rd Wave P table, a PPG-style table meant
-    /// for the PPG's raw playback (Adam, 2026-10-27), or a file whose name carries the mark
-    /// already.
+    /// Whether a table's Tonverk name gets the “r” that asks for raw sample playback: a 3rd Wave
+    /// P table, a PPG-style table meant for the PPG's raw playback, or a file whose name carries
+    /// the mark already (which came from Tonverk, or was meant for it). The page has no setting
+    /// for this (Adam, 2026-10-27: the rule is safe to assume); `OutputOptions.tonverkRawSamples`
+    /// set to true or false overrides it for other callers of the library.
     public func tonverkRawDefault(for item: Item) -> Bool {
         if item.table.isMarkedForTonverkRawSamples { return true }
         switch item.table.source {
@@ -852,35 +853,12 @@ public struct ConvertPlan: Equatable {
         }
     }
 
-    /// `options` as the writer gets them for one table: the Raw Sample Playback setting's
-    /// Each Table’s Own resolved to that table's own (`tonverkRawDefault(for:)`).
+    /// `options` as the writer gets them for one table: `tonverkRawSamples` left nil is resolved
+    /// to that table's own (`tonverkRawDefault(for:)`).
     public func options(for item: Item) -> OutputOptions {
         var o = options
         if preset == .tonverk, o.tonverkRawSamples == nil { o.tonverkRawSamples = tonverkRawDefault(for: item) }
         return o
-    }
-
-    /// The tables to convert that Each Table’s Own marks with Tonverk's “r”, with the number
-    /// of tables to convert that can convert, for the caption under the Raw Sample Playback
-    /// pop-up: "2 of the 5 tables".
-    public var tonverkRawMarks: (marked: Int, of: Int) {
-        let able = includedItems.filter { canConvert($0) }
-        return (able.filter { tonverkRawDefault(for: $0) }.count, able.count)
-    }
-
-    /// The caption under the Raw Sample Playback pop-up, under Options for Tonverk: what the
-    /// mark does, and which tables Each Table’s Own marks. Each sentence stands on its own.
-    public var tonverkRawCaption: String {
-        let marks = tonverkRawMarks
-        let count: String
-        if marks.of == 0 { count = "none of the tables to convert" }
-        else if marks.marked == 0 { count = "none of the \(marks.of == 1 ? "table" : "\(marks.of) tables")" }
-        else if marks.marked == marks.of { count = marks.of == 1 ? "the one table" : CountWords.all(marks.of, "tables").lowercased() }
-        else { count = "\(marks.marked) of the \(marks.of) tables" }
-        return ["An “r” at the end of the file name asks Tonverk to play each frame’s samples without interpolation between them, as the PPG played its tables: a bright, stepped edge, audible on frames of 64 or 128 samples.",
-                "Tonverk blends between frames either way.",
-                "Each Table’s Own marks 3rd Wave P tables, the PPG-style tables, and files already marked “r”: here \(count).",
-                "On marks every table; Off marks none."].joined(separator: " ")
     }
 
     // MARK: Existing choices (the Options pickers)

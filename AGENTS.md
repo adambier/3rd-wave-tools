@@ -108,10 +108,15 @@ over real exports: every unmodified file must come back identical.
 - This project is file-based. For live communication with the 3rd Wave (dumps, hash lookups), see
   Groove Synthesis's *3rd Wave MIDI CC + SysEx Spec*; nothing here implements it.
 
-**Tools wanted** (open an issue to say what you are building): a cross-platform command-line tool
-for pack, unpack, and convert (the libraries are ready; `tw3pg` is a developer harness, not it); a
-Windows or Linux front end on `PgdataPackerCore`; a librarian; tests of the wavetable destinations
-in their synths (`OutputPreset.testedIn`).
+**Tools wanted** (open an issue to say what you are building): two cross-platform command-line
+tools, each single-purpose in the Unix way and thin over its library (decided for the release
+after 1.1; `tw3pg` is a developer harness, not either of them): one for the 3rd Wave's files
+(pack, unpack, convert older programs, inspect) on `PgdataFormats`, and one for wavetables
+(list, convert) on `WavetableFormats`, since the converter has an audience that has never seen a
+`.pgdata`; a Windows or Linux front end on `PgdataPackerCore`; a librarian; tests of the wavetable
+destinations in their synths (`OutputPreset.testedIn`). The libraries stay products of this one
+package: `WavetableFormats` depends on `PgdataFormats` because the 3rd Wave's `.wt` is one of the
+formats it reads and writes, and a consumer links only what it uses.
 
 ## 3. Repository map
 
@@ -440,8 +445,12 @@ No tests cover the SwiftUI views; a UI change is verified by building and using 
   the reader must not miss gets an icon and a color (`ConvertSweepNoteView`: orange with the
   warning triangle for a caution, the accent-colored info circle for information).
 - "Frame" for a cycle in a table, never "wave" (which is kept for the analog oscillator's waves,
-  the PPG's four standard waveforms, and names: Wave Maker, the `WAVES` folder). Crossfade and
-  spectral are interpolation methods; "none" is the absence of interpolation, not a method.
+  the PPG's four standard waveforms, and names: Wave Maker, the `WAVES` folder). "Interpolation"
+  is the blend between frames and nothing else (Serum's `clm ` flag, Surge XT's continuous
+  morph, the 3rd Wave's wavetable smoothing); crossfade and spectral are interpolation methods,
+  and "none" is the absence of interpolation, not a method. The smoothing between a frame's
+  samples (the 3rd Wave's waveform smoothing; Tonverk's `r`, read in its manual as "without
+  interpolation") is "raw sample playback" when it is off, never "interpolation".
 - P tables before U tables wherever both are listed (P00–P35, U00–U55; P36–P47, U56–U63).
 - Quotation marks around words taken from synth documentation (Tonverk's manual says "smooth"),
   and an inference marked when such a word is read as one of ours ("taken here to mean a
@@ -522,9 +531,10 @@ credentials that are not in the repository.
   1.4.1 for the Tonverk destination (WAVETABLES.md section 2: the tags read, the frames in order;
   Tonverk's own recordings showed that the `r` at the end of a name switches off the
   interpolation between a frame's samples, not the blend between frames, which Tonverk always
-  makes, so the `r` is the page's Raw sample playback option, `OutputOptions.tonverkRawSamples`,
-  nil meaning each table's own, `ConvertPlan.tonverkRawDefault(for:)`: 3rd Wave P tables and
-  files already marked; a Tonverk name records no interpolation, `recordsInterpolation` false).
+  makes, so the page writes the `r` by rule, with no setting: 3rd Wave P tables and files
+  already marked, `ConvertPlan.tonverkRawDefault(for:)`, through `OutputOptions.tonverkRawSamples`,
+  which other callers of the library may set; a Tonverk name records no interpolation,
+  `recordsInterpolation` false).
   `testedIn` is empty for every other destination: no converted file has yet been loaded in those
   synths through this project. WAVETABLES.md "Open questions" lists what each test would settle.
 - The mipmap chain written for U tables uses ideal spectral cut-offs; the factory filter is unknown

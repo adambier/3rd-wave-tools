@@ -259,10 +259,7 @@ struct ConvertOptionsBox: View {
                 VStack(alignment: .leading, spacing: 12) {
                     if frameCount { ConvertFrameCountOption(state: state) }
                     if preset.recordsInterpolation { ConvertInterpolationOption(state: state) }
-                    if preset == .tonverk {
-                        ConvertTonverkSizeOption(state: state)
-                        ConvertTonverkRawOption(state: state)
-                    }
+                    if preset == .tonverk { ConvertTonverkSizeOption(state: state) }
                     if preset == .thirdWaveP { ConvertPPGOption(state: state) }
                     if preset.isThirdWave { ConvertPackOption(state: state) }
                 }
@@ -464,29 +461,3 @@ struct ConvertPPGOption: View {
     }
 }
 
-/// Tonverk's raw sample playback: a pop-up that ends the file name in “r”, which Tonverk reads as
-/// a request to play each frame's samples without interpolation between them (tests in Tonverk
-/// OS 1.4.1: the “r” changes the playback of the samples, not the blend between frames). Each
-/// Table’s Own (nil) marks 3rd Wave P tables (PPG-style) and files marked already
-/// (`ConvertPlan.tonverkRawDefault(for:)`); On and Off mark every table or none.
-/// The caption (`ConvertPlan.tonverkRawCaption`) says what the mark does and what Each Table’s
-/// Own comes to for the tables listed.
-struct ConvertTonverkRawOption: View {
-    @ObservedObject var state: AppState
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Raw sample playback (an \u{201C}r\u{201D} at the end of the file name)")
-            Picker("Raw sample playback", selection: $state.convertPlan.options.tonverkRawSamples) {
-                Text("Each Table’s Own").tag(Optional<Bool>.none)
-                Text("On").tag(Optional<Bool>.some(true))
-                Text("Off").tag(Optional<Bool>.some(false))
-            }
-            .labelsHidden()
-            .frame(maxWidth: 260, alignment: .leading)
-            .help("Tonverk\u{2019}s manual, section 5.2.5: an \u{201C}r\u{201D} at the end of the file name loads the table without interpolation. Tested in Tonverk OS 1.4.1, the \u{201C}r\u{201D} switches off the interpolation between each frame\u{2019}s samples (the PPG\u{2019}s raw playback); Tonverk blends between frames either way.")
-            ConvertSentences(state.convertPlan.tonverkRawCaption)
-                .padding(.top, ConvertPreviewFacts.detailSpacing - 4)
-        }
-    }
-}

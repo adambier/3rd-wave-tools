@@ -240,7 +240,7 @@ final class FLACTests: XCTestCase {
         XCTAssertNil(t.interpolation, "Tonverk's r is not an interpolation claim")
         XCTAssertTrue(t.isMarkedForTonverkRawSamples)
         XCTAssertEqual(t.samples.count, 3 * 1024)
-        XCTAssertEqual(t.notes, ["The file name ends in “r”, which asks Tonverk to play each frame’s samples without interpolation between them (raw, as the PPG played its tables); Tonverk still blends between frames.",
+        XCTAssertEqual(t.notes, ["The file name ends in “r”, Tonverk’s mark for raw sample playback (no interpolation between a frame’s samples).",
                                  "100 samples after the last whole frame are left out."])
     }
 

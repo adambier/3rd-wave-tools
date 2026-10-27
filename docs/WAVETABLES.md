@@ -67,10 +67,11 @@ Notes on each:
   (its example is `strings_wt128r.wav`). Tested in Tonverk OS 1.4.1, the `r` switches off the
   interpolation between each frame's **samples** (raw, sample-and-hold playback, as the PPG
   played its tables), not the blend between frames, which Tonverk makes whatever the name
-  says.[^tonverk-tests] So the app writes the `r` as its own option, Raw sample playback (on by
-  default for 3rd Wave P tables and for files already marked), and never as the interpolation;
-  the reader notes the mark and reads no interpolation from it. An explicit size tag is always
-  written, and any tag the name already has is replaced.
+  says.[^tonverk-tests] So the app writes the `r` for 3rd Wave P tables, the PPG-style tables,
+  and for files already marked, never as the interpolation and with no setting of its own
+  (`OutputOptions.tonverkRawSamples` lets another tool choose); the reader notes the mark and
+  reads no interpolation from it. An explicit size tag is always written, and any tag the name
+  already has is replaced.
 - **Phase Plant** documents its wavetables as exactly 256 frames of 2,048 samples (524,288 in
   all).[^phaseplant] Whether it accepts shorter files is not documented; 256 frames are always
   written, the table expanded or reduced by the method you choose.

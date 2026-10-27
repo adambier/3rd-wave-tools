@@ -153,9 +153,9 @@ public enum WavetableWriter {
             let raw = options.tonverkRawSamples ?? false
             let tag = "_wt\(plan.frameSizeOut)" + (raw ? "r" : "")
             if raw {
-                notes.append("The file name ends in “r”, as the Raw Sample Playback setting under Options asks: Tonverk plays each frame’s samples without interpolation between them, as the PPG played its tables, which adds a bright, stepped edge to frames of 64 or 128 samples.")
+                notes.append("The file name ends in “r”: Tonverk plays each frame’s samples raw, without interpolation between them, as the PPG played its tables (a bright, stepped edge on frames of 64 or 128 samples).")
             } else if let old = untagged.removed, old.hasSuffix("r") || old.hasSuffix("R") {
-                notes.append("The source file’s name asked Tonverk for raw sample playback (its “r”); the new name does not, as the Raw Sample Playback setting under Options is Off.")
+                notes.append("The source file’s name ended in “r”, Tonverk’s mark for raw sample playback; the new name does not.")
             }
             if let old = untagged.removed {
                 notes.append("The name’s own Tonverk tag “\(old)” was replaced by “\(tag)”.")

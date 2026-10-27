@@ -75,7 +75,7 @@ public extension OutputPreset {
         case .miniFreak:
             return "The same WAV, at most 64 frames: what a MiniFreak keeps. Larger tables are cut down to 64 frames here, before MiniFreak V reads the file."
         case .tonverk:
-            return "Up to 64 frames; Tonverk reads the frame size from the file name, and an “r” at the end of the name asks for raw playback of each frame’s samples. Tonverk blends between frames either way."
+            return "Up to 64 frames; Tonverk reads the frame size from the file name. The name of a 3rd Wave P table, or of a file already marked, ends in “r”, which asks Tonverk to play each frame’s samples raw, as the PPG did. Tonverk blends between frames either way."
         case .phasePlant:
             return "The same WAV, but exactly 256 frames, as Phase Plant’s documentation asks; a table of any other length is brought to 256 frames."
         case .surge:

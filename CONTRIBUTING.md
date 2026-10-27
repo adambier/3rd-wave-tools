@@ -86,8 +86,9 @@ The README, FORMATS.md, the documentation, and the app's text follow a few conve
 - In explanations, name the noun rather than a pronoun ("the file's length", not "its length"),
   finish every statement ("frames of 128 samples", not "128"), and name the control a value was
   set in ("selected in the Interpolation pop-up under Options"), never "asked for" alone.
-- AGENTS.md section 10 has the full list ("frame", never "wave", for a cycle in a table; P tables
-  before U tables; quotation marks around words taken from synth documentation; and more).
+- AGENTS.md section 10 has the full list ("frame", never "wave", for a cycle in a table;
+  "interpolation" only for the blend between frames, "raw sample playback" for Tonverk's "r"; P
+  tables before U tables; quotation marks around words taken from synth documentation; and more).
 
 **Language review.** A change to user-facing text or documentation gets a careful read before it
 is merged, checking that each statement is accurate against its evidence and still current (names

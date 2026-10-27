@@ -271,7 +271,7 @@ final class WritingTests: XCTestCase {
 
         let raw = try write(t, .tonverk, OutputOptions(tonverkRawSamples: true))
         XCTAssertEqual(raw.fileName, "Test Table_wt1024r.wav")
-        notes(raw, contain: "The file name ends in “r”, as the Raw Sample Playback setting under Options asks")
+        notes(raw, contain: "The file name ends in “r”: Tonverk plays each frame’s samples raw")
         XCTAssertEqual(try write(t, .tonverk, OutputOptions(tonverkRawSamples: false)).fileName, "Test Table_wt1024.wav")
         XCTAssertEqual(try write(t, .tonverk, OutputOptions(tonverkRawSamples: nil)).fileName, "Test Table_wt1024.wav", "the writer treats nil as off")
 
@@ -285,7 +285,7 @@ final class WritingTests: XCTestCase {
         let out = try write(t, .tonverk)
         XCTAssertEqual(out.fileName, "strings_wt128.wav")
         notes(out, contain: "“_wt128r” was replaced by “_wt128”")
-        notes(out, contain: "The source file’s name asked Tonverk for raw sample playback (its “r”); the new name does not")
+        notes(out, contain: "The source file’s name ended in “r”, Tonverk’s mark for raw sample playback; the new name does not")
         let kept = try write(t, .tonverk, OutputOptions(tonverkRawSamples: true))
         XCTAssertEqual(kept.fileName, "strings_wt128r.wav")
         XCTAssertFalse(kept.notes.contains { $0.contains("the new name does not") }, "\(kept.notes)")

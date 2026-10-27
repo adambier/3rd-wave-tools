@@ -1161,8 +1161,8 @@ final class ConvertExistingChoicesTests: XCTestCase {
         XCTAssertNil(plan.sharedExistingInterpolation)
     }
 
-    /// Tonverk's Raw Sample Playback setting: Each Table’s Own (nil) marks 3rd Wave P tables and
-    /// files already marked “r”; On and Off mark every table or none. The caption counts.
+    /// Tonverk's “r”: the page marks 3rd Wave P tables and files already marked, with no setting
+    /// of its own; a library caller can override with `tonverkRawSamples` true or false.
     func testTonverkRawSamplesDefaultsPerTable() {
         // Different levels, so the plan does not fold the four into one item (duplicates by content).
         func wave(_ level: Float) -> [Float] { let w = (0..<128).map { Float(sin(Double($0) * 2 * .pi / 128)) * level }; return w + w }
@@ -1176,9 +1176,6 @@ final class ConvertExistingChoicesTests: XCTestCase {
         XCTAssertEqual(plan.items.map { plan.tonverkRawDefault(for: $0) }, [true, false, true, false])
         XCTAssertNil(plan.options.tonverkRawSamples)
         XCTAssertEqual(plan.items.map { plan.options(for: $0).tonverkRawSamples }, [true, false, true, false])
-        XCTAssertEqual(plan.tonverkRawMarks.marked, 2)
-        XCTAssertEqual(plan.tonverkRawMarks.of, 4)
-        XCTAssertTrue(plan.tonverkRawCaption.contains("here 2 of the 4 tables."), plan.tonverkRawCaption)
         XCTAssertEqual(plan.convert().files.map(\.fileName), ["P_wt128r.wav", "U_wt128.wav", "M_wt128r.wav", "W_wt128.wav"])
         plan.options.tonverkRawSamples = true
         XCTAssertEqual(plan.convert().files.map(\.fileName), ["P_wt128r.wav", "U_wt128r.wav", "M_wt128r.wav", "W_wt128r.wav"])

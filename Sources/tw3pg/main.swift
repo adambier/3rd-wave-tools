@@ -697,8 +697,9 @@ case "wtconvert":
     // --new-frames original|crossfade (Original Frames Only, Crossfade New Frames),
     // --interpolation none|crossfade|spectral (the Interpolation pop-up; dropped where the
     // destination records none), --ppg-waves (the P table's "Add the PPG's standard waveforms at
-    // 60–63"), --tonverk-size N, --tonverk-raw own|on|off (the Raw Sample Playback pop-up: Each
-    // Table's Own, On, Off). --frame-size N is the page's one frame size for several
+    // 60–63"), --tonverk-size N, --tonverk-raw own|on|off (own is the page's rule, an "r" for 3rd
+    // Wave P tables and files already marked; on and off override it, which the page cannot).
+    // --frame-size N is the page's one frame size for several
     // tables: it settles every table whose file does not state a size and whose length allows
     // N, and says which tables it did not apply to. --name-suffix adds to every table's name
     // (as renaming in the Name column would).

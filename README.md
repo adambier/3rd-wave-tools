@@ -381,9 +381,14 @@ marks a destination that has been tested. [`docs/WAVETABLES.md`](docs/WAVETABLES
 what each destination expects, with sources.
 
 Tonverk has been tested as well (OS 1.4.1): tables of 4 and 64 frames at 64, 128, 1,024, and
-2,048 samples per frame loaded through its Sample Browser and the Wavefinder's SLOT, played in
-order at the right pitch, and Tonverk's own recordings showed what the "r" at the end of a file
-name does (below, under Options). A destination still untested says so in its row.
+2,048 samples per frame loaded through its Sample Browser and the Wavefinder's SLOT and played in
+order at the right pitch. Tonverk's own recordings settled what the "r" at the end of a file
+name does, which its manual describes as loading the table "without interpolation": it switches
+off the interpolation between each frame's samples (the PPG's raw, stepped playback, audible on
+frames of 64 or 128 samples as a bright edge), while Tonverk blends between frames either way.
+The page ends the name in "r" for 3rd Wave P tables, the PPG-style tables, and for files already
+marked, and never otherwise; there is nothing to set. A destination still untested says so in
+its row.
 
 #### Options
 
@@ -399,13 +404,7 @@ Shown when a choice applies to the destination and the tables (the captions coun
   the synth steps from frame to frame). The preview shows what each table's own input file
   specifies; by default each table keeps that, and a table whose file says nothing gets
   crossfade.
-- Tonverk's frame size, and **Raw sample playback** for Tonverk: an "r" at the end of the file
-  name, which Tonverk's manual describes as loading the table "without interpolation". Tested in
-  Tonverk OS 1.4.1, the "r" switches off the interpolation between each frame's samples (the
-  PPG's raw, stepped playback, audible on frames of 64 or 128 samples as a bright edge), while
-  Tonverk blends between frames either way. **Each Table's Own** marks 3rd Wave P tables, the
-  PPG-style tables, and files already marked; **On** and **Off** mark every table or none.
-- The PPG's four standard waveforms for P tables.
+- Tonverk's frame size, and the PPG's four standard waveforms for P tables.
 - For a 3rd Wave destination, **Also add the .wt files to the Pack page**, to embed them in
   programs; both Convert buttons honor it.
 

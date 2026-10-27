@@ -302,8 +302,8 @@ public struct OutputOptions: Equatable, Sendable {
     /// Manual OS 1.4.1, section 5.2.5, and tests in Tonverk OS 1.4.1: the `r` changes the
     /// playback of the samples, not the blend between frames, which Tonverk always makes).
     /// False: the name carries no `r`, whatever the source file's name said. Nil: the caller
-    /// decides per table (pgdata Packer marks 3rd Wave P tables, which the 3rd Wave plays the
-    /// PPG's way, and files already marked); the writer itself treats nil as false.
+    /// decides per table (pgdata Packer marks 3rd Wave P tables, the PPG-style tables, and files
+    /// already marked, with no setting of its own); the writer itself treats nil as false.
     public var tonverkRawSamples: Bool?
     /// 3rd Wave P tables only: fit the table into frames 0–59 (by `frameCountPolicy`, keeping its
     /// first and last frames) and put the PPG's four standard waveforms (triangle, narrow pulse,

@@ -155,7 +155,7 @@ extension WavetableReader {
                 // The r is not an interpolation claim: Tonverk blends between frames whatever
                 // the name says, and plays the samples of each frame raw (tests in Tonverk OS
                 // 1.4.1, docs/WAVETABLES.md section 2).
-                notes.append(ReadNote(.tonverkRawSamples, "The file name ends in “r”, which asks Tonverk to play each frame’s samples without interpolation between them (raw, as the PPG played its tables); Tonverk still blends between frames."))
+                notes.append(ReadNote(.tonverkRawSamples, "The file name ends in “r”, Tonverk’s mark for raw sample playback (no interpolation between a frame’s samples)."))
             }
         }
         // 5. Serum sidecar text.
