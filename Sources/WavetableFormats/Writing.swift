@@ -113,7 +113,7 @@ public enum WavetableWriter {
             reshape()
             if preset == .miniFreak, plan.frameCountIn < 64 {
                 let n = plan.frameCountIn
-                notes.append("\(n) frame\(n == 1 ? "" : "s"), fewer than the 64 a MiniFreak stores; the count is kept, since how MiniFreak V treats fewer than 64 frames is not documented.")
+                notes.append("\(n) frame\(n == 1 ? "" : "s"), fewer than the 64 a MiniFreak stores; the count is kept, and MiniFreak V has been observed to spread the frames over the whole sweep.")
             }
             if plan.scalesToFit { scaleToFit() } else { notePeakKept() }
             if plan.addsPPGWaves {
@@ -428,11 +428,17 @@ public extension OutputPreset {
     /// and 64 frames at 64, 128, 1,024, and 2,048 samples per frame loaded through the Sample
     /// Browser and the Wavefinder's SLOT, played in order at the right pitch, and Tonverk's
     /// own recordings of a 64-sample sine showed the `r` switching its sample interpolation off
-    /// (2026-10-27, OS 1.4.1; docs/WAVETABLES.md section 2). Nothing else has been tested yet.
+    /// (2026-10-27, OS 1.4.1; docs/WAVETABLES.md section 2). Pigments 7.0.1 and Serum 2.1.5
+    /// (from Serum's Tables folder; a drop goes through Serum's re-slicing instead): frames in
+    /// order, the `clm ` flag followed by Serum, Pigments' Morph button deciding; MiniFreak V
+    /// 5.1.0: frames in order, a 4-frame table spread over the whole sweep (2026-10-27). Vital,
+    /// Phase Plant, Surge XT, and WaveEdit's format have not been tested yet.
     var testedIn: [String] {
         switch self {
         case .thirdWaveP, .thirdWaveU: return ["on the 3rd Wave 8M, OS 2.0d"]
         case .tonverk: return ["in Tonverk, OS 1.4.1"]
+        case .wav2048: return ["in Pigments 7.0.1", "in Serum 2.1.5"]
+        case .miniFreak: return ["in MiniFreak V 5.1.0"]
         default: return []
         }
     }
@@ -469,7 +475,7 @@ public extension OutputPreset {
         case .wav2048:
             return "Vital’s behavior is taken from its public source code; the current release may differ. Pigments reads no metadata, so the interpolation saved in the file does not reach it."
         case .miniFreak:
-            return "How MiniFreak V reduces 2,048-sample frames to 512, and how it treats fewer than 64 frames, is not documented."
+            return "How MiniFreak V reduces 2,048-sample frames to 512 for the MiniFreak is not documented, and the MiniFreak itself has not been tested here."
         case .phasePlant:
             return "Kilohearts documents exactly 256 frames; whether a shorter table loads is untested, so 256 are always written."
         case .thirdWaveU, .thirdWaveP, .tonverk, .surge, .waveEdit:

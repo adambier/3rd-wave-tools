@@ -756,7 +756,6 @@ public struct ConvertPlan: Equatable {
     /// only when the tables to convert, or a choice made, bring it about:
     /// - Serum, Vital, Pigments: an interpolation other than crossfade is saved for some table,
     ///   which Pigments does not read.
-    /// - MiniFreak V: some table has fewer than 64 frames, which it is not documented to handle.
     /// - Phase Plant: some table has fewer than the 256 frames its documentation asks for, so
     ///   frames are added.
     /// The 3rd Wave destinations have none: how many tables fit is a matter for the 3rd Wave
@@ -770,15 +769,13 @@ public struct ConvertPlan: Equatable {
                 return saved != nil && saved != .crossfade
             }
             return notCrossfade ? "Pigments does not read the interpolation saved in the file (Serum and Vital do)." : nil
-        case .miniFreak:
-            let short = tables.filter { ($0.frameCount ?? 64) < 64 }.count
-            guard short > 0 else { return nil }
-            return "\(Self.tablesHave(short, of: tables.count)) fewer than 64 frames; what MiniFreak V does with fewer than 64 frames is not documented."
         case .phasePlant:
             let short = tables.filter { ($0.frameCount ?? 256) < 256 }.count
             guard short > 0 else { return nil }
             return "\(Self.tablesHave(short, of: tables.count)) fewer than 256 frames; whether Phase Plant loads shorter tables is untested, so frames are added to reach 256."
-        case .thirdWaveU, .thirdWaveP, .tonverk, .surge, .waveEdit:
+        case .thirdWaveU, .thirdWaveP, .tonverk, .miniFreak, .surge, .waveEdit:
+            // MiniFreak V has been observed to spread a table of fewer than 64 frames over the
+            // whole sweep (5.1.0, 2026-10-27), so short tables raise no caution.
             return nil
         }
     }

@@ -39,8 +39,8 @@ chunk.[^vital] Most other synths set interpolation on the oscillator, not in the
 
 | Destination | What is written | Source |
 |---|---|---|
-| Serum, Vital, Pigments | Mono 32-bit float WAV, 48 kHz, 2,048 per frame, up to 256 frames, with a `clm ` chunk carrying the interpolation | [^serum] [^vital] [^pigments] |
-| MiniFreak V (for the MiniFreak) | The same, with at most 64 frames | [^minifreak] |
+| Serum, Vital, Pigments | Mono 32-bit float WAV, 48 kHz, 2,048 per frame, up to 256 frames, with a `clm ` chunk carrying the interpolation. Tested in Pigments 7.0.1 and Serum 2.1.5 | [^serum] [^vital] [^pigments] [^wav-tests] |
+| MiniFreak V (for the MiniFreak) | The same, with at most 64 frames. Tested in MiniFreak V 5.1.0 | [^minifreak] [^wav-tests] |
 | Tonverk | Mono 32-bit float WAV, 48 kHz, at most 64 frames, its frame size in the file name, and an `r` at the end for raw sample playback (`Name_wt1024.wav`, `Name_wt128r.wav`). Tested in Tonverk OS 1.4.1 | [^tonverk] [^tonverk-tests] |
 | Phase Plant | Exactly 256 frames of 2,048, with a `clm ` chunk | [^phaseplant] |
 | Surge XT | A Surge `.wt` (binary, below) | [^surge-code] |
@@ -52,15 +52,27 @@ Notes on each:
 
 - **Serum** loads up to 256 frames of 2,048 samples (2 MB of 32-bit samples). Without a `clm `
   chunk it offers several ways to slice the file; a `.txt` file beside it overrides them.[^serum]
+  Tested in Serum 2.1.5: a file dropped on an oscillator goes through Serum's re-slicing
+  choices (pitch detection, a fixed frame size, an FFT size) whatever the `clm ` chunk says,
+  while a file in Serum's Tables folder loads as the chunk says, frames in order. A table
+  whose chunk says crossfade or spectral showed 256 frames in Serum after loading, a table
+  whose chunk says none kept its count (4 and 64); the inference taken here is that Serum 2
+  renders the interpolation into 256 positions on load, and the table plays as it
+  should.[^wav-tests]
 - **Vital** slices `.wav` files at 2,048 per frame and does not read the `clm ` chunk's frame size,
   only its interpolation digit. A file of exactly 16,384 samples whose spectrum looks like a
   WaveEdit table is sliced at 256 instead.[^vital]
 - **Pigments** places each 2,048 samples in a position, up to 256 positions, and reads no
-  metadata; interpolation is the engine's Morph setting.[^pigments]
+  metadata; interpolation is the engine's Morph setting.[^pigments] Tested in Pigments 7.0.1:
+  tables of 4, 64, and 128 frames loaded with the frames in order, and the Morph button
+  decided between a blend and steps.[^wav-tests]
 - **MiniFreak V** imports tables (including Pigments') and sends them to a MiniFreak over USB; on
   import it truncates them to 24-bit, 512 samples per frame, and 64 frames. How it reduces a
   2,048-sample frame to 512, or more than 64 frames to 64, is not documented, so larger tables
   are cut down to 64 frames here, by the method you choose, before MiniFreak V sees the file.[^minifreak]
+  Tested in MiniFreak V 5.1.0 (the plug-in; no MiniFreak was at hand): the tables imported
+  through the wavetable browser's Import button and played in order, and a 4-frame table was
+  spread over the whole sweep.[^wav-tests]
 - **Tonverk** reads the frame size from a `_wt<N>` tag at the end of the file name (2,048 when
   there is none) and takes up to 64 frames, picking evenly spaced ones from a larger
   table.[^tonverk] The manual says a name ending in `r` loads the table "without interpolation"
@@ -246,7 +258,10 @@ Results from any of these are welcome:
 - Whether Tonverk's `r` works without a `_wt<N>` tag (every form tested had the tag or was
   tested for the wrong property), and whether Tonverk's factory library, whose files carry no
   tags, is read at 2,048 throughout (one file, `All Waves.wav`, is 8,192 samples).
-- How MiniFreak V reduces 2,048-sample frames to 512, and how it treats fewer than 64 frames.
+- How MiniFreak V reduces 2,048-sample frames to 512, and what a MiniFreak itself plays from the
+  tables MiniFreak V sends it (only the plug-in has been tested).
+- Whether Vital follows the `clm ` chunk's interpolation digit, and whether it takes the app's
+  WaveEdit-format files as 64 frames of 256.
 - Whether the app's 3rd Wave U table from a Serum WAV matches what Wave Maker makes from the same
   file.
 
@@ -273,6 +288,17 @@ Results from any of these are welcome:
     sine plus lines at 63 × and 65 × the note at −36 dB, the images of a 64-step staircase
     (1/64 = −36 dB): the `r` turns the interpolation between samples off. A Serum-style `clm `
     chunk in the file changed nothing, and an unknown chunk after the audio was ignored.
+[^wav-tests]: Tests on 2026-10-27 with tables written by the app: a 64-frame sine-to-square
+    morph (crossfade), a 4-frame table of four shapes (none), a 64-frame table adding one
+    harmonic per frame (none), and a 128-frame table (spectral). Pigments 7.0.1: each loaded
+    with the expected count of positions, the frames in order, the Morph button deciding the
+    blend. MiniFreak V 5.1.0: imported through the wavetable browser's Import button; the
+    64-frame tables in order, the 4-frame table's shapes spread over the whole sweep. Serum
+    2.1.5: dropped on an oscillator, every file went through Serum's re-slicing choices;
+    loaded from Serum's Tables folder, the 4-frame table showed 4 frames and stepped, the
+    64-frame "none" table 64, and the crossfade and spectral tables 256 frames, each playing
+    its frames in order; a second copy of a file under another name never appeared in the
+    list, which suggests a listing by content.
 [^phaseplant]: Kilohearts, Phase Plant manual and "Wavetables".
     <https://kilohearts.com/docs/wavetables>
 [^flac]: RFC 9639, "Free Lossless Audio Codec" (IETF, 2024).

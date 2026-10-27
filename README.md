@@ -371,8 +371,10 @@ field above the table narrows the list by name or file, as on the Pack page.
 
 The two 3rd Wave destinations have been tested on the 3rd Wave (an 8M, OS 2.0d): eight tables
 converted by the page, four of each kind, were imported with **Bulk wavetable import**, played
-as written, and came back the same from **Export Wavetable** (to the export's six decimals). The
-other destinations rest on their synths' documents and source code until someone tests them.
+as written, and came back the same from **Export Wavetable** (to the export's six decimals).
+Pigments 7.0.1, Serum 2.1.5, MiniFreak V 5.1.0, and Tonverk OS 1.4.1 have played the page's
+tables as well; the others rest on their synths' documents and source code until someone tests
+them.
 
 The destination applies to every table converted. The chosen row says why its format is separate
 and, in orange, anything its sources leave open that the tables bring about. The book icon beside
@@ -387,8 +389,15 @@ name does, which its manual describes as loading the table "without interpolatio
 off the interpolation between each frame's samples (the PPG's raw, stepped playback, audible on
 frames of 64 or 128 samples as a bright edge), while Tonverk blends between frames either way.
 The page ends the name in "r" for 3rd Wave P tables, the PPG-style tables, and for files already
-marked, and never otherwise; there is nothing to set. A destination still untested says so in
-its row.
+marked, and never otherwise; there is nothing to set.
+
+Pigments, MiniFreak V, and Serum (the plug-ins) played tables of 4, 64, and 128 frames in order.
+Pigments reads no metadata, so its Morph button decides between a blend and steps. MiniFreak V
+spread a 4-frame table over the whole sweep (what a MiniFreak itself plays has not been tested).
+Serum follows the file's interpolation when the file is loaded from its Tables folder; a file
+dropped on an oscillator goes through Serum's own re-slicing choices instead, and a table that
+records a crossfade or spectral interpolation shows 256 frames once loaded. A destination still
+untested says so in its row.
 
 #### Options
 

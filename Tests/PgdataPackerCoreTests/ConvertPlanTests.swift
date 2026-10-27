@@ -1092,12 +1092,13 @@ final class ConvertExistingChoicesTests: XCTestCase {
         XCTAssertNotNil(stepped.caveat(for: .wav2048))
         stepped.options.interpolation = .crossfade   // the override makes every file crossfade
         XCTAssertNil(stepped.caveat(for: .wav2048))
-        // MiniFreak V and Phase Plant: only for tables with fewer frames than they expect.
+        // Phase Plant: only for tables with fewer frames than it expects. MiniFreak V spreads a
+        // short table over the sweep (observed in 5.1.0), so it raises none.
         let two = pickerPlan(.miniFreak, [(nil, 2048), (nil, 2048)])
-        XCTAssertEqual(two.caveat(for: .miniFreak), "Both tables have fewer than 64 frames; what MiniFreak V does with fewer than 64 frames is not documented.")
+        XCTAssertNil(two.caveat(for: .miniFreak))
         XCTAssertEqual(two.caveat(for: .phasePlant), "Both tables have fewer than 256 frames; whether Phase Plant loads shorter tables is untested, so frames are added to reach 256.")
-        let one = pickerPlan(.miniFreak, [(nil, 2048)])
-        XCTAssertEqual(one.caveat(for: .miniFreak), "1 table has fewer than 64 frames; what MiniFreak V does with fewer than 64 frames is not documented.")
+        let one = pickerPlan(.phasePlant, [(nil, 2048)])
+        XCTAssertEqual(one.caveat(for: .phasePlant), "1 table has fewer than 256 frames; whether Phase Plant loads shorter tables is untested, so frames are added to reach 256.")
         var tall = ConvertPlan(preset: .miniFreak)
         let wave = (0..<2048).map { Float(sin(Double($0) * 2 * .pi / 2048)) * 0.5 }
         let table = FoundTable(name: "Tall", fileName: "Tall.wav", source: .wav, samples: Array(Array(repeating: wave, count: 64).joined()),

@@ -535,8 +535,14 @@ credentials that are not in the repository.
   already marked, `ConvertPlan.tonverkRawDefault(for:)`, through `OutputOptions.tonverkRawSamples`,
   which other callers of the library may set; a Tonverk name records no interpolation,
   `recordsInterpolation` false).
-  `testedIn` is empty for every other destination: no converted file has yet been loaded in those
-  synths through this project. WAVETABLES.md "Open questions" lists what each test would settle.
+  `testedIn` also names Pigments 7.0.1 and Serum 2.1.5 for the Serum-style WAV and MiniFreak V
+  5.1.0 for the MiniFreak destination (2026-10-27, WAVETABLES.md section 2 and its
+  `[^wav-tests]` footnote: frames in order; Serum follows the `clm ` digit only for files loaded
+  from its Tables folder and shows 256 frames for a crossfade or spectral table; MiniFreak V
+  spreads a short table over the sweep, so `ConvertPlan.caveat(for: .miniFreak)` is nil).
+  `testedIn` is empty for Phase Plant, Surge XT, and WaveEdit: no converted file has yet been
+  loaded in those synths through this project. WAVETABLES.md "Open questions" lists what each
+  test would settle.
 - The mipmap chain written for U tables uses ideal spectral cut-offs; the factory filter is unknown
   (the 3rd Wave identifies a table by its first 65,536 values, so the chain need not match).
 - `.wt` value lines must stay within 31 characters: the 3rd Wave has been observed to read a longer line as two values

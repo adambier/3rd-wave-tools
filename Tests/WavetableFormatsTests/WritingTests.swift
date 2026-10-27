@@ -236,7 +236,7 @@ final class WritingTests: XCTestCase {
         notes(big, contain: "Frame count changed from 100 to 64")
         let small = try write(table(frames: 10, size: 2048), .miniFreak)
         XCTAssertEqual(parseWAV(small.data).samples.count, 10 * 2048)
-        notes(small, contain: "not documented")
+        notes(small, contain: "spread the frames over the whole sweep")
     }
 
     func testPhasePlantExpandsTo256() throws {
@@ -388,7 +388,7 @@ final class WritingTests: XCTestCase {
             XCTAssertFalse(p.title.isEmpty)
             // Each entry carries its preposition, for the page's "Tested …" line.
             for entry in p.testedIn { XCTAssertTrue(entry.hasPrefix("on ") || entry.hasPrefix("in "), entry) }
-            XCTAssertEqual(p.testedIn.isEmpty, !(p.isThirdWave || p == .tonverk), "\(p)")
+            XCTAssertEqual(p.testedIn.isEmpty, [.phasePlant, .surge, .waveEdit].contains(p), "\(p)")
             XCTAssertFalse(p.basis.isEmpty)
             XCTAssertLessThanOrEqual(p.requiredFrameCount ?? 0, p.maxFrameCount)
         }
