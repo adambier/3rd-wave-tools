@@ -28,10 +28,10 @@ struct ConvertDetailPane: View {
     static let minimumHeight: CGFloat = 120
     /// The height the pane keeps whatever is selected, so it does not grow and shrink as the
     /// selection or the Frame slider changes the text in it (Adam, 2026-10-26): room for the
-    /// pictures with four lines of legend under them, and for the facts with three notes and a
-    /// sweep note. Taller content, which is rare, still grows it (or scrolls it in a short
-    /// window).
-    static let preferredHeight: CGFloat = 340
+    /// pictures with their legends and the controls under them, and for the facts with a few
+    /// notes. Taller content still grows it (or scrolls it in a short window). 340 left an
+    /// empty strip under the controls in the common case; 320 since 2026-10-27 (Adam).
+    static let preferredHeight: CGFloat = 320
 
     /// The selected rows the table shows (a row the filter hides stays selected out of sight,
     /// as in Pack).
