@@ -524,7 +524,7 @@ in any language. Everything here is open source under the MIT license.
   unpacks `.pgdata` files, converts older programs as the 3rd Wave does, and recognizes Groove
   Synthesis's factory wavetables. It depends only on Foundation, and its tests run on macOS, Linux,
   and Windows. Add it to a Swift package with
-  `.package(url: "https://github.com/adambier/3rd-wave-tools", from: "1.0.5")` and the product
+  `.package(url: "https://github.com/adambier/3rd-wave-tools", from: "1.1.0")` and the product
   `PgdataFormats`. Its documentation, with a getting-started guide, is at
   [adambier.github.io/3rd-wave-tools](https://adambier.github.io/3rd-wave-tools/documentation/pgdataformats/).
   The library is versioned with the app (tags `v1.0.5` and on).
@@ -536,8 +536,9 @@ in any language. Everything here is open source under the MIT license.
   [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes the formats, with sources, and the
   library's documentation is at
   [adambier.github.io/3rd-wave-tools](https://adambier.github.io/3rd-wave-tools/documentation/wavetableformats/).
-  It is new in 1.1 and provisional: its API may change until a 1.1.x release, once its
-  destinations have been tested in their synths.
+  It is new in 1.1 and provisional: its API may change until a 1.1.x release, since the app is
+  its only consumer so far and the command-line tool planned next will show what belongs in a
+  library.
 - **The app's logic, for other platforms.** `PgdataPackerCore`, the package's third library,
   holds pgdata Packer's own decisions without its user interface: pack, unpack, and convert plans,
   factory table handling, file names, and Clean Up Names. A command-line tool, or an app for Windows or

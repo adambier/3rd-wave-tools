@@ -8,7 +8,7 @@ In your `Package.swift`, depend on the repository and the `PgdataFormats` produc
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/adambier/3rd-wave-tools", from: "1.0.5"),
+    .package(url: "https://github.com/adambier/3rd-wave-tools", from: "1.1.0"),
 ],
 targets: [
     .target(name: "MyTool", dependencies: [

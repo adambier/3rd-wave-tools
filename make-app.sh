@@ -86,7 +86,7 @@ fi
 APP="pgdata Packer.app"
 BUNDLE_ID="org.biers.pgdatapacker"
 ARCH="$(uname -m)"
-VERSION="1.0.5"
+VERSION="1.1.0"
 # The build number must rise with every release (an updater compares it): the number of commits.
 BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 DEPLOYMENT_TARGET="13.0"

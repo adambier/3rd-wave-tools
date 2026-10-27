@@ -26,8 +26,8 @@ This repository exists as much to help other tools get built as to ship pgdata P
 
 ```swift
 dependencies: [
-    // Use the latest tag; `PgdataFormats` is stable from v1.0.5 on, `WavetableFormats` arrives with 1.1.
-    .package(url: "https://github.com/adambier/3rd-wave-tools", from: "1.0.5"),
+    // Use the latest tag; `PgdataFormats` is stable from v1.0.5 on, `WavetableFormats` from v1.1.0 (provisional).
+    .package(url: "https://github.com/adambier/3rd-wave-tools", from: "1.1.0"),
 ],
 targets: [
     .target(name: "MyTool", dependencies: [
@@ -41,7 +41,7 @@ targets: [
 | Product | Take it for | Stability |
 |---|---|---|
 | `PgdataFormats` | Reading, writing, packing, unpacking, and converting the 3rd Wave's files; recognizing factory tables | Versioned with the app; kept stable from `v1.0.5` on |
-| `WavetableFormats` | Finding wavetables in WAV, FLAC, Surge `.wt`, and 3rd Wave files; resizing; writing for other synths | Provisional in 1.1 (new; may change until a 1.1.x release after more testing) |
+| `WavetableFormats` | Finding wavetables in WAV, FLAC, Surge `.wt`, and 3rd Wave files; resizing; writing for other synths | Provisional in 1.1 (new; may change until a 1.1.x release, once the planned command-line tool has shown what belongs in a library) |
 | `PgdataPackerCore` | Pack, unpack, and convert plans, output names, Clean Up Names, report text | May change between versions |
 
 Three common jobs, in full (the DocC pages have more: `Sources/*/*.docc/`):
@@ -564,8 +564,11 @@ credentials that are not in the repository.
 - `fixtures/` exercise structure, not sound, and have not been loaded on the 3rd Wave.
 - The app is macOS-only; CI compiles it but has no tests for it. A Linux or Windows front end would
   build on `PgdataPackerCore`, whose API may change between versions more than `PgdataFormats`'s.
-- `WavetableFormats` is provisional in 1.1: its API may change until a 1.1.x release, once its
-  destinations have been tested in their synths.
+- `WavetableFormats` is provisional in 1.1: its API may change until a 1.1.x release. Its
+  destinations are tested (all but WaveEdit, E370); what is still open is the API's shape, which
+  the planned wavetable command-line tool, its second consumer, will settle (the deferred
+  findings of the 2026-10-27 refactoring review: a found table's three frame-size fields,
+  `testedIn`'s prepositions, the Tonverk tag parsed in three places).
 - Listen and the preview's spectral lines use `Resampling.spectralBlend`, an approximation: Serum's
   and Vital's morph methods are not published. `FrameSizeFit` is a heuristic (frames alike at lag
   n, unlike at n/2); the Input column says "estimated" wherever it decided, and the samples
