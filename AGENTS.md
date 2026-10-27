@@ -382,7 +382,7 @@ Other checks:
   Wavetables page's Convert All does, through `ConvertPlan` itself (the Options box's choices as
   flags, the app's own writing and report), so a destination can be tested in its synth without
   the app; `tw3pg wtmatch <expected> -- <files>` identifies 3rd Wave `.wt` files by content (the
-  64 frames; a U table's mipmap chain and a P table's differences reported separately; values
+  64 frames; a P table's differences and a U table's mipmap chain reported separately; values
   within `WavetableFile.exportTolerance` count as the same, since **Export Wavetable** writes six
   decimals), for checking `01.wt`, `02.wt`, … against the files imported; `tw3pg makewavetests
   <out dir>` writes three synthetic tables recognizable by ear
@@ -474,7 +474,7 @@ new `mutating func` in `Writing.swift`; fill every `switch` in the `OutputPreset
 `fileExtension`, and `scalesToFit`/`isThirdWave` where they apply; `PresetInfo.swift`:
 `recordsInterpolation`; PgdataPackerCore's `DestinationInfo.swift`: `shortTitle`, `specLine`,
 `distinction`, the page's wording; `ConvertPlan.caveat(for:)`, an exhaustive switch; `Job.countReason` in
-`Writing.swift`; `ConvertOverviewPair.hearingHelp` in the app; the preset list in tw3pg's `sweep` usage line;
+`Writing.swift`; `ConvertOverviewPair.hearingHelp` in the app; the preset lists in tw3pg's `sweep` and `wtconvert` usage lines;
 `ConvertPlan.gatingPresets` if the destination should gate the page);
 the app lists presets through `OutputPreset.Group.presets`, so no UI list needs editing; add
 `WritingTests` and `RoundTripTests` cases; add a row to `docs/WAVETABLES.md` section 2 with a
@@ -522,7 +522,7 @@ credentials that are not in the repository.
   the Wavetables page (`ConvertPlan.gatingPresets`).
 - The mipmap chain written for U tables uses ideal spectral cut-offs; the factory filter is unknown
   (the 3rd Wave identifies a table by its first 65,536 values, so the chain need not match).
-- `.wt` value lines must stay within 31 characters: the 3rd Wave reads a longer line as two values
+- `.wt` value lines must stay within 31 characters: the 3rd Wave has been observed to read a longer line as two values
   (FORMATS.md section 5.1). The library's writers never exceed 18; `WavetableFile` does not yet
   warn about a file that does. 3rd Wave Terminal's P exports (256 plain samples per `//waveform`
   block) read as pairs give the table's samples, which is also how the 3rd Wave imports them, so

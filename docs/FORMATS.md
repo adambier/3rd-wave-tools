@@ -73,8 +73,8 @@ Where something is reasoning that has not been checked, the text says so in word
     October 2026, with a user P table whose frames 60–63 were written as the PPG's triangle,
     narrow pulse, square, and sawtooth: with **use upper wavetable** off, wave offsets 60–63
     all played the same waveform as 59 (a square in that table, compared directly against 59);
-    with it on, they played the four frames as written, and the wave offset knob stops at 63
-    (the display runs 0–63). The spill into P30 is the manual's statement (p. 103 of the 8M
+    with **use upper wavetable** on, offsets 60–63 played the four frames as written, and the
+    wave offset knob stops at 63 (the display runs 0–63). The spill into P30 is the manual's statement (p. 103 of the 8M
     manual), not checked.
 [^smoothing]: Checked on a 3rd Wave 8M (OS 2.0d), 26 October 2026: an oscillator set to a P
     table showed **wavetable smoothing** off, and one set to a U table showed it on, without the
@@ -224,8 +224,8 @@ not interpreted.
 | Value | Meaning |
 |---|---|
 | 0, 1, 2 | Source ids of oscillators 1, 2, and 3 (section [2](#2-oscillator-sources)).[^osc-ids] |
-| 34 | Amp envelope amount, probably (3rd Wave Terminal labels it Amp Env Amount); 100 = +100, and setting the amount to 127 on an 8M wrote 127.[^edited] A `W3_PROG_3` program packed unconverted, with 0 here, plays silently (section 6.1).[^8m] Groove Synthesis's 8M "Init Program" carries 0 here (and 1.0 in float 113) and is not silent: its amp section's Velocity amount is 127, and the amp follows the sum of the two amounts.[^amp] |
-| 26, 30 | The amp envelope's decay and release, probably: 80 and 82 in the 8M's "Init Program", whose amp envelope reads A 0, D 80, S 127, R 82 on the 3rd Wave, and both 0 after decay and release were set to 0. Integers 25 and 29 (87 and 74, also set to 0 then) are probably the filter envelope's decay and release, by their position.[^edited] |
+| 26, 30 | The amp envelope's decay and release, probably: 80 and 82 in Groove Synthesis's 8M "Init Program", whose amp envelope reads A 0, D 80, S 127, R 82 on the 3rd Wave, and both 0 after decay and release were set to 0. Integers 25 and 29 (87 and 74 in the same program, both 0 after the filter envelope's decay and release were set to 0) are probably the filter envelope's decay and release, by their position just before 26 and 30.[^edited] |
+| 34 | Amp envelope amount, probably (3rd Wave Terminal labels it Amp Env Amount); 100 = +100, and setting the amount to 127 on an 8M wrote 127.[^edited] A `W3_PROG_3` program packed unconverted, with 0 here, plays silently (section 6.1).[^8m] The 8M "Init Program" carries 0 here (and 1.0 in float 113) and is not silent: its amp section's "Velocity" amount is 127, and the amp follows the sum of "Env Amount" and "Velocity".[^amp] |
 
 **Float part blocks**
 
@@ -235,23 +235,24 @@ not interpreted.
 | 53 | Tempo in BPM, probably (3rd Wave Terminal shows 102.000000 as 102.0 BPM). |
 | 98 | A filter cutoff, probably: setting both filters' cutoffs to 127 changed it from 0.535 to 1.0 (float 99, already 1.0, may be the other filter's).[^edited] |
 | 112 | The part's level, probably, as level ÷ 100: a part set to 170 wrote 1.7, and a part set to 0 wrote 0.0.[^edited] |
-| 113 | Probably a second amp envelope amount, 0 = full, 1 = none; in a `W3_PROG_3` program OS 2.0 folds it into integer 34 when converting.[^bulk] OS 2.0d still writes both: setting the amp envelope amount to 127 wrote integer 34 = 127 and float 113 = 0.0, from 0 and 1.0.[^edited] |
+| 113 | Probably a second amp envelope amount, 0 = full, 1 = none; in a `W3_PROG_3` program OS 2.0 folds it into integer 34 when converting.[^bulk] OS 2.0d has been observed to keep both in step: setting the amp envelope amount to 127 wrote integer 34 = 127 and float 113 = 0.0, from 0 and 1.0.[^edited] |
 | 124 | Pan, probably (3rd Wave Terminal's Pan knob): 0 = left, 0.5 = center, 1 = right. |
 
-Values that also changed when that program was edited so that both envelopes had 0 attack,
-decay, release, and delay with sustain 127, the wave envelope was off, and nothing but the mod
-wheel (already routed to every oscillator's wave offset) modulated anything: part 1's integers 5
-and 21 (2 and 34 → 0) and globals 9, 146, 147, 179, and 180. Which value holds which setting has
-not been separated.[^edited]
+Values that also changed when Groove Synthesis's 8M "Init Program" was edited so that both
+envelopes had 0 attack, decay, release, and delay with sustain 127, the wave envelope was off,
+and nothing but the mod wheel (already routed to every oscillator's wave offset) modulated
+anything: part 1's integers 5 and 21 (from 2 and 34 to 0) and globals 9, 146, 147, 179, and
+180. Which value holds which setting has not been separated.[^edited]
 
 [^edited]: One program on an 8M (OS 2.0d), 26 October 2026: Groove Synthesis's "Init Program"
     (8M factory bank) with its sources changed, imported, edited on the 3rd Wave as described,
     and exported; every value that differs between the two files is accounted for here or in
     section 6.3 (float 102). "Probably" because the attribution of each value to a setting rests
     on that one comparison.
-[^amp]: Tests on an 8M (OS 2.0d), October 2026: the amp envelope always shapes the amplifier,
-    with a depth that is the sum of the amp section's Env Amount and its Velocity amount, capped
-    at 127; both at 0 is silent, and either alone at 127 follows the envelope.
+[^amp]: Tests on an 8M (OS 2.0d), October 2026, by the owner: with the amp section's "Env
+    Amount" and "Velocity" both at 0 the 8M is silent, with either alone at 127 the amp follows
+    the envelope, "Env Amount" 64 with "Velocity" 64 on a hard strike is louder than "Env
+    Amount" 64 with "Velocity" 0 (the two add), and the total is capped at 127.
 
 **Global values.** These apply to the whole program. Apart from value 0, the meanings below are
 inferences: from how the values change when the 3rd Wave converts or fits a program to an 8M, from
@@ -404,17 +405,19 @@ Plain text, LF or CRLF line ends.
   float, and the shortest exact form otherwise.
 - **Keep every value line within 31 characters.** The 3rd Wave reads the values as one stream,
   comment lines aside, and a line longer than 31 characters has been observed to be read as two
-  values (the first 31 characters and the rest), which shifts everything after it; **Export
-  Wavetable** also writes at most 31 characters per value, cutting longer ones. A 32-byte buffer
-  is the inference.[^long-lines] Ordinary values take 8 to 18 characters, so only out-of-range
+  values (the first 31 characters, and presumably the rest, which read as 0 in every case),
+  which shifts everything after it; **Export Wavetable** has been observed to write at most 31
+  characters per value, cutting the six-decimal form of longer ones short. A 32-byte buffer is
+  the inference.[^long-lines] Ordinary values take at most 18 characters, so only out-of-range
   values written in fixed notation (`-261953457593075210649600.0000000000000f`) reach the limit.
-- **A second layout exists:** 3rd Wave Terminal exports a P table as 64 `//waveform` blocks of
-  256 plain samples, each cycle at twice the resolution, instead of 128 sample-and-difference
-  pairs. The even values follow the table's 128 samples closely (within 0.008 in the one file
-  examined, a median of 0.0002; whether the 3rd Wave sends 256 samples over SysEx or Terminal
-  resamples is not known), and the odd values lie between them. Read as pairs, the even values
-  become the samples, so the 3rd Wave imports such a file as a close copy of the table it came
-  from (one test).[^long-lines]
+- **3rd Wave Terminal writes P tables differently:** the one 3rd Wave Terminal export examined
+  holds a P table as 64 `//waveform` blocks of 256 plain samples, each cycle at twice the
+  resolution, instead of 128 sample-and-difference pairs. The even values follow the table's
+  128 samples closely (within 0.008, a median of 0.0002) and the odd values lie between them;
+  since the SysEx dumps examined carry 128 samples per frame (below), the doubling is presumably
+  3rd Wave Terminal's own resampling (not checked). Read as pairs, the even values become the
+  samples, so the 3rd Wave imports such a file as a close copy of the table it came from (one
+  test).[^terminal]
 
 **P tables (PPG-style).** The P set is the 3rd Wave's form of the PPG Wave's wavetables. P00–P31
 are derived from the PPG Wave 2.2/2.3's own tables (P30 is the PPG's *upper wavetable*), P32 and
@@ -428,11 +431,13 @@ the user's own.[^manual] The format:
   derived data: in every factory P table examined it equals the next sample minus this one to
   float precision, and over SysEx the 3rd Wave sends a P table as 64 × 128 plain samples.[^p-diff]
   A writer should compute the differences
-  from the samples. The 3rd Wave stores and exports the second value of each pair as given: a
-  file whose second values were not differences (they lay between the samples instead) came
-  back from **Export Wavetable** with those values unchanged, and its samples played as the
-  table, so the second values appear not to be used in playback, at least with that program's
-  Wave Flow settings (one test, by ear).[^long-lines]
+  from the samples.
+- **The second values are passed through.** The 3rd Wave has been observed to store and export
+  the second value of each pair as given: a file whose second values were not differences (the
+  second values lay between the samples instead) came back from **Export Wavetable** with those
+  values unchanged, and its samples played as the table, so the second values appear not to be
+  used in playback, at least with that program's Wave Flow settings (one test, by
+  ear).[^terminal]
 - **The samples are floats within ±1**, not quantized to the PPG's 8-bit levels, although the
   manual calls the P set "8-bit" and says the **Wave Maker** converts imported audio "to the correct
   sample rate and bit depth" for it. So any reduction the 3rd Wave applies is presumably made when
@@ -454,11 +459,12 @@ and **use upper wavetable**.
 - With **use upper wavetable** off, the 3rd Wave plays positions 0–59 only: the manual says
   sweeping "will always stop at offset 59", and a wave offset set to 60, 61, 62, or 63 by hand
   has been observed to keep playing frame 59.
-- With it on, positions 60–63 play the table's own last four frames (the wave offset set there
-  with the wave envelope off gives the PPG's "analog" waveforms, the manual's "How to Sound Like
-  a Vintage PPG"). The wave offset knob stops at 63; the manual adds that modulation past
-  position 63 (the Wave Surfer, as the PPG spilled over) continues into P30, the PPG's upper
-  wavetable, which was not tested here.[^upper]
+- With **use upper wavetable** on, positions 60–63 have been observed to play the table's own
+  last four frames (in the tables that carry them, the wave offset set there with the wave
+  envelope off gives the PPG's "analog" waveforms, the manual's "How to Sound Like a Vintage
+  PPG"). The wave offset knob stops at 63; the manual adds that modulation past position 63 (by
+  the Wave Surfer, for example) continues into P30, the PPG's upper wavetable, as the PPG itself
+  spilled over; this was not tested here.[^upper]
 
 That is why a P table's last four frames look unrelated to the rest. The user manual's "About
 Wave Flow and the Upper Wavetables" and "Importing Wavetables into the P Set" have more.
@@ -650,7 +656,7 @@ audible: the same `W3_PROG_3` program imported both ways on a 24M sounds the sam
 identical parameters in an editor; only the sequencer piano roll's scroll position differs,
 which may be what the value stores.[^24m] On the 8M, a current-layout program imported with
 **Bulk program import**, edited, and exported came back with 0.591133 in float 102 of both
-parts (the file had carried 1.0), so the value is not fixed per model either; a stored view
+parts (the file had carried 1.0), so the value is state rather than a per-model mark; a stored view
 position would fit.[^edited]
 
 ### 6.4 What an 8M does on top
@@ -726,8 +732,9 @@ Tested on an 8M (OS 2.0d) unless a footnote says otherwise; section
   table(s). Blank placeholder tables count as used.
 - **Bulk wavetable import asks for a starting slot** and has been observed to write the files
   into consecutive slots from there, in plain character order of their names, with no overwrite
-  prompt: eight `.wt` files (four P, four U) with U55 chosen as the start went into P36–P39 and
-  U55–U58, U55 being the last slot of the 2025 factory set (once, on the 8M).[^wt-import]
+  prompt: eight `.wt` files (four P, four U), with U55 chosen as the starting U slot, went into
+  P36–P39 and U55–U58, U55 being the last slot of the 2025 factory set (once, on the
+  8M).[^wt-import]
 - **A source listed without data** plays whatever is in that slot; an empty multisample slot plays
   silence, with no warning.
 - **Import program** asks for a name for the new program (defaulting to the one in the file); the
@@ -763,25 +770,32 @@ Tested on an 8M (OS 2.0d) unless a footnote says otherwise; section
   (`.wt`), `AUDIO` (`.bin` and exported `.wav`), and `FIRMWARE` when mounted on a Mac.[^8m]
   Groove Synthesis's READMEs write them as `program/`, `waves/`, and `audio/`.
 
-[^wt-export]: 8M, OS 2.0d, 26 October 2026: eight tables written by pgdata Packer with the
-    shortest exact decimals, imported, and exported with **Export Wavetable**: every value in
-    every export, frames and mipmap chains alike, was the imported value rounded to six decimals
-    (largest difference 0.0000005), and nothing else differed. Whether the 3rd Wave would match
-    such an export to the original by content on a second import is untested; by the rounding,
-    an inference says not.
-[^long-lines]: 8M, OS 2.0d, 26 October 2026: a P table exported by 3rd Wave Terminal (64
-    `//waveform` blocks of 256 plain samples; three blocks of out-of-range values from a corrupted
-    transfer, written as 34- to 53-character lines) imported with **Bulk wavetable import** without
-    complaint and exported again. In the export, every clean block came back as its even values
-    (the samples, which match the original table within 0.008) and odd values (the second of
-    each pair, unchanged), and each of the three long-line
-    blocks came back as two frames whose samples were the block's values in order with 0 as every
-    second value, shifting the following frames by one each time (frames 11–12, 23–24, and 29–30
-    held the garbage); the export's longest line is 31 characters. The table played as the
-    original apart from those frames.
+[^wt-export]: 8M, OS 2.0d, 26 October 2026: eight tables written by pgdata Packer (six decimals
+    where that gives back the exact float, the shortest exact form otherwise), imported, and
+    exported with **Export Wavetable**: every value in every export, frames and mipmap chains
+    alike, was the imported value rounded to six decimals (largest difference 0.0000005), and
+    nothing else differed. Whether the 3rd Wave would match such an export to the original by
+    content on a second import is untested; the rounding suggests not (an inference).
+[^terminal]: 8M, OS 2.0d, 26 October 2026: a P table exported by 3rd Wave Terminal (64
+    `//waveform` blocks of 256 plain samples; three blocks of out-of-range values from a
+    corrupted transfer) imported with **Bulk wavetable import** without complaint and exported
+    again. In the export, every clean block came back as its even values (the samples, which
+    match the original table within 0.008) and its odd values (the second of each pair,
+    unchanged), and the table played as the original apart from the frames in the next footnote.
+[^long-lines]: The same import. The three out-of-range blocks were written on 34- to 53-character
+    lines, and each came back as two frames whose samples were the block's values in order with
+    0 as every second value, shifting the following frames by one each time (frames 11–12,
+    23–24, and 29–30 held them). The export's longest line is 31 characters:
+    `-261953457593073734254592.00000`, the six-decimal form of a value cut after 31 characters,
+    without its `f`.
 [^wt-import]: 8M, OS 2.0d, 26 October 2026: the wavetable-conversion test of pgdata Packer 1.1
-    (eight tables written by the app's Wavetables page). The P slots were free; U55 was chosen
-    as the starting U slot in the import's prompt.
+    (eight tables written by the app's Wavetables page). The prompt was answered with U55 as the
+    starting U slot; whether it asked for a P start as well was not recorded, and P36 was the
+    first free P slot. The files, in plain character order, were Test All Waves, Test Four
+    Frames, Test Harmonic Steps, Test JunoSQR, Test Morph PPG, Test Morph, Test Synced Ramp, and
+    Test Zing; the slots received them in that order within each kind (P36 All Waves, P37
+    Harmonic Steps, P38 Morph PPG, P39 Zing; U55 Four Frames, U56 JunoSQR, U57 Morph, U58
+    Synced Ramp), as the OSC screen showed.
 [^file-names]: Stated by Groove Synthesis. The hardware tests in section
     [9](#9-how-this-was-established) also imported files under names of their own.
 
@@ -826,10 +840,10 @@ one run. The exceptions are 12 third-party `.pgdata` files that are damaged as d
 | 24M: a `.pgdata` carrying a new U table (U08 at half level) with its chain zeroed, then **Export Wavetable** | stored in U56, played the same from C2 to C7, exported with the zeros intact: the chain is not used |
 | 24M: the 2022 program of section 6.5 that gains a copy of part 1, packed unconverted (`W3_PROG_3` layout) and imported with the `.pgdata` import | part 2 still blank, tempo 120, velocity 5: the fixes are not applied; parts 1 and 2 both shown active (cause not examined) |
 | 24M: two `.pgdata` files carrying the same multisample labeled S20 and S21 | the first stored it in S11 ("Updating sample voice memory"); the second pointed its program at S11 ("Updating Sample Data"): reused by content |
-| Eight `.wt` files written by pgdata Packer's Wavetables page (four U tables: from Serum-style and u-he files resized from 2,048 to 1,024 samples per frame, one reduced from 174 frames to 64, one crossfaded from 4 frames to 64; four P tables: from 64 × 128 files and from Serum-style files resized to 128, one with the PPG's waveforms at 60–63), by **Bulk wavetable import** (26 October 2026) | stored in consecutive slots from the one chosen (P36–P39, U55–U58); every table played as written, the U tables blending between frames and the P tables stepping; **Export Wavetable** gave every table back the same to six decimals (section 5.1) |
-| A user P table carrying the PPG's four waveforms at 60–63, wave offset set to 60–63 by hand | with **use upper wavetable** off, one unchanging waveform; with it on, the triangle, narrow pulse, square, and sawtooth as written (section 5.1) |
+| Eight `.wt` files written by pgdata Packer's Wavetables page (four P tables: from 64 × 128 files and from Serum-style files resized to 128, one with the PPG's waveforms at 60–63; four U tables: from Serum-style and u-he files resized from 2,048 to 1,024 samples per frame, one reduced from 174 frames to 64, one crossfaded from 4 frames to 64), by **Bulk wavetable import** (26 October 2026) | stored in consecutive slots from the one chosen (P36–P39, U55–U58); every table played as written, the U tables blending between frames and the P tables stepping; **Export Wavetable** gave every table back the same to six decimals (section 5.1) |
+| A user P table carrying the PPG's four waveforms at 60–63, wave offset set to 60–63 by hand | with **use upper wavetable** off, frame 59's waveform throughout; with it on, the triangle, narrow pulse, square, and sawtooth as written (section 5.1) |
 | Programs written with source ids 1002 and 2048 | the OSC screen showed P36 and U55 with the tables imported there (section 2) |
-| A P table exported by 3rd Wave Terminal (256 plain samples per block, three blocks of garbage on 34- to 53-character lines), by **Bulk wavetable import**, then **Export Wavetable** | imported without complaint and played as the original; the long lines were read as two values each, shifting later frames (section 5.1) |
+| A P table exported by 3rd Wave Terminal (256 plain samples per block, three blocks of out-of-range values on 34- to 53-character lines), by **Bulk wavetable import**, then **Export Wavetable** | imported without complaint and played as the original apart from the shifted frames; the long lines were read as two values each, shifting later frames (section 5.1) |
 
 **Implemented from this document alone.** As a check that section 6 describes the conversion fully
 enough to reproduce it, a converter was written by

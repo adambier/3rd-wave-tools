@@ -636,7 +636,7 @@ case "makewavetests":
     //   Test Four Frames.wav     4 frames of 2,048: sine, triangle, sawtooth, square (for the
     //                           frame-count options: repeated, or crossfaded into 64 frames)
     //   Test Harmonic Steps.wav 64 frames of 128: frame n holds harmonics 1 to n + 1 (a P table's
-    //                           size; harmonic 64 would be the frames' Nyquist, so the last frame
+    //                           size; harmonic 64 would be the frames' Nyquist, so frame 62
     //                           holds 1 to 63 and frame 63 repeats it)
     // The first two are Serum-style files written by the library; the third is a plain WAV with a
     // clm chunk stating its frame size. Existing files of these names are replaced.
@@ -784,11 +784,11 @@ case "wtmatch":
         if d.differing == 0 {
             var line = "\(label)  = \(name): " + words(d, "the 64 frames are", total: frames.count)
             if w.kind == .u, let c1 = e.mipmapChain, let c2 = w.mipmapChain {
-                line += "; " + words(WavetableFile.compare(c1, c2), "the mipmap chain is", total: c1.count).replacingOccurrences(of: "chain is differ", with: "chain values differ")
+                line += "; " + words(WavetableFile.compare(c1, c2), "the mipmap chain is", total: c1.count).replacingOccurrences(of: "chain is differ in", with: "chain differs in")
             } else if w.kind == .p {
                 let ed = stride(from: 1, to: e.values.count, by: 2).map { e.values[$0] }
                 let wd = stride(from: 1, to: w.values.count, by: 2).map { w.values[$0] }
-                line += "; " + words(WavetableFile.compare(ed, wd), "the differences are", total: ed.count).replacingOccurrences(of: "are differ", with: "differ")
+                line += "; " + words(WavetableFile.compare(ed, wd), "the second values (the differences) are", total: ed.count).replacingOccurrences(of: "are differ in", with: "differ in")
             }
             if w.name != e.name { line += "; the name differs: expected “\(e.name)”" }
             print(line)

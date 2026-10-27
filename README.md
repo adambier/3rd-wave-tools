@@ -370,10 +370,9 @@ field above the table narrows the list by name or file, as on the Pack page.
 | WaveEdit, E370 | a 16-bit WAV of 64 frames of 256 samples |
 
 The two 3rd Wave destinations have been tested on the 3rd Wave (an 8M, OS 2.0d): eight tables
-converted by the page, four of each kind, imported with **Bulk wavetable import**, played as
-written, and came back the same from **Export Wavetable**. The other destinations rest on their
-synths' documents and source code until someone tests them; the book icon beside each lists the
-sources, and a green seal replaces it once a destination has been tested.
+converted by the page, four of each kind, were imported with **Bulk wavetable import**, played
+as written, and came back the same from **Export Wavetable** (to the export's six decimals). The
+other destinations rest on their synths' documents and source code until someone tests them.
 
 The destination applies to every table converted. The chosen row says why its format is separate
 and, in orange, anything its sources leave open that the tables bring about. The book icon beside
@@ -381,7 +380,7 @@ each row (under **Sources**) names the documents the format rests on; a green se
 marks a destination that has been tested. [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes
 what each destination expects, with sources.
 
-Until the 3rd Wave's tables and Tonverk have been tested, the page is shown only with View ›
+Until Tonverk has been tested as well, the page is shown only with View ›
 **Show Under-Development Features** and carries a notice that wavetable conversion is under
 development. After that, the page is shown by default, the menu item goes, and a destination
 still untested says so in its row.
@@ -592,8 +591,9 @@ with `tw3pg`.
 The test `.pgdata` files are built with `tw3pg` from files that are not included here (a Groove
 Synthesis factory program and one of its `.wt` files, two third-party programs, and a small
 `.bin`). The Wavetables page's 3rd Wave tables were tested on an 8M with eight converted tables
-(above, under Destinations); `tw3pg makewavetests`, `wtconvert`, and `wtmatch` build the inputs,
-convert them as the page does, and identify the 3rd Wave's exports by content.
+(above, under Destinations); `tw3pg makewavetests`, `wtconvert`, and `wtmatch` are there for
+such tests: they write synthetic inputs, convert as the page does, and identify the 3rd Wave's
+exports by content.
 
 Still unknown: how the 3rd Wave writes non-ASCII letters in file names; whether a 24K converts
 older programs exactly as the 24M does; and the meaning of most program values.

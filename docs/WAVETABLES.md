@@ -122,12 +122,13 @@ Cue points and loops (rules 6 and 7) mark ordinary samples too, so they count on
 of two up to 4,096 that give at least two frames: a single looped cycle is a sample. When two of
 these disagree, both are noted.
 
-When only the length suggested a size, the other sizes the length allows can be chosen instead.
-When nothing settles the size, the page estimates the likely size (below) and the Input column
-says "estimated"; when no size stands out, the page lists the sizes the length allows and waits
-for a choice. A file of 8,192 samples is 64 × 128 for the 3rd Wave's Wave Maker (a PPG table)
-but 4 × 2,048 for Serum, Pigments, or Tonverk (whose factory library has one), and a file of
-16,384 is 64 × 256 for WaveEdit but 8 × 2,048 for Serum.
+When only the length suggests a size, the other sizes the length allows can be chosen instead.
+When nothing settles the size, the page estimates the likely size from the samples (below), and
+the Input column says "estimated"; when no size stands out, the estimate is 2,048, the
+Serum-style size. Two lengths wait for a choice instead when the samples point to no size,
+because each is a well-known table at two sizes: a file of 8,192 samples is 64 × 128 for the 3rd
+Wave's Wave Maker (a PPG table) but 4 × 2,048 for Serum, Pigments, or Tonverk (whose factory
+library has one), and a file of 16,384 is 64 × 256 for WaveEdit but 8 × 2,048 for Serum.
 
 A WAV with none of the metadata above is listed only when it is mono, its length is a multiple
 of 2,048 (up to 256 frames), and its name does not end in a note name ("Pad-000-036-c2",
@@ -186,13 +187,13 @@ Rules 4, 5, and 8 apply as for a WAV.
 The reversed form is what Phase Plant's factory library has. Of its 402 files (all mono, 24-bit,
 and 256 × 2,048 samples):
 
-- 29 carry a 48-byte " mlc" block holding `<!>2048 10000000 Kilohearts (www.kilohearts.com)`;
-- 8 carry a 60-byte "lpms" block (a `smpl` chunk with no loops);
-- every one carries an 8-byte "MsHk" block: a little-endian 32-bit 1, then a 32-bit float
+- 29 carry a 48-byte " mlc" block holding `<!>2048 10000000 Kilohearts (www.kilohearts.com)`.
+- 8 carry a 60-byte "lpms" block (a `smpl` chunk with no loops).
+- Every one carries an 8-byte "MsHk" block: a little-endian 32-bit 1, then a 32-bit float
   between 0.89 and 3.55 (1.0 in 272 files), with no evident relation to the file's peak (all
   peak at exactly full scale) or RMS level. The block states neither a frame size nor a frame
-  count, so it is read past; what the float means is not documented;
-- the 373 files without a " mlc" block are listed by their length (rule 8).
+  count, so it is read past; what the float means is not documented.
+- The 373 files without a " mlc" block are listed by their length (rule 8).
 
 A Vorbis comment whose value is a Serum tag (`<!>2048 …`) is read as a `clm ` chunk, with a note
 saying where it was found (no writer is known to do this; the tag's form is unmistakable).
