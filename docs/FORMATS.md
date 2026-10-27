@@ -213,15 +213,30 @@ not interpreted.
 | Value | Meaning |
 |---|---|
 | 0, 1, 2 | Source ids of oscillators 1, 2, and 3 (section [2](#2-oscillator-sources)).[^osc-ids] |
-| 34 | Amp envelope amount, probably (3rd Wave Terminal labels it Amp Env Amount); 100 = +100. A `W3_PROG_3` program packed unconverted, with 0 here, plays silently (section 6.1).[^8m] |
+| 34 | Amp envelope amount, probably (3rd Wave Terminal labels it Amp Env Amount); 100 = +100, and setting the amount to 127 on an 8M wrote 127.[^edited] A `W3_PROG_3` program packed unconverted, with 0 here, plays silently (section 6.1).[^8m] Groove Synthesis's 8M "Init Program" carries 0 here (and 1.0 in float 113) and is not silent, so this is not the only route to the amplifier. |
 
 **Float part blocks**
 
 | Value | Meaning |
 |---|---|
+| 6, 7, 8 | The three oscillators' levels, probably, as level ÷ 100: setting oscillator 1 to 100 and oscillator 2 to 0 on the 3rd Wave wrote 1.0 and 0.0 (oscillator 3, already at 0, had 0.0).[^edited] |
 | 53 | Tempo in BPM, probably (3rd Wave Terminal shows 102.000000 as 102.0 BPM). |
-| 113 | `W3_PROG_3` only: probably a second amp envelope amount, 0 = full, 1 = none. OS 2.0 folds it into integer 34 when converting.[^bulk] |
+| 98 | A filter cutoff, probably: setting both filters' cutoffs to 127 changed it from 0.535 to 1.0 (float 99, already 1.0, may be the other filter's).[^edited] |
+| 112 | The part's level, probably, as level ÷ 100: a part set to 170 wrote 1.7, and a part set to 0 wrote 0.0.[^edited] |
+| 113 | Probably a second amp envelope amount, 0 = full, 1 = none; in a `W3_PROG_3` program OS 2.0 folds it into integer 34 when converting.[^bulk] OS 2.0d still writes both: setting the amp envelope amount to 127 wrote integer 34 = 127 and float 113 = 0.0, from 0 and 1.0.[^edited] |
 | 124 | Pan, probably (3rd Wave Terminal's Pan knob): 0 = left, 0.5 = center, 1 = right. |
+
+Values that changed together when a program was edited on the 3rd Wave so that both envelopes
+had 0 attack, decay, release, and delay with sustain 127, the wave envelope was off, the mod wheel
+was routed to every oscillator's wave offset at 127, and nothing else was modulated: part 1's
+integers 5, 21, 25, 26, 29, and 30 (2, 34, 87, 80, 74, and 82 → 0) and globals 9, 146, 147, 179,
+and 180. Which value holds which setting has not been separated.[^edited]
+
+[^edited]: One program on an 8M (OS 2.0d), 26 October 2026: Groove Synthesis's "Init Program"
+    (8M factory bank) with its sources changed, imported, edited on the 3rd Wave as described,
+    and exported; every value that differs between the two files is accounted for here or in
+    section 6.3 (float 102). "Probably" because the attribution of each value to a setting rests
+    on that one comparison.
 
 **Global values.** These apply to the whole program. Apart from value 0, the meanings below are
 inferences: from how the values change when the 3rd Wave converts or fits a program to an 8M, from
@@ -585,7 +600,10 @@ layout keeps what it carries. Float 102 is the one value a `.pgdata` cannot carr
 into a 24K/24M as **Import program** would set it, since the `.pgdata` import makes it 1.0 whatever
 the file says. The difference is not audible: the same `W3_PROG_3` program imported both ways on a
 24M sounds the same and shows identical parameters in an editor; only the sequencer piano roll's
-scroll position differs, which may be what the value stores.[^24m]
+scroll position differs, which may be what the value stores.[^24m] On the 8M, a current-layout
+program imported with **Bulk program import**, edited, and exported came back with 0.591133 in
+float 102 of both parts (the file had carried 1.0), so the value is not fixed per model either;
+a stored view position would fit.[^edited]
 
 ### 6.4 What an 8M does on top
 
@@ -656,6 +674,10 @@ Tested on an 8M (OS 2.0d) unless a footnote says otherwise; section
 - **A new wavetable or multisample goes into a free slot**, and the program is pointed there: the
   slot in the file is only a label. With no free slot, the 3rd Wave offers to overwrite its last
   table(s). Blank placeholder tables count as used.
+- **Bulk wavetable import asks for a starting slot** and has been observed to write the files
+  into consecutive slots from there, in plain character order of their names, with no overwrite
+  prompt: eight `.wt` files (four P, four U) with U55 chosen as the start went into P36–P39 and
+  U55–U58, U55 being the last slot of the 2025 factory set (once, on the 8M).[^wt-import]
 - **A source listed without data** plays whatever is in that slot; an empty multisample slot plays
   silence, with no warning.
 - **Import program** asks for a name for the new program (defaulting to the one in the file); the
@@ -691,6 +713,9 @@ Tested on an 8M (OS 2.0d) unless a footnote says otherwise; section
   (`.wt`), `AUDIO` (`.bin` and exported `.wav`), and `FIRMWARE` when mounted on a Mac.[^8m]
   Groove Synthesis's READMEs write them as `program/`, `waves/`, and `audio/`.
 
+[^wt-import]: 8M, OS 2.0d, 26 October 2026: the wavetable-conversion test of pgdata Packer 1.1
+    (eight tables written by the app's Wavetables page). The P slots were free; U55 was chosen
+    as the starting U slot in the import's prompt.
 [^file-names]: Stated by Groove Synthesis. The hardware tests in section
     [9](#9-how-this-was-established) also imported files under names of their own.
 
