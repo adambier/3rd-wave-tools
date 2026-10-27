@@ -16,7 +16,7 @@ Why you might want to use it:
 * You'd like to extract 3rd Wave program, wavetable, and sample files from unified program files.
 * You'd like to convert wavetables from other hardware and software synths' formats to the 3rd Wave's, or 3rd Wave P and U tables to formats other synths read (or between other synths' formats)—one at a time or in bulk.
 * You'd like to preview wavetables and listen to them, with data on their frame sizes and interpolation settings.
-* You're developing your own software for use with the 3rd Wave and would like to check out the file-format documentation and code for this app. An agent-optimized specification (AGENTS.md) is included for all your vibe-coding needs.
+* You're developing your own software for use with the 3rd Wave and would like to check out the file-format documentation and code for this app. An agent-optimized specification ([`AGENTS.md`](AGENTS.md)) is included for all your vibe-coding needs.
 
 Not affiliated with or endorsed by Groove Synthesis (but many thanks to them for creating such a
 fantastic instrument!). Everything here was worked out from files and checked on an 8M and a 24M,
