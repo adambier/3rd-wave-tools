@@ -72,8 +72,10 @@ Where something is reasoning that has not been checked, the text says so in word
     103–104) and "Use 'Upper Wavetable'" in the PPG chapter. Checked on an 8M (OS 2.0d), 26
     October 2026, with a user P table whose frames 60–63 were written as the PPG's triangle,
     narrow pulse, square, and sawtooth: with **use upper wavetable** off, wave offsets 60–63
-    all played one saw-like waveform; with it on, they played the four frames as written, and
-    the wave offset knob stops at 63 (the display runs 0–63).
+    all played one saw-like waveform (not the square at 59, by ear; the frame was not
+    identified); with it on, they played the four frames as written, and the wave offset knob
+    stops at 63 (the display runs 0–63). The spill into P30 is the manual's statement (p. 103
+    of the 8M manual), not checked.
 [^smoothing]: Checked on a 3rd Wave 8M (OS 2.0d), 26 October 2026: an oscillator set to a P
     table showed **wavetable smoothing** off, and one set to a U table showed it on, without the
     setting having been changed. Not yet checked on a 24M.
@@ -434,11 +436,15 @@ and **use upper wavetable**.
   playing a U table,[^smoothing] so a P table steps from frame to frame and a U table blends
   between them unless the program says otherwise.
 - With **use upper wavetable** off, the 3rd Wave plays positions 0–59 only: the manual says
-  sweeping "will always stop at offset 59", and a wave offset set to 60–63 by hand has been
-  observed to play one unchanging waveform.
+  sweeping "will always stop at offset 59", and a wave offset set to 60, 61, 62, or 63 by hand
+  has been observed to play one unchanging waveform at all four. Which frame that is has not
+  been settled: in the table tested it sounded like a sawtooth, which that table had at 63, not
+  the square it had at 59.
 - With it on, positions 60–63 play the table's own last four frames (the wave offset set there
   with the wave envelope off gives the PPG's "analog" waveforms, the manual's "How to Sound Like
-  a Vintage PPG"), and a sweep past 63 continues into P30, the PPG's upper wavetable.[^upper]
+  a Vintage PPG"). The wave offset knob stops at 63; the manual adds that modulation past
+  position 63 (the Wave Surfer, as the PPG spilled over) continues into P30, the PPG's upper
+  wavetable, which was not tested here.[^upper]
 
 That is why a P table's last four frames look unrelated to the rest. The user manual's "About
 Wave Flow and the Upper Wavetables" and "Importing Wavetables into the P Set" have more.
