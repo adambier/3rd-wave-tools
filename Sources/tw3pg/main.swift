@@ -28,7 +28,8 @@ import WavetableFormats
 //                                        plays while the Frame slider is dragged from the first frame to the
 //                                        last, one WAV per interpolation, with the difference between cycles
 //   tw3pg wtconvert <out dir> [--preset <name>] [--new-frames original|crossfade] [--interpolation <mode>]
-//                [--ppg-waves] [--tonverk-size N] [--frame-size N] [--name-suffix text] <files or dirs>...
+//                [--ppg-waves] [--tonverk-size N] [--tonverk-raw own|on|off] [--frame-size N]
+//                [--name-suffix text] <files or dirs>...
 //                                        convert as the Wavetables page's Convert All does (the same plan,
 //                                        writer, and writing), without the app, printing the page's report
 //   tw3pg wtmatch <expected .wt files or dirs> -- <files or dirs to identify>   identify 3rd Wave .wt files by
@@ -696,7 +697,8 @@ case "wtconvert":
     // --new-frames original|crossfade (Original Frames Only, Crossfade New Frames),
     // --interpolation none|crossfade|spectral (the Interpolation pop-up; dropped where the
     // destination records none), --ppg-waves (the P table's "Add the PPG's standard waveforms at
-    // 60–63"), --tonverk-size N. --frame-size N is the page's one frame size for several
+    // 60–63"), --tonverk-size N, --tonverk-raw own|on|off (the Raw Sample Playback pop-up: Each
+    // Table's Own, On, Off). --frame-size N is the page's one frame size for several
     // tables: it settles every table whose file does not state a size and whose length allows
     // N, and says which tables it did not apply to. --name-suffix adds to every table's name
     // (as renaming in the Name column would).
@@ -706,12 +708,13 @@ case "wtconvert":
     let modeName = takeOption("--interpolation", from: &convertArgs)
     let ppgWaves = takeFlag("--ppg-waves", from: &convertArgs)
     let tonverkSize = integerOption("--tonverk-size", takeOption("--tonverk-size", from: &convertArgs))
+    let tonverkRaw = takeOption("--tonverk-raw", from: &convertArgs) ?? "own"
     let forcedSize = integerOption("--frame-size", takeOption("--frame-size", from: &convertArgs))
     let suffix = takeOption("--name-suffix", from: &convertArgs) ?? ""
     rejectUnknownOptions(convertArgs)
     need(2, convertArgs, "wtconvert <out dir> [--preset thirdWaveP|thirdWaveU|wav2048|miniFreak|tonverk|phasePlant|surge|waveEdit] "
          + "[--new-frames original|crossfade] [--interpolation none|crossfade|spectral] [--ppg-waves] [--tonverk-size N] "
-         + "[--frame-size N] [--name-suffix text] <files or dirs>...")
+         + "[--tonverk-raw own|on|off] [--frame-size N] [--name-suffix text] <files or dirs>...")
     guard let preset = OutputPreset(rawValue: presetName) else {
         print("unknown preset \(presetName); one of \(OutputPreset.allCases.map(\.rawValue).joined(separator: ", "))"); exit(2)
     }
@@ -727,6 +730,12 @@ case "wtconvert":
     }
     options.appendPPGStandardWaves = ppgWaves
     options.tonverkFrameSize = tonverkSize
+    switch tonverkRaw {
+    case "own": options.tonverkRawSamples = nil
+    case "on": options.tonverkRawSamples = true
+    case "off": options.tonverkRawSamples = false
+    default: print("unknown --tonverk-raw \(tonverkRaw); own, on, or off"); exit(2)
+    }
     let outDir = URL(fileURLWithPath: convertArgs[0])
     let inputs = convertArgs.dropFirst().map { URL(fileURLWithPath: $0) }
     for u in inputs where !FileManager.default.fileExists(atPath: u.path) { print("error: no such file or folder: \(u.path)"); exit(1) }

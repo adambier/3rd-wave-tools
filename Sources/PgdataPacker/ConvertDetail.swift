@@ -508,9 +508,7 @@ struct ConvertOverviewPair: View {
 
     /// The note's tip: where the format records the interpolation.
     static func recordedHelp(for preset: OutputPreset) -> String {
-        preset == .tonverk
-            ? "Tonverk reads whether the table steps or blends between frames from the file name, so the Interpolation pop-up under Options in the Convert to pane decides what the file name says and what is drawn and played here."
-            : "This format saves the interpolation in the file, so the Interpolation pop-up under Options in the Convert to pane decides what the file says and what is drawn and played here."
+        "This format saves the interpolation in the file, so the Interpolation pop-up under Options in the Convert to pane decides what the file says and what is drawn and played here."
     }
 
     /// The Interpolation pop-up's tip: what the choice is for, and what the synth itself does
@@ -522,6 +520,7 @@ struct ConvertOverviewPair: View {
         switch preset {
         case .thirdWaveU: return common + "On the 3rd Wave, wavetable smoothing is on by default for a U table (taken here to be a crossfade) and can be turned off in the program’s Wave Flow settings."
         case .thirdWaveP: return common + "On the 3rd Wave, wavetable smoothing is off by default for a P table and can be turned on in the program’s Wave Flow settings."
+        case .tonverk: return common + "Tonverk blends between frames whatever the file name says (heard in Tonverk OS 1.4.1), taken here to be a crossfade; the pop-up starts there."
         case .surge: return common + "What Surge XT does by default is not known here; the preview starts at None (stepped)."
         case .waveEdit: return common + "What WaveEdit or the E370 does by default is not known here; the preview starts at None (stepped)."
         default: return common + "What \(preset.shortTitle) does by default is not known here; the preview starts at None (stepped)."

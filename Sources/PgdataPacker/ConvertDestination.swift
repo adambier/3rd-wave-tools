@@ -259,7 +259,10 @@ struct ConvertOptionsBox: View {
                 VStack(alignment: .leading, spacing: 12) {
                     if frameCount { ConvertFrameCountOption(state: state) }
                     if preset.recordsInterpolation { ConvertInterpolationOption(state: state) }
-                    if preset == .tonverk { ConvertTonverkSizeOption(state: state) }
+                    if preset == .tonverk {
+                        ConvertTonverkSizeOption(state: state)
+                        ConvertTonverkRawOption(state: state)
+                    }
                     if preset == .thirdWaveP { ConvertPPGOption(state: state) }
                     if preset.isThirdWave { ConvertPackOption(state: state) }
                 }
@@ -308,23 +311,14 @@ struct ConvertFrameCountOption: View {
 struct ConvertInterpolationOption: View {
     @ObservedObject var state: AppState
 
-    private var tonverk: Bool { state.convertPlan.preset == .tonverk }
+    private let tip = "Serum and Vital read the interpolation from the WAV. Other synths set the interpolation method on the oscillator."
 
-    private var tip: String {
-        tonverk ? "Tonverk reads the interpolation from the file name: a trailing \u{201C}r\u{201D} means stepped, otherwise crossfade (Tonverk’s manual says \u{201C}smooth\u{201D}, taken here to mean a crossfade)."
-                : "Serum and Vital read the interpolation from the WAV. Other synths set the interpolation method on the oscillator."
-    }
-
-    /// The values the destination can record. Tonverk's name says stepped or smooth, nothing
-    /// else (a spectral table is marked smooth, which is what the writer records for it).
-    private var choices: [Interpolation] {
-        tonverk ? [Interpolation.none, .crossfade] : [Interpolation.none, .crossfade, .spectral]
-    }
+    /// The values the destination can record.
+    private let choices: [Interpolation] = [Interpolation.none, .crossfade, .spectral]
 
     /// The menu's words for a value: its `displayName`, except plain "None" for no
     /// interpolation, since the caption under the menu says what None means (the preview's
     /// pop-up and facts, with no caption beside them, keep "None (stepped)"; Adam, 2026-10-26).
-    /// Tonverk's manual says "smooth" for a crossfade; the page keeps one word for one thing.
     private func label(_ value: Interpolation) -> String { value == Interpolation.none ? "None" : value.displayName }
 
     /// What the choices mean, and what "existing" means when the menu says it. One sentence
@@ -344,11 +338,7 @@ struct ConvertInterpolationOption: View {
             }
             lines.append(sentence + ".")
         }
-        if tonverk {
-            lines.append("Crossfade is an interpolation method: each frame blends into the next. None is no interpolation: Tonverk steps from frame to frame, and the file name gets an \u{201C}r\u{201D}.")
-        } else {
-            lines.append("Crossfade and spectral are interpolation methods: crossfade blends each frame into the next; spectral blends the frames’ harmonics (Serum’s and Vital’s spectral morph). None is no interpolation: the synth steps from frame to frame.")
-        }
+        lines.append("Crossfade and spectral are interpolation methods: crossfade blends each frame into the next; spectral blends the frames’ harmonics (Serum’s and Vital’s spectral morph). None is no interpolation: the synth steps from frame to frame.")
         return lines.joined(separator: " ")
     }
 
@@ -361,8 +351,8 @@ struct ConvertInterpolationOption: View {
         VStack(alignment: .leading, spacing: 4) {
             // "To be saved": the setting is about the output, not what the input says (Adam,
             // 2026-10-26); the preview's "Interpolation in the file" is the input's.
-            Text(tonverk ? "Interpolation to be marked in the output file name" : "Interpolation to be saved in the output file")
-            Picker(tonverk ? "Interpolation to be marked in the output file name" : "Interpolation to be saved in the output file", selection: selection) {
+            Text("Interpolation to be saved in the output file")
+            Picker("Interpolation to be saved in the output file", selection: selection) {
                 if let own = plan.eachTablesOwnInterpolationLabel {
                     choiceText(own).tag(Optional<Interpolation>.none)
                 }
@@ -385,14 +375,12 @@ struct ConvertInterpolationOption: View {
 
     /// The menu's selection: nil (no override) for the item that stands for it (the existing
     /// value, or the default when no file states one), which the option also maps to when it
-    /// equals that value; for Tonverk, a spectral choice reads as smooth and choosing smooth
-    /// stores crossfade.
+    /// equals that value.
     private var selection: Binding<Interpolation?> {
         Binding(
             get: {
                 let plan = state.convertPlan
-                var value = plan.options.interpolation
-                if tonverk, value == .spectral { value = .crossfade }
+                let value = plan.options.interpolation
                 let unmarkedDefault = plan.sharedExistingInterpolation ?? plan.defaultInterpolationItem
                 return value == unmarkedDefault ? nil : value
             },
@@ -473,5 +461,32 @@ struct ConvertPPGOption: View {
         Toggle("Add the PPG’s standard waveforms at 60–63", isOn: $state.convertPlan.options.appendPPGStandardWaves)
             .toggleStyle(.checkbox)
             .help("Triangle, narrow pulse, square, and sawtooth, as in the 3rd Wave’s PPG-derived P tables. Your table is fitted into frames 0–59, the part the 3rd Wave sweeps when \u{201C}use upper wavetable\u{201D} is off.")
+    }
+}
+
+/// Tonverk's raw sample playback: a pop-up that ends the file name in “r”, which Tonverk reads as
+/// a request to play each frame's samples without interpolation between them (tests in Tonverk
+/// OS 1.4.1: the “r” changes the playback of the samples, not the blend between frames). Each
+/// Table’s Own (nil) marks 3rd Wave P tables (PPG-style) and files marked already
+/// (`ConvertPlan.tonverkRawDefault(for:)`); On and Off mark every table or none.
+/// The caption (`ConvertPlan.tonverkRawCaption`) says what the mark does and what Each Table’s
+/// Own comes to for the tables listed.
+struct ConvertTonverkRawOption: View {
+    @ObservedObject var state: AppState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Raw sample playback (an \u{201C}r\u{201D} at the end of the file name)")
+            Picker("Raw sample playback", selection: $state.convertPlan.options.tonverkRawSamples) {
+                Text("Each Table’s Own").tag(Optional<Bool>.none)
+                Text("On").tag(Optional<Bool>.some(true))
+                Text("Off").tag(Optional<Bool>.some(false))
+            }
+            .labelsHidden()
+            .frame(maxWidth: 260, alignment: .leading)
+            .help("Tonverk\u{2019}s manual, section 5.2.5: an \u{201C}r\u{201D} at the end of the file name loads the table without interpolation. Tested in Tonverk OS 1.4.1, the \u{201C}r\u{201D} switches off the interpolation between each frame\u{2019}s samples (the PPG\u{2019}s raw playback); Tonverk blends between frames either way.")
+            ConvertSentences(state.convertPlan.tonverkRawCaption)
+                .padding(.top, ConvertPreviewFacts.detailSpacing - 4)
+        }
     }
 }

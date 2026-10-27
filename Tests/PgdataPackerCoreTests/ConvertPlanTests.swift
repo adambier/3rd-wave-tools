@@ -576,11 +576,12 @@ final class ConvertPlanStateTests: XCTestCase {
         XCTAssertEqual(OutputPreset.Group.thirdWave.title, "3rd Wave")
         XCTAssertEqual(OutputPreset.Group.otherSynths.title, "Other Synths", "a group heading: title case")
         XCTAssertEqual(OutputPreset.thirdWaveU.specLine, "64 × 1,024 · .wt")
-        XCTAssertEqual(OutputPreset.allCases.filter(\.recordsInterpolation), [.wav2048, .miniFreak, .tonverk, .phasePlant])
+        XCTAssertEqual(OutputPreset.allCases.filter(\.recordsInterpolation), [.wav2048, .miniFreak, .phasePlant])
         XCTAssertEqual(Interpolation.none.displayName, "None (stepped)")
         XCTAssertEqual(Interpolation.displayName(nil), "Not stated")
         XCTAssertEqual(Interpolation.displayName(.spectral), "Spectral")
-        XCTAssertEqual(ConvertPlan.testingStatus(.tonverk), "Converting to this destination has not yet been tested in its synth.")
+        XCTAssertEqual(ConvertPlan.testingStatus(.tonverk), "Tested in Tonverk, OS 1.4.1.")
+        XCTAssertEqual(ConvertPlan.testingStatus(.surge), "Converting to this destination has not yet been tested in its synth.")
         XCTAssertEqual(ConvertPlan.testingStatus(.thirdWaveU), "Tested on the 3rd Wave 8M, OS 2.0d.")
         XCTAssertEqual(ConvertPlan.tablesHave(1, of: 5), "1 table has")
         XCTAssertEqual(ConvertPlan.tablesHave(2, of: 2), "Both tables have")
@@ -768,13 +769,14 @@ final class WavetableSketchInterpolationTests: XCTestCase {
         XCTAssertEqual(WavetableSketch.cycle(at: 0.5, in: [a], interpolation: .crossfade)?.values, a, "one frame: itself")
     }
 
-    func testTonverkRecordsSpectralAsCrossfade() {
+    func testTonverkRecordsNoInterpolationAndPlaysACrossfade() {
         let wave = (0..<2048).map { Float(sin(Double($0) * 2 * .pi / 2048)) * 0.5 }
         let t = FoundTable(name: "T", fileName: "T.wav", source: .wav, samples: wave + wave, frameSize: 2048,
                            frameSizeBasis: "clm chunk", interpolation: .spectral)
         var plan = ConvertPlan(preset: .tonverk)
         plan.add([ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/T.wav"), table: t)], factory: FactoryLibrary())
-        XCTAssertEqual(plan.interpolationRecorded(for: plan.items[0]), .crossfade)
+        XCTAssertNil(plan.interpolationRecorded(for: plan.items[0]))
+        XCTAssertEqual(plan.interpolationPlayed(for: plan.items[0]), .crossfade, "heard in Tonverk OS 1.4.1")
         plan.preset = .wav2048
         XCTAssertEqual(plan.interpolationRecorded(for: plan.items[0]), .spectral)
         plan.preset = .surge
@@ -1152,13 +1154,40 @@ final class ConvertExistingChoicesTests: XCTestCase {
         XCTAssertEqual(plan.existingInterpolations(), [:])
         XCTAssertEqual(plan.unstatedInterpolationCount, 0)
         XCTAssertNil(plan.eachTablesOwnInterpolationLabel)
-        // Tonverk: spectral counts as crossfade (its name can say only stepped or smooth).
+        // Tonverk: its name records no interpolation either (the r is raw sample playback).
         plan.preset = .tonverk
-        XCTAssertEqual(plan.existingInterpolations(), [.crossfade: 2, Interpolation.none: 2])
-        XCTAssertEqual(plan.eachTablesOwnInterpolationLabel?.text, "Each table’s own — existing: 2 stepped, 2 crossfade; 1 not stated, saved as crossfade")
-        let smooth = pickerPlan(.tonverk, [(.spectral, 2048), (.crossfade, 1024)])
-        XCTAssertEqual(smooth.sharedExistingInterpolation, .crossfade)
-        XCTAssertNil(smooth.eachTablesOwnInterpolationLabel)
+        XCTAssertEqual(plan.existingInterpolations(), [:])
+        XCTAssertNil(plan.eachTablesOwnInterpolationLabel)
+        XCTAssertNil(plan.sharedExistingInterpolation)
+    }
+
+    /// Tonverk's Raw Sample Playback setting: Each Table’s Own (nil) marks 3rd Wave P tables and
+    /// files already marked “r”; On and Off mark every table or none. The caption counts.
+    func testTonverkRawSamplesDefaultsPerTable() {
+        // Different levels, so the plan does not fold the four into one item (duplicates by content).
+        func wave(_ level: Float) -> [Float] { let w = (0..<128).map { Float(sin(Double($0) * 2 * .pi / 128)) * level }; return w + w }
+        let p = FoundTable(name: "P", fileName: "p.wt", source: .thirdWaveWavetable(isP: true), samples: wave(0.5), frameSize: 128, frameSizeBasis: "3rd Wave P table")
+        let u = FoundTable(name: "U", fileName: "u.wt", source: .thirdWaveWavetable(isP: false), samples: wave(0.6), frameSize: 128, frameSizeBasis: "3rd Wave U table")
+        let marked = FoundTable(name: "M", fileName: "M_wt128r.wav", source: .wav, samples: wave(0.7), frameSize: 128, frameSizeBasis: "name",
+                                readNotes: [ReadNote(.tonverkRawSamples, "r")])
+        let plain = FoundTable(name: "W", fileName: "w.wav", source: .wav, samples: wave(0.8), frameSize: 128, frameSizeBasis: "clm chunk")
+        var plan = ConvertPlan(preset: .tonverk)
+        plan.add([p, u, marked, plain].map { ConvertPlan.Found(url: URL(fileURLWithPath: "/tmp/\($0.fileName)"), table: $0) }, factory: FactoryLibrary())
+        XCTAssertEqual(plan.items.map { plan.tonverkRawDefault(for: $0) }, [true, false, true, false])
+        XCTAssertNil(plan.options.tonverkRawSamples)
+        XCTAssertEqual(plan.items.map { plan.options(for: $0).tonverkRawSamples }, [true, false, true, false])
+        XCTAssertEqual(plan.tonverkRawMarks.marked, 2)
+        XCTAssertEqual(plan.tonverkRawMarks.of, 4)
+        XCTAssertTrue(plan.tonverkRawCaption.contains("here 2 of the 4 tables."), plan.tonverkRawCaption)
+        XCTAssertEqual(plan.convert().files.map(\.fileName), ["P_wt128r.wav", "U_wt128.wav", "M_wt128r.wav", "W_wt128.wav"])
+        plan.options.tonverkRawSamples = true
+        XCTAssertEqual(plan.convert().files.map(\.fileName), ["P_wt128r.wav", "U_wt128r.wav", "M_wt128r.wav", "W_wt128r.wav"])
+        plan.options.tonverkRawSamples = false
+        XCTAssertEqual(plan.convert().files.map(\.fileName), ["P_wt128.wav", "U_wt128.wav", "M_wt128.wav", "W_wt128.wav"])
+        // Another destination ignores the setting.
+        plan.preset = .wav2048
+        XCTAssertEqual(plan.options(for: plan.items[0]).tonverkRawSamples, false)
+        XCTAssertEqual(plan.convert().files.map(\.fileName), ["P.wav", "U.wav", "M.wav", "W.wav"])
     }
 
     func testExistingInterpolationsLeaveOutTablesThatCannotConvertYet() {
@@ -1217,26 +1246,32 @@ final class ConvertPlanTonverkNumberingTests: XCTestCase {
 
 /// Switching destinations drops a choice the new destination cannot take.
 final class ConvertPresetSwitchTests: XCTestCase {
-    func testSpectralChoiceIsDroppedOnTheWayToTonverk() {
+    func testInterpolationChoiceIsDroppedOnTheWayToADestinationThatRecordsNone() {
         var plan = ConvertPlan(preset: .wav2048)
         plan.options.interpolation = .spectral
         plan.preset = .miniFreak
         XCTAssertEqual(plan.options.interpolation, .spectral, "MiniFreak V's files record a spectral morph")
         plan.preset = .tonverk
-        XCTAssertNil(plan.options.interpolation, "a Tonverk file name cannot mark a spectral morph")
+        XCTAssertNil(plan.options.interpolation, "a Tonverk file name records no interpolation (its r is raw sample playback)")
         plan.options.interpolation = .crossfade
+        XCTAssertNil(plan.options.interpolation, "and the Options box shows no pop-up for Tonverk")
         plan.preset = .phasePlant
+        plan.options.interpolation = .crossfade
+        plan.preset = .wav2048
         XCTAssertEqual(plan.options.interpolation, .crossfade, "crossfade is kept between destinations that record it")
         plan.preset = .thirdWaveU
         XCTAssertNil(plan.options.interpolation, "a 3rd Wave table records no interpolation, and the Options box shows no pop-up")
         // The same rule at init and on setting the options directly.
         XCTAssertNil(ConvertPlan(preset: .tonverk, options: OutputOptions(interpolation: .spectral)).options.interpolation)
-        XCTAssertEqual(ConvertPlan(preset: .tonverk, options: OutputOptions(interpolation: .crossfade)).options.interpolation, .crossfade)
+        XCTAssertEqual(ConvertPlan(preset: .phasePlant, options: OutputOptions(interpolation: .crossfade)).options.interpolation, .crossfade)
         var tonverk = ConvertPlan(preset: .tonverk)
-        tonverk.options.interpolation = .spectral
-        XCTAssertNil(tonverk.options.interpolation)
         tonverk.options.interpolation = Interpolation.none
-        XCTAssertEqual(tonverk.options.interpolation, Interpolation.none)
+        XCTAssertNil(tonverk.options.interpolation)
+        // Tonverk's own setting survives a switch and back.
+        tonverk.options.tonverkRawSamples = true
+        tonverk.preset = .wav2048
+        tonverk.preset = .tonverk
+        XCTAssertEqual(tonverk.options.tonverkRawSamples, true)
     }
 }
 

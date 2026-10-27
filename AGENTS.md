@@ -302,13 +302,15 @@ plain Return while a list has the focus edits the selected row's name, Pack's li
 cursor in the program's name field, through an `NSEvent` local monitor) and `ToolbarController`
 (the unified toolbar whose segmented control
 switches pages, with the audio output menu at its trailing end on every page while the Wavetables
-page is offered, `AppState.showsWavetablesPage`). The Wavetables page
-is shown only while View › Show Under-Development Features is on (`AppState.showsUnderDevelopmentFeatures`,
-`Section.isUnderDevelopment`, `availableSections`), and carries an orange under-development notice
-while `ConvertPlan.conversionUnderDevelopment` is true (a gating destination's `OutputPreset.testedIn`
-empty: `ConvertPlan.gatingPresets`, the 3rd Wave's P and U tables and Tonverk); once none is, the
-page is shown by default and the menu item leaves the View menu (`AppState.hasUnderDevelopmentSections`),
-so a page complete enough to show cannot be hidden by a toggle whose purpose is gone (Adam, 2026-10-26). Scroll bars follow the system setting; menus carry
+page is offered, `AppState.showsWavetablesPage`). The Wavetables page is shown by default since
+every gating destination has been tested (`ConvertPlan.gatingPresets`, the 3rd Wave's P and U
+tables and Tonverk, each with an `OutputPreset.testedIn` entry); the gating mechanism stays for a
+future page or destination: while `ConvertPlan.conversionUnderDevelopment` is true, the page is
+shown only with View › Show Under-Development Features (`AppState.showsUnderDevelopmentFeatures`,
+`Section.isUnderDevelopment`, `availableSections`) and carries an orange under-development notice,
+and once nothing is gated the menu item leaves the View menu (`AppState.hasUnderDevelopmentSections`),
+so a page complete enough to show cannot be hidden by a toggle whose purpose is gone (Adam,
+2026-10-26). Scroll bars follow the system setting; menus carry
 the shortcuts (⌘O, ⇧⌘E, ⌘1–⌘3, ⌥⌘L, ⌫, ⌘A, ⌘Z); the Info.plist declares the file types with
 `LSHandlerRank` None, so files open by Dock-icon drop without the app claiming any type.
 `ListCommands.swift` is how Delete and Return reach a list: each `List` or `Table` keeps a
@@ -516,10 +518,15 @@ credentials that are not in the repository.
   follow from the range. The upper S-slot limit has not been checked (`SourceRef.sMax = 127` is
   the library's limit, not the 3rd Wave's).
 - `OutputPreset.testedIn` names the 3rd Wave 8M (OS 2.0d) for the P and U tables (eight converted
-  tables imported, played, and exported back, 2026-10-26; FORMATS.md section 9) and is empty for
-  every other destination: no converted file has yet been loaded in those synths through this
-  project. WAVETABLES.md "Open questions" lists what each test would settle. Tonverk still gates
-  the Wavetables page (`ConvertPlan.gatingPresets`).
+  tables imported, played, and exported back, 2026-10-26; FORMATS.md section 9) and Tonverk OS
+  1.4.1 for the Tonverk destination (WAVETABLES.md section 2: the tags read, the frames in order;
+  Tonverk's own recordings showed that the `r` at the end of a name switches off the
+  interpolation between a frame's samples, not the blend between frames, which Tonverk always
+  makes, so the `r` is the page's Raw sample playback option, `OutputOptions.tonverkRawSamples`,
+  nil meaning each table's own, `ConvertPlan.tonverkRawDefault(for:)`: 3rd Wave P tables and
+  files already marked; a Tonverk name records no interpolation, `recordsInterpolation` false).
+  `testedIn` is empty for every other destination: no converted file has yet been loaded in those
+  synths through this project. WAVETABLES.md "Open questions" lists what each test would settle.
 - The mipmap chain written for U tables uses ideal spectral cut-offs; the factory filter is unknown
   (the 3rd Wave identifies a table by its first 65,536 values, so the chain need not match).
 - `.wt` value lines must stay within 31 characters: the 3rd Wave has been observed to read a longer line as two values

@@ -56,7 +56,7 @@ public struct Wavetable: Equatable, Sendable {
 
 /// How a synth moves between neighboring frames, as some file formats can record it.
 public enum Interpolation: String, Equatable, Sendable, CaseIterable {
-    /// Jumps from frame to frame (Serum's "no interp"; Tonverk's trailing `r`).
+    /// Jumps from frame to frame (Serum's "no interp").
     case none
     /// Crossfades between neighboring frames.
     case crossfade
@@ -108,7 +108,8 @@ public enum FrameSizeSource: Equatable, Sendable {
     case srgeChunk
     /// A u-he `uhWT` chunk (or FLAC application block).
     case uhWTChunk
-    /// A Tonverk `_wt<N>` tag at the end of the file name, with the tag's text (e.g., "_wt1024r").
+    /// A Tonverk `_wt<N>` tag at the end of the file name, with the tag's text (e.g., "_wt1024r";
+    /// the `r` asks Tonverk for raw sample playback, see ``ReadNote/Kind/tonverkRawSamples``).
     case tonverkFileName(tag: String)
     /// A Serum `.txt` file beside the WAV or FLAC file.
     case serumSidecar
@@ -161,6 +162,10 @@ public struct ReadNote: Equatable, Sendable {
         case tagInComment(key: String)
         /// In a FLAC file, a comment mentions frames, cycles, or wavetables; it is not used.
         case commentMentionsFrames(key: String, value: String)
+        /// The file name ends in Tonverk's `r` (`_wt128r.wav`), which asks Tonverk to play each
+        /// frame's samples raw, without interpolation between them. The table's samples are what
+        /// they are; the mark is about Tonverk's playback (see ``OutputOptions/tonverkRawSamples``).
+        case tonverkRawSamples
     }
 
     /// Why a stated frame size is ignored.
@@ -218,6 +223,12 @@ public struct FoundTable: Equatable, Sendable {
     /// The notes as sentences (`readNotes`' text).
     public var notes: [String] { readNotes.map(\.text) }
 
+    /// Whether the file's name ends in Tonverk's `r`, which asks Tonverk for raw sample
+    /// playback (``ReadNote/Kind/tonverkRawSamples``).
+    public var isMarkedForTonverkRawSamples: Bool {
+        readNotes.contains(where: { $0.kind == .tonverkRawSamples })
+    }
+
     /// Creates a found table; see the properties for what each value means.
     public init(name: String, fileName: String, source: SourceFormat, samples: [Float], frameSize: Int?,
                 frameSizeBasis: String, candidateFrameSizes: [Int] = [], interpolation: Interpolation? = nil,
@@ -258,7 +269,7 @@ public enum OutputPreset: String, Equatable, Sendable, CaseIterable {
     /// import and send to a MiniFreak (which stores 64 frames; the writer reduces larger tables
     /// itself rather than leave it to MiniFreak V).
     case miniFreak
-    /// A WAV for Tonverk, its frame size and interpolation in the file name.
+    /// A WAV for Tonverk, its frame size (and, when asked, raw sample playback) in the file name.
     case tonverk
     /// A WAV of exactly 256 frames of 2,048 samples (Phase Plant).
     case phasePlant
@@ -281,11 +292,19 @@ public struct OutputOptions: Equatable, Sendable {
     /// How to reach the destination's frame count, when it differs from the source's.
     public var frameCountPolicy: FrameCountPolicy
     /// The interpolation to record, for destinations whose files can say (Serum-style `clm `
-    /// chunks, Tonverk names); nil keeps the source's, or the destination's default.
+    /// chunks); nil keeps the source's, or the destination's default.
     public var interpolation: Interpolation?
     /// Tonverk only: the frame size to write (64, 128, …, 4,096); nil keeps the source's when
     /// Tonverk accepts it, otherwise 2,048.
     public var tonverkFrameSize: Int?
+    /// Tonverk only: end the file name in `r`, which asks Tonverk to play each frame's samples
+    /// raw, without interpolation between them, as the PPG played its tables (Tonverk User
+    /// Manual OS 1.4.1, section 5.2.5, and tests in Tonverk OS 1.4.1: the `r` changes the
+    /// playback of the samples, not the blend between frames, which Tonverk always makes).
+    /// False: the name carries no `r`, whatever the source file's name said. Nil: the caller
+    /// decides per table (pgdata Packer marks 3rd Wave P tables, which the 3rd Wave plays the
+    /// PPG's way, and files already marked); the writer itself treats nil as false.
+    public var tonverkRawSamples: Bool?
     /// 3rd Wave P tables only: fit the table into frames 0–59 (by `frameCountPolicy`, keeping its
     /// first and last frames) and put the PPG's four standard waveforms (triangle, narrow pulse,
     /// square, sawtooth) at 60–63, as the 3rd Wave's PPG-derived tables have them.
@@ -293,9 +312,10 @@ public struct OutputOptions: Equatable, Sendable {
 
     /// Creates options; the defaults pick frames evenly and keep the source's interpolation.
     public init(frameCountPolicy: FrameCountPolicy = .pickEvenly, interpolation: Interpolation? = nil,
-                tonverkFrameSize: Int? = nil, appendPPGStandardWaves: Bool = false) {
+                tonverkFrameSize: Int? = nil, tonverkRawSamples: Bool? = nil, appendPPGStandardWaves: Bool = false) {
         self.frameCountPolicy = frameCountPolicy; self.interpolation = interpolation
-        self.tonverkFrameSize = tonverkFrameSize; self.appendPPGStandardWaves = appendPPGStandardWaves
+        self.tonverkFrameSize = tonverkFrameSize; self.tonverkRawSamples = tonverkRawSamples
+        self.appendPPGStandardWaves = appendPPGStandardWaves
     }
 }
 

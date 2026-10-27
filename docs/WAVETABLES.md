@@ -26,7 +26,7 @@ uses internally and what most other synths assume when a file says nothing else.
 | `clm ` chunk | ASCII `<!>2048 F0000000 …`: the frame size, then flags; the first flag digit F is the interpolation (below) | Serum, Vital, Surge, this app | Serum (the first 10 bytes); Vital (the flag only); Surge (2,048 only)[^surge-code][^vital] |
 | `srge` chunk | int32 version, int32 frame size | Surge | Surge[^surge-code] |
 | `uhWT` chunk | a frame size field (2,048 throughout Hive's library; the layout is an inference from those files), which Surge reads as 2,048 | u-he synths | Surge, this app[^surge-code] |
-| `_wt<N>` at the end of the file name | the frame size N (64–4,096, a power of two); a trailing `r` means no interpolation | this app (for Tonverk) | Tonverk[^tonverk] |
+| `_wt<N>` at the end of the file name | the frame size N (64–4,096, a power of two); a trailing `r` asks Tonverk for raw sample playback (below) | this app (for Tonverk) | Tonverk[^tonverk] |
 | a `.txt` file beside the WAV | line 1 `[N]`, the samples per frame; optional line 2 `[interp]` or `[no interp]` | people, by hand | Serum (`<name>.txt`, then `FolderInfo.txt`)[^serum] |
 | nothing | the reader's own assumption, usually 2,048 | many | Pigments slices every 2,048 samples[^pigments] |
 
@@ -41,7 +41,7 @@ chunk.[^vital] Most other synths set interpolation on the oscillator, not in the
 |---|---|---|
 | Serum, Vital, Pigments | Mono 32-bit float WAV, 48 kHz, 2,048 per frame, up to 256 frames, with a `clm ` chunk carrying the interpolation | [^serum] [^vital] [^pigments] |
 | MiniFreak V (for the MiniFreak) | The same, with at most 64 frames | [^minifreak] |
-| Tonverk | Mono 32-bit float WAV, 48 kHz, at most 64 frames, its frame size and interpolation in the file name (`Name_wt1024.wav`, `Name_wt128r.wav`) | [^tonverk] |
+| Tonverk | Mono 32-bit float WAV, 48 kHz, at most 64 frames, its frame size in the file name, and an `r` at the end for raw sample playback (`Name_wt1024.wav`, `Name_wt128r.wav`). Tested in Tonverk OS 1.4.1 | [^tonverk] [^tonverk-tests] |
 | Phase Plant | Exactly 256 frames of 2,048, with a `clm ` chunk | [^phaseplant] |
 | Surge XT | A Surge `.wt` (binary, below) | [^surge-code] |
 | WaveEdit, E370 | Mono 16-bit WAV, 44.1 kHz, 64 frames of 256, no extra chunk | [^waveedit] |
@@ -62,11 +62,15 @@ Notes on each:
   2,048-sample frame to 512, or more than 64 frames to 64, is not documented, so larger tables
   are cut down to 64 frames here, by the method you choose, before MiniFreak V sees the file.[^minifreak]
 - **Tonverk** reads the frame size from a `_wt<N>` tag at the end of the file name (2,048 when
-  there is none) and plays without interpolation when the name ends in `r`. It takes up to 64
-  frames and picks evenly spaced ones from a larger table.[^tonverk] The manual's only example of
-  the `r` has a size tag (`strings_wt128r.wav`); read literally, any name ending in "r" could load
-  stepped, so an explicit tag is always written and any tag the name already has is removed.
-  (An inference from the manual's wording; untested.)
+  there is none) and takes up to 64 frames, picking evenly spaced ones from a larger
+  table.[^tonverk] The manual says a name ending in `r` loads the table "without interpolation"
+  (its example is `strings_wt128r.wav`). Tested in Tonverk OS 1.4.1, the `r` switches off the
+  interpolation between each frame's **samples** (raw, sample-and-hold playback, as the PPG
+  played its tables), not the blend between frames, which Tonverk makes whatever the name
+  says.[^tonverk-tests] So the app writes the `r` as its own option, Raw sample playback (on by
+  default for 3rd Wave P tables and for files already marked), and never as the interpolation;
+  the reader notes the mark and reads no interpolation from it. An explicit size tag is always
+  written, and any tag the name already has is replaced.
 - **Phase Plant** documents its wavetables as exactly 256 frames of 2,048 samples (524,288 in
   all).[^phaseplant] Whether it accepts shorter files is not documented; 256 frames are always
   written, the table expanded or reduced by the method you choose.
@@ -238,7 +242,9 @@ The report after converting says what was done to each table.
 Results from any of these are welcome:
 
 - Whether Phase Plant loads tables of fewer than 256 frames.
-- Whether Tonverk treats a name ending in "r" without a `_wt<N>` tag as stepped.
+- Whether Tonverk's `r` works without a `_wt<N>` tag (every form tested had the tag or was
+  tested for the wrong property), and whether Tonverk's factory library, whose files carry no
+  tags, is read at 2,048 throughout (one file, `All Waves.wav`, is 8,192 samples).
 - How MiniFreak V reduces 2,048-sample frames to 512, and how it treats fewer than 64 frames.
 - Whether the app's 3rd Wave U table from a Serum WAV matches what Wave Maker makes from the same
   file.
@@ -256,6 +262,16 @@ Results from any of these are welcome:
     <https://www.arturia.com/api/download/products/minifreak-v/manual/minifreak-v_Manual_5_1_0_EN.pdf>
 [^tonverk]: *Tonverk User Manual*, OS 1.4.1, section 5.2.5, "Wavetables".
     <https://www.elektron.se/wp-content/uploads/2026/09/Tonverk-User-Manual_ENG_OS1.4.1_260923.pdf>
+[^tonverk-tests]: Tests in Tonverk OS 1.4.1, 2026-10-27. Tables written by the app (4 and 64
+    frames of 64, 128, 1,024, and 2,048 samples) loaded through the Sample Browser and the
+    Wavefinder's SLOT and played in order at the right pitch for every tag. The blend between
+    frames: a four-frame table alternating a sine with silence faded gradually under six name
+    forms (`_wt2048r`, `_wt2048R`, with and without spaces, `r` with and without a tag). The
+    samples: Tonverk's own recordings of a 64-sample sine at C4, with the name `Test Stairs
+    A_wt64.wav` a pure sine, and with `_wt64r` (also `_wt64R`, and without spaces) the same
+    sine plus lines at 63 × and 65 × the note at −36 dB, the images of a 64-step staircase
+    (1/64 = −36 dB): the `r` turns the interpolation between samples off. A Serum-style `clm `
+    chunk in the file changed nothing, and an unknown chunk after the audio was ignored.
 [^phaseplant]: Kilohearts, Phase Plant manual and "Wavetables".
     <https://kilohearts.com/docs/wavetables>
 [^flac]: RFC 9639, "Free Lossless Audio Codec" (IETF, 2024).

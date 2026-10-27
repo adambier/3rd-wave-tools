@@ -8,11 +8,13 @@ import Foundation
 
 public extension OutputPreset {
     /// Whether the preset's files record the interpolation: a `clm ` chunk (Serum,
-    /// Vital, Pigments, MiniFreak V, Phase Plant) or Tonverk's file name.
+    /// Vital, Pigments, MiniFreak V, Phase Plant). A Tonverk file name records none: its `r`
+    /// is about the playback of each frame's samples, not the blend between frames, which
+    /// Tonverk always makes (tests in Tonverk OS 1.4.1).
     var recordsInterpolation: Bool {
         switch self {
-        case .wav2048, .miniFreak, .phasePlant, .tonverk: return true
-        case .thirdWaveU, .thirdWaveP, .surge, .waveEdit: return false
+        case .wav2048, .miniFreak, .phasePlant: return true
+        case .thirdWaveU, .thirdWaveP, .tonverk, .surge, .waveEdit: return false
         }
     }
 }

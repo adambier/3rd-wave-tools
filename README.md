@@ -75,10 +75,8 @@ command-line tools alone. Such a build has no Sparkle, so no **Check for Updates
 
 ## Using it
 
-The window has two pages, **Pack** and **Unpack**, chosen in the toolbar or from the View menu
-(⌘1, ⌘2), and a third, **Wavetables** (⌘3), that is still being tested: View › **Show
-Under-Development Features** adds it, with the audio output control that goes with it. There is
-nothing else to set up.
+The window has three pages, **Pack**, **Unpack**, and **Wavetables**, chosen in the toolbar or
+from the View menu (⌘1, ⌘2, ⌘3). There is nothing else to set up.
 
 Files and folders can be dropped onto a page, chosen with **Add Files or Folders…** (⌘O) in the
 File menu or on the page, or dropped onto the app's icon in the Dock, which sends each file to the
@@ -366,7 +364,7 @@ field above the table narrows the list by name or file, as on the Pack page.
 | 3rd Wave U table | a `.wt` of 64 frames of 1,024 samples, with its mipmap chain |
 | Serum, Vital, Pigments | a 32-bit float WAV of up to 256 frames of 2,048 samples, recording the interpolation |
 | MiniFreak V | the same, with at most 64 frames, for MiniFreak V to send to a MiniFreak |
-| Tonverk | a 32-bit float WAV of up to 64 frames, with the frame size and interpolation in the file name |
+| Tonverk | a 32-bit float WAV of up to 64 frames, with the frame size in the file name, and an "r" at its end when raw sample playback is asked for |
 | Phase Plant | a 32-bit float WAV of exactly 256 frames of 2,048 samples |
 | Surge XT | a Surge `.wt` |
 | WaveEdit, E370 | a 16-bit WAV of 64 frames of 256 samples |
@@ -382,10 +380,10 @@ each row (under **Sources**) names the documents the format rests on; a green se
 marks a destination that has been tested. [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes
 what each destination expects, with sources.
 
-Until Tonverk has been tested as well, the page is shown only with View ›
-**Show Under-Development Features** and carries a notice that wavetable conversion is under
-development. After that, the page is shown by default, the menu item goes, and a destination
-still untested says so in its row.
+Tonverk has been tested as well (OS 1.4.1): tables of 4 and 64 frames at 64, 128, 1,024, and
+2,048 samples per frame loaded through its Sample Browser and the Wavefinder's SLOT, played in
+order at the right pitch, and Tonverk's own recordings showed what the "r" at the end of a file
+name does (below, under Options). A destination still untested says so in its row.
 
 #### Options
 
@@ -396,12 +394,18 @@ Shown when a choice applies to the destination and the tables (the captions coun
   spaced originals (the first and last among them) for fewer frames and repeats each original in
   order for more, making no new waveforms; **Crossfade New Frames** makes each new frame by
   crossfading its neighbors.
-- **Interpolation to be saved in the output file** (for Tonverk, marked in the output file
-  name), for formats whose file records it: an interpolation method, crossfade or spectral, or
-  none (no interpolation: the synth steps from frame to frame). The preview shows what each
-  table's own input file specifies; by default each table keeps that, and a table whose file says
-  nothing gets crossfade.
-- Tonverk's frame size, and the PPG's four standard waveforms for P tables.
+- **Interpolation to be saved in the output file**, for formats whose file records it
+  (Serum-style WAVs): an interpolation method, crossfade or spectral, or none (no interpolation:
+  the synth steps from frame to frame). The preview shows what each table's own input file
+  specifies; by default each table keeps that, and a table whose file says nothing gets
+  crossfade.
+- Tonverk's frame size, and **Raw sample playback** for Tonverk: an "r" at the end of the file
+  name, which Tonverk's manual describes as loading the table "without interpolation". Tested in
+  Tonverk OS 1.4.1, the "r" switches off the interpolation between each frame's samples (the
+  PPG's raw, stepped playback, audible on frames of 64 or 128 samples as a bright edge), while
+  Tonverk blends between frames either way. **Each Table's Own** marks 3rd Wave P tables, the
+  PPG-style tables, and files already marked; **On** and **Off** mark every table or none.
+- The PPG's four standard waveforms for P tables.
 - For a 3rd Wave destination, **Also add the .wt files to the Pack page**, to embed them in
   programs; both Convert buttons honor it.
 
@@ -419,13 +423,12 @@ frames (drawn as a crossfade, an inference from the manual's description).
 How the result is drawn and played between frames depends on whether the destination's file
 records the interpolation:
 
-- For formats whose file records none (the 3rd Wave's tables, Surge XT, WaveEdit), an
+- For formats whose file records none (the 3rd Wave's tables, Tonverk, Surge XT, WaveEdit), an
   **Interpolation** pop-up under the pictures chooses it. Whenever the table or the destination
-  changes, the pop-up goes back to the synth's default where that is known (the 3rd Wave's) and
-  otherwise to none.
-- For formats whose file records it (Serum-style WAVs, Tonverk), the **Interpolation to be saved
-  in the output file** option under **Options** decides, and the preview says so in the pop-up's
-  place.
+  changes, the pop-up goes back to the synth's default where that is known (the 3rd Wave's, and
+  Tonverk's, which blends between frames) and otherwise to none.
+- For formats whose file records it (Serum-style WAVs), the **Interpolation to be saved in the
+  output file** option under **Options** decides, and the preview says so in the pop-up's place.
 
 The **Frame** slider sweeps through the table and draws the cycle at its position large, input
 and result together. The frames in the file are magnetic: the slider lands on them as it passes,
@@ -592,10 +595,10 @@ with `tw3pg`.
 
 The test `.pgdata` files are built with `tw3pg` from files that are not included here (a Groove
 Synthesis factory program and one of its `.wt` files, two third-party programs, and a small
-`.bin`). The Wavetables page's 3rd Wave tables were tested on an 8M with eight converted tables
-(above, under Destinations); `tw3pg makewavetests`, `wtconvert`, and `wtmatch` are there for
-such tests: they write synthetic inputs, convert as the page does, and identify the 3rd Wave's
-exports by content.
+`.bin`). The Wavetables page's 3rd Wave tables were tested on an 8M with eight converted tables,
+and its Tonverk files in Tonverk (above, under Destinations); `tw3pg makewavetests`,
+`wtconvert`, and `wtmatch` are there for such tests: they write synthetic inputs, convert as the
+page does, and identify the 3rd Wave's exports by content.
 
 Still unknown: how the 3rd Wave writes non-ASCII letters in file names; whether a 24K converts
 older programs exactly as the 24M does; and the meaning of most program values.

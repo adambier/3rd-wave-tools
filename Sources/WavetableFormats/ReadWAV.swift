@@ -151,7 +151,12 @@ extension WavetableReader {
             let subject = "the file name (\(t.text))"
             let source = FrameSizeSource.tonverkFileName(tag: t.text)
             offer(t.size, source: source, basis: "Tonverk tag in the file name (\(t.text))", subject: subject, evidence: .fileName)
-            if t.stepped { interps.append(InterpolationClaim(value: .none, source: source, subject: subject)) }
+            if t.raw {
+                // The r is not an interpolation claim: Tonverk blends between frames whatever
+                // the name says, and plays the samples of each frame raw (tests in Tonverk OS
+                // 1.4.1, docs/WAVETABLES.md section 2).
+                notes.append(ReadNote(.tonverkRawSamples, "The file name ends in “r”, which asks Tonverk to play each frame’s samples without interpolation between them (raw, as the PPG played its tables); Tonverk still blends between frames."))
+            }
         }
         // 5. Serum sidecar text.
         if let text = sidecarText {
@@ -390,18 +395,18 @@ extension WavetableReader {
     }
 
     /// A Tonverk tag at the end of a file stem: `_wt<N>`, case-insensitive, with an optional
-    /// trailing `r` for no interpolation. N must be one of the sizes Tonverk's manual lists (the
-    /// powers of two from 64 to 4,096): "KOMPLEXER_WT1" and "Pad_wt2" are names numbering their
-    /// tables, not tags (found in Serum libraries), and are left alone.
-    fileprivate static func tonverkTag(in stem: String) -> (size: Int, stepped: Bool, text: String, nameBeforeTag: String)? {
+    /// trailing `r` (or `R`) for raw sample playback. N must be one of the sizes Tonverk's manual
+    /// lists (the powers of two from 64 to 4,096): "KOMPLEXER_WT1" and "Pad_wt2" are names
+    /// numbering their tables, not tags (found in Serum libraries), and are left alone.
+    fileprivate static func tonverkTag(in stem: String) -> (size: Int, raw: Bool, text: String, nameBeforeTag: String)? {
         guard let r = stem.range(of: "_wt", options: [.backwards, .caseInsensitive]) else { return nil }
         let rest = stem[r.upperBound...]
         let digits = rest.prefix { $0.isASCII && $0.isNumber }
         let tail = rest.dropFirst(digits.count)
         guard !digits.isEmpty, tail.isEmpty || tail == "r" || tail == "R", let n = Int(digits),
               (64...4096).contains(n), n & (n - 1) == 0 else { return nil }
-        let stepped = !tail.isEmpty
-        return (n, stepped, "_wt\(digits)\(stepped ? "r" : "")", String(stem[..<r.lowerBound]))
+        let raw = !tail.isEmpty
+        return (n, raw, "_wt\(digits)\(raw ? "r" : "")", String(stem[..<r.lowerBound]))
     }
 
     /// Whether a file stem ends in a note name, as the notes of a multisampled instrument are

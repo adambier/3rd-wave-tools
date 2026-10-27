@@ -269,7 +269,9 @@ final class ReadingTests: XCTestCase {
         let t = try readOne(wavFile([ramp(4096)]), "Strings_WT512r.wav")
         XCTAssertEqual(t.frameSize, 512)
         XCTAssertEqual(t.frameSizeBasis, "Tonverk tag in the file name (_wt512r)")
-        XCTAssertEqual(t.interpolation, Interpolation.none)
+        XCTAssertNil(t.interpolation, "the r marks raw sample playback, not the blend between frames (tests in Tonverk OS 1.4.1)")
+        XCTAssertTrue(t.isMarkedForTonverkRawSamples)
+        XCTAssertEqual(t.readNotes.map(\.kind), [.tonverkRawSamples])
         XCTAssertEqual(t.name, "Strings")
         let plain = try readOne(wavFile([ramp(4096)]), "pad_wt256.wav")
         XCTAssertEqual(plain.frameSize, 256)
@@ -299,7 +301,7 @@ final class ReadingTests: XCTestCase {
         XCTAssertEqual(t.interpolation, .crossfade)
         XCTAssertTrue(t.notes.contains { $0.contains("_wt1024r") && $0.contains("1,024") && $0.contains("(clm chunk) is used") },
                       "\(t.notes)")
-        XCTAssertTrue(t.notes.contains { $0.contains("no interpolation") }, "\(t.notes)")
+        XCTAssertTrue(t.isMarkedForTonverkRawSamples)
         XCTAssertEqual(t.name, "keys")
     }
 
@@ -466,9 +468,8 @@ final class ReadingTests: XCTestCase {
 
         let beats = try readOne(wavFile([ramp(8192)], chunks: [clm("<!>2048 10000000")]), "keys_wt1024r.wav")
         XCTAssertEqual(beats.readNotes.map(\.kind),
-                       [.sizeClaimsDisagree(chosen: .clmChunk, chosenSize: 2048, other: .tonverkFileName(tag: "_wt1024r"), otherSize: 1024),
-                        .interpolationClaimsDisagree(chosen: .clmChunk, chosenValue: .crossfade,
-                                                     other: .tonverkFileName(tag: "_wt1024r"), otherValue: Interpolation.none)])
+                       [.tonverkRawSamples,
+                        .sizeClaimsDisagree(chosen: .clmChunk, chosenSize: 2048, other: .tonverkFileName(tag: "_wt1024r"), otherSize: 1024)])
 
         let cut = try readOne(wavFile([ramp(24 * 2048 + 32)], chunks: [clm("<!>2048 20000000")]), "a.wav")
         XCTAssertEqual(cut.readNotes.map(\.kind), [.samplesLeftOut(32, shortOfAnotherFrame: nil)])

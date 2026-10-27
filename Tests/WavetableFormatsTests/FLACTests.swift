@@ -237,9 +237,11 @@ final class FLACTests: XCTestCase {
         XCTAssertEqual(t.frameSize, 1024)
         XCTAssertEqual(t.frameSizeEvidence, .fileName)
         XCTAssertEqual(t.frameSizeBasis, "Tonverk tag in the file name (_wt1024r)")
-        XCTAssertEqual(t.interpolation, Interpolation.none)
+        XCTAssertNil(t.interpolation, "Tonverk's r is not an interpolation claim")
+        XCTAssertTrue(t.isMarkedForTonverkRawSamples)
         XCTAssertEqual(t.samples.count, 3 * 1024)
-        XCTAssertEqual(t.notes, ["100 samples after the last whole frame are left out."])
+        XCTAssertEqual(t.notes, ["The file name ends in “r”, which asks Tonverk to play each frame’s samples without interpolation between them (raw, as the PPG played its tables); Tonverk still blends between frames.",
+                                 "100 samples after the last whole frame are left out."])
     }
 
     func testSerumSidecarBesideTheFile() throws {

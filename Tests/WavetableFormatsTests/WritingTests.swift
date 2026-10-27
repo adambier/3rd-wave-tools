@@ -258,20 +258,26 @@ final class WritingTests: XCTestCase {
         XCTAssertEqual([w.formatTag, w.sampleRate, w.bits], [3, 48_000, 32])
         XCTAssertEqual(w.samples, t.frames.flatMap { $0 })
 
-        XCTAssertEqual(try write(t, .tonverk, OutputOptions(interpolation: Interpolation.none)).fileName, "Test Table_wt1024r.wav")
+        // The interpolation never reaches a Tonverk name: Tonverk blends between frames whatever
+        // the name says (tests in Tonverk OS 1.4.1). The "r" is the raw sample playback option.
+        XCTAssertEqual(try write(t, .tonverk, OutputOptions(interpolation: Interpolation.none)).fileName, "Test Table_wt1024.wav")
         var stepped = t; stepped.interpolation = Interpolation.none
-        XCTAssertEqual(try write(stepped, .tonverk).fileName, "Test Table_wt1024r.wav")
+        let steppedOut = try write(stepped, .tonverk)
+        XCTAssertEqual(steppedOut.fileName, "Test Table_wt1024.wav")
+        notes(steppedOut, contain: "what the source file records (no interpolation) is not carried over; Tonverk blends between frames itself")
 
         var guitar = t; guitar.name = "Guitar"
-        XCTAssertEqual(try write(guitar, .tonverk).fileName, "Guitar_wt1024.wav", "a name ending in r stays smooth")
+        XCTAssertEqual(try write(guitar, .tonverk).fileName, "Guitar_wt1024.wav", "a name ending in r gets no mark")
+
+        let raw = try write(t, .tonverk, OutputOptions(tonverkRawSamples: true))
+        XCTAssertEqual(raw.fileName, "Test Table_wt1024r.wav")
+        notes(raw, contain: "The file name ends in “r”, as the Raw Sample Playback setting under Options asks")
+        XCTAssertEqual(try write(t, .tonverk, OutputOptions(tonverkRawSamples: false)).fileName, "Test Table_wt1024.wav")
+        XCTAssertEqual(try write(t, .tonverk, OutputOptions(tonverkRawSamples: nil)).fileName, "Test Table_wt1024.wav", "the writer treats nil as off")
 
         let spectral = try write(t, .tonverk, OutputOptions(interpolation: .spectral))
         XCTAssertEqual(spectral.fileName, "Test Table_wt1024.wav")
-        notes(spectral, contain: "spectral interpolation given as the interpolation option is left unmarked")
-        var spectralFile = t; spectralFile.interpolation = .spectral
-        let fromFile = try write(spectralFile, .tonverk)
-        XCTAssertEqual(fromFile.fileName, "Test Table_wt1024.wav")
-        notes(fromFile, contain: "The source file records spectral interpolation, which a Tonverk file name cannot mark")
+        notes(spectral, contain: "the interpolation option (spectral) is not written; Tonverk blends between frames itself")
     }
 
     func testTonverkReplacesExistingTag() throws {
@@ -279,6 +285,10 @@ final class WritingTests: XCTestCase {
         let out = try write(t, .tonverk)
         XCTAssertEqual(out.fileName, "strings_wt128.wav")
         notes(out, contain: "“_wt128r” was replaced by “_wt128”")
+        notes(out, contain: "The source file’s name asked Tonverk for raw sample playback (its “r”); the new name does not")
+        let kept = try write(t, .tonverk, OutputOptions(tonverkRawSamples: true))
+        XCTAssertEqual(kept.fileName, "strings_wt128r.wav")
+        XCTAssertFalse(kept.notes.contains { $0.contains("the new name does not") }, "\(kept.notes)")
     }
 
     func testTonverkFrameSizes() throws {
@@ -378,7 +388,7 @@ final class WritingTests: XCTestCase {
             XCTAssertFalse(p.title.isEmpty)
             // Each entry carries its preposition, for the page's "Tested …" line.
             for entry in p.testedIn { XCTAssertTrue(entry.hasPrefix("on ") || entry.hasPrefix("in "), entry) }
-            XCTAssertEqual(p.testedIn.isEmpty, !p.isThirdWave, "\(p)")
+            XCTAssertEqual(p.testedIn.isEmpty, !(p.isThirdWave || p == .tonverk), "\(p)")
             XCTAssertFalse(p.basis.isEmpty)
             XCTAssertLessThanOrEqual(p.requiredFrameCount ?? 0, p.maxFrameCount)
         }
@@ -445,7 +455,7 @@ final class WritingTests: XCTestCase {
                                            options: OutputOptions(frameCountPolicy: .interpolate))
         XCTAssertEqual(tonverk.frameSizeOut, 2048)
         XCTAssertEqual(tonverk.frameCountOut, 64)
-        XCTAssertEqual(tonverk.interpolationRecorded, .crossfade, "a Tonverk name can say only stepped or smooth")
+        XCTAssertNil(tonverk.interpolationRecorded, "a Tonverk name records no interpolation")
         XCTAssertEqual(tonverk.countPolicy, .interpolate)
         XCTAssertEqual(tonverk.fileExtension, "wav")
 
@@ -562,7 +572,7 @@ final class InterpolationNoteTests: XCTestCase {
         let serum = try WavetableWriter.write(plain, preset: .wav2048)
         XCTAssertTrue(serum.notes.contains { $0.contains("The source file says nothing about interpolation, and the Interpolation setting is left at its default, so crossfade is saved.") }, "\(serum.notes)")
         let tonverk = try WavetableWriter.write(plain, preset: .tonverk)
-        XCTAssertTrue(tonverk.notes.contains { $0.hasPrefix("The source file says nothing about interpolation, and the Interpolation setting is left at its default, so the file name carries no “r”") }, "\(tonverk.notes)")
+        XCTAssertFalse(tonverk.notes.contains { $0.contains("interpolation") }, "a Tonverk name records none, and a file that says nothing gets no note: \(tonverk.notes)")
         // A destination whose files record none: the option, or the source file's value, is reported as not written.
         var stated = plain; stated.interpolation = .spectral
         let u = try WavetableWriter.write(stated, preset: .thirdWaveU)

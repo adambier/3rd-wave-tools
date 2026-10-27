@@ -78,13 +78,11 @@ public enum WavetableWriter {
 
     /// The interpolation `preset`'s file records for a table whose own is `source` (nil when its
     /// file does not say): `options.interpolation`, else `source`, else crossfade; nil when the
-    /// format cannot record one. A Tonverk name can say only stepped or smooth, so spectral is
-    /// recorded as crossfade there.
+    /// format cannot record one.
     public static func interpolationRecorded(for preset: OutputPreset, source: Interpolation?,
                                              options: OutputOptions = OutputOptions()) -> Interpolation? {
         guard preset.recordsInterpolation else { return nil }
-        let asked = options.interpolation ?? source ?? .crossfade
-        return preset == .tonverk && asked == .spectral ? .crossfade : asked
+        return options.interpolation ?? source ?? .crossfade
     }
 
     /// One conversion: the frames as they change, and the notes saying how. Every step follows
@@ -146,21 +144,19 @@ public enum WavetableWriter {
         // MARK: Destinations
 
         mutating func tonverk() -> OutputFile {
-            let stepped = plan.interpolationRecorded == Interpolation.none
-            if interpolation == .spectral {
-                // Spectral from the options or from the source file: say which. (Notes name
-                // where a value came from, never "asked for": Adam, 2026-10-26. The app never
-                // passes spectral for Tonverk; the first wording is for other callers.)
-                let plays = "Tonverk plays the table as a crossfade (Tonverk’s manual says “smooth”, taken here to mean a crossfade)."
-                notes.append(options.interpolation == .spectral
-                    ? "A Tonverk file name can mark a table only as stepped (a trailing “r”) or not, so the spectral interpolation given as the interpolation option is left unmarked: " + plays
-                    : "The source file records spectral interpolation, which a Tonverk file name cannot mark (only stepped, with a trailing “r”, or not): " + plays)
-            }
-            noteDefaultInterpolation(prefix: "", result: "so the file name carries no “r” and Tonverk plays the table as a crossfade (Tonverk’s manual says “smooth”, taken here to mean a crossfade)")
+            // A Tonverk file name records no interpolation: Tonverk blends between frames
+            // whatever the name says (tests in Tonverk OS 1.4.1, docs/WAVETABLES.md section 2).
+            noteUnrecordedInterpolation(who: "Tonverk blends between frames itself")
             let named = WavetableWriter.Names.fileStem(table.name)
             notes += named.notes
             let untagged = WavetableWriter.Names.removeTonverkTag(named.stem)
-            let tag = "_wt\(plan.frameSizeOut)" + (stepped ? "r" : "")
+            let raw = options.tonverkRawSamples ?? false
+            let tag = "_wt\(plan.frameSizeOut)" + (raw ? "r" : "")
+            if raw {
+                notes.append("The file name ends in “r”, as the Raw Sample Playback setting under Options asks: Tonverk plays each frame’s samples without interpolation between them, as the PPG played its tables, which adds a bright, stepped edge to frames of 64 or 128 samples.")
+            } else if let old = untagged.removed, old.hasSuffix("r") || old.hasSuffix("R") {
+                notes.append("The source file’s name asked Tonverk for raw sample playback (its “r”); the new name does not, as the Raw Sample Playback setting under Options is Off.")
+            }
             if let old = untagged.removed {
                 notes.append("The name’s own Tonverk tag “\(old)” was replaced by “\(tag)”.")
             }
@@ -263,7 +259,7 @@ public enum WavetableWriter {
         }
 
         /// For destinations that record the interpolation: says that the file records a
-        /// crossfade (or, for Tonverk, no stepped mark) because the source file doesn't specify
+        /// crossfade because the source file doesn't specify
         /// the interpolation and no other choice was made. `prefix` opens the note (a sentence
         /// and a space, or nothing); `result` closes it, after "so".
         mutating func noteDefaultInterpolation(prefix: String = "This format records whether and how a synth interpolates between frames. ",
@@ -275,14 +271,15 @@ public enum WavetableWriter {
 
         /// For destinations whose files can't record the interpolation: says so when the
         /// options or the source file give one, naming which (the app passes none for these
-        /// destinations, so from the app only the source file's is reported).
-        mutating func noteUnrecordedInterpolation() {
-            let who = preset.isThirdWave ? "the 3rd Wave" : "the synth"
+        /// destinations, so from the app only the source file's is reported). `who` is the
+        /// clause after the semicolon: who decides the blend between frames.
+        mutating func noteUnrecordedInterpolation(who: String? = nil) {
+            let who = who ?? ((preset.isThirdWave ? "the 3rd Wave" : "the synth") + " sets how frames blend")
             func words(_ i: Interpolation) -> String { i == Interpolation.none ? "no interpolation" : i.displayName.lowercased() }
             if let given = options.interpolation {
-                notes.append("This format doesn’t store the interpolation method, so the interpolation option (\(words(given))) is not written; \(who) sets how frames blend.")
+                notes.append("This format doesn’t store the interpolation method, so the interpolation option (\(words(given))) is not written; \(who).")
             } else if let recorded = table.interpolation {
-                notes.append("This format doesn’t store the interpolation method, so what the source file records (\(words(recorded))) is not carried over; \(who) sets how frames blend.")
+                notes.append("This format doesn’t store the interpolation method, so what the source file records (\(words(recorded))) is not carried over; \(who).")
             }
         }
 
@@ -427,11 +424,15 @@ public extension OutputPreset {
     /// tables with and without the PPG's waveforms at 60–63; U tables from Serum-style and u-he
     /// files, resized and with their frame counts changed both ways) imported with **Bulk
     /// wavetable import** into an 8M, played as written, and exported again the same to the
-    /// export's six decimal places (section 9 of FORMATS.md, 2026-10-26). Nothing else has been
-    /// tested yet.
+    /// export's six decimal places (section 9 of FORMATS.md, 2026-10-26). Tonverk: tables of 4
+    /// and 64 frames at 64, 128, 1,024, and 2,048 samples per frame loaded through the Sample
+    /// Browser and the Wavefinder's SLOT, played in order at the right pitch, and Tonverk's
+    /// own recordings of a 64-sample sine showed the `r` switching its sample interpolation off
+    /// (2026-10-27, OS 1.4.1; docs/WAVETABLES.md section 2). Nothing else has been tested yet.
     var testedIn: [String] {
         switch self {
         case .thirdWaveP, .thirdWaveU: return ["on the 3rd Wave 8M, OS 2.0d"]
+        case .tonverk: return ["in Tonverk, OS 1.4.1"]
         default: return []
         }
     }
@@ -449,7 +450,7 @@ public extension OutputPreset {
         case .miniFreak:
             return "Arturia, MiniFreak V User Manual 5.1.0, pp. 30–31"
         case .tonverk:
-            return "Elektron, Tonverk User Manual OS 1.4.1, §5.2.5, pp. 19–20"
+            return "Elektron, Tonverk User Manual OS 1.4.1, §5.2.5, pp. 19–20; tests in Tonverk OS 1.4.1 (WAVETABLES.md 2)"
         case .phasePlant:
             return "Kilohearts, Phase Plant manual (Wavetable Oscillator) and its Wavetables page"
         case .surge:

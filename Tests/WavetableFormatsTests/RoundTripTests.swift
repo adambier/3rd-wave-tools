@@ -47,9 +47,14 @@ final class RoundTripTests: XCTestCase {
         for interp in Interpolation.allCases {
             let opts = OutputOptions(interpolation: interp)
             XCTAssertEqual(try readBack(WavetableWriter.write(t, preset: .wav2048, options: opts)).interpolation, interp)
+            // A Tonverk name records no interpolation; its r is the raw sample playback mark.
             let tonverk = try readBack(WavetableWriter.write(t, preset: .tonverk, options: opts))
-            XCTAssertEqual(tonverk.interpolation, interp == Interpolation.none ? Interpolation.none : nil)
+            XCTAssertNil(tonverk.interpolation)
+            XCTAssertFalse(tonverk.isMarkedForTonverkRawSamples)
         }
+        let raw = try readBack(WavetableWriter.write(t, preset: .tonverk, options: OutputOptions(tonverkRawSamples: true)))
+        XCTAssertNil(raw.interpolation)
+        XCTAssertTrue(raw.isMarkedForTonverkRawSamples)
     }
 
     func testTonverkNonDefaultSizeIsReadFromTheName() throws {

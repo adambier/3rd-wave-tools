@@ -409,10 +409,9 @@ public struct ConvertPlan: Equatable {
     /// The tables listed, in the order added.
     public var items: [Item] = []
     /// The destination. An interpolation chosen for another destination is dropped on the way
-    /// to one that cannot take it: a destination whose files record no interpolation (the
-    /// Options box shows no Interpolation pop-up there, so the choice would act unseen), or
-    /// Tonverk for a spectral choice, which a Tonverk file name cannot mark (the pop-up showed
-    /// Crossfade while the writer noted a spectral morph: Adam, 2026-10-26). The pop-up then
+    /// to one whose files record no interpolation (the Options box shows no Interpolation
+    /// pop-up there, so the choice would act unseen; a choice that showed as Crossfade while
+    /// the writer noted a spectral morph was the lesson: Adam, 2026-10-26). The pop-up then
     /// shows each table's own interpolation, or the default.
     public var preset: OutputPreset {
         didSet { options = Self.allowed(options, for: preset) }
@@ -423,11 +422,10 @@ public struct ConvertPlan: Equatable {
         didSet { options = Self.allowed(options, for: preset) }
     }
 
-    /// `options` with an interpolation the destination cannot take dropped: any, for a
-    /// destination whose files record none; spectral, for Tonverk.
+    /// `options` with an interpolation dropped for a destination whose files record none.
     static func allowed(_ options: OutputOptions, for preset: OutputPreset) -> OutputOptions {
         var o = options
-        if !preset.recordsInterpolation || (preset == .tonverk && o.interpolation == .spectral) { o.interpolation = nil }
+        if !preset.recordsInterpolation { o.interpolation = nil }
         return o
     }
 
@@ -657,7 +655,7 @@ public struct ConvertPlan: Equatable {
         case .channelsDropped, .sizeClaimsDisagree, .interpolationClaimsDisagree, .samplesLeftOut, .cutShort,
              .sizeTagRejected, .sizeTagUnreadable, .sidecarOutOfRange:
             return true
-        case .peak, .highFrameCount, .unusualSurgeFrameSize, .tagInComment, .commentMentionsFrames:
+        case .peak, .highFrameCount, .unusualSurgeFrameSize, .tagInComment, .commentMentionsFrames, .tonverkRawSamples:
             return false
         }
     }
@@ -817,8 +815,7 @@ public struct ConvertPlan: Equatable {
     public var destinationScalesToFit: Bool { preset.scalesToFit }
 
     /// The interpolation as the destination's file will record it: the option, else
-    /// the source's, else crossfade; nil when the format cannot record it. A Tonverk name
-    /// can say only stepped or smooth, so spectral is recorded as crossfade there.
+    /// the source's, else crossfade; nil when the format cannot record it.
     public func interpolationRecorded(for item: Item) -> Interpolation? {
         WavetableWriter.interpolationRecorded(for: preset, source: item.table.interpolation, options: options)
     }
@@ -828,15 +825,62 @@ public struct ConvertPlan: Equatable {
     /// whose files record none, what its Wave Flow does by default (checked on an 8M; FORMATS.md
     /// section 5.1): a U table plays with wavetable smoothing on, taken here to be a crossfade
     /// between frames (the manual describes it as interpolation between neighboring frames; the method
-    /// is an inference), and a P table with it off, stepping from frame to frame. Nil for a
+    /// is an inference), and a P table with it off, stepping from frame to frame. Tonverk
+    /// blends between frames whatever the file name says (heard in Tonverk OS 1.4.1 on a
+    /// sine-and-silence table; the method is an inference, taken as a crossfade). Nil for a
     /// format that records nothing when the synth's default is not known.
     public func interpolationPlayed(for item: Item) -> Interpolation? {
         if let recorded = interpolationRecorded(for: item) { return recorded }
         switch preset {
-        case .thirdWaveU: return .crossfade
+        case .thirdWaveU, .tonverk: return .crossfade
         case .thirdWaveP: return Interpolation.none
         default: return nil
         }
+    }
+
+    // MARK: Tonverk's raw sample playback
+
+    /// Whether a table gets Tonverk's “r” when the Raw Sample Playback setting is Each Table’s
+    /// Own (`options.tonverkRawSamples == nil`): a 3rd Wave P table, a PPG-style table meant
+    /// for the PPG's raw playback (Adam, 2026-10-27), or a file whose name carries the mark
+    /// already.
+    public func tonverkRawDefault(for item: Item) -> Bool {
+        if item.table.isMarkedForTonverkRawSamples { return true }
+        switch item.table.source {
+        case .thirdWaveWavetable(isP: true), .unifiedProgram(_, isP: true): return true
+        default: return false
+        }
+    }
+
+    /// `options` as the writer gets them for one table: the Raw Sample Playback setting's
+    /// Each Table’s Own resolved to that table's own (`tonverkRawDefault(for:)`).
+    public func options(for item: Item) -> OutputOptions {
+        var o = options
+        if preset == .tonverk, o.tonverkRawSamples == nil { o.tonverkRawSamples = tonverkRawDefault(for: item) }
+        return o
+    }
+
+    /// The tables to convert that Each Table’s Own marks with Tonverk's “r”, with the number
+    /// of tables to convert that can convert, for the caption under the Raw Sample Playback
+    /// pop-up: "2 of the 5 tables".
+    public var tonverkRawMarks: (marked: Int, of: Int) {
+        let able = includedItems.filter { canConvert($0) }
+        return (able.filter { tonverkRawDefault(for: $0) }.count, able.count)
+    }
+
+    /// The caption under the Raw Sample Playback pop-up, under Options for Tonverk: what the
+    /// mark does, and which tables Each Table’s Own marks. Each sentence stands on its own.
+    public var tonverkRawCaption: String {
+        let marks = tonverkRawMarks
+        let count: String
+        if marks.of == 0 { count = "none of the tables to convert" }
+        else if marks.marked == 0 { count = "none of the \(marks.of == 1 ? "table" : "\(marks.of) tables")" }
+        else if marks.marked == marks.of { count = marks.of == 1 ? "the one table" : CountWords.all(marks.of, "tables").lowercased() }
+        else { count = "\(marks.marked) of the \(marks.of) tables" }
+        return ["An “r” at the end of the file name asks Tonverk to play each frame’s samples without interpolation between them, as the PPG played its tables: a bright, stepped edge, audible on frames of 64 or 128 samples.",
+                "Tonverk blends between frames either way.",
+                "Each Table’s Own marks 3rd Wave P tables, the PPG-style tables, and files already marked “r”: here \(count).",
+                "On marks every table; Off marks none."].joined(separator: " ")
     }
 
     // MARK: Existing choices (the Options pickers)
@@ -846,9 +890,9 @@ public struct ConvertPlan: Equatable {
     // table states that value (that item stands for no override, `options.interpolation == nil`),
     // or a first item "Each table’s own — existing: 3 stepped, 2 crossfade; 4 not stated" when
     // they differ or some files say nothing. A file that says nothing has no existing value: it
-    // is saved with the writer's default (crossfade; Tonverk's smooth), and when no file says
-    // anything the default item simply stands for no override, unmarked. Tables that cannot
-    // convert yet are left out of the counts.
+    // is saved with the writer's default (crossfade), and when no file says anything the default
+    // item simply stands for no override, unmarked. Tables that cannot convert yet are left out
+    // of the counts.
 
     /// A picker item's words in three parts: the value ("Crossfade", "Each table’s own"); set
     /// apart after a dash and in a second style, the mark that the tables already have it
@@ -874,12 +918,11 @@ public struct ConvertPlan: Equatable {
     }
 
     /// The interpolation the writer records when a file says nothing and nothing is chosen
-    /// (`WavetableWriter`'s default; Tonverk's manual calls a crossfade "smooth").
+    /// (`WavetableWriter`'s default).
     public static let defaultInterpolation: Interpolation = .crossfade
 
     /// The interpolations the tables to convert state in their files, as the destination would
-    /// record them (for Tonverk, whose name can say only stepped or smooth, spectral counts as
-    /// crossfade), keyed by interpolation with the number of tables. Files that say nothing are
+    /// record them, keyed by interpolation with the number of tables. Files that say nothing are
     /// not counted (see `unstatedInterpolationCount`). Empty when the destination's files record
     /// no interpolation, or no table to convert can convert yet.
     public func existingInterpolations() -> [Interpolation: Int] {
@@ -932,7 +975,7 @@ public struct ConvertPlan: Equatable {
     }
 
     /// The word for an interpolation in the existing counts: "stepped", "crossfade", or
-    /// "spectral" (Tonverk's manual says "smooth" for a crossfade; the page keeps one word).
+    /// "spectral".
     func existingWord(_ i: Interpolation) -> String {
         switch i {
         case Interpolation.none: return "stepped"
@@ -993,7 +1036,7 @@ public struct ConvertPlan: Equatable {
     public func expected(for item: Item, frameSize: Int?) -> ExpectedResult? {
         guard let size = frameSize, size > 0, !item.table.samples.isEmpty, item.table.samples.count % size == 0 else { return nil }
         return WavetableWriter.plan(frameSize: size, frameCount: item.table.samples.count / size, peak: item.peak,
-                                    interpolation: item.table.interpolation, preset: preset, options: options)
+                                    interpolation: item.table.interpolation, preset: preset, options: options(for: item))
     }
 
     /// `expected(for:)` as one line (e.g., "64 × 1,024; resized from 2,048 samples per frame;
@@ -1100,7 +1143,7 @@ public struct ConvertPlan: Equatable {
             case .unusableSize: return "unusable size tag ignored"
             case .fileShorterThanFrame: return source == .serumSidecar ? ".txt size larger than the file, ignored" : "size tag larger than the file, ignored"
             }
-        case .peak, .highFrameCount, .unusualSurgeFrameSize, .tagInComment, .commentMentionsFrames: return nil
+        case .peak, .highFrameCount, .unusualSurgeFrameSize, .tagInComment, .commentMentionsFrames, .tonverkRawSamples: return nil
         }
     }
 
@@ -1192,7 +1235,7 @@ public struct ConvertPlan: Equatable {
         -> OutputFile? {
         guard var table = item.table.wavetable(frameSize: item.frameSize) else { return nil }
         table.name = item.name
-        return try? write(table, preset, options)
+        return try? write(table, preset, options(for: item))
     }
 
     // MARK: Names
@@ -1229,7 +1272,7 @@ public struct ConvertPlan: Equatable {
             }
             table.name = item.name
             do {
-                let f = try write(table, preset, options)
+                let f = try write(table, preset, options(for: item))
                 files.append(f); converted.append(item.id)
                 // The repeated-frames caution goes with the writer's notes: it is about the file.
                 reports.append(ItemReport(name: item.name, notes: f.notes + (repeatedFramesNote(for: item).map { [$0.text] } ?? [])))
