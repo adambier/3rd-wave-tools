@@ -176,12 +176,13 @@ attention.
 firmware (`W3_PROG_3`, `W3_PROG_4`, or a `W3_PROG_5` from before OS 2.0) is brought up to the
 current format in the same way the 3rd Wave's **Import program** function converts it, and a line
 under the program name says so. This matters because **Import unified program data file** does
-only part of that conversion, and a 2022 factory program packed unconverted plays silently. The
-converter was checked against 599 conversions made by an 8M and a 24M and matches the 3rd Wave's
-own result value for value, except for eight 2022 factory programs that the 3rd Wave corrects
-individually on import, by name (see [`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs)).
-The packed program keeps all four parts, so one file works on every model: an 8M fits it to its
-two parts when it imports it.
+only part of that conversion, and a 2022 factory program packed unconverted plays silently.
+
+The converter was checked against 599 conversions made by an 8M and a 24M and matches the 3rd
+Wave's own result value for value, except for eight 2022 factory programs that the 3rd Wave
+corrects individually on import, by name (see
+[`docs/FORMATS.md`](docs/FORMATS.md#6-converting-older-programs)). The packed program keeps all
+four parts, so one file works on every model: an 8M fits it to its two parts when it imports it.
 
 #### Changing what oscillators play
 
@@ -238,11 +239,15 @@ its file name. Source files are not changed, and unpacking keeps names as they a
 Name fields hold 31 characters, and the 3rd Wave displays all 31 for programs, wavetables, and
 multisamples. The fields hold single-byte (Latin-1) characters only. A name they cannot hold is
 changed the same way wherever the app writes one, here and in the 3rd Wave tables the Wavetables
-page writes: a line break becomes a space; a letter outside Latin-1 keeps its base letter and
-loses its accents (e.g., "Ő" becomes "O"); any other character outside Latin-1 (an en dash, curly
-quotes, an emoji) becomes "?"; and the name is then shortened to 31 characters. Every change is
-flagged next to the name, in the program's notes, and in the report after packing, with the name as
-it will be written.
+page writes:
+
+- a line break becomes a space;
+- a letter outside Latin-1 keeps its base letter and loses its accents (e.g., "Ő" becomes "O");
+- any other character outside Latin-1 (an en dash, curly quotes, an emoji) becomes "?";
+- the name is then shortened to 31 characters.
+
+Every change is flagged next to the name, in the program's notes, and in the report after
+packing, with the name as it will be written.
 
 #### Writing
 
@@ -581,13 +586,14 @@ factory tables instead of embedding them, so its output differs there by design.
 Besides the import behavior above, name lengths and the 3rd Wave's own export file names were
 checked on the 3rd Wave. The conversion of older programs was worked out from 599 programs
 bulk-imported and exported again on an 8M and a 24M, and programs converted and packed by this
-app were imported on both. The 3rd Wave's exports were also
-unpacked and repacked byte for byte with `tw3pg`. The test `.pgdata` files are built with `tw3pg`
-from files that are not included here (a Groove Synthesis factory program and one of its `.wt`
-files, two third-party programs, and a small `.bin`). The Wavetables page's 3rd Wave tables were
-tested on an 8M with eight converted tables (above, under Destinations); `tw3pg makewavetests`,
-`wtconvert`, and `wtmatch` build the inputs, convert them as the page does, and identify the
-3rd Wave's exports by content.
+app were imported on both. The 3rd Wave's exports were also unpacked and repacked byte for byte
+with `tw3pg`.
+
+The test `.pgdata` files are built with `tw3pg` from files that are not included here (a Groove
+Synthesis factory program and one of its `.wt` files, two third-party programs, and a small
+`.bin`). The Wavetables page's 3rd Wave tables were tested on an 8M with eight converted tables
+(above, under Destinations); `tw3pg makewavetests`, `wtconvert`, and `wtmatch` build the inputs,
+convert them as the page does, and identify the 3rd Wave's exports by content.
 
 Still unknown: how the 3rd Wave writes non-ASCII letters in file names; whether a 24K converts
 older programs exactly as the 24M does; and the meaning of most program values.

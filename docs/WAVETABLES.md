@@ -116,20 +116,24 @@ which one it was:
 
 Rules 1–5 are written for the purpose and are trusted as long as one whole frame fits; when the
 samples run past the last whole frame (as in some editors' files, and in Surge's own library),
-the extra samples are left out, with a note. Cue points and loops (rules 6 and 7) mark ordinary
-samples too, so they count only for powers of two up to 4,096 that give at least two frames: a
-single looped cycle is a sample. When two of these disagree, both are noted. When only the
-length suggested a size, the other sizes the length allows can be chosen instead. When nothing
-settles the size, the page estimates the likely size (below) and the Input column says
-"estimated", or, when none stands out, lists the sizes the length allows and waits for you to
-choose: a file
-of 8,192 samples is 64 × 128 for the 3rd Wave's Wave Maker (a PPG table) but 4 × 2,048 for Serum,
-Pigments, or Tonverk (whose factory library has one), and one of 16,384 is 64 × 256 for WaveEdit
-but 8 × 2,048 for Serum. A WAV with none of the metadata above is listed only when it is mono, its
-length is a multiple of 2,048 (up to 256 frames), and its name does not end in a note name
-("Pad-000-036-c2", "Saw C3"), which is how the notes of a multisampled instrument are named;
-anything else is taken to be ordinary audio. Some audio still fits that rule by chance (a sample
-library's mono loops, say), and is listed with "file length only" as the reason.
+the extra samples are left out, with a note.
+
+Cue points and loops (rules 6 and 7) mark ordinary samples too, so they count only for powers
+of two up to 4,096 that give at least two frames: a single looped cycle is a sample. When two of
+these disagree, both are noted.
+
+When only the length suggested a size, the other sizes the length allows can be chosen instead.
+When nothing settles the size, the page estimates the likely size (below) and the Input column
+says "estimated"; when no size stands out, the page lists the sizes the length allows and waits
+for a choice. A file of 8,192 samples is 64 × 128 for the 3rd Wave's Wave Maker (a PPG table)
+but 4 × 2,048 for Serum, Pigments, or Tonverk (whose factory library has one), and a file of
+16,384 is 64 × 256 for WaveEdit but 8 × 2,048 for Serum.
+
+A WAV with none of the metadata above is listed only when it is mono, its length is a multiple
+of 2,048 (up to 256 frames), and its name does not end in a note name ("Pad-000-036-c2",
+"Saw C3"), which is how the notes of a multisampled instrument are named; anything else is
+taken to be ordinary audio. Some audio still fits that rule by chance (a sample library's mono
+loops, say), and is listed with "file length only" as the reason.
 
 These rules were checked against about 20,000 files from the libraries of Hive, Surge XT,
 Tonverk, and several Serum packs: every table those libraries hold was listed with the size its
@@ -139,22 +143,27 @@ not. DUNE 3's `.wt` files, and Harmor's and Komplexer's, are in formats of their
 does not read them.
 
 **Estimating from the samples.** When nothing but the file's length points to a size (rule 8,
-or a length rule 8 leaves open), the page rates every size the length allows by how alike neighboring frames are at that size, takes the best as its
-estimate (the Input column says "estimated"), and falls back to 2,048, the Serum-style size,
-only when no size stands out; the chooser draws the first frame at each size and marks the
-rated size "likely" whenever another is in use. The rating rests on how alike
-neighboring frames are: at each candidate size n, the page takes the mean difference between
-every sample and the one n samples later (frame k against frame k + 1), as a fraction of the
-file's mean level, and the same at a lag of n/2. The frames of a wavetable change little from one
-to the next, so at the right size the first difference is small (at most 0.5) and much
-smaller than the second (at most half of it: the two halves of a cycle differ). A size that is
-too small fails the second test, since a smooth cycle is about as like itself a fragment later as
-half a fragment later; a multiple of the right size passes neither better than the right size
-does, and when several sizes pass, the smallest is taken. The pictures themselves are not
-decisive either: a size twice too large shows the cycle repeated, and one too small shows part
-of it, both of them smooth. A bank of unrelated frames (a WaveEdit bank, say) fits no size; when
-the sizes fit equally badly the chooser says so. For the two lengths never settled by convention
-(8,192 and 16,384 samples), a file whose samples point to no size waits for a choice.
+or a length rule 8 leaves open), the page rates every size the length allows by how alike
+neighboring frames are at that size, takes the best as its estimate (the Input column says
+"estimated"), and falls back to 2,048, the Serum-style size, only when no size stands out. The
+chooser draws the first frame at each size and marks the rated size "likely" whenever another
+is in use.
+
+The rating: at each candidate size n, the page takes the mean difference between every sample
+and the one n samples later (frame k against frame k + 1), as a fraction of the file's mean
+level, and the same at a lag of n/2. The frames of a wavetable change little from one to the
+next, so at the right size the first difference is small (at most 0.5) and much smaller than
+the second (at most half of it: the two halves of a cycle differ).
+
+Why the two lags: a size that is too small fails the second test, since a smooth cycle is about
+as like itself a fragment later as half a fragment later; a multiple of the right size passes
+neither test better than the right size does, and when several sizes pass, the smallest is
+taken. The pictures themselves are not decisive: a size twice too large shows the cycle
+repeated, and one too small shows part of it, both of them smooth.
+
+A bank of unrelated frames (a WaveEdit bank, say) fits no size; when the sizes fit equally badly
+the chooser says so. For the two lengths never settled by convention (8,192 and 16,384
+samples), a file whose samples point to no size waits for a choice.
 
 **Single-cycle files are not listed.** A WAV holding one cycle (for example, a single-cycle
 library's 600-sample cycles, each looped over the whole file) is a building block for a wavetable
@@ -171,18 +180,23 @@ carries one, the MD5 signature of its audio, and reports a file that fails any o
 damaged. Only the first channel is kept, as for a WAV.
 
 A FLAC file has no RIFF chunks, so rules 1–3, 6, and 7 look at its APPLICATION blocks instead:
-a block whose id is one of those chunk ids, forwards or byte-reversed, is read as that chunk. The
-reversed form is what Phase Plant's factory library has: of its 402 files (all mono, 24-bit, and
-256 × 2,048 samples), 29 carry a 48-byte " mlc" block holding `<!>2048 10000000 Kilohearts
-(www.kilohearts.com)`, and 8 carry a 60-byte "lpms" block (a `smpl` chunk with no loops). Every one
-also carries an 8-byte "MsHk" block: a little-endian 32-bit 1, then a 32-bit float between 0.89
-and 3.55 (1.0 in 272 files), with no evident relation to the file's peak (all peak at exactly full
-scale) or RMS level; it states neither a frame size nor a frame count, so it is read past, and
-what the float means is not documented. A Vorbis comment whose value is a Serum tag (`<!>2048 …`)
-is read as a `clm ` chunk, with a note saying where it was found (no writer is known to do this;
-the tag's form is unmistakable). Other comments that mention frames, cycles, or wavetables are
-noted, not acted on. Rules 4, 5, and 8 apply as for a WAV, so Phase Plant's 373 untagged files are
-listed by their length.
+a block whose id is one of those chunk ids, forwards or byte-reversed, is read as that chunk.
+Rules 4, 5, and 8 apply as for a WAV.
+
+The reversed form is what Phase Plant's factory library has. Of its 402 files (all mono, 24-bit,
+and 256 × 2,048 samples):
+
+- 29 carry a 48-byte " mlc" block holding `<!>2048 10000000 Kilohearts (www.kilohearts.com)`;
+- 8 carry a 60-byte "lpms" block (a `smpl` chunk with no loops);
+- every one carries an 8-byte "MsHk" block: a little-endian 32-bit 1, then a 32-bit float
+  between 0.89 and 3.55 (1.0 in 272 files), with no evident relation to the file's peak (all
+  peak at exactly full scale) or RMS level. The block states neither a frame size nor a frame
+  count, so it is read past; what the float means is not documented;
+- the 373 files without a " mlc" block are listed by their length (rule 8).
+
+A Vorbis comment whose value is a Serum tag (`<!>2048 …`) is read as a `clm ` chunk, with a note
+saying where it was found (no writer is known to do this; the tag's form is unmistakable).
+Other comments that mention frames, cycles, or wavetables are noted, not acted on.
 
 Checked: the 402 files of Phase Plant's library decode sample for sample as ffmpeg decodes them
 (as 32-bit floats; all 402 also pass their MD5 signatures), every one is listed as 256 × 2,048,
@@ -194,15 +208,18 @@ partitions, and missing or wrong MD5 signatures, with ffmpeg's decoding as the r
 
 ## 4. Changing frame size and frame count
 
-Frames are resized through their spectrum. Growing a frame keeps every harmonic, so the
-original samples are reproduced at their positions and the new samples between them are the
-band-limited waveform's values; growing a frame and shrinking it again returns the original
-samples (the tests check this to within 0.0001). Shrinking a frame removes the harmonics the
-smaller frame cannot hold (those above its Nyquist frequency) and keeps the rest, so a 2,048-sample
-frame with content above the 512th harmonic loses it when it becomes a 1,024-sample frame; the
-report says when a frame was resized. Growing can raise the peak slightly between the original
-samples; such peaks are kept in 32-bit float files, and for the 3rd Wave and 16-bit files the table
-is attenuated to fit, which the report says.
+Frames are resized through their spectrum, and the report says when a frame was resized.
+
+- Growing a frame keeps every harmonic, so the original samples are reproduced at their
+  positions and the new samples between them are the band-limited waveform's values; growing a
+  frame and shrinking it again returns the original samples (the tests check this to within
+  0.0001).
+- Shrinking a frame removes the harmonics the smaller frame cannot hold (those above its Nyquist
+  frequency) and keeps the rest, so a 2,048-sample frame with content above the 512th harmonic
+  loses it when it becomes a 1,024-sample frame.
+- Growing can raise the peak slightly between the original samples. Such peaks are kept in
+  32-bit float files; for the 3rd Wave and 16-bit files the table is attenuated to fit, which
+  the report says.
 
 When a destination needs a different number of frames, you choose how:
 
