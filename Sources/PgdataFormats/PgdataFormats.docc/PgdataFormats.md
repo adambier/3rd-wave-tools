@@ -29,8 +29,8 @@ What it does not do is interpret a program's sound settings: what most of a prog
 through unchanged. It supports tools that move, pack, unpack, convert, and rename programs, not
 yet ones that create sounds or edit a program's settings.
 
-The package also offers two more libraries. `WavetableFormats` reads and writes other synths'
-wavetable formats and converts tables to and from the 3rd Wave's. `PgdataPackerCore` holds
+The package also offers two more libraries. `WavetableFormats` reads other synths' wavetable
+formats and converts their tables to the 3rd Wave's (and writes those formats as well). `PgdataPackerCore` holds
 pgdata Packer's own decisions without its user interface (pack, unpack, and convert plans, file
 names, Clean Up Names), for a command-line tool or an app on another platform that should behave
 like pgdata Packer; its API may change between versions more than this library's.

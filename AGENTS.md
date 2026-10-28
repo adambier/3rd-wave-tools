@@ -32,7 +32,7 @@ dependencies: [
 ],
 targets: [
     .target(name: "MyTool", dependencies: [
-        .product(name: "PgdataFormats", package: "3rd-wave-tools"),      // the 3rd Wave's files
+        .product(name: "PgdataFormats", package: "3rd-wave-tools"),      // files in the 3rd Wave's formats
         .product(name: "WavetableFormats", package: "3rd-wave-tools"),   // other synths' wavetables
         .product(name: "PgdataPackerCore", package: "3rd-wave-tools"),   // only to behave exactly like pgdata Packer
     ]),
@@ -41,8 +41,8 @@ targets: [
 
 | Product | Take it for | Stability |
 |---|---|---|
-| `PgdataFormats` | Reading, writing, packing, unpacking, and converting the 3rd Wave's files; recognizing factory tables | Versioned with the app; kept stable from `v1.0.5` on |
-| `WavetableFormats` | Finding wavetables in WAV, FLAC, Surge `.wt`, and 3rd Wave files; resizing; writing for other synths | Provisional in 1.1 (new; may change until a 1.1.x release, once the planned command-line tool has shown what belongs in a library) |
+| `PgdataFormats` | Reading, writing, packing, unpacking, and converting files in the 3rd Wave's formats; recognizing factory tables | Versioned with the app; kept stable from `v1.0.5` on |
+| `WavetableFormats` | Finding wavetables in WAV, FLAC, Surge `.wt`, and files in the 3rd Wave's formats; resizing; writing 3rd Wave P and U tables, and other synths' formats | Provisional in 1.1 (new; may change until a 1.1.x release, once the planned command-line tool has shown what belongs in a library) |
 | `PgdataPackerCore` | Pack, unpack, and convert plans, output names, Clean Up Names, report text | May change between versions |
 
 Three common jobs, in full (the DocC pages have more: `Sources/*/*.docc/`):
@@ -113,7 +113,7 @@ over real exports: every unmodified file must come back identical.
 
 **Tools wanted** (open an issue to say what you are building): two cross-platform command-line
 tools, each single-purpose in the Unix way and thin over its library (decided for the release
-after 1.1; `tw3pg` is a developer harness, not either of them): one for the 3rd Wave's files
+after 1.1; `tw3pg` is a developer harness, not either of them): one for files in the 3rd Wave's formats
 (pack, unpack, convert older programs, inspect) on `PgdataFormats`, and one for wavetables
 (list, convert) on `WavetableFormats`, since the converter has an audience that has never seen a
 `.pgdata`; a Windows or Linux front end on `PgdataPackerCore`; a librarian; tests of the wavetable

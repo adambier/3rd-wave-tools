@@ -1,13 +1,13 @@
 # ``WavetableFormats``
 
-Find wavetables in the files of the 3rd Wave and other synths, resize them, and write them for
-another synth.
+Find wavetables in the files of other synths and plug-ins, resize them, and write them as 3rd
+Wave P and U tables. It also reads files in the 3rd Wave's own formats and writes other synths' formats.
 
 ## Overview
 
 WavetableFormats is the library behind pgdata Packer's Wavetables page, offered for anyone
-building their own wavetable tools. It converts existing wavetables between formats; it does
-not make wavetables from other audio.
+building their own tools for bringing wavetables to the 3rd Wave. It converts existing
+wavetables between formats; it does not make wavetables from other audio.
 
 - ``WavetableReader`` finds the wavetables in a file by its content, not its name: WAV and FLAC
   files with their `clm `, `srge`, `uhWT`, `cue `, and `smpl` chunks (or the matching FLAC

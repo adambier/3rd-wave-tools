@@ -6,8 +6,8 @@
 
 A macOS app that packs Groove Synthesis 3rd Wave programs (`.pro`) together with the wavetables
 (`.wt`) and multisamples (`.bin`) they use into unified program files (`.pgdata`), unpacks
-`.pgdata` files back into those parts, and converts wavetables between the 3rd Wave's formats and
-those of other synths.
+`.pgdata` files back into those parts, and converts wavetables from other synths' formats to the
+3rd Wave's (and between formats).
 
 Why you might want to use it:
 
@@ -530,7 +530,8 @@ in any language. Everything here is open source under the MIT license.
   The library is versioned with the app (tags `v1.0.5` and on).
 - **Other synths' wavetable formats.** `WavetableFormats`, the package's second library, finds
   wavetables in files (WAV and FLAC with their metadata, Surge `.wt`, and the 3rd Wave's `.wt` and
-  `.pgdata`), resizes them, and writes them for the destinations the Wavetables page offers. Like
+  `.pgdata`), resizes them, and writes them as 3rd Wave P and U tables or for the other
+  destinations the Wavetables page offers. Like
   `PgdataFormats`, on which it builds, it depends only on Foundation and is tested on macOS, Linux,
   and Windows.
   [`docs/WAVETABLES.md`](docs/WAVETABLES.md) describes the formats, with sources, and the

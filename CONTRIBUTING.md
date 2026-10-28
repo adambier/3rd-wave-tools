@@ -12,7 +12,7 @@ the format reference is as appreciated as code.
   found out on the 3rd Wave or another instrument, from the company's documents, or from files.
 - **Bug reports** for the app, the libraries, or `tw3pg`, with the files that show the problem if
   you can share them.
-- **Word of what you build.** If you write a tool that reads or writes the 3rd Wave's files, open
+- **Word of what you build.** If you write a tool that reads or writes files in the 3rd Wave's formats, open
   an issue to say so; it may be worth linking from the README.
 
 ## Evidence for format findings
