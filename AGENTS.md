@@ -3,7 +3,8 @@
 Machine-first orientation for Claude Code, Cursor, Copilot, and similar tools working in this
 repository. Human developers: paste this file into your tool, or point it here, before asking for
 changes. Facts below are checked against the code at the commit that introduced or last updated
-this file; `docs/FORMATS.md` and `docs/WAVETABLES.md` remain the authorities on the file formats.
+this file; `docs/FORMATS.md` and `docs/WAVETABLES.md` remain the authorities on the file formats,
+and `docs/BEHRINGER-WAVE.md` on the Behringer WAVE's data (a reference; nothing here implements it).
 
 ## 1. Project at a glance
 
@@ -136,6 +137,8 @@ formats it reads and writes, and a consumer links only what it uses.
 | `fixtures/` | Seven synthetic files, one per format and layout, each with a `<file>.json` of what it parses to; `fixtures/README.md` |
 | `docs/FORMATS.md` | The 3rd Wave format reference (sections 1–10 and an appendix); every claim about the 3rd Wave lives here with its evidence in footnotes |
 | `docs/WAVETABLES.md` | Other synths' wavetable formats, with sources; the destinations the Wavetables page writes |
+| `docs/BEHRINGER-WAVE.md` | The Behringer WAVE's SysEx data (programs, sequences, global settings, wavetable uploads), what two factory dumps show, and errata in its manual; a reference for a future converter, not implemented |
+| `docs/README.md` | Index of the documents: what each covers, what it was written against, and its status; the documentation license and trademark notes |
 | `docs/*.png` | README screenshots |
 | `Sources/*/*.docc/` | DocC catalogs for PgdataFormats (overview, `GettingStarted.md`) and WavetableFormats |
 | `make-app.sh` | Builds, bundles, signs, and (for the owner) notarizes the app and updates the appcast |
@@ -207,6 +210,9 @@ Do:
 - Put any new or changed claim about what the 3rd Wave does in `docs/FORMATS.md` with its evidence
   (a test on the 3rd Wave with model and OS version, a Groove Synthesis document, or a count of files),
   and mark inferences as inferences, in the code comment as well as the document.
+- Put any new or changed claim about the Behringer WAVE in `docs/BEHRINGER-WAVE.md` with its
+  evidence (the manual's page, a factory dump, or a named open-source implementation), and mark
+  inferences as inferences.
 - For a new wavetable destination, set `OutputPreset.basis` to its sources and leave `testedIn`
   empty until someone has tested it in that synth (`docs/WAVETABLES.md` carries the sources).
 - Keep `fixtures/` synthetic (made by the libraries, no one else's sounds) and regenerate them with
@@ -230,7 +236,8 @@ Don't:
   "estimated" (the rule is `FoundTable.estimatedFrameSize(fit:)` in the library; the app applies it
   through `ConvertPlan.Item.estimatedFrameSize` and says so in `sizeQualifier`); 2,048, the
   Serum-style convention, is the estimate only when the samples point to no size.
-- Don't commit files from other people's sound sets, factory banks, or synth exports; tests build
+- Don't commit files from other people's sound sets, factory banks, or synth exports (the Behringer
+  WAVE's factory dumps included); tests build
   their inputs synthetically (see the headers of `CorpusCaseTests.swift` and `ReadingTests.swift`).
 - Don't import a module a test target does not depend on in `Package.swift` (section 4): a
   local build that has built every target has the module on hand, CI building the targets in
@@ -361,7 +368,7 @@ a separate manager for the typing (`AppDelegate.windowWillReturnUndoManager`).
 | Clean Up Names | `NameCleaner.swift` | `WorkbenchTests`; `NameCleanupSheet.swift` |
 | Menus, About, Help links, updater | `main.swift` | `make-app.sh` (Info.plist keys) |
 | Developer checks against real files | `Sources/tw3pg/main.swift` | README "Verification" |
-| Format documentation | `docs/FORMATS.md`, `docs/WAVETABLES.md`, `Sources/*/*.docc/` | `fixtures/README.md` |
+| Format documentation | `docs/README.md` (index), `docs/FORMATS.md`, `docs/WAVETABLES.md`, `docs/BEHRINGER-WAVE.md`, `Sources/*/*.docc/` | `fixtures/README.md` |
 
 ## 9. How to verify
 
@@ -562,6 +569,8 @@ credentials that are not in the repository.
   give the table's samples, which is also how the 3rd Wave imports them, so the reader needs no
   second layout.
 - `fixtures/` exercise structure, not sound, and have not been loaded on the 3rd Wave.
+- Converting Behringer WAVE or PPG Wave programs into 3rd Wave programs would need the unmapped
+  `.pro` values above; `docs/BEHRINGER-WAVE.md` section 11 lists what would map and what is lost.
 - The app is macOS-only; CI compiles it but has no tests for it. A Linux or Windows front end would
   build on `PgdataPackerCore`, whose API may change between versions more than `PgdataFormats`'s.
 - `WavetableFormats` is provisional in 1.1: its API may change until a 1.1.x release. Its
