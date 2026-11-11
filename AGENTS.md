@@ -98,7 +98,9 @@ over real exports: every unmodified file must come back identical.
 - It matches wavetables and multisamples **by content**, not name: an identical table already loaded
   is reused and the file's name ignored; the slot in a file is only a label, and new content goes
   into a free slot (P36–P47, U56–U63 for tables), with an offer to overwrite the last ones when none
-  is free.
+  is free. A wavetable slot cannot be deleted, and one overwritten with a silent table named
+  `-----` (3rd Wave Terminal's Delete) has been observed still to count as used (24M, OS 2.0d;
+  FORMATS.md §7).
 - Imports come from the USB drive (volume `THIRDWAVE`): `PROGRAMS` for `.pro` and `.pgdata`, `WAVES`
   for `.wt`, `AUDIO` for `.bin` and `.wav`. **Import unified program data file** takes the first
   `.pgdata` in `PROGRAMS` (plain character order) without offering a choice; **Bulk program

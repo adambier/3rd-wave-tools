@@ -479,10 +479,11 @@ Checked on an 8M (OS 2.0d), and most points on a 24M as well
   name) is reused. No slot is used, and the 3rd Wave keeps its own name for it.
 - **A new table or multisample** goes into a free slot, and the program is pointed there. The slot
   number in the file is only a label. With no free slot, the 3rd Wave offers to overwrite its last
-  ones; blank placeholder tables count as used. The Pack page shows how many free wavetable slots a
-  program may need; each embedded multisample the 3rd Wave does not already have also takes a free
-  S slot. (For multisamples, the 3rd Wave's message says it erases the most recently loaded
-  samples; not tried here.)
+  ones. A wavetable slot cannot be deleted, and one overwritten with a silent table named `-----`
+  (as 3rd Wave Terminal's Delete does) has been observed still to count as used (24M, OS 2.0d).
+  The Pack page shows how many free wavetable slots a program may need; each embedded multisample
+  the 3rd Wave does not already have also takes a free S slot. (For multisamples, the 3rd Wave's
+  message says it erases the most recently loaded samples; not tried here.)
 - **A table or multisample listed without its data** plays whatever is in that slot on the 3rd Wave,
   with no warning; an empty sample slot plays silence. That is why multisamples are always
   embedded.

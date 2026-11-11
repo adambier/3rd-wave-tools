@@ -731,7 +731,15 @@ Tested on an 8M (OS 2.0d) unless a footnote says otherwise; section
   second copy is stored.[^24m]
 - **A new wavetable or multisample goes into a free slot**, and the program is pointed there: the
   slot in the file is only a label. With no free slot, the 3rd Wave offers to overwrite its last
-  table(s). Blank placeholder tables count as used.
+  table(s).
+- **A wavetable slot cannot be emptied.** Groove Synthesis has stated that the 3rd Wave has no way
+  to delete a wavetable. The nearest thing is to overwrite the slot with a silent table (every
+  value 0) named `-----`, which is what 3rd Wave Terminal's Delete does. On the 24M (OS 2.0d),
+  such a slot is still listed as `-----` on the OSC screen and has been observed to count as used:
+  two later imports skipped such slots, each taking the first slot that had never held a
+  table.[^zero-table] The blank slots that counted as used on the 8M were probably tables of this
+  kind, since 3rd Wave Terminal showed those slots as it shows the zeroed slots on the 24M (an
+  inference).
 - **Bulk wavetable import asks for a starting slot** and has been observed to write the files
   into consecutive slots from there, in plain character order of their names, with no overwrite
   prompt: eight `.wt` files (four P, four U), with U55 chosen as the starting U slot, went into
@@ -798,6 +806,13 @@ Tested on an 8M (OS 2.0d) unless a footnote says otherwise; section
     Test Zing; the slots received them in that order within each kind (P36 All Waves, P37
     Harmonic Steps, P38 Morph PPG, P39 Zing; U55 Four Frames, U56 JunoSQR, U57 Morph, U58
     Synced Ramp), as the OSC screen showed.
+[^zero-table]: 24M, OS 2.0d, 10 November 2026: two new U tables imported one at a time with
+    **Import Wavetable**. Beforehand, U56 had held a user table in October and had since been
+    cleared by means not recorded; the 3rd Wave listed U56 as `-----`, and U57–U63 had never held
+    a table. The first import went into U57. 3rd Wave Terminal's Delete then overwrote U57 with a
+    silent table named `-----`, and the second import went into U58, skipping U56 and U57; the OSC
+    screen listed both U56 and U57 as `-----`. U58, cleared the same way afterwards, read back in
+    3rd Wave Terminal as `-----` with 64 frames of 0.
 [^file-names]: Stated by Groove Synthesis. The hardware tests in section
     [9](#9-how-this-was-established) also imported files under names of their own.
 
@@ -817,7 +832,7 @@ file checked comes back byte for byte (`.wt` files value for value), most recent
 one run. The exceptions are 12 third-party `.pgdata` files that are damaged as distributed
 (empty or cut short).
 
-**Tests on a 3rd Wave 8M and 24M (OS 2.0d), October 2026** (8M unless marked):
+**Tests on a 3rd Wave 8M and 24M (OS 2.0d), October and November 2026** (8M unless marked):
 
 | What was tested | Result |
 |---|---|
@@ -825,6 +840,7 @@ one run. The exceptions are 12 third-party `.pgdata` files that are damaged as d
 | `.pgdata` listing factory tables without data | imports and plays from the factory slots |
 | A table identical to a factory one, labeled with another slot; the same content under a new name; a new table under a factory name | reused, reused, stored as new: matching is by content |
 | A new table or multisample labeled with an occupied or blank slot | stored in a free slot (or after an overwrite prompt), program repointed |
+| 24M (10 November 2026): two new U tables imported one at a time, the first table's slot overwritten between them with a silent table named `-----` | each went into the first slot that had never held a table, skipping the slots listed as `-----` (section 7) |
 | Multisample slot listed without data, slot occupied / empty | plays that slot / silent, no warning |
 | 31-character names | displayed in full |
 | Wave Flow defaults: an oscillator set to a P table, and one set to a U table | **wavetable smoothing** off for the P table, on for the U table (section 5.1) |
@@ -860,6 +876,9 @@ in section 6.5, plus float 102 on the 24M (section 6.3).
   unpacker that does not convert would write it (the library converts every layout it knows, and
   writes others as they are, with a warning).
 - The meaning of most part, float, and global values, and of event fields *a* and *time*.
+- Whether a slot holding a silent `-----` table can be used again by software that writes a table
+  into a chosen slot (as 3rd Wave Terminal's uploads do), and whether a later OS frees such slots
+  for the 3rd Wave's own imports.
 
 ## Appendix: values for new positions
 
